@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --background: #050811;
+  --foreground: #f8fafc;
+  --card: #0b101d;
+  --border: rgba(255, 255, 255, 0.08);
+  --cyan-glow: #00d4ff;
+  --blue-primary: #2563eb;
+  --gold-accent: #f59e0b;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #070b14;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Card Glow Utility */
+.lions-card {
+  background: rgba(11, 16, 29, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease-in-out;
+}
+
+.lions-card:hover {
+  border-color: rgba(0, 212, 255, 0.25);
+  box-shadow: 0 6px 24px rgba(0, 212, 255, 0.08);
+}
