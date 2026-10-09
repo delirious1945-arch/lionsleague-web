@@ -96,8 +96,9 @@ export interface DartsToWinCategory {
 export interface DartsToWinEfficiency {
   elite: DartsToWinCategory; // <= 18
   liga_top: DartsToWinCategory; // 19-24
-  arbeit: DartsToWinCategory; // 25-30
-  zitter: DartsToWinCategory; // 31+
+  norm: DartsToWinCategory; // 25-30
+  arbeit: DartsToWinCategory; // 31-42
+  zitter: DartsToWinCategory; // 43+
   best_leg: number;
   avg_darts: number;
   total_won_legs: number;
@@ -582,14 +583,16 @@ export function computePlayerAnalytics(
   // GRAFIK 2: Darts-to-Win Effizienz & Leg-Längen
   // ----------------------------------------------------
   let cElite = 0;
-  let cLiga = 0;
+  let cLigaTop = 0;
+  let cNorm = 0;
   let cArbeit = 0;
   let cZitter = 0;
 
   for (const d of wonLegsDarts) {
     if (d <= 18) cElite++;
-    else if (d <= 24) cLiga++;
-    else if (d <= 30) cArbeit++;
+    else if (d <= 24) cLigaTop++;
+    else if (d <= 30) cNorm++;
+    else if (d <= 42) cArbeit++;
     else cZitter++;
   }
 
@@ -600,8 +603,12 @@ export function computePlayerAnalytics(
       pct: wTotal > 0 ? Math.round((cElite / wTotal) * 1000) / 10 : 0,
     },
     liga_top: {
-      count: cLiga,
-      pct: wTotal > 0 ? Math.round((cLiga / wTotal) * 1000) / 10 : 0,
+      count: cLigaTop,
+      pct: wTotal > 0 ? Math.round((cLigaTop / wTotal) * 1000) / 10 : 0,
+    },
+    norm: {
+      count: cNorm,
+      pct: wTotal > 0 ? Math.round((cNorm / wTotal) * 1000) / 10 : 0,
     },
     arbeit: {
       count: cArbeit,
@@ -622,7 +629,16 @@ export function computePlayerAnalytics(
   const powerCount = allScores.filter((s) => s >= 100).length;
   const solidCount = allScores.filter((s) => s >= 60 && s < 100).length;
   const lowCount = allScores.filter((s) => s < 60).length;
-  const count26 = allScores.filter((s) => s === 26).length;
+
+  // Nur echte 26er Fehlwürfe (kein 26er Checkout bei rest_score === 0!)
+  let count26 = 0;
+  for (const leg of legsVisits) {
+    for (const v of leg) {
+      if (v.score === 26 && v.rest_score > 0) {
+        count26++;
+      }
+    }
+  }
 
   const legAnatomy: LegAnatomy = {
     power_pct: totalVisits > 0 ? Math.round((powerCount / totalVisits) * 1000) / 10 : 0,

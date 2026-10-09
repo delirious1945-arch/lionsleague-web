@@ -68,7 +68,7 @@ export default function LegTrendChart({
             <span>📈</span> Chronologischer Leg-Trend & Konstanz-Korridor
           </h3>
           <p className="text-[11px] text-slate-400">
-            Jeder Punkt = 1 gespieltes Leg • Gelbe Linie = Gleitender Form-Trend (3 Legs)
+            Jeder Punkt = 1 gespieltes Leg • Gelbe Linie = Gleitender Form-Schnitt (3-Leg-Ø Average)
           </p>
         </div>
 
@@ -84,7 +84,7 @@ export default function LegTrendChart({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-0.5 bg-amber-400" />
-            <span className="text-amber-300">Trend</span>
+            <span className="text-amber-300">Form-Trend (3-Leg-Ø)</span>
           </div>
         </div>
       </div>
@@ -267,14 +267,14 @@ export default function LegTrendChart({
               </div>
               {hoveredPoint.checkout && (
                 <div>
-                  Checkout:{' '}
+                  Finish-Checkout:{' '}
                   <span className="font-bold text-emerald-400">
-                    {hoveredPoint.checkout}
+                    {hoveredPoint.checkout} Pkt
                   </span>
                 </div>
               )}
               <div>
-                Trend (3 Leg):{' '}
+                Form-Schnitt (3-Leg-Ø):{' '}
                 <span className="font-bold text-amber-300">
                   {hoveredPoint.moving_avg_3.toFixed(1)}
                 </span>

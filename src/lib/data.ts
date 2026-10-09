@@ -765,6 +765,8 @@ export async function getAllAnalyticsLegVisits(
           JOIN players p ON v.player_id = p.id
           WHERE m.season = ${season}
             AND p.team IN ('A-Team', 'B-Team')
+            AND m.player_a_name NOT LIKE '%&%'
+            AND m.player_b_name NOT LIKE '%&%'
           ORDER BY v.player_id ASC, m.match_date ASC, m.id ASC, l.leg_num ASC, v.visit_order ASC
         `
       : await sql`
@@ -777,6 +779,8 @@ export async function getAllAnalyticsLegVisits(
           JOIN analytics_matches m ON l.match_id = m.id
           JOIN players p ON v.player_id = p.id
           WHERE p.team IN ('A-Team', 'B-Team')
+            AND m.player_a_name NOT LIKE '%&%'
+            AND m.player_b_name NOT LIKE '%&%'
           ORDER BY v.player_id ASC, m.match_date ASC, m.id ASC, l.leg_num ASC, v.visit_order ASC
         `;
 
