@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import Link from 'next/link';
+
 import { addMatchAction, addDoublesSpecialAction } from '../actions';
 import { Player } from '@/lib/data';
+
 
 const STAFFEL_7_OPPONENTS = [
   'Bromer Burglöwen B',
@@ -149,9 +152,23 @@ export default function EingabeClient({
   };
 
   return (
-    <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto py-2">
+    <div className="space-y-6 animate-fadeIn max-w-4xl mx-auto py-2">
+      {/* Top Breadcrumb & Version 2.0 Badge */}
+      <div className="flex items-center justify-between text-xs pb-1">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-slate-400 hover:text-cyan-400 transition-colors font-semibold"
+        >
+          <span>←</span> Zurück zum Dashboard
+        </Link>
+        <span className="text-[10px] font-black bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded font-mono">
+          VERSION 2.0
+        </span>
+      </div>
+
       {/* Title */}
       <div className="pb-4 border-b border-white/10">
+
         <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
           <span>📝</span> Data Entry / Eingabemaske
         </h1>

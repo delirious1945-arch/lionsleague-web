@@ -6,6 +6,7 @@ import {
   getPlayers,
   getTop26Players,
 } from '@/lib/data';
+import { getSessionAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +15,14 @@ export default async function AnalyticsPage({
 }: {
   searchParams: Promise<{ season?: string }>;
 }) {
+  const session = await getSessionAction();
+  if (!session) {
+    return null;
+  }
+
   const params = await searchParams;
   const seasons = await getAvailableSeasons();
+
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
 
   const [matches, players, top26] = await Promise.all([

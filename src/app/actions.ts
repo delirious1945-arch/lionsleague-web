@@ -2,6 +2,179 @@
 
 import { sql } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+
+export interface UserSession {
+  id: number;
+  name: string;
+  role: string;
+  team: string;
+}
+
+export async function getSessionAction(): Promise<UserSession | null> {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('lions_session');
+    if (!sessionCookie?.value) return null;
+    return JSON.parse(sessionCookie.value) as UserSession;
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function loginAction(usernameInput: string, passwordInput: string) {
+  try {
+    const u = usernameInput.trim().toLowerCase();
+    const p = passwordInput.trim();
+
+    if (!u) {
+      return { success: false, error: 'Bitte gib deinen Benutzernamen / Namen ein.' };
+    }
+    if (!p) {
+      return { success: false, error: 'Bitte gib dein Passwort ein.' };
+    }
+
+    const rows = await sql`
+      SELECT id, name, team, password, must_change_password, role
+      FROM players
+    `;
+
+    for (const row of rows) {
+      const pName = String(row.name);
+      const pNameLower = pName.toLowerCase();
+      const firstNameLower = pNameLower.split(' ')[0];
+      const pRole = String(row.role || 'player');
+
+      const matchesUser =
+        u === pNameLower ||
+        u === firstNameLower ||
+        (u === 'admin' && pRole === 'admin');
+
+      if (matchesUser) {
+        const storedPass = String(row.password || '');
+        const passMatches = p === storedPass || p === 'lions2026';
+
+        if (passMatches) {
+          const isFirstLogin = Boolean(row.must_change_password) || p === 'lions2026';
+
+          if (isFirstLogin) {
+            return {
+              success: false,
+              requiresPasswordChange: true,
+              playerId: Number(row.id),
+              name: pName,
+              role: pRole,
+              team: String(row.team),
+            };
+          }
+
+          const sessionData: UserSession = {
+            id: Number(row.id),
+            name: pName,
+            role: pRole,
+            team: String(row.team),
+          };
+
+          const cookieStore = await cookies();
+          cookieStore.set('lions_session', JSON.stringify(sessionData), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 30, // 30 days
+            path: '/',
+          });
+
+          revalidatePath('/', 'layout');
+          return { success: true, user: sessionData };
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error:
+        'Ungültiger Name oder Passwort. Bei Erstanmeldung nutze bitte deinen Vor- und Nachnamen und das Einmal-Passwort "lions2026".',
+    };
+  } catch (err: any) {
+    console.error('Error during login:', err);
+    return { success: false, error: `Login-Fehler: ${err.message}` };
+  }
+}
+
+export async function firstLoginPasswordChangeAction(
+  playerId: number,
+  newPasswordInput: string,
+  confirmPasswordInput: string
+) {
+  try {
+    const newPw = newPasswordInput.trim();
+    const confirmPw = confirmPasswordInput.trim();
+
+    if (newPw.length < 10) {
+      return { success: false, error: 'Das Passwort muss mindestens 10 Zeichen lang sein.' };
+    }
+    if (!/\d/.test(newPw)) {
+      return { success: false, error: 'Das Passwort muss mindestens eine Zahl (0–9) enthalten.' };
+    }
+    if (!/[^a-zA-Z0-9]/.test(newPw)) {
+      return {
+        success: false,
+        error:
+          'Das Passwort muss mindestens ein Sonderzeichen (z.B. !, ?, @, #, $, %, -, _) enthalten.',
+      };
+    }
+    if (newPw !== confirmPw) {
+      return { success: false, error: 'Die beiden Passwörter stimmen nicht überein.' };
+    }
+
+    await sql`
+      UPDATE players
+      SET password = ${newPw}, must_change_password = 0
+      WHERE id = ${playerId}
+    `;
+
+    const userRows = await sql`
+      SELECT id, name, team, role FROM players WHERE id = ${playerId}
+    `;
+    if (userRows.length > 0) {
+      const u = userRows[0];
+      const sessionData: UserSession = {
+        id: Number(u.id),
+        name: String(u.name),
+        role: String(u.role || 'player'),
+        team: String(u.team),
+      };
+
+      const cookieStore = await cookies();
+      cookieStore.set('lions_session', JSON.stringify(sessionData), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      });
+    }
+
+    revalidatePath('/', 'layout');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in firstLoginPasswordChangeAction:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function logoutAction() {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete('lions_session');
+    revalidatePath('/', 'layout');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error logging out:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 
 export async function updateSettingsAction(
   win_w: number,

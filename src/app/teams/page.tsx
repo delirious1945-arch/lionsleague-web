@@ -5,6 +5,7 @@ import {
   getDashboardData,
   getPlayers,
 } from '@/lib/data';
+import { getSessionAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,8 +14,14 @@ export default async function TeamsPage({
 }: {
   searchParams: Promise<{ season?: string }>;
 }) {
+  const session = await getSessionAction();
+  if (!session) {
+    return null;
+  }
+
   const params = await searchParams;
   const seasons = await getAvailableSeasons();
+
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
 
   const allPlayers = await getPlayers();

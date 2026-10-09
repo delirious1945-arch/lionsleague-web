@@ -1,35 +1,53 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Calendar } from 'lucide-react';
+import { Calendar, LogOut } from 'lucide-react';
+import { logoutAction, UserSession } from '@/app/actions';
 
 interface HeaderProps {
-  currentSeason: string;
-  seasons: string[];
+  currentSeason?: string;
+  seasons?: string[];
+  user?: UserSession | null;
 }
 
-export default function Header({ currentSeason, seasons }: HeaderProps) {
+export default function Header({
+  currentSeason = '2026/2027',
+  seasons = ['2026/2027'],
+  user,
+}: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
-  // Admin-Modus Status (standardmäßig aktiv für lokale Entwicklung)
-  const [isAdmin, setIsAdmin] = useState(true);
+  // Admin status from user role or toggle
+  const userIsAdminRole = user?.role === 'admin';
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(true);
+
 
   useEffect(() => {
     const savedMode = localStorage.getItem('lions_role_mode');
     if (savedMode !== null) {
-      setIsAdmin(savedMode === 'admin');
+      setIsAdminMode(savedMode === 'admin');
+    } else {
+      setIsAdminMode(userIsAdminRole);
     }
-  }, []);
+  }, [userIsAdminRole]);
 
   const toggleAdmin = () => {
-    const newMode = !isAdmin;
-    setIsAdmin(newMode);
+    const newMode = !isAdminMode;
+    setIsAdminMode(newMode);
     localStorage.setItem('lions_role_mode', newMode ? 'admin' : 'player');
+  };
+
+  const handleLogout = () => {
+    startTransition(async () => {
+      await logoutAction();
+      router.refresh();
+    });
   };
 
   const handleSeasonChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -71,8 +89,13 @@ export default function Header({ currentSeason, seasons }: HeaderProps) {
               />
             </div>
             <div className="leading-tight">
-              <div className="text-sm font-black tracking-wider text-white">
-                LIONS LEAGUE
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black tracking-wider text-white">
+                  LIONS LEAGUE
+                </span>
+                <span className="text-[10px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 px-1.5 py-0.2 rounded font-mono">
+                  2.0
+                </span>
               </div>
               <p className="text-[10px] font-semibold tracking-wide text-blue-400 uppercase">
                 SC Weyhausen von 1921 e.V.
@@ -85,12 +108,20 @@ export default function Header({ currentSeason, seasons }: HeaderProps) {
             <button
               onClick={toggleAdmin}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                isAdmin
+                isAdminMode
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                   : 'bg-blue-600/20 text-blue-300 border-blue-500/40'
               }`}
             >
-              {isAdmin ? '👑 Admin' : '🎯 Spieler'}
+              {isAdminMode ? '👑 Admin' : '🎯 Spieler'}
+            </button>
+            <button
+              onClick={handleLogout}
+              disabled={isPending}
+              className="p-1.5 rounded-lg text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 transition-all"
+              title="Abmelden"
+            >
+              <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -116,7 +147,7 @@ export default function Header({ currentSeason, seasons }: HeaderProps) {
           })}
 
           {/* Trennlinie für Adminbereich */}
-          {isAdmin && (
+          {isAdminMode && (
             <>
               <span className="text-white/20 px-1 hidden sm:inline select-none">
                 |
@@ -143,10 +174,10 @@ export default function Header({ currentSeason, seasons }: HeaderProps) {
           )}
         </div>
 
-        {/* Right Section: Season Selector & Admin Switcher */}
-        <div className="hidden xl:flex items-center gap-3 shrink-0">
+        {/* Right Section: Season Selector, User Profile & Switcher */}
+        <div className="hidden xl:flex items-center gap-2.5 shrink-0">
           {/* Season Selector */}
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-white/10 rounded-xl px-2.5 py-1 shadow-inner">
+          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-white/10 rounded-xl px-2.5 py-1 shadow-inner">
             <Calendar className="w-3.5 h-3.5 text-cyan-400" />
             <select
               value={currentSeason}
@@ -161,16 +192,45 @@ export default function Header({ currentSeason, seasons }: HeaderProps) {
             </select>
           </div>
 
+          {/* User Badge */}
+          {user && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
+              <span className="font-bold text-white truncate max-w-[120px]">
+                {user.name}
+              </span>
+              <span
+                className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded ${
+                  user.role === 'admin'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'bg-blue-500/20 text-blue-300'
+                }`}
+              >
+                {user.role === 'admin' ? 'Admin' : 'Spieler'}
+              </span>
+            </div>
+          )}
+
           {/* Admin / Spieler Mode Switcher */}
           <button
             onClick={toggleAdmin}
             className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all flex items-center gap-1.5 shadow-sm ${
-              isAdmin
+              isAdminMode
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 shadow-amber-500/10'
                 : 'bg-blue-600/20 text-blue-300 border-blue-500/40 hover:bg-blue-600/30 shadow-blue-500/10'
             }`}
           >
-            <span>{isAdmin ? '👑 Admin' : '🎯 Spieler'}</span>
+            <span>{isAdminMode ? '👑 Admin' : '🎯 Spieler'}</span>
+          </button>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            disabled={isPending}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/5 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40 border border-white/10 text-slate-400 transition-all cursor-pointer"
+            title="Abmelden"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden 2xl:inline">Abmelden</span>
           </button>
         </div>
       </div>

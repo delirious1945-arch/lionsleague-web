@@ -1,15 +1,18 @@
 import React from 'react';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import { getSettings, getAvailableSeasons } from '@/lib/data';
+import { getSettings } from '@/lib/data';
 import { sql } from '@/lib/db';
 import SettingsClient from './SettingsClient';
+import { getSessionAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OptionenPage() {
+  const session = await getSessionAction();
+  if (!session) {
+    return null;
+  }
+
   const settings = await getSettings();
-  const seasons = await getAvailableSeasons();
 
   const playersRows = await sql`
     SELECT id, name, team, role, must_change_password
@@ -26,12 +29,8 @@ export default async function OptionenPage() {
   }));
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#050811] text-slate-100">
-      <Header currentSeason="2026/2027" seasons={seasons} />
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <SettingsClient initialSettings={settings} players={players} />
-      </main>
-      <Footer />
+    <div className="py-2">
+      <SettingsClient initialSettings={settings} players={players} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Settings } from '@/lib/scoring';
 import {
   updateSettingsAction,
@@ -9,6 +10,7 @@ import {
   updatePlayerRoleAction,
 } from '../actions';
 import { Sliders, UserPlus, KeyRound, ShieldCheck, Check, AlertTriangle } from 'lucide-react';
+
 
 interface PlayerItem {
   id: number;
@@ -115,9 +117,23 @@ export default function SettingsClient({
 
   return (
     <div className="space-y-6">
+      {/* Top Breadcrumb & Version 2.0 Badge */}
+      <div className="flex items-center justify-between text-xs pb-1">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-slate-400 hover:text-cyan-400 transition-colors font-semibold"
+        >
+          <span>←</span> Zurück zum Dashboard
+        </Link>
+        <span className="text-[10px] font-black bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded font-mono">
+          VERSION 2.0
+        </span>
+      </div>
+
       {/* Title */}
       <div>
         <h1 className="text-2xl font-black text-white tracking-wide flex items-center gap-2">
+
           <span>⚙️</span> Einstellungen & Punktegewichtungen
         </h1>
         <p className="text-sm text-slate-400 mt-1">

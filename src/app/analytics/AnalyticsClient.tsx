@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { AnalyticsMatchItem, Player, Top26Player } from '@/lib/data';
 
 export default function AnalyticsClient({
@@ -45,8 +46,22 @@ export default function AnalyticsClient({
   );
 
   return (
-    <div className="space-y-8 animate-fadeIn py-2">
+    <div className="space-y-6 animate-fadeIn py-2">
+      {/* Top Breadcrumb & Version 2.0 Badge */}
+      <div className="flex items-center justify-between text-xs pb-1">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-slate-400 hover:text-cyan-400 transition-colors font-semibold"
+        >
+          <span>←</span> Zurück zum Dashboard
+        </Link>
+        <span className="text-[10px] font-black bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded font-mono">
+          VERSION 2.0
+        </span>
+      </div>
+
       {/* Header Banner */}
+
       <div className="relative overflow-hidden bg-gradient-to-r from-[#071329] via-[#091b38] to-[#050e1f] border border-cyan-500/40 rounded-2xl p-6 shadow-xl shadow-cyan-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

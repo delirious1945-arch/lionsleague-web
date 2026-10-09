@@ -8,6 +8,7 @@ import {
   getSettings,
 } from '@/lib/data';
 import { calculateMatchPerformance } from '@/lib/scoring';
+import { getSessionAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,14 @@ export default async function SpielerPage({
 }: {
   searchParams: Promise<{ season?: string }>;
 }) {
+  const session = await getSessionAction();
+  if (!session) {
+    return null;
+  }
+
   const params = await searchParams;
   const seasons = await getAvailableSeasons();
+
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
 
   const [players, matches, doubles, settings] = await Promise.all([
