@@ -5,6 +5,7 @@ import {
   getAvailableSeasons,
   getPlayers,
   getTop26Players,
+  getAllAnalyticsLegVisits,
 } from '@/lib/data';
 import { getSessionAction } from '../actions';
 
@@ -25,10 +26,11 @@ export default async function AnalyticsPage({
 
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
 
-  const [matches, players, top26] = await Promise.all([
+  const [matches, players, top26, allLegVisits] = await Promise.all([
     getAnalyticsMatches(selectedSeason),
     getPlayers(),
     getTop26Players(selectedSeason),
+    getAllAnalyticsLegVisits(selectedSeason),
   ]);
 
   return (
@@ -37,6 +39,7 @@ export default async function AnalyticsPage({
         matches={matches}
         players={players}
         top26={top26}
+        allLegVisits={allLegVisits}
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
       />

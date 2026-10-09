@@ -732,4 +732,98 @@ export async function getAnalyticsMatches(season?: string): Promise<AnalyticsMat
   }
 }
 
+export interface RawLegVisit {
+  id: number;
+  leg_id: number;
+  visit_order: number;
+  score: number;
+  rest_score: number;
+  opponent_rest: number;
+  leg_num: number;
+  match_id: number;
+  starter_player_id: number;
+  winner_player_id: number;
+  darts_thrown: number | null;
+  checkout: number | null;
+  is_break: boolean;
+  match_date: string;
+}
+
+export async function getAllAnalyticsLegVisits(
+  season?: string
+): Promise<Record<number, RawLegVisit[][]>> {
+  try {
+    const rows = season && season !== 'Alle Saisons'
+      ? await sql`
+          SELECT v.id, v.leg_id, v.player_id, v.visit_order, v.score, v.rest_score, v.opponent_rest_at_visit,
+                 l.leg_num, l.starter_player_id, l.winner_player_id, l.darts_thrown_a, l.darts_thrown_b,
+                 l.checkout_a, l.checkout_b, l.is_break,
+                 m.id as match_id, m.player_a_id, m.player_b_id, m.match_date
+          FROM analytics_visits v
+          JOIN analytics_legs l ON v.leg_id = l.id
+          JOIN analytics_matches m ON l.match_id = m.id
+          JOIN players p ON v.player_id = p.id
+          WHERE m.season = ${season}
+            AND p.team IN ('A-Team', 'B-Team')
+          ORDER BY v.player_id ASC, m.match_date ASC, m.id ASC, l.leg_num ASC, v.visit_order ASC
+        `
+      : await sql`
+          SELECT v.id, v.leg_id, v.player_id, v.visit_order, v.score, v.rest_score, v.opponent_rest_at_visit,
+                 l.leg_num, l.starter_player_id, l.winner_player_id, l.darts_thrown_a, l.darts_thrown_b,
+                 l.checkout_a, l.checkout_b, l.is_break,
+                 m.id as match_id, m.player_a_id, m.player_b_id, m.match_date
+          FROM analytics_visits v
+          JOIN analytics_legs l ON v.leg_id = l.id
+          JOIN analytics_matches m ON l.match_id = m.id
+          JOIN players p ON v.player_id = p.id
+          WHERE p.team IN ('A-Team', 'B-Team')
+          ORDER BY v.player_id ASC, m.match_date ASC, m.id ASC, l.leg_num ASC, v.visit_order ASC
+        `;
+
+    const playerLegsMap: Record<number, Record<number, RawLegVisit[]>> = {};
+
+    for (const row of rows) {
+      const pid = Number(row.player_id);
+      const legId = Number(row.leg_id);
+      const isPlayerA = Number(row.player_a_id) === pid;
+      const dartsThrown = isPlayerA ? Number(row.darts_thrown_a) : Number(row.darts_thrown_b);
+      const co = isPlayerA ? Number(row.checkout_a) : Number(row.checkout_b);
+
+      if (!playerLegsMap[pid]) {
+        playerLegsMap[pid] = {};
+      }
+      if (!playerLegsMap[pid][legId]) {
+        playerLegsMap[pid][legId] = [];
+      }
+
+      playerLegsMap[pid][legId].push({
+        id: Number(row.id),
+        leg_id: legId,
+        visit_order: Number(row.visit_order),
+        score: Number(row.score),
+        rest_score: Number(row.rest_score),
+        opponent_rest: row.opponent_rest_at_visit != null ? Number(row.opponent_rest_at_visit) : 501,
+        leg_num: Number(row.leg_num),
+        match_id: Number(row.match_id),
+        starter_player_id: Number(row.starter_player_id),
+        winner_player_id: Number(row.winner_player_id),
+        darts_thrown: dartsThrown > 0 ? dartsThrown : null,
+        checkout: co > 0 ? co : null,
+        is_break: Boolean(row.is_break),
+        match_date: String(row.match_date),
+      });
+    }
+
+    const result: Record<number, RawLegVisit[][]> = {};
+    for (const [pidStr, legGroup] of Object.entries(playerLegsMap)) {
+      result[Number(pidStr)] = Object.values(legGroup);
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Error fetching all analytics leg visits:', err);
+    return {};
+  }
+}
+
 
