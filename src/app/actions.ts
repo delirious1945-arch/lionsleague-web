@@ -52,12 +52,11 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
 
       if (matchesUser) {
         const storedPass = String(row.password || '');
-        const passMatches = p === storedPass || p === 'lions2026';
+        const mustChange = Number(row.must_change_password) === 1;
 
-        if (passMatches) {
-          const isFirstLogin = Boolean(row.must_change_password) || p === 'lions2026';
-
-          if (isFirstLogin) {
+        if (mustChange) {
+          // Erstanmeldung noch erforderlich
+          if (p === 'lions2026' || p === storedPass) {
             return {
               success: false,
               requiresPasswordChange: true,
@@ -66,26 +65,46 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
               role: pRole,
               team: String(row.team),
             };
+          } else {
+            return {
+              success: false,
+              error: 'Falsches Passwort. Bitte nutze für die Erstanmeldung das Initial-Passwort "lions2026".',
+            };
+          }
+        } else {
+          // Erstanmeldung bereits abgeschlossen: Initialpasswort 'lions2026' ist abgelaufen!
+          if (p === 'lions2026') {
+            return {
+              success: false,
+              error: 'Das Initial-Passwort "lions2026" ist abgelaufen. Bitte nutze dein neu vergebenes persönliches Passwort.',
+            };
           }
 
-          const sessionData: UserSession = {
-            id: Number(row.id),
-            name: pName,
-            role: pRole,
-            team: String(row.team),
-          };
+          if (p === storedPass) {
+            const sessionData: UserSession = {
+              id: Number(row.id),
+              name: pName,
+              role: pRole,
+              team: String(row.team),
+            };
 
-          const cookieStore = await cookies();
-          cookieStore.set('lions_session', JSON.stringify(sessionData), {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 30, // 30 days
-            path: '/',
-          });
+            const cookieStore = await cookies();
+            cookieStore.set('lions_session', JSON.stringify(sessionData), {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 30, // 30 Tage gültig
+              path: '/',
+            });
 
-          revalidatePath('/', 'layout');
-          return { success: true, user: sessionData };
+            revalidatePath('/', 'layout');
+            return { success: true, user: sessionData };
+          } else {
+            return {
+              success: false,
+              error: 'Ungültiges Passwort. Bitte prüfe deine Eingabe.',
+            };
+          }
         }
       }
     }
