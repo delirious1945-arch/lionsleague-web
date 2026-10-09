@@ -37,7 +37,7 @@ export default function LandingPage() {
       } else {
         setErrorMessage(
           res.error ||
-            'Ungültiger Name oder Passwort. Bei Erstanmeldung nutze bitte deinen Vor- und Nachnamen und das Einmal-Passwort "lions2026".'
+            'Ungültiger Name oder Passwort. Bei Erstanmeldung nutze bitte deinen Vor- und Nachnamen und das Einmal-Passwort "Lions2026".'
         );
       }
     });
@@ -213,7 +213,7 @@ export default function LandingPage() {
                 <p className="text-center text-[11px] text-slate-500 pt-1">
                   Erstanmeldung? Nutze deinen Namen & das Passwort{' '}
                   <code className="text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded font-mono">
-                    lions2026
+                    Lions2026
                   </code>
                 </p>
               </form>

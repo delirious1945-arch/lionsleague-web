@@ -53,10 +53,11 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
       if (matchesUser) {
         const storedPass = String(row.password || '');
         const mustChange = Number(row.must_change_password) === 1;
+        const isInitialPw = p.toLowerCase() === 'lions2026';
 
         if (mustChange) {
-          // Erstanmeldung noch erforderlich
-          if (p === 'lions2026' || p === storedPass) {
+          // Erstanmeldung noch erforderlich: Initial-Passwort 'Lions2026' (oder storedPass) akzeptieren
+          if (isInitialPw || p === storedPass) {
             return {
               success: false,
               requiresPasswordChange: true,
@@ -68,15 +69,15 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
           } else {
             return {
               success: false,
-              error: 'Falsches Passwort. Bitte nutze für die Erstanmeldung das Initial-Passwort "lions2026".',
+              error: 'Falsches Passwort. Bitte nutze für die Erstanmeldung das Initial-Passwort "Lions2026".',
             };
           }
         } else {
-          // Erstanmeldung bereits abgeschlossen: Initialpasswort 'lions2026' ist abgelaufen!
-          if (p === 'lions2026') {
+          // Erstanmeldung bereits abgeschlossen: Wenn bereits ein persönliches Passwort hinterlegt ist
+          if (isInitialPw && storedPass.toLowerCase() !== 'lions2026') {
             return {
               success: false,
-              error: 'Das Initial-Passwort "lions2026" ist abgelaufen. Bitte nutze dein neu vergebenes persönliches Passwort.',
+              error: 'Das Initial-Passwort "Lions2026" ist abgelaufen, da für dieses Konto bereits ein persönliches Passwort festgelegt wurde. Bitte nutze dein persönliches Passwort.',
             };
           }
 
@@ -112,7 +113,7 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
     return {
       success: false,
       error:
-        'Ungültiger Name oder Passwort. Bei Erstanmeldung nutze bitte deinen Vor- und Nachnamen und das Einmal-Passwort "lions2026".',
+        'Ungültiger Name oder Passwort. Bei Erstanmeldung nutze bitte deinen Vor- und Nachnamen und das Einmal-Passwort "Lions2026".',
     };
   } catch (err: any) {
     console.error('Error during login:', err);
@@ -225,7 +226,7 @@ export async function addPlayerAction(name: string, team: string, role = 'player
   try {
     await sql`
       INSERT INTO players (name, team, password, must_change_password, role)
-      VALUES (${name.trim()}, ${team}, 'lions2026', 1, ${role})
+      VALUES (${name.trim()}, ${team}, 'Lions2026', 1, ${role})
     `;
     revalidatePath('/');
     revalidatePath('/teams');
@@ -242,7 +243,7 @@ export async function resetPlayerPasswordAction(playerId: number) {
   try {
     await sql`
       UPDATE players
-      SET password = 'lions2026', must_change_password = 1
+      SET password = 'Lions2026', must_change_password = 1
       WHERE id = ${playerId}
     `;
     return { success: true };
