@@ -571,3 +571,155 @@ export async function getDashboardData(season = '2026/2027') {
     matches: matchesWithPerf,
   };
 }
+
+export async function getPlayers(): Promise<Player[]> {
+  try {
+    const rows = await sql`
+      SELECT id, name, team, role
+      FROM players
+      ORDER BY name ASC
+    `;
+    return rows.map((r) => ({
+      id: Number(r.id),
+      name: String(r.name),
+      team: String(r.team),
+      role: String(r.role || 'player'),
+    }));
+  } catch (err) {
+    console.error('Error fetching players:', err);
+    return [];
+  }
+}
+
+export async function getAllMatches(season?: string): Promise<MatchRow[]> {
+  try {
+    const rows = season && season !== 'Alle Saisons'
+      ? await sql`
+          SELECT m.id, m.player_id, m.match_date, m.opponent, m.legs_won, m.legs_lost, 
+                 m.avg_total, m.avg_9, m.avg_18, m.scores_80, m.scores_100, m.scores_140, 
+                 m.scores_180, m.high_finishes, m.short_legs, m.specials_count, m.season, 
+                 COALESCE(m.team, p.team) as team,
+                 p.name as player_name, p.team as player_team
+          FROM matches m
+          JOIN players p ON m.player_id = p.id
+          WHERE m.season = ${season}
+          ORDER BY m.match_date DESC, m.id DESC
+        `
+      : await sql`
+          SELECT m.id, m.player_id, m.match_date, m.opponent, m.legs_won, m.legs_lost, 
+                 m.avg_total, m.avg_9, m.avg_18, m.scores_80, m.scores_100, m.scores_140, 
+                 m.scores_180, m.high_finishes, m.short_legs, m.specials_count, m.season, 
+                 COALESCE(m.team, p.team) as team,
+                 p.name as player_name, p.team as player_team
+          FROM matches m
+          JOIN players p ON m.player_id = p.id
+          ORDER BY m.match_date DESC, m.id DESC
+        `;
+    return rows.map((r) => ({
+      id: Number(r.id),
+      player_id: Number(r.player_id),
+      match_date: String(r.match_date),
+      opponent: String(r.opponent),
+      legs_won: Number(r.legs_won),
+      legs_lost: Number(r.legs_lost),
+      avg_total: Number(r.avg_total),
+      avg_9: Number(r.avg_9),
+      avg_18: Number(r.avg_18),
+      scores_80: Number(r.scores_80),
+      scores_100: Number(r.scores_100),
+      scores_140: Number(r.scores_140),
+      scores_180: Number(r.scores_180),
+      high_finishes: Number(r.high_finishes),
+      short_legs: Number(r.short_legs),
+      specials_count: Number(r.specials_count || 0),
+      season: String(r.season),
+      team: String(r.team).trim(),
+      player_name: String(r.player_name).trim(),
+      player_team: String(r.player_team).trim(),
+    }));
+  } catch (err) {
+    console.error('Error fetching all matches:', err);
+    return [];
+  }
+}
+
+export async function getDoublesSpecials(season?: string): Promise<DoublesSpecialRow[]> {
+  try {
+    const rows = season && season !== 'Alle Saisons'
+      ? await sql`
+          SELECT d.id, d.player_id, d.partner_name, d.opponent_team, d.match_date, d.special_type, d.description, d.season,
+                 p.name as player_name, p.team
+          FROM doubles_specials d
+          JOIN players p ON d.player_id = p.id
+          WHERE d.season = ${season}
+          ORDER BY d.match_date DESC, d.id DESC
+        `
+      : await sql`
+          SELECT d.id, d.player_id, d.partner_name, d.opponent_team, d.match_date, d.special_type, d.description, d.season,
+                 p.name as player_name, p.team
+          FROM doubles_specials d
+          JOIN players p ON d.player_id = p.id
+          ORDER BY d.match_date DESC, d.id DESC
+        `;
+    return rows.map((r) => ({
+      id: Number(r.id),
+      player_id: Number(r.player_id),
+      partner_name: String(r.partner_name),
+      opponent_team: String(r.opponent_team),
+      match_date: String(r.match_date),
+      special_type: String(r.special_type),
+      description: String(r.description || ''),
+      season: String(r.season),
+      player_name: String(r.player_name),
+      team: String(r.team),
+    }));
+  } catch (err) {
+    console.error('Error fetching doubles specials:', err);
+    return [];
+  }
+}
+
+export interface AnalyticsMatchItem {
+  id: number;
+  player_a_name: string;
+  player_b_name: string;
+  match_date: string;
+  duration_min: number;
+  season: string;
+  round_name: string;
+  best_of_legs: number;
+  winner_id?: number;
+}
+
+export async function getAnalyticsMatches(season?: string): Promise<AnalyticsMatchItem[]> {
+  try {
+    const rows = season && season !== 'Alle Saisons'
+      ? await sql`
+          SELECT id, player_a_name, player_b_name, match_date, duration_min, season, round_name, best_of_legs, winner_id
+          FROM analytics_matches
+          WHERE season = ${season}
+          ORDER BY match_date DESC, id DESC
+        `
+      : await sql`
+          SELECT id, player_a_name, player_b_name, match_date, duration_min, season, round_name, best_of_legs, winner_id
+          FROM analytics_matches
+          ORDER BY match_date DESC, id DESC
+        `;
+    return rows.map((r) => ({
+      id: Number(r.id),
+      player_a_name: String(r.player_a_name),
+      player_b_name: String(r.player_b_name),
+      match_date: String(r.match_date),
+      duration_min: Number(r.duration_min || 0),
+      season: String(r.season),
+      round_name: String(r.round_name || 'Liga-Spiel'),
+      best_of_legs: Number(r.best_of_legs || 5),
+      winner_id: r.winner_id ? Number(r.winner_id) : undefined,
+    }));
+  } catch (err) {
+    console.error('Error fetching analytics matches:', err);
+    return [];
+  }
+}
+
+
