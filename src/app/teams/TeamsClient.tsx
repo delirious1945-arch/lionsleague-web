@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { LeaderboardEntry } from '@/lib/data';
+import PlayerAvatar from '@/components/PlayerAvatar';
 
 interface PlayerCardInfo {
   id: number;
@@ -144,32 +144,19 @@ export default function TeamsClient({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {currentPlayers.map((player) => {
-            const photoSrc = `/players/${encodeURIComponent(player.name)}.png`;
-
             return (
               <div
                 key={player.id}
                 className="group relative bg-gradient-to-b from-[#0e1a38]/90 to-[#070d1e]/95 border border-white/10 hover:border-cyan-400/50 rounded-2xl p-5 text-center transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 flex flex-col items-center"
               >
                 {/* Avatar with fallback */}
-                <div className="relative w-24 h-24 rounded-full overflow-hidden mb-4 p-1 ring-2 ring-white/10 group-hover:ring-cyan-400/60 transition-all bg-slate-900/80">
-                  <Image
-                    src={photoSrc}
-                    alt={player.name}
-                    width={96}
-                    height={96}
-                    className="w-full h-full object-cover rounded-full"
-                    onError={(e) => {
-                      // fallback to standard avatar if player image doesn't exist
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
+                <div className="mb-4">
+                  <PlayerAvatar
+                    name={player.name}
+                    size={96}
+                    borderColor={accentColor}
+                    className="group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="w-full h-full rounded-full flex items-center justify-center font-black text-xl text-cyan-400 bg-cyan-950/40">
-                    {player.name
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')}
-                  </div>
                 </div>
 
                 {/* Name & Team */}

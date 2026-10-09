@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
+import PlayerAvatar from '@/components/PlayerAvatar';
 
 interface PlayerProfile {
 
@@ -95,10 +95,6 @@ export default function PlayerClient({
     (max, m) => (m.high_finish > max ? m.high_finish : max),
     0
   );
-
-  const photoSrc = currentPlayer
-    ? `/players/${encodeURIComponent(currentPlayer.name)}.png`
-    : '';
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -202,23 +198,13 @@ export default function PlayerClient({
           {/* Player Header Banner */}
           <div className="relative overflow-hidden bg-gradient-to-r from-[#0c1833] via-[#08152b] to-[#050b18] border border-cyan-500/30 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-xl shadow-cyan-950/20">
             {/* Player Avatar */}
-            <div className="relative w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden p-1 ring-4 ring-cyan-400/40 bg-slate-900 shrink-0">
-              <Image
-                src={photoSrc}
-                alt={currentPlayer.name}
-                width={144}
-                height={144}
-                className="w-full h-full object-cover rounded-full"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
+            <div className="shrink-0">
+              <PlayerAvatar
+                name={currentPlayer.name}
+                size={144}
+                borderColor="#38bdf8"
+                className="shadow-2xl shadow-cyan-500/20"
               />
-              <div className="w-full h-full rounded-full flex items-center justify-center font-black text-3xl text-cyan-400 bg-cyan-950/50">
-                {currentPlayer.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')}
-              </div>
             </div>
 
             {/* Player Details */}

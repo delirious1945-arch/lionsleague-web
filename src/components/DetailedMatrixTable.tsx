@@ -210,8 +210,9 @@ export default function DetailedMatrixTable({
                   {p.avg_18.toFixed(1)}
                 </td>
                 <td className="py-3 px-3 text-right font-bold text-amber-400">
-                  {p.specials_count > 0 ? `${p.specials_count} 🎯` : '-'}
+                  {p.specials_count > 0 ? p.specials_count : '-'}
                 </td>
+
                 <td className="py-3 px-3 text-right text-slate-400">
                   {p.doppel_bonus > 0 ? `+${p.doppel_bonus.toFixed(1)}` : '-'}
                 </td>

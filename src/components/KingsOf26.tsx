@@ -31,20 +31,21 @@ export default function KingsOf26({ top26 }: KingsOf26Props) {
       avatarBorder: '#F59E0B',
     },
     {
-      numColor: 'text-slate-300',
-      border: 'border-slate-400/30',
-      bg: 'bg-slate-400/5',
+      numColor: 'text-slate-400',
+      border: 'border-white/10',
+      bg: 'bg-white/[0.03]',
       badgeColor: 'text-slate-300',
-      avatarBorder: '#CBD5E1',
+      avatarBorder: 'rgba(255,255,255,0.15)',
     },
     {
-      numColor: 'text-amber-600',
-      border: 'border-amber-700/30',
-      bg: 'bg-amber-700/5',
-      badgeColor: 'text-amber-500',
-      avatarBorder: '#D97706',
+      numColor: 'text-slate-400',
+      border: 'border-white/10',
+      bg: 'bg-white/[0.03]',
+      badgeColor: 'text-slate-300',
+      avatarBorder: 'rgba(255,255,255,0.15)',
     },
   ];
+
 
   return (
     <div className="lions-card p-5">

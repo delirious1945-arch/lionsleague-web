@@ -186,6 +186,7 @@ export async function getTop26Players(season = '2026/2027'): Promise<Top26Player
         AND m.player_a_name NOT LIKE '%&%'
         AND m.player_b_name NOT LIKE '%&%'
         AND v.rest_score > 0
+        AND p.team IN ('A-Team', 'B-Team')
       GROUP BY p.id, p.name, p.team
       ORDER BY count_26 DESC, p.name ASC
       LIMIT 10
@@ -216,6 +217,7 @@ export async function getDashboardData(season = '2026/2027') {
     FROM matches m
     JOIN players p ON m.player_id = p.id
     WHERE m.season = ${season}
+      AND p.team IN ('A-Team', 'B-Team')
     ORDER BY m.match_date DESC, m.id DESC
   `;
 
@@ -230,6 +232,8 @@ export async function getDashboardData(season = '2026/2027') {
     JOIN players p1 ON m.player1_id = p1.id
     JOIN players p2 ON m.player2_id = p2.id
     WHERE m.season = ${season}
+      AND p1.team IN ('A-Team', 'B-Team')
+      AND p2.team IN ('A-Team', 'B-Team')
     ORDER BY m.match_date DESC, m.id DESC
   `;
 
@@ -240,6 +244,7 @@ export async function getDashboardData(season = '2026/2027') {
     FROM doubles_specials d
     JOIN players p ON d.player_id = p.id
     WHERE d.season = ${season}
+      AND p.team IN ('A-Team', 'B-Team')
     ORDER BY d.match_date DESC, d.id DESC
   `;
 
@@ -577,6 +582,7 @@ export async function getPlayers(): Promise<Player[]> {
     const rows = await sql`
       SELECT id, name, team, role
       FROM players
+      WHERE team IN ('A-Team', 'B-Team')
       ORDER BY name ASC
     `;
     return rows.map((r) => ({
@@ -603,6 +609,7 @@ export async function getAllMatches(season?: string): Promise<MatchRow[]> {
           FROM matches m
           JOIN players p ON m.player_id = p.id
           WHERE m.season = ${season}
+            AND p.team IN ('A-Team', 'B-Team')
           ORDER BY m.match_date DESC, m.id DESC
         `
       : await sql`
@@ -613,6 +620,7 @@ export async function getAllMatches(season?: string): Promise<MatchRow[]> {
                  p.name as player_name, p.team as player_team
           FROM matches m
           JOIN players p ON m.player_id = p.id
+          WHERE p.team IN ('A-Team', 'B-Team')
           ORDER BY m.match_date DESC, m.id DESC
         `;
     return rows.map((r) => ({
@@ -652,6 +660,7 @@ export async function getDoublesSpecials(season?: string): Promise<DoublesSpecia
           FROM doubles_specials d
           JOIN players p ON d.player_id = p.id
           WHERE d.season = ${season}
+            AND p.team IN ('A-Team', 'B-Team')
           ORDER BY d.match_date DESC, d.id DESC
         `
       : await sql`
@@ -659,6 +668,7 @@ export async function getDoublesSpecials(season?: string): Promise<DoublesSpecia
                  p.name as player_name, p.team
           FROM doubles_specials d
           JOIN players p ON d.player_id = p.id
+          WHERE p.team IN ('A-Team', 'B-Team')
           ORDER BY d.match_date DESC, d.id DESC
         `;
     return rows.map((r) => ({

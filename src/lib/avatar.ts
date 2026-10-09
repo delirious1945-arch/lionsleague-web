@@ -2,33 +2,30 @@ export function getPlayerPhotoUrl(name: string): string | null {
   if (!name) return null;
   const clean = name.trim().toLowerCase();
 
-  const map: Record<string, string> = {
-    'sebastian kirste': '/players/Sebastian.png',
-    'erik schremmer': '/players/Erik%20Schremmer.jpg',
-    'martin thomas': '/players/Martin%20Thomas.jpg',
-    'dirk ostermann': '/players/Dirk.jpg',
-    'jens goltermann': '/players/Jens%20Goltermann.jpg',
-    'kevin emde': '/players/Kevin.jpg',
-    'maik feuerhahn': '/players/Maik.jpg',
-    'jannik baier': '/players/Jannik.jpg',
-    'michael gehrt': '/players/Michael%20Gehrt.jpg',
-    'michael jochen': '/players/Michael%20Jochen.jpg',
-    'michael kranz': '/players/Michael%20Kranz.png',
-    'karsten kohnert': '/players/Karsten.png',
-    'karen schulz': '/players/Karen.png',
-    'nicholas stedman': '/players/Nick.png',
-    'philip ostermann': '/players/Philip.png',
-    'martin wolnik': '/players/Martin%20Wolnik.png',
-    'uwe kohnert': '/players/Uwe.png',
-    'achim': '/players/Achim.png',
-    'joachim koch': '/players/Achim.png',
-  };
-
-  if (map[clean]) return map[clean];
-
-  for (const [k, v] of Object.entries(map)) {
-    if (clean.includes(k) || k.includes(clean)) return v;
-  }
+  // 1. Direct explicit player mappings
+  if (clean.includes('sebastian') || clean.includes('kirste')) return '/players/Sebastian.png';
+  if (clean.includes('erik') || clean.includes('schremmer')) return '/players/Erik%20Schremmer.jpg';
+  if (clean.includes('martin') && clean.includes('thomas')) return '/players/Martin%20Thomas.jpg';
+  if (clean.includes('dirk') || clean.includes('ostermann') && !clean.includes('philip')) return '/players/Dirk.jpg';
+  if (clean.includes('jens') || clean.includes('goltermann')) return '/players/Jens%20Goltermann.jpg';
+  if (clean.includes('kevin') || clean.includes('emde')) return '/players/Kevin.jpg';
+  if (clean.includes('maik') || (clean.includes('feuerhahn') && !clean.includes('timo'))) return '/players/Maik.jpg';
+  if (clean.includes('timo') && clean.includes('feuerhahn')) return '/players/Maik.jpg';
+  if (clean.includes('jannik') || clean.includes('baier')) return '/players/Jannik.jpg';
+  if (clean.includes('michael') && clean.includes('gehrt')) return '/players/Michael%20Gehrt.jpg';
+  if (clean.includes('michael') && clean.includes('jochen')) return '/players/Michael%20Jochen.jpg';
+  if (clean.includes('michael') && clean.includes('kranz')) return '/players/Michael%20Kranz.png';
+  if (clean.includes('karsten') && clean.includes('kohnert') && !clean.includes('uwe')) return '/players/Karsten.png';
+  if (clean.includes('karen') || clean.includes('schulz')) return '/players/Karen.png';
+  if (clean.includes('nicholas') || clean.includes('nick') || clean.includes('stedman')) return '/players/Nick.png';
+  if (clean.includes('andr') || clean.includes('rathje')) return '/players/Andre.png';
+  if (clean.includes('gehrt')) return '/players/Gehrt.png';
+  if (clean.includes('lukas')) return '/players/Lukas.png';
+  if (clean.includes('malte')) return '/players/Malte.png';
+  if (clean.includes('uwe')) return '/players/Uwe.png';
+  if (clean.includes('martin') && clean.includes('wolnik')) return '/players/Martin%20Wolnik.png';
+  if (clean.includes('philip')) return '/players/Philip.png';
+  if (clean.includes('joachim') || clean.includes('achim')) return '/players/Achim.png';
 
   return null;
 }
