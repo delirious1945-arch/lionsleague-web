@@ -167,7 +167,7 @@ export default function PlayerClient({
                   : 'bg-white/5 text-slate-400 hover:text-white'
               }`}
             >
-              {t === 'all' ? 'Alle Teams' : t === 'A-Team' ? '🦁 A-Team' : '🐯 B-Team'}
+              {t === 'all' ? 'Alle Teams' : t}
             </button>
           ))}
         </div>
@@ -185,7 +185,6 @@ export default function PlayerClient({
           >
             {filteredPlayers.map((p) => (
               <option key={p.id} value={p.name} className="bg-slate-900 text-white font-medium">
-                {p.team === 'A-Team' ? '🦁 ' : '🐯 '}
                 {p.name} ({p.team})
               </option>
             ))}
@@ -210,7 +209,6 @@ export default function PlayerClient({
             {/* Player Details */}
             <div className="text-center md:text-left flex-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-extrabold mb-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                <span>{currentPlayer.team === 'A-Team' ? '🦁' : '🐯'}</span>
                 {currentPlayer.team === 'A-Team'
                   ? 'A-Team (2. Kreisklasse Staffel 07)'
                   : 'B-Team (2. Kreisklasse Staffel 11)'}

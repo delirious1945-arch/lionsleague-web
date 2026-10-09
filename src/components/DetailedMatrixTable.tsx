@@ -3,13 +3,22 @@
 import React, { useState } from 'react';
 import PlayerAvatar from './PlayerAvatar';
 import { LeaderboardEntry } from '@/lib/data';
-import { ArrowUpDown, Table as TableIcon } from 'lucide-react';
+import { Table as TableIcon } from 'lucide-react';
 
 interface DetailedMatrixTableProps {
   leaderboard: LeaderboardEntry[];
 }
 
-type SortField = 'rank' | 'player_name' | 'match_count' | 'wins' | 'avg_total' | 'final_rating';
+type SortField =
+  | 'rank'
+  | 'player_name'
+  | 'match_count'
+  | 'pts_win_w'
+  | 'pts_avg_w'
+  | 'pts_9_18_w'
+  | 'pts_scores_w'
+  | 'total_specials_bonus'
+  | 'final_rating';
 
 export default function DetailedMatrixTable({
   leaderboard,
@@ -38,8 +47,12 @@ export default function DetailedMatrixTable({
     else if (sortField === 'player_name')
       res = a.player_name.localeCompare(b.player_name);
     else if (sortField === 'match_count') res = a.match_count - b.match_count;
-    else if (sortField === 'wins') res = a.wins - b.wins;
-    else if (sortField === 'avg_total') res = a.avg_total - b.avg_total;
+    else if (sortField === 'pts_win_w') res = a.pts_win_w - b.pts_win_w;
+    else if (sortField === 'pts_avg_w') res = a.pts_avg_w - b.pts_avg_w;
+    else if (sortField === 'pts_9_18_w') res = a.pts_9_18_w - b.pts_9_18_w;
+    else if (sortField === 'pts_scores_w') res = a.pts_scores_w - b.pts_scores_w;
+    else if (sortField === 'total_specials_bonus')
+      res = a.total_specials_bonus - b.total_specials_bonus;
     else if (sortField === 'final_rating')
       res = a.final_rating - b.final_rating;
     return sortAsc ? res : -res;
@@ -61,7 +74,7 @@ export default function DetailedMatrixTable({
           </div>
         </div>
 
-        {/* Team Filter Buttons */}
+        {/* Team Filter Buttons (professionell ohne Tier-Emojis) */}
         <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-white/10 text-xs font-bold">
           <button
             onClick={() => setFilterTeam('ALL')}
@@ -81,7 +94,7 @@ export default function DetailedMatrixTable({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            🦁 A-Team
+            A-Team
           </button>
           <button
             onClick={() => setFilterTeam('B-Team')}
@@ -91,138 +104,139 @@ export default function DetailedMatrixTable({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            🐯 B-Team
+            B-Team
           </button>
         </div>
       </div>
 
-      {/* Responsive Table */}
+      {/* Exakte Tabelle wie auf dem Bild */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-white/10 text-[11px] font-extrabold uppercase tracking-wider text-slate-400 select-none">
               <th
                 onClick={() => handleSort('rank')}
-                className="py-3 px-3 cursor-pointer hover:text-white"
+                className="py-3 px-3 cursor-pointer hover:text-white w-10"
               >
-                <div className="flex items-center gap-1">
-                  <span>#</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
+                #
               </th>
               <th
                 onClick={() => handleSort('player_name')}
-                className="py-3 px-3 cursor-pointer hover:text-white"
+                className="py-3 px-4 cursor-pointer hover:text-white"
               >
-                <div className="flex items-center gap-1">
-                  <span>Spieler</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
+                SPIELER
               </th>
-              <th className="py-3 px-3">Team</th>
               <th
                 onClick={() => handleSort('match_count')}
-                className="py-3 px-3 text-right cursor-pointer hover:text-white"
+                className="py-3 px-3 text-center cursor-pointer hover:text-white"
               >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Spiele</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
+                SPIELE
               </th>
               <th
-                onClick={() => handleSort('wins')}
-                className="py-3 px-3 text-right cursor-pointer hover:text-white"
+                onClick={() => handleSort('pts_win_w')}
+                className="py-3 px-3 text-right cursor-pointer hover:text-white text-slate-400 font-bold"
               >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Siege</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
+                SIEG (50%)
               </th>
               <th
-                onClick={() => handleSort('avg_total')}
-                className="py-3 px-3 text-right cursor-pointer hover:text-white"
+                onClick={() => handleSort('pts_avg_w')}
+                className="py-3 px-3 text-right cursor-pointer hover:text-white text-slate-400 font-bold"
               >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Gesamt Avg</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
+                AVG (20%)
               </th>
-              <th className="py-3 px-3 text-right">9D Avg</th>
-              <th className="py-3 px-3 text-right">18D Avg</th>
-              <th className="py-3 px-3 text-right">Specials</th>
-              <th className="py-3 px-3 text-right">Doppel-Bonus</th>
+              <th
+                onClick={() => handleSort('pts_9_18_w')}
+                className="py-3 px-3 text-right cursor-pointer hover:text-white text-slate-400 font-bold"
+              >
+                9/18D (15%)
+              </th>
+              <th
+                onClick={() => handleSort('pts_scores_w')}
+                className="py-3 px-3 text-right cursor-pointer hover:text-white text-slate-400 font-bold"
+              >
+                SCORES (15%)
+              </th>
+              <th
+                onClick={() => handleSort('total_specials_bonus')}
+                className="py-3 px-3 text-right cursor-pointer text-emerald-400 font-extrabold"
+              >
+                SPECIALS
+              </th>
               <th
                 onClick={() => handleSort('final_rating')}
-                className="py-3 px-3 text-right cursor-pointer hover:text-white"
+                className="py-3 px-4 text-right cursor-pointer text-cyan-400 font-black tracking-wide"
               >
-                <div className="flex items-center justify-end gap-1 text-cyan-400">
-                  <span>Punkte</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
+                GESAMT
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
-            {sorted.map((p) => (
-              <tr
-                key={p.player_name}
-                className="hover:bg-white/[0.03] transition-colors"
-              >
-                <td className="py-3 px-3 font-black text-cyan-400">
-                  {p.rank}
-                </td>
-                <td className="py-3 px-3">
-                  <div className="flex items-center gap-2.5">
-                    <PlayerAvatar
-                      name={p.player_name}
-                      size={28}
-                      borderColor="#00D4FF"
-                    />
-                    <span className="font-bold text-white">
-                      {p.player_name}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3 px-3">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      p.team === 'A-Team'
-                        ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
-                        : 'bg-slate-400/10 text-slate-300 border border-slate-400/20'
-                    }`}
-                  >
-                    {p.team}
-                  </span>
-                </td>
-                <td className="py-3 px-3 text-right font-semibold text-slate-300">
-                  {p.match_count}
-                </td>
-                <td className="py-3 px-3 text-right font-semibold text-emerald-400">
-                  {p.wins}
-                </td>
-                <td className="py-3 px-3 text-right font-mono font-bold text-white">
-                  {p.avg_total.toFixed(1)}
-                </td>
-                <td className="py-3 px-3 text-right font-mono text-slate-400">
-                  {p.avg_9.toFixed(1)}
-                </td>
-                <td className="py-3 px-3 text-right font-mono text-slate-400">
-                  {p.avg_18.toFixed(1)}
-                </td>
-                <td className="py-3 px-3 text-right font-bold text-amber-400">
-                  {p.specials_count > 0 ? p.specials_count : '-'}
-                </td>
+          <tbody className="divide-y divide-white/5 font-medium">
+            {sorted.map((p) => {
+              const specStr =
+                p.total_specials_bonus > 0
+                  ? `+${p.total_specials_bonus.toFixed(2)}`
+                  : '-';
 
-                <td className="py-3 px-3 text-right text-slate-400">
-                  {p.doppel_bonus > 0 ? `+${p.doppel_bonus.toFixed(1)}` : '-'}
-                </td>
-                <td className="py-3 px-3 text-right font-black text-sm text-cyan-400">
-                  {p.final_rating.toFixed(2)}
-                </td>
-              </tr>
-            ))}
+              return (
+                <tr
+                  key={p.player_name}
+                  className="hover:bg-white/[0.03] transition-colors"
+                >
+                  <td className="py-3.5 px-3 font-black text-slate-400 text-sm">
+                    {p.rank}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar
+                        name={p.player_name}
+                        size={32}
+                        borderColor="#334155"
+                      />
+                      <span className="font-bold text-white text-sm">
+                        {p.player_name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-3 text-center text-slate-300 font-semibold text-sm">
+                    {p.match_count}
+                  </td>
+                  <td className="py-3.5 px-3 text-right font-mono text-slate-300 font-semibold text-sm">
+                    {p.pts_win_w.toFixed(2)}
+                  </td>
+                  <td className="py-3.5 px-3 text-right font-mono text-slate-300 font-semibold text-sm">
+                    {p.pts_avg_w.toFixed(2)}
+                  </td>
+                  <td className="py-3.5 px-3 text-right font-mono text-slate-300 font-semibold text-sm">
+                    {p.pts_9_18_w.toFixed(2)}
+                  </td>
+                  <td className="py-3.5 px-3 text-right font-mono text-slate-300 font-semibold text-sm">
+                    {p.pts_scores_w.toFixed(2)}
+                  </td>
+                  <td className="py-3.5 px-3 text-right font-mono font-bold text-emerald-400 text-sm">
+                    {specStr}
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono font-black text-cyan-400 text-base">
+                    {p.final_rating.toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      </div>
+
+      {/* Fußzeile mit offizieller Formel-Erklärung */}
+      <div className="mt-4 pt-3 border-t border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-400">
+        <div>
+          <span className="font-bold text-slate-300">Formel: </span>
+          <span className="italic">
+            Gesamt = Sieg (50%) + Avg (20%) + 9/18D (15%) + Scores (15%) + Specials
+          </span>
+        </div>
+        <div className="text-slate-400">
+          Max. Basiswertung pro Spiel:{' '}
+          <span className="font-bold text-slate-200">6,45 Pkt</span> (+ Specials)
+        </div>
       </div>
     </div>
   );

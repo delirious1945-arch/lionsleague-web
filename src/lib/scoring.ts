@@ -18,6 +18,10 @@ export interface MatchPerformance {
   specials_count: number;
   specials_bonus: number;
   total_rating: number;
+  weighted_win: number;
+  weighted_avg: number;
+  weighted_9_18: number;
+  weighted_scores: number;
 }
 
 export function getPointsForAverage(value: number): number {
@@ -112,6 +116,10 @@ export function calculateMatchPerformance(
     specials_count: specials,
     specials_bonus: specialsBonus,
     total_rating: Math.round(totalRating * 100) / 100,
+    weighted_win: weightedWin,
+    weighted_avg: weightedAvg,
+    weighted_9_18: weightedAvg9 + weightedAvg18,
+    weighted_scores: weightedScores,
   };
 }
 

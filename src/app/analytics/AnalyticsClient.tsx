@@ -218,7 +218,6 @@ export default function AnalyticsClient({
                 >
                   {players.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.team === 'A-Team' ? '🦁 ' : '🐯 '}
                       {p.name} ({p.team})
                     </option>
                   ))}
@@ -603,7 +602,6 @@ export default function AnalyticsClient({
                 >
                   {players.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.team === 'A-Team' ? '🦁 ' : '🐯 '}
                       {p.name} ({p.team})
                     </option>
                   ))}
@@ -629,7 +627,6 @@ export default function AnalyticsClient({
                 >
                   {players.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.team === 'A-Team' ? '🦁 ' : '🐯 '}
                       {p.name} ({p.team})
                     </option>
                   ))}
@@ -816,7 +813,7 @@ export default function AnalyticsClient({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  {t === 'all' ? 'Alle Teams' : t === 'A-Team' ? '🦁 A-Team' : '🐯 B-Team'}
+                  {t === 'all' ? 'Alle Teams' : t}
                 </button>
               ))}
             </div>
@@ -864,7 +861,7 @@ export default function AnalyticsClient({
                             : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                         }`}
                       >
-                        {player.team === 'A-Team' ? '🦁 A-Team' : '🐯 B-Team'}
+                        {player.team}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center font-black text-cyan-300 text-sm">

@@ -95,6 +95,11 @@ export interface LeaderboardEntry {
   doppel_bonus: number;
   base_rating: number;
   final_rating: number;
+  pts_win_w: number;
+  pts_avg_w: number;
+  pts_9_18_w: number;
+  pts_scores_w: number;
+  total_specials_bonus: number;
 }
 
 export interface TeamBattleStats {
@@ -344,17 +349,32 @@ export async function getDashboardData(season = '2026/2027') {
         ? group.matches.reduce((acc, m) => acc + m.avg_18, 0) / count
         : 0;
 
-    const baseRatingMean =
+    const ptsWinW =
       count > 0
-        ? group.matches.reduce((acc, m) => acc + m.perf.base_rating, 0) / count
+        ? group.matches.reduce((acc, m) => acc + m.perf.weighted_win, 0) / count
         : 0;
+    const ptsAvgW =
+      count > 0
+        ? group.matches.reduce((acc, m) => acc + m.perf.weighted_avg, 0) / count
+        : 0;
+    const pts918W =
+      count > 0
+        ? group.matches.reduce((acc, m) => acc + m.perf.weighted_9_18, 0) / count
+        : 0;
+    const ptsScoresW =
+      count > 0
+        ? group.matches.reduce((acc, m) => acc + m.perf.weighted_scores, 0) / count
+        : 0;
+
+    const baseRatingMean = ptsWinW + ptsAvgW + pts918W + ptsScoresW;
 
     const specialsSum = group.matches.reduce(
       (acc, m) => acc + m.specials_count,
       0
     );
     const doppelBonus = doublesBonusMap[group.player_name] || 0;
-    const finalRating = baseRatingMean + specialsSum * 0.5 + doppelBonus;
+    const totalSpecialsBonus = specialsSum * 0.5 + doppelBonus;
+    const finalRating = baseRatingMean + totalSpecialsBonus;
 
     return {
       player_name: group.player_name,
@@ -370,6 +390,11 @@ export async function getDashboardData(season = '2026/2027') {
       doppel_bonus: doppelBonus,
       base_rating: Math.round(baseRatingMean * 100) / 100,
       final_rating: Math.round(finalRating * 100) / 100,
+      pts_win_w: Math.round(ptsWinW * 100) / 100,
+      pts_avg_w: Math.round(ptsAvgW * 100) / 100,
+      pts_9_18_w: Math.round(pts918W * 100) / 100,
+      pts_scores_w: Math.round(ptsScoresW * 100) / 100,
+      total_specials_bonus: Math.round(totalSpecialsBonus * 100) / 100,
     };
   });
 
