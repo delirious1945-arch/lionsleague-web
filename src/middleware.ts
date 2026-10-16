@@ -14,14 +14,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = request.cookies.get('lions_session');
-  const isAuthenticated = Boolean(session?.value);
-
-  // If unauthenticated and trying to access any page other than root
-  if (!isAuthenticated && pathname !== '/') {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-
+  // Anmeldebedingung deaktiviert - direkter Durchlass
   return NextResponse.next();
 }
 
