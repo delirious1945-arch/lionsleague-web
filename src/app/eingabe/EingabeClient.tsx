@@ -7,8 +7,14 @@ import {
   addDoublesMatchAction,
   addDoublesSpecialAction,
   importSpieltagAction,
+  scanSpieltageDirectoryAction,
+  batchImportSpieltageAction,
 } from '../actions';
 import { Player } from '@/lib/data';
+import type {
+  ScannedSpieltagItem,
+  BatchImportSummary,
+} from '@/lib/importSpieltag';
 
 const STAFFEL_7_OPPONENTS = [
   'Bromer Burglöwen B',
@@ -36,9 +42,13 @@ const STAFFEL_11_OPPONENTS = [
 export default function EingabeClient({
   players,
   availableSeasons,
+  defaultRootDir = 'C:\\Users\\sebas\\Documents\\Lions Weyhausen\\02_Liga\\Dart_Match_Image_Analyzer\\output\\spieltage',
+  initialScannedSpieltage = [],
 }: {
   players: Player[];
   availableSeasons: string[];
+  defaultRootDir?: string;
+  initialScannedSpieltage?: ScannedSpieltagItem[];
 }) {
   const [activeTab, setActiveTab] = useState<
     'csv_import' | 'single' | 'doubles_match' | 'doubles_special'
@@ -60,8 +70,124 @@ export default function EingabeClient({
   );
 
   // -------------------------------------------------------------
-  // TAB 1: CSV-SPIELTAGS-IMPORT STATE
+  // TAB 1: ORDNER-SCAN & BATCH-IMPORT STATE
   // -------------------------------------------------------------
+  const [rootDir, setRootDir] = useState<string>(defaultRootDir);
+  const [scannedList, setScannedList] = useState<ScannedSpieltagItem[]>(
+    initialScannedSpieltage
+  );
+  const [selectedSlugs, setSelectedSlugs] = useState<Record<string, boolean>>(
+    () => {
+      const init: Record<string, boolean> = {};
+      for (const sp of initialScannedSpieltage) {
+        init[sp.dir_path] = sp.is_new_candidate;
+      }
+      return init;
+    }
+  );
+  const [syncBatch, setSyncBatch] = useState<boolean>(true);
+  const [batchResult, setBatchResult] = useState<BatchImportSummary | null>(
+    null
+  );
+
+  const handleScanDirectory = (customSeason?: string) => {
+    const targetSeason = customSeason || season;
+    startTransition(async () => {
+      setMessage(null);
+      setBatchResult(null);
+      const res = await scanSpieltageDirectoryAction(rootDir, targetSeason);
+      if (res.success) {
+        setScannedList(res.items);
+        const nextSel: Record<string, boolean> = {};
+        for (const sp of res.items) {
+          nextSel[sp.dir_path] = sp.is_new_candidate;
+        }
+        setSelectedSlugs(nextSel);
+      } else {
+        setMessage({
+          text: `Fehler beim Scannen des Hauptordners: ${res.error}`,
+          type: 'error',
+        });
+      }
+    });
+  };
+
+  const toggleSelectSpieltag = (dirPath: string) => {
+    setSelectedSlugs((prev) => ({
+      ...prev,
+      [dirPath]: !prev[dirPath],
+    }));
+  };
+
+  const selectAllSpieltage = () => {
+    const next: Record<string, boolean> = {};
+    for (const sp of scannedList) {
+      next[sp.dir_path] = true;
+    }
+    setSelectedSlugs(next);
+  };
+
+  const selectOnlyNewSpieltage = () => {
+    const next: Record<string, boolean> = {};
+    for (const sp of scannedList) {
+      next[sp.dir_path] = sp.is_new_candidate;
+    }
+    setSelectedSlugs(next);
+  };
+
+  const deselectAllSpieltage = () => {
+    setSelectedSlugs({});
+  };
+
+  const selectedSpieltageForImport = scannedList.filter(
+    (sp) => !!selectedSlugs[sp.dir_path]
+  );
+
+  const handleBatchImport = () => {
+    if (selectedSpieltageForImport.length === 0) return;
+
+    startTransition(async () => {
+      setMessage(null);
+      setBatchResult(null);
+
+      const res = await batchImportSpieltageAction(
+        selectedSpieltageForImport.map((sp) => ({
+          dir_path: sp.dir_path,
+          slug: sp.slug,
+          team_display: sp.team_display,
+          opp_display: sp.opp_display,
+        })),
+        season,
+        syncBatch
+      );
+
+      if (res.success) {
+        setBatchResult(res.summary);
+        setMessage({
+          text: `✅ Batch-Import abgeschlossen: ${res.summary.imported_spieltage} Spieltag(e) verarbeitet (${res.summary.total_created} Spiele neu angelegt, ${res.summary.total_updated} aktualisiert/ersetzt).`,
+          type: 'success',
+        });
+
+        // Nach dem Import automatisch neu scannen, damit der Status auf ⚪ VORHANDEN aktualisiert wird
+        const scanRes = await scanSpieltageDirectoryAction(rootDir, season);
+        if (scanRes.success) {
+          setScannedList(scanRes.items);
+          const nextSel: Record<string, boolean> = {};
+          for (const sp of scanRes.items) {
+            nextSel[sp.dir_path] = sp.is_new_candidate;
+          }
+          setSelectedSlugs(nextSel);
+        }
+      } else {
+        setMessage({
+          text: `❌ Fehler beim Batch-Import: ${res.error}`,
+          type: 'error',
+        });
+      }
+    });
+  };
+
+  // Alternative: Manuelles Drag & Drop einzelner CSV-Dateien
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFiles, setUploadedFiles] = useState<{
     matchesText?: string;
@@ -116,7 +242,6 @@ export default function EingabeClient({
       }
     }
 
-    // Match-Anzahl und Metadaten ermitteln
     let matchesCount = 0;
     let detectedDate = infoObj?.date;
     let detectedOpponent = infoObj?.opponent;
@@ -186,6 +311,10 @@ export default function EingabeClient({
         setMessage({ text: res.message, type: 'success' });
         setUploadedFiles({ fileNames: [], matchesCount: 0 });
         if (fileInputRef.current) fileInputRef.current.value = '';
+        const scanRes = await scanSpieltageDirectoryAction(rootDir, season);
+        if (scanRes.success) {
+          setScannedList(scanRes.items);
+        }
       } else {
         setMessage({
           text: `Fehler beim Import: ${res.error || res.message}`,
@@ -370,8 +499,15 @@ export default function EingabeClient({
     });
   };
 
+  const newSpList = scannedList.filter((s) => s.is_new_candidate);
+  const existingSpList = scannedList.filter((s) => !s.is_new_candidate);
+  const totalMatchesFound = scannedList.reduce(
+    (sum, s) => sum + s.total_matches,
+    0
+  );
+
   return (
-    <div className="space-y-6 animate-fadeIn py-2 max-w-4xl mx-auto">
+    <div className="space-y-6 animate-fadeIn py-2 max-w-5xl mx-auto">
       {/* Top Breadcrumb & Version 2.0 Badge */}
       <div className="flex items-center justify-between text-xs pb-1">
         <Link
@@ -401,7 +537,11 @@ export default function EingabeClient({
           <span className="text-xs font-bold text-slate-400">📅 Saison:</span>
           <select
             value={season}
-            onChange={(e) => setSeason(e.target.value)}
+            onChange={(e) => {
+              const newS = e.target.value;
+              setSeason(newS);
+              handleScanDirectory(newS);
+            }}
             className="bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
           >
             {availableSeasons.map((s) => (
@@ -439,7 +579,7 @@ export default function EingabeClient({
               : 'border-transparent text-slate-400 hover:text-white'
           }`}
         >
-          <span>📥</span> CSV-Spieltags-Import (DAE & Liga)
+          <span>📥</span> CSV-Import (DAE & Liga)
         </button>
 
         <button
@@ -477,132 +617,335 @@ export default function EingabeClient({
       </div>
 
       {/* ---------------------------------------------------------- */}
-      {/* TAB 1: CSV-SPIELTAGS-IMPORT                                */}
+      {/* TAB 1: CSV-SPIELTAGS-IMPORT (ORDNER-SCAN & BATCH-IMPORT)   */}
       {/* ---------------------------------------------------------- */}
       {activeTab === 'csv_import' && (
         <div className="bg-[#0b1428] border border-cyan-500/30 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 mb-3 shadow-[0_0_12px_rgba(0,212,255,0.25)]">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-br from-cyan-500/10 to-blue-600/5 border border-cyan-500/30 rounded-xl p-5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 mb-2 shadow-[0_0_12px_rgba(0,212,255,0.25)]">
               <span>⚡</span> AUTOMATISCHE SYNCHRONISATION
             </div>
             <h2 className="text-xl md:text-2xl font-black text-white">
               📥 Intelligenter CSV-Spieltags-Import (DAE & Lions League)
             </h2>
-            <p className="text-xs md:text-sm text-slate-400 mt-1">
-              Wähle einfach die exportierten CSV-Dateien aus deinem Spieltag (z. B. aus dem Dart Match Image Analyzer). Das System gleicht vorhandene Spiele automatisch ab und importiert sie ohne Duplikate.
+            <p className="text-xs md:text-sm text-slate-300 mt-1">
+              Durchsucht automatisch den Hauptordner und alle Unterordner des{' '}
+              <b>Dart Match Image Analyzers</b>, gleicht vorhandene Spiele mit der
+              Datenbank ab und zeigt dir direkt, welche Spieltage <b>NEU</b> sind.
             </p>
           </div>
 
-          {/* Info-Box */}
-          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 text-xs md:text-sm text-slate-300 space-y-1">
-            <div className="font-bold text-cyan-300 flex items-center gap-1.5">
-              <span>💡</span> Unterstützte Dateien pro Spieltag:
-            </div>
-            <div>• <code>matches.csv</code> (Matches, Ergebnisse & Spielpaarungen)</div>
-            <div>• <code>legs.csv</code> (Legs, Checkouts & Darts-to-Win)</div>
-            <div>• <code>visits.csv</code> (Alle 3-Dart-Aufnahmen für die DAE-Engine)</div>
-            <div>• <code>statistics.csv</code> & <code>spieltag_info.json</code> (Statistiken & Metadaten)</div>
-          </div>
-
-          {/* Upload Dropzone */}
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              handleFilesSelected(e.dataTransfer.files);
-            }}
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-cyan-500/40 hover:border-cyan-400 bg-slate-900/60 hover:bg-slate-900/90 rounded-2xl p-8 text-center cursor-pointer transition-all space-y-3 group"
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".csv,.json"
-              onChange={(e) => handleFilesSelected(e.target.files)}
-              className="hidden"
-            />
-            <div className="text-4xl group-hover:scale-110 transition-transform">
-              📂
+          {/* 1. HAUPTORDNER-SCANNER */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <div className="md:col-span-3">
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                📁 Pfad zum Hauptordner (durchsucht alle Unterordner)
+              </label>
+              <input
+                type="text"
+                value={rootDir}
+                onChange={(e) => setRootDir(e.target.value)}
+                placeholder="C:\Users\sebas\Documents\Lions Weyhausen\02_Liga\Dart_Match_Image_Analyzer\output\spieltage"
+                className="w-full bg-slate-900 border border-white/20 rounded-xl px-3.5 py-2.5 text-xs md:text-sm font-mono text-cyan-200 focus:outline-none focus:border-cyan-400"
+              />
             </div>
             <div>
-              <p className="text-base font-bold text-white">
-                Klicke hier zum Auswählen oder ziehe Dateien per Drag & Drop hierher
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Du kannst alle Dateien eines Spieltagsordners gleichzeitig markieren (.csv & .json)
-              </p>
+              <button
+                type="button"
+                onClick={() => handleScanDirectory()}
+                disabled={isPending}
+                className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-300 font-bold py-2.5 px-4 rounded-xl text-sm transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <span>🔍</span>{' '}
+                {isPending ? 'Scanne...' : 'Hauptordner scannen'}
+              </button>
             </div>
           </div>
 
-          {/* Dateivorschau */}
-          {uploadedFiles.fileNames.length > 0 && (
-            <div className="bg-slate-900/90 border border-white/10 rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <span className="text-sm font-bold text-cyan-300">
-                  📋 Ausgewählte Dateien ({uploadedFiles.fileNames.length}):
-                </span>
-                <span className="text-xs font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded">
-                  {uploadedFiles.matchesCount} Matches erkannt
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300">
-                {uploadedFiles.fileNames.map((fn, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-white/5 p-2 rounded-lg truncate">
-                    <span className="text-emerald-400">✓</span>
-                    <span className="truncate">{fn}</span>
+          {/* 2. GEFUNDENE SPIELTAGE & KPI-BOXEN */}
+          {scannedList.length > 0 ? (
+            <div className="space-y-5">
+              {/* 3 KPI Metriken */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-4">
+                  <div className="text-xs font-bold text-slate-400">
+                    🟢 Neue Spieltage
                   </div>
-                ))}
+                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                    {newSpList.length}
+                  </div>
+                  <div className="text-[11px] text-emerald-300/80 mt-0.5">
+                    {newSpList.length > 0
+                      ? 'Bereit zum Import'
+                      : 'Alles aktuell'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 border border-white/10 rounded-xl p-4">
+                  <div className="text-xs font-bold text-slate-400">
+                    ⚪ Bereits vorhanden
+                  </div>
+                  <div className="text-2xl font-black text-slate-200 mt-1">
+                    {existingSpList.length}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Bereits in Supabase gespeichert
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 border border-cyan-500/30 rounded-xl p-4">
+                  <div className="text-xs font-bold text-slate-400">
+                    🎯 Gefundene Matches
+                  </div>
+                  <div className="text-2xl font-black text-cyan-300 mt-1">
+                    {totalMatchesFound}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    In {scannedList.length} Spieltags-Ordnern
+                  </div>
+                </div>
               </div>
 
-              {/* Erkannte Metadaten */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-                <div className="bg-cyan-500/10 border border-cyan-500/20 p-2.5 rounded-lg">
-                  <span className="text-slate-400 block">Datum:</span>
-                  <span className="font-bold text-white text-sm">
-                    {uploadedFiles.detectedDate || 'Wird ermittelt'}
-                  </span>
-                </div>
-                <div className="bg-cyan-500/10 border border-cyan-500/20 p-2.5 rounded-lg">
-                  <span className="text-slate-400 block">Mannschaft:</span>
-                  <span className="font-bold text-cyan-300 text-sm">
-                    {uploadedFiles.detectedTeam || 'A-Team'}
-                  </span>
-                </div>
-                <div className="bg-cyan-500/10 border border-cyan-500/20 p-2.5 rounded-lg">
-                  <span className="text-slate-400 block">Gegner:</span>
-                  <span className="font-bold text-white text-sm">
-                    {uploadedFiles.detectedOpponent || 'Ligagegner'}
-                  </span>
+              {/* Schnellauswahl & Überschrift */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-b border-white/10 pb-2">
+                <h3 className="text-sm font-extrabold text-white">
+                  📋 Gefundene Spieltage ({scannedList.length}):
+                </h3>
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={selectAllSpieltage}
+                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                  >
+                    ☑️ Alle auswählen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={selectOnlyNewSpieltage}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
+                  >
+                    🟢 Nur Neue auswählen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={deselectAllSpieltage}
+                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                  >
+                    ⬜ Auswahl aufheben
+                  </button>
                 </div>
               </div>
 
-              {/* Sync-Option */}
-              <label className="flex items-center gap-3 pt-2 cursor-pointer text-xs font-semibold text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={syncLeagueCsv}
-                  onChange={(e) => setSyncLeagueCsv(e.target.checked)}
-                  className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-400"
-                />
-                <span>
-                  ✅ Automatisch in die offizielle Lions League Rangliste (<code>matches</code> & <code>doubles_matches</code>) synchronisieren
-                </span>
-              </label>
+              {/* Spieltags-Liste mit Checkboxen */}
+              <div className="space-y-2.5">
+                {scannedList.map((sp) => {
+                  const isChecked = !!selectedSlugs[sp.dir_path];
+                  const statusColor =
+                    sp.status === 'NEW'
+                      ? '#00e676'
+                      : sp.status === 'PARTIAL'
+                      ? '#ffd700'
+                      : '#94a3b8';
 
-              {/* Action Button */}
-              <button
-                onClick={handleImportSpieltag}
-                disabled={isPending || !uploadedFiles.matchesText}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-3.5 rounded-xl text-base transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 cursor-pointer mt-2"
-              >
-                {isPending
-                  ? 'Importiere & Synchronisiere Spieltag...'
-                  : `🚀 Spieltag jetzt in Supabase importieren (${uploadedFiles.matchesCount} Matches)`}
-              </button>
+                  return (
+                    <div
+                      key={sp.dir_path}
+                      onClick={() => toggleSelectSpieltag(sp.dir_path)}
+                      className={`grid grid-cols-1 md:grid-cols-12 items-center gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                        isChecked
+                          ? 'bg-cyan-500/10 border-cyan-400/50 shadow-[0_0_15px_rgba(0,212,255,0.12)]'
+                          : 'bg-slate-900/70 border-white/10 hover:border-white/25'
+                      }`}
+                    >
+                      {/* Checkbox + Titel + Ordner */}
+                      <div className="md:col-span-7 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleSelectSpieltag(sp.dir_path)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-1 w-4 h-4 rounded accent-cyan-400 cursor-pointer shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-white">
+                            <span className="text-cyan-300">{sp.sp_display}</span>{' '}
+                            ({sp.date_str}):{' '}
+                            <span className="text-white">{sp.team_display}</span> vs.{' '}
+                            <span className="text-amber-300">{sp.opp_display}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono truncate mt-0.5">
+                            📂 {sp.slug} | Stand: {sp.mtime_str}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Match-Anzahl */}
+                      <div className="md:col-span-2 text-xs md:text-sm font-bold text-slate-200 md:text-center">
+                        🎯 {sp.total_matches} Matches
+                      </div>
+
+                      {/* Status Badge */}
+                      <div className="md:col-span-3 flex md:justify-end">
+                        <div
+                          style={{
+                            background: 'rgba(13,27,42,0.85)',
+                            border: `1px solid ${statusColor}`,
+                            borderRadius: '8px',
+                            padding: '6px 10px',
+                            textAlign: 'center',
+                          }}
+                          className="w-full md:w-auto min-w-[165px]"
+                        >
+                          <div
+                            style={{
+                              fontSize: '0.78rem',
+                              fontWeight: 800,
+                              color: statusColor,
+                            }}
+                          >
+                            {sp.status_badge}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.68rem',
+                              color: '#cbd5e1',
+                            }}
+                          >
+                            {sp.status_desc}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Synchronisations-Checkbox & Batch-Import Button */}
+              <div className="pt-3 border-t border-white/10 space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer text-xs md:text-sm font-semibold text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={syncBatch}
+                    onChange={(e) => setSyncBatch(e.target.checked)}
+                    className="w-4 h-4 rounded accent-cyan-400 cursor-pointer"
+                  />
+                  <span>
+                    ✅ Automatisch in die offizielle Lions League Rangliste (
+                    <code>matches</code> & <code>doubles_matches</code>)
+                    synchronisieren
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleBatchImport}
+                  disabled={
+                    isPending || selectedSpieltageForImport.length === 0
+                  }
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-3.5 rounded-xl text-base transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {isPending
+                    ? `Importiere & Synchronisiere ${selectedSpieltageForImport.length} Spieltag(e)...`
+                    : `🚀 Alle ausgewählten Spieltage importieren (${selectedSpieltageForImport.length} von ${scannedList.length})`}
+                </button>
+              </div>
+
+              {/* Ergebnis-Details nach dem Batch-Import */}
+              {batchResult && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-2 text-xs md:text-sm">
+                  <div className="font-bold text-emerald-300">
+                    📋 Import-Protokoll:
+                  </div>
+                  {batchResult.results.map((r, i) => (
+                    <div key={i} className="text-slate-200">
+                      {r.success ? (
+                        <span>
+                          • 🟢 <b>{r.slug}</b> ({r.team} vs. {r.opponent}):{' '}
+                          {r.created} neu, {r.updated} aktualisiert
+                        </span>
+                      ) : (
+                        <span className="text-rose-400">
+                          • ❌ <b>{r.slug}</b>: {r.error}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-xs md:text-sm text-amber-300">
+              ⚠️ Keine Spieltags-CSV-Dateien (<code>*matches.csv</code>) unter{' '}
+              <code>{rootDir}</code> gefunden. Bitte prüfe den Pfad und klicke auf{' '}
+              <b>Hauptordner scannen</b>.
             </div>
           )}
+
+          {/* 3. ALTERNATIVE: MANUELLER DRAG & DROP UPLOAD */}
+          <details className="bg-slate-900/60 border border-white/10 rounded-xl p-4 group">
+            <summary className="text-xs md:text-sm font-bold text-slate-300 hover:text-cyan-300 cursor-pointer list-none flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span>📤</span> Alternative: Einzelne CSV-Dateien manuell hochladen
+                (Drag & Drop)
+              </span>
+              <span className="text-cyan-400 group-open:rotate-180 transition-transform">
+                ▼
+              </span>
+            </summary>
+
+            <div className="pt-4 mt-3 border-t border-white/10 space-y-4">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleFilesSelected(e.dataTransfer.files);
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-cyan-500/40 hover:border-cyan-400 bg-slate-900/60 hover:bg-slate-900/90 rounded-2xl p-6 text-center cursor-pointer transition-all space-y-2"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".csv,.json"
+                  onChange={(e) => handleFilesSelected(e.target.files)}
+                  className="hidden"
+                />
+                <div className="text-3xl">📂</div>
+                <p className="text-sm font-bold text-white">
+                  Klicke hier zum Auswählen oder ziehe Dateien per Drag & Drop
+                  hierher
+                </p>
+                <p className="text-xs text-slate-400">
+                  Unterstützt: <code>*matches.csv</code>, <code>*legs.csv</code>,{' '}
+                  <code>*visits.csv</code>, <code>*statistics.csv</code>,{' '}
+                  <code>*spieltag_info.json</code>
+                </p>
+              </div>
+
+              {uploadedFiles.fileNames.length > 0 && (
+                <div className="bg-slate-900/90 border border-white/10 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-cyan-300">
+                      Ausgewählte Dateien ({uploadedFiles.fileNames.length}):
+                    </span>
+                    <span className="font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded">
+                      {uploadedFiles.matchesCount} Matches erkannt
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleImportSpieltag}
+                    disabled={isPending || !uploadedFiles.matchesText}
+                    className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer"
+                  >
+                    🚀 Manuell ausgewählte Dateien importieren
+                  </button>
+                </div>
+              )}
+            </div>
+          </details>
         </div>
       )}
 

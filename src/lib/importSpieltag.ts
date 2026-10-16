@@ -1,4 +1,9 @@
 import { sql } from './db';
+import fs from 'fs';
+import path from 'path';
+
+export const DEFAULT_SPIELTAGE_DIR =
+  'C:\\Users\\sebas\\Documents\\Lions Weyhausen\\02_Liga\\Dart_Match_Image_Analyzer\\output\\spieltage';
 
 export interface ImportSpieltagPayload {
   season: string;
@@ -20,6 +25,8 @@ export interface ImportSpieltagPayload {
 export interface ImportResult {
   success: boolean;
   importedMatches: number;
+  created: number;
+  updated: number;
   importedLegs: number;
   importedVisits: number;
   importedLeagueSingles: number;
@@ -31,9 +38,45 @@ export interface ImportResult {
   error?: string;
 }
 
+export interface ScannedSpieltagItem {
+  dir_path: string;
+  match_file: string;
+  slug: string;
+  team_display: string;
+  opp_display: string;
+  sp_display: string;
+  date_str: string;
+  total_matches: number;
+  new_count: number;
+  existing_count: number;
+  status: 'NEW' | 'PARTIAL' | 'EXISTS';
+  status_badge: string;
+  status_desc: string;
+  mtime_str: string;
+  is_new_candidate: boolean;
+}
+
+export interface BatchImportItemResult {
+  slug: string;
+  team?: string;
+  opponent?: string;
+  created?: number;
+  updated?: number;
+  error?: string;
+  success: boolean;
+}
+
+export interface BatchImportSummary {
+  imported_spieltage: number;
+  total_created: number;
+  total_updated: number;
+  results: BatchImportItemResult[];
+}
+
 export function parseCsv(text: string): Record<string, string>[] {
   if (!text) return [];
-  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const cleanText = text.replace(/^\uFEFF/, '');
+  const lines = cleanText.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length < 2) return [];
 
   const firstLine = lines[0];
@@ -88,6 +131,397 @@ function parseIsoDate(rawDate?: string, fallbackSlug?: string): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function formatDisplayDate(rawDate?: string, fallbackSlug?: string): string {
+  if (rawDate) {
+    const dm = rawDate.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+    if (dm) {
+      let y = dm[3];
+      if (y.length === 2) y = `20${y}`;
+      const m = dm[2].padStart(2, '0');
+      const d = dm[1].padStart(2, '0');
+      return `${d}.${m}.${y}`;
+    }
+    const iso = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+      return `${iso[3]}.${iso[2]}.${iso[1]}`;
+    }
+  }
+  if (fallbackSlug) {
+    const dm = fallbackSlug.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+    if (dm) {
+      let y = dm[3];
+      if (y.length === 2) y = `20${y}`;
+      const m = dm[2].padStart(2, '0');
+      const d = dm[1].padStart(2, '0');
+      return `${d}.${m}.${y}`;
+    }
+  }
+  return '';
+}
+
+function walkDirectories(dir: string): { dirPath: string; files: string[] }[] {
+  const results: { dirPath: string; files: string[] }[] = [];
+  if (!dir || !fs.existsSync(dir)) return results;
+
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const fileNames = entries.filter((e) => e.isFile()).map((e) => e.name);
+    if (fileNames.length > 0) {
+      results.push({ dirPath: dir, files: fileNames });
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        results.push(...walkDirectories(path.join(dir, entry.name)));
+      }
+    }
+  } catch (err) {
+    console.error('Error walking directory:', dir, err);
+  }
+  return results;
+}
+
+export async function scanDirectoryForSpieltage(
+  rootDir: string = DEFAULT_SPIELTAGE_DIR,
+  season: string = '2026/2027'
+): Promise<ScannedSpieltagItem[]> {
+  if (!rootDir || !fs.existsSync(rootDir)) {
+    return [];
+  }
+
+  // Alle vorhandenen Analytics-Matches dieser Saison in einer einzigen Abfrage laden
+  const existingRows = await sql`
+    SELECT id, player_a_name, player_b_name, match_date, match_nr, event_name
+    FROM analytics_matches
+    WHERE season = ${season}
+  `;
+
+  const allDirs = walkDirectories(rootDir);
+  const foundSpieltage: ScannedSpieltagItem[] = [];
+
+  for (const { dirPath, files } of allDirs) {
+    const matchFiles = files.filter((f) => f.toLowerCase().endsWith('matches.csv'));
+    if (matchFiles.length === 0) continue;
+
+    // Spezifischste Datei bevorzugen (längster Name = präfixiert)
+    matchFiles.sort((a, b) => b.length - a.length);
+    const matchFile = matchFiles[0];
+    const fullMatchPath = path.join(dirPath, matchFile);
+
+    const prefix = matchFile.slice(0, -11); // ohne "matches.csv"
+    const infoFile =
+      files.find((f) => f.toLowerCase().endsWith('spieltag_info.json')) ||
+      'spieltag_info.json';
+    const infoPath = path.join(dirPath, infoFile);
+
+    let infoData: any = {};
+    if (fs.existsSync(infoPath)) {
+      try {
+        const rawJson = fs.readFileSync(infoPath, 'utf-8');
+        infoData = JSON.parse(rawJson);
+      } catch (e) {}
+    }
+
+    let matchesRows: Record<string, string>[] = [];
+    try {
+      const csvText = fs.readFileSync(fullMatchPath, 'utf-8');
+      matchesRows = parseCsv(csvText);
+    } catch (e) {
+      continue;
+    }
+
+    if (matchesRows.length === 0) continue;
+
+    const totalMatches = matchesRows.length;
+    const slug: string =
+      infoData.slug || prefix.replace(/_+$/, '') || path.basename(dirPath);
+    const team: string | undefined = infoData.team;
+    const opp: string | undefined = infoData.opponent;
+    let dtStr: string = formatDisplayDate(infoData.date, '');
+    const spNr: number | undefined = infoData.matchday_nr;
+
+    if (!dtStr) {
+      for (const r of matchesRows) {
+        if (r.start_datetime) {
+          const formatted = formatDisplayDate(r.start_datetime, '');
+          if (formatted) {
+            dtStr = formatted;
+            break;
+          }
+        }
+      }
+    }
+    if (!dtStr && slug) {
+      dtStr = formatDisplayDate('', slug);
+    }
+
+    const spieltagDateIso = parseIsoDate(dtStr || infoData.date, slug);
+
+    let newCount = 0;
+    let existingCount = 0;
+
+    const matchdayTeam = team
+      ? team.includes('A')
+        ? 'A-Team'
+        : team.includes('B')
+        ? 'B-Team'
+        : team
+      : slug.includes('Lions-A') || slug.includes('Lions A')
+      ? 'A-Team'
+      : slug.includes('Lions-B') || slug.includes('Lions B')
+      ? 'B-Team'
+      : null;
+
+    const eventNameStr = matchdayTeam
+      ? `Lions League (${matchdayTeam})`
+      : 'Lions League';
+
+    for (const mRow of matchesRows) {
+      const midCsv = (mRow.match_id || '').trim();
+      const homeP = (mRow.home_player || '').trim();
+      const awayP = (mRow.away_player || '').trim();
+      let mNr = parseInt(mRow.match_number || '0', 10) || 0;
+      if (mNr === 0 && midCsv.startsWith('M_')) {
+        mNr = parseInt(midCsv.replace('M_', ''), 10) || 0;
+      }
+
+      const startDt = (mRow.start_datetime || '').trim();
+      const mDate = startDt ? parseIsoDate(startDt, spieltagDateIso) : spieltagDateIso;
+
+      const exists = existingRows.some((er) => {
+        const dbDate = String(er.match_date || '').slice(0, 10);
+        const dbHome = String(er.player_a_name || '').trim();
+        const dbAway = String(er.player_b_name || '').trim();
+        const dbNr = Number(er.match_nr || 0);
+        const dbEvent = String(er.event_name || '').trim();
+
+        return (
+          (dbHome === homeP && dbAway === awayP && dbDate === mDate) ||
+          (dbNr === mNr && mNr > 0 && dbDate === mDate && dbEvent === eventNameStr)
+        );
+      });
+
+      if (exists) {
+        existingCount++;
+      } else {
+        newCount++;
+      }
+    }
+
+    let mtimeStr = '';
+    try {
+      const stat = fs.statSync(fullMatchPath);
+      const d = stat.mtime;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      mtimeStr = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(
+        d.getHours()
+      )}:${pad(d.getMinutes())}`;
+    } catch (e) {}
+
+    let status: 'NEW' | 'PARTIAL' | 'EXISTS';
+    let statusBadge: string;
+    let statusDesc: string;
+
+    if (existingCount === 0) {
+      status = 'NEW';
+      statusBadge = '🟢 NEU';
+      statusDesc = `${newCount} neue Spiele`;
+    } else if (newCount > 0) {
+      status = 'PARTIAL';
+      statusBadge = '🟡 TEILWEISE NEU';
+      statusDesc = `${newCount} neu, ${existingCount} vorhanden`;
+    } else {
+      status = 'EXISTS';
+      statusBadge = '⚪ VORHANDEN';
+      statusDesc = `Alle ${existingCount} Spiele in DB`;
+    }
+
+    const teamDisplay = team
+      ? team
+      : slug.includes('Lions-A')
+      ? 'Lions A'
+      : slug.includes('Lions-B')
+      ? 'Lions B'
+      : 'Lions';
+
+    const oppDisplay = opp
+      ? opp
+      : slug.includes('_vs_')
+      ? slug.split('_vs_').pop()!.replace(/-/g, ' ')
+      : 'Unbekannt';
+
+    let spDisplay = 'Spieltag ?';
+    if (spNr) {
+      spDisplay = `Spieltag ${spNr}`;
+    } else if (slug.includes('_SP')) {
+      const spPart = slug.split('_SP')[1]?.slice(0, 2);
+      const parsedSp = parseInt(spPart || '', 10);
+      if (!isNaN(parsedSp)) {
+        spDisplay = `Spieltag ${parsedSp}`;
+      }
+    }
+
+    foundSpieltage.push({
+      dir_path: dirPath,
+      match_file: fullMatchPath,
+      slug,
+      team_display: teamDisplay,
+      opp_display: oppDisplay,
+      sp_display: spDisplay,
+      date_str: dtStr || 'Unbekannt',
+      total_matches: totalMatches,
+      new_count: newCount,
+      existing_count: existingCount,
+      status,
+      status_badge: statusBadge,
+      status_desc: statusDesc,
+      mtime_str: mtimeStr,
+      is_new_candidate: status === 'NEW' || status === 'PARTIAL',
+    });
+  }
+
+  foundSpieltage.sort((a, b) => {
+    if (a.is_new_candidate !== b.is_new_candidate) {
+      return a.is_new_candidate ? -1 : 1;
+    }
+    return a.date_str.localeCompare(b.date_str);
+  });
+
+  return foundSpieltage;
+}
+
+export async function importSpieltagFromDirectory(
+  dirPath: string,
+  season: string = '2026/2027',
+  syncLeague: boolean = true
+): Promise<ImportResult> {
+  if (!dirPath || !fs.existsSync(dirPath)) {
+    return {
+      success: false,
+      importedMatches: 0,
+      created: 0,
+      updated: 0,
+      importedLegs: 0,
+      importedVisits: 0,
+      importedLeagueSingles: 0,
+      importedLeagueDoubles: 0,
+      matchdayDate: '',
+      opponent: '',
+      team: '',
+      message: `Ordner nicht gefunden: ${dirPath}`,
+      error: `Ordner nicht gefunden: ${dirPath}`,
+    };
+  }
+
+  const files = fs.readdirSync(dirPath);
+  const pickFile = (suffix: string) => {
+    const candidates = files.filter((f) => f.toLowerCase().endsWith(suffix.toLowerCase()));
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.length - a.length);
+    return path.join(dirPath, candidates[0]);
+  };
+
+  const matchesPath = pickFile('matches.csv');
+  if (!matchesPath) {
+    return {
+      success: false,
+      importedMatches: 0,
+      created: 0,
+      updated: 0,
+      importedLegs: 0,
+      importedVisits: 0,
+      importedLeagueSingles: 0,
+      importedLeagueDoubles: 0,
+      matchdayDate: '',
+      opponent: '',
+      team: '',
+      message: 'Keine matches.csv im Ordner gefunden.',
+      error: 'Keine matches.csv im Ordner gefunden.',
+    };
+  }
+
+  const legsPath = pickFile('legs.csv');
+  const visitsPath = pickFile('visits.csv');
+  const statsPath = pickFile('statistics.csv') || pickFile('stats.csv');
+  const infoPath = pickFile('spieltag_info.json');
+
+  const matchesCsvText = fs.readFileSync(matchesPath, 'utf-8');
+  const legsCsvText = legsPath && fs.existsSync(legsPath) ? fs.readFileSync(legsPath, 'utf-8') : '';
+  const visitsCsvText =
+    visitsPath && fs.existsSync(visitsPath) ? fs.readFileSync(visitsPath, 'utf-8') : '';
+  const statisticsCsvText =
+    statsPath && fs.existsSync(statsPath) ? fs.readFileSync(statsPath, 'utf-8') : '';
+
+  let spieltagInfo: any = {};
+  if (infoPath && fs.existsSync(infoPath)) {
+    try {
+      spieltagInfo = JSON.parse(fs.readFileSync(infoPath, 'utf-8'));
+    } catch (e) {}
+  }
+
+  if (!spieltagInfo.slug) {
+    spieltagInfo.slug = path.basename(dirPath);
+  }
+
+  return processSpieltagImport({
+    season,
+    spieltagInfo,
+    matchesCsvText,
+    legsCsvText,
+    visitsCsvText,
+    statisticsCsvText,
+    syncLeague,
+  });
+}
+
+export async function batchImportSpieltage(
+  selectedSpieltage: {
+    dir_path: string;
+    slug?: string;
+    team_display?: string;
+    opp_display?: string;
+  }[],
+  season: string = '2026/2027',
+  syncLeague: boolean = true
+): Promise<BatchImportSummary> {
+  let totalCreated = 0;
+  let totalUpdated = 0;
+  let importedCount = 0;
+  const results: BatchImportItemResult[] = [];
+
+  for (const sp of selectedSpieltage) {
+    const dirP = sp.dir_path;
+    if (!dirP || !fs.existsSync(dirP)) continue;
+
+    const res = await importSpieltagFromDirectory(dirP, season, syncLeague);
+    if (res.success) {
+      importedCount++;
+      totalCreated += res.created;
+      totalUpdated += res.updated;
+      results.push({
+        slug: sp.slug || path.basename(dirP),
+        team: sp.team_display || res.team,
+        opponent: sp.opp_display || res.opponent,
+        created: res.created,
+        updated: res.updated,
+        success: true,
+      });
+    } else {
+      results.push({
+        slug: sp.slug || path.basename(dirP),
+        error: res.error || res.message || 'Unbekannter Fehler',
+        success: false,
+      });
+    }
+  }
+
+  return {
+    imported_spieltage: importedCount,
+    total_created: totalCreated,
+    total_updated: totalUpdated,
+    results,
+  };
+}
+
 export async function processSpieltagImport(
   payload: ImportSpieltagPayload
 ): Promise<ImportResult> {
@@ -106,6 +540,8 @@ export async function processSpieltagImport(
     return {
       success: false,
       importedMatches: 0,
+      created: 0,
+      updated: 0,
       importedLegs: 0,
       importedVisits: 0,
       importedLeagueSingles: 0,
@@ -130,13 +566,17 @@ export async function processSpieltagImport(
     matchdayDate = parseIsoDate(matchesRows[0].start_datetime, slug);
   }
 
-  let team = spieltagInfo?.team || '';
-  if (!team) {
-    if (slug.includes('Lions-B') || slug.includes('Lions_B') || slug.includes('Lions B')) {
-      team = 'B-Team';
-    } else {
-      team = 'A-Team';
-    }
+  let rawTeam = spieltagInfo?.team || '';
+  let team = 'A-Team';
+  if (
+    rawTeam.includes('B') ||
+    slug.includes('Lions-B') ||
+    slug.includes('Lions_B') ||
+    slug.includes('Lions B')
+  ) {
+    team = 'B-Team';
+  } else {
+    team = 'A-Team';
   }
 
   let opponent = spieltagInfo?.opponent || '';
@@ -146,6 +586,8 @@ export async function processSpieltagImport(
       opponent = vsMatch[1].replace(/[-_]/g, ' ').trim();
     }
   }
+
+  const eventName = `Lions League (${team})`;
 
   // 2. Spieler-Mapping aus der Datenbank laden
   const playerRows = await sql`SELECT id, name, team FROM players`;
@@ -161,7 +603,6 @@ export async function processSpieltagImport(
       team: String(p.team),
       name: pName,
     });
-    // Auch nur Vorname als Fallback
     const firstName = pName.split(' ')[0].toLowerCase();
     if (!playerMap.has(firstName)) {
       playerMap.set(firstName, {
@@ -172,35 +613,43 @@ export async function processSpieltagImport(
     }
   }
 
-  // 3. Bestehende Matches an diesem Tag löschen (Deduplizierung)
+  // Prüfen, wie viele Matches für diesen Spieltag bereits existierten (für created vs updated Statistik)
+  const existingCountRows = await sql`
+    SELECT COUNT(*) as cnt
+    FROM analytics_matches
+    WHERE match_date = ${matchdayDate} AND season = ${season} AND event_name = ${eventName}
+  `;
+  const existingBeforeCount = Number(existingCountRows[0]?.cnt || 0);
+
+  // 3. Bestehende Matches dieses Teams an diesem Tag löschen (Deduplizierung)
   await sql`
     DELETE FROM analytics_visits
     WHERE leg_id IN (
       SELECT l.id FROM analytics_legs l
       JOIN analytics_matches m ON l.match_id = m.id
-      WHERE m.match_date = ${matchdayDate} AND m.season = ${season}
+      WHERE m.match_date = ${matchdayDate} AND m.season = ${season} AND m.event_name = ${eventName}
     )
   `;
   await sql`
     DELETE FROM analytics_legs
     WHERE match_id IN (
       SELECT id FROM analytics_matches
-      WHERE match_date = ${matchdayDate} AND season = ${season}
+      WHERE match_date = ${matchdayDate} AND season = ${season} AND event_name = ${eventName}
     )
   `;
   await sql`
     DELETE FROM analytics_matches
-    WHERE match_date = ${matchdayDate} AND season = ${season}
+    WHERE match_date = ${matchdayDate} AND season = ${season} AND event_name = ${eventName}
   `;
 
   if (syncLeague) {
     await sql`
       DELETE FROM matches
-      WHERE match_date = ${matchdayDate} AND season = ${season}
+      WHERE match_date = ${matchdayDate} AND season = ${season} AND team = ${team}
     `;
     await sql`
       DELETE FROM doubles_matches
-      WHERE match_date = ${matchdayDate} AND season = ${season}
+      WHERE match_date = ${matchdayDate} AND season = ${season} AND team = ${team}
     `;
   }
 
@@ -226,7 +675,8 @@ export async function processSpieltagImport(
     const awayPlayer = mRow.away_player || '';
     const resHome = parseInt(mRow.result_home || '0', 10) || 0;
     const resAway = parseInt(mRow.result_away || '0', 10) || 0;
-    const matchNr = parseInt(mRow.match_number || String(mIdx + 1), 10) || (mIdx + 1);
+    const matchNr =
+      parseInt(mRow.match_number || String(mIdx + 1), 10) || mIdx + 1;
     const boardNr = parseInt(mRow.board || '1', 10) || 1;
     const durMin = parseInt(mRow.duration_minutes || '0', 10) || 0;
     const startTime = mRow.start_datetime || '';
@@ -244,8 +694,8 @@ export async function processSpieltagImport(
     const pA = playerMap.get(homePlayer.toLowerCase());
     const pB = playerMap.get(awayPlayer.toLowerCase());
 
-    const pAId = pA?.id || 0;
-    const pBId = pB?.id || 0;
+    let pAId = pA?.id || 0;
+    let pBId = pB?.id || 0;
 
     // Doppel-Partner auflösen
     let dA1Id = 0,
@@ -258,11 +708,13 @@ export async function processSpieltagImport(
       if (partsA.length >= 2) {
         dA1Id = playerMap.get(partsA[0].toLowerCase())?.id || 0;
         dA2Id = playerMap.get(partsA[1].toLowerCase())?.id || 0;
+        if (pAId === 0 && dA1Id > 0) pAId = dA1Id;
       }
       const partsB = awayPlayer.split(/[/&+]/).map((s) => s.trim());
       if (partsB.length >= 2) {
         dB1Id = playerMap.get(partsB[0].toLowerCase())?.id || 0;
         dB2Id = playerMap.get(partsB[1].toLowerCase())?.id || 0;
+        if (pBId === 0 && dB1Id > 0) pBId = dB1Id;
       }
     }
 
@@ -280,7 +732,14 @@ export async function processSpieltagImport(
         ? pBId
         : dB1Id;
 
-    const eventName = `Lions League (${team})`;
+    const locationStr =
+      spieltagInfo?.is_home !== undefined
+        ? spieltagInfo.is_home
+          ? 'Heim'
+          : 'Auswärts'
+        : pBId > 0 && pAId === 0
+        ? 'Auswärts'
+        : 'Heim';
 
     // Insert analytics_match
     const insertedMatch = await sql`
@@ -291,7 +750,7 @@ export async function processSpieltagImport(
       ) VALUES (
         ${pAId}, ${pBId}, ${homePlayer}, ${awayPlayer}, ${matchdayDate},
         ${eventName}, 'Liga-Spiel', ${Math.max(matchLegs.length, resHome + resAway, 3)},
-        'Heim', ${winnerId || null}, ${season},
+        ${locationStr}, ${winnerId || null}, ${season},
         ${durMin}, ${startTime}, ${endTime}, ${boardNr}, ${matchNr}, 1
       )
       RETURNING id
@@ -336,10 +795,14 @@ export async function processSpieltagImport(
       const coWin = parseInt(legMeta?.checkout_winner || '0', 10) || 0;
       const isBrk = legMeta?.is_break === 'True' || legMeta?.is_break === 'true';
 
-      const dartsA = winnerPid === pAId ? dartsWin : dartsLos;
-      const dartsB = winnerPid === pAId ? dartsLos : dartsWin;
-      const coA = winnerPid === pAId ? coWin : 0;
-      const coB = winnerPid === pBId ? coWin : 0;
+      const isHomeWinner = winnerStr
+        ? winnerStr === homePlayer.toLowerCase()
+        : winnerPid === pAId;
+
+      const dartsA = isHomeWinner ? dartsWin : dartsLos;
+      const dartsB = isHomeWinner ? dartsLos : dartsWin;
+      const coA = isHomeWinner ? coWin : 0;
+      const coB = !isHomeWinner ? coWin : 0;
 
       // Leg einfügen
       const insertedLeg = await sql`
@@ -372,7 +835,8 @@ export async function processSpieltagImport(
         const score = parseInt(v.score || '0', 10) || 0;
         const restScore = parseInt(v.remaining_score || '0', 10) || 0;
         const oppRest = parseInt(v.opponent_remaining_score || '501', 10) || 501;
-        const vOrder = parseInt(v.visit_number || String(vIdx + 1), 10) || (vIdx + 1);
+        const vOrder =
+          parseInt(v.visit_number || String(vIdx + 1), 10) || vIdx + 1;
 
         const isPlayerA =
           vPlayer === homePlayer.toLowerCase() ||
@@ -418,65 +882,76 @@ export async function processSpieltagImport(
           const myLegsWon = isA ? resHome : resAway;
           const myLegsLost = isA ? resAway : resHome;
 
-          const myVisits = processedLegs.flatMap((l) => (isA ? l.visitsA : l.visitsB));
+          const myVisits = processedLegs.flatMap((l) =>
+            isA ? l.visitsA : l.visitsB
+          );
+          const first9Visits = processedLegs.flatMap((l) =>
+            (isA ? l.visitsA : l.visitsB).slice(0, 3)
+          );
+          const first18Visits = processedLegs.flatMap((l) =>
+            (isA ? l.visitsA : l.visitsB).slice(0, 6)
+          );
           const totalDarts = processedLegs.reduce(
             (sum, l) => sum + (isA ? l.dartsA : l.dartsB),
             0
           );
 
           // Aus stats.csv abgleichen falls vorhanden
-          const st = statsMap.get(`${matchIdCsv.toLowerCase()}_${lp.name.toLowerCase()}`);
+          const st = statsMap.get(
+            `${matchIdCsv.toLowerCase()}_${lp.name.toLowerCase()}`
+          );
 
-          const avgTotal =
-            st?.overall_average
-              ? parseFloat(st.overall_average)
-              : totalDarts > 0 && myVisits.length > 0
-              ? Math.round(((myVisits.reduce((a, b) => a + b, 0) / totalDarts) * 3) * 10) / 10
-              : 45.0;
+          const avgTotal = st?.overall_average
+            ? Math.round(parseFloat(st.overall_average) * 10) / 10
+            : totalDarts > 0 && myVisits.length > 0
+            ? Math.round(
+                (myVisits.reduce((a, b) => a + b, 0) / totalDarts) * 3 * 10
+              ) / 10
+            : 45.0;
 
-          const avg9 = st?.first_9_avg
-            ? parseFloat(st.first_9_avg)
-            : avgTotal;
+          const avg9 =
+            first9Visits.length > 0
+              ? Math.round(
+                  (first9Visits.reduce((a, b) => a + b, 0) /
+                    first9Visits.length) *
+                    10
+                ) / 10
+              : st?.first_9_avg
+              ? parseFloat(st.first_9_avg)
+              : avgTotal;
 
-          const avg18 = st?.first_18_avg
-            ? parseFloat(st.first_18_avg)
-            : avgTotal;
+          const avg18 =
+            first18Visits.length > 0
+              ? Math.round(
+                  (first18Visits.reduce((a, b) => a + b, 0) /
+                    first18Visits.length) *
+                    10
+                ) / 10
+              : st?.first_18_avg
+              ? parseFloat(st.first_18_avg)
+              : avgTotal;
 
-          const s80 = st?.scoring_80_plus
-            ? parseInt(st.scoring_80_plus, 10)
-            : myVisits.filter((s) => s >= 80 && s < 100).length;
-
-          const s100 = st?.scoring_100_plus
-            ? parseInt(st.scoring_100_plus, 10)
-            : myVisits.filter((s) => s >= 100 && s < 140).length;
-
-          const s140 = st?.scoring_140_plus
-            ? parseInt(st.scoring_140_plus, 10)
-            : myVisits.filter((s) => s >= 140 && s < 180).length;
-
-          const s180 = st?.scoring_180
-            ? parseInt(st.scoring_180, 10)
-            : myVisits.filter((s) => s === 180).length;
+          const s80 = myVisits.filter((s) => s >= 80 && s <= 99).length;
+          const s100 = myVisits.filter((s) => s >= 100 && s <= 139).length;
+          const s140 = myVisits.filter((s) => s >= 140 && s <= 179).length;
+          const s180 = myVisits.filter((s) => s === 180).length;
+          const s141_179 = myVisits.filter((s) => s >= 141 && s <= 179).length;
 
           const hf = Math.max(
             ...processedLegs.map((l) => (isA ? l.coA : l.coB)),
             0
           );
           const shortLegs = processedLegs.filter(
-            (l) => l.winnerPid === lp.pid && (isA ? l.dartsA : l.dartsB) <= 18 && (isA ? l.dartsA : l.dartsB) > 0
+            (l) =>
+              l.winnerPid === lp.pid &&
+              (isA ? l.dartsA : l.dartsB) <= 18 &&
+              (isA ? l.dartsA : l.dartsB) > 0
           ).length;
 
-          // Specials
           const specialsCount =
-            s180 +
-            (hf >= 101 ? 1 : 0) +
-            shortLegs +
-            myVisits.filter((s) => s >= 141 && s < 180).length;
+            s180 + s141_179 + (hf >= 101 ? 1 : 0) + shortLegs;
 
-          const pData = playerRows.find((p) => Number(p.id) === lp.pid);
-          const matchTeam = pData ? String(pData.team) : team;
-
-          await sql`
+          const insertedLm = await sql`
             INSERT INTO matches (
               player_id, match_date, opponent, legs_won, legs_lost,
               avg_total, avg_9, avg_18, scores_80, scores_100, scores_140,
@@ -486,19 +961,44 @@ export async function processSpieltagImport(
               ${lp.pid}, ${matchdayDate}, ${lp.oppName || opponent}, ${myLegsWon}, ${myLegsLost},
               ${avgTotal}, ${avg9}, ${avg18}, ${s80}, ${s100}, ${s140},
               ${s180}, ${hf >= 101 ? hf : 0}, ${shortLegs}, ${specialsCount},
-              ${season}, ${matchTeam}
+              ${season}, ${team}
             )
+            RETURNING id
           `;
+          if (insertedLm[0]?.id) {
+            await sql`
+              UPDATE analytics_matches SET league_match_id = ${Number(insertedLm[0].id)}
+              WHERE id = ${analyticsMatchId}
+            `;
+          }
           countLeagueSingles++;
         }
       } else {
         // DOPPELMATCH: Lions-Doppel identifizieren
-        const lionsDoubles: { p1: number; p2: number; oppName: string; isHome: boolean }[] = [];
+        const lionsDoubles: {
+          p1: number;
+          p2: number;
+          oppName: string;
+          isHome: boolean;
+          pairName: string;
+        }[] = [];
         if (dA1Id > 0 && dA2Id > 0) {
-          lionsDoubles.push({ p1: dA1Id, p2: dA2Id, oppName: awayPlayer, isHome: true });
+          lionsDoubles.push({
+            p1: dA1Id,
+            p2: dA2Id,
+            oppName: awayPlayer,
+            isHome: true,
+            pairName: homePlayer,
+          });
         }
         if (dB1Id > 0 && dB2Id > 0) {
-          lionsDoubles.push({ p1: dB1Id, p2: dB2Id, oppName: homePlayer, isHome: false });
+          lionsDoubles.push({
+            p1: dB1Id,
+            p2: dB2Id,
+            oppName: homePlayer,
+            isHome: false,
+            pairName: awayPlayer,
+          });
         }
 
         for (const ld of lionsDoubles) {
@@ -506,39 +1006,70 @@ export async function processSpieltagImport(
           const myLegsWon = isA ? resHome : resAway;
           const myLegsLost = isA ? resAway : resHome;
 
-          const myVisits = processedLegs.flatMap((l) => (isA ? l.visitsA : l.visitsB));
+          const myVisits = processedLegs.flatMap((l) =>
+            isA ? l.visitsA : l.visitsB
+          );
+          const first9Visits = processedLegs.flatMap((l) =>
+            (isA ? l.visitsA : l.visitsB).slice(0, 3)
+          );
+          const first18Visits = processedLegs.flatMap((l) =>
+            (isA ? l.visitsA : l.visitsB).slice(0, 6)
+          );
           const totalDarts = processedLegs.reduce(
             (sum, l) => sum + (isA ? l.dartsA : l.dartsB),
             0
           );
 
-          const avgTotal =
-            totalDarts > 0 && myVisits.length > 0
-              ? Math.round(((myVisits.reduce((a, b) => a + b, 0) / totalDarts) * 3) * 10) / 10
-              : 42.0;
+          const st = statsMap.get(
+            `${matchIdCsv.toLowerCase()}_${ld.pairName.toLowerCase()}`
+          );
 
-          const s80 = myVisits.filter((s) => s >= 80 && s < 100).length;
-          const s100 = myVisits.filter((s) => s >= 100 && s < 140).length;
-          const s140 = myVisits.filter((s) => s >= 140 && s < 180).length;
+          const avgTotal = st?.overall_average
+            ? Math.round(parseFloat(st.overall_average) * 10) / 10
+            : totalDarts > 0 && myVisits.length > 0
+            ? Math.round(
+                (myVisits.reduce((a, b) => a + b, 0) / totalDarts) * 3 * 10
+              ) / 10
+            : 42.0;
+
+          const avg9 =
+            first9Visits.length > 0
+              ? Math.round(
+                  (first9Visits.reduce((a, b) => a + b, 0) /
+                    first9Visits.length) *
+                    10
+                ) / 10
+              : avgTotal;
+
+          const avg18 =
+            first18Visits.length > 0
+              ? Math.round(
+                  (first18Visits.reduce((a, b) => a + b, 0) /
+                    first18Visits.length) *
+                    10
+                ) / 10
+              : avgTotal;
+
+          const s80 = myVisits.filter((s) => s >= 80 && s <= 99).length;
+          const s100 = myVisits.filter((s) => s >= 100 && s <= 139).length;
+          const s140 = myVisits.filter((s) => s >= 140 && s <= 179).length;
           const s180 = myVisits.filter((s) => s === 180).length;
+          const s141_179 = myVisits.filter((s) => s >= 141 && s <= 179).length;
 
           const hf = Math.max(
             ...processedLegs.map((l) => (isA ? l.coA : l.coB)),
             0
           );
           const shortLegs = processedLegs.filter(
-            (l) => (isA ? l.dartsA : l.dartsB) <= 18 && (isA ? l.dartsA : l.dartsB) > 0
+            (l) =>
+              (isA ? l.dartsA : l.dartsB) <= 18 &&
+              (isA ? l.dartsA : l.dartsB) > 0
           ).length;
 
           const specialsCount =
-            s180 +
-            (hf >= 101 ? 1 : 0) +
-            shortLegs;
+            s180 + s141_179 + (hf >= 101 ? 1 : 0) + shortLegs;
 
-          const pData = playerRows.find((p) => Number(p.id) === ld.p1);
-          const matchTeam = pData ? String(pData.team) : team;
-
-          await sql`
+          const insertedDm = await sql`
             INSERT INTO doubles_matches (
               player1_id, player2_id, match_date, opponent,
               legs_won, legs_lost, avg_total, avg_9, avg_18,
@@ -547,21 +1078,128 @@ export async function processSpieltagImport(
               season, team
             ) VALUES (
               ${ld.p1}, ${ld.p2}, ${matchdayDate}, ${ld.oppName || opponent},
-              ${myLegsWon}, ${myLegsLost}, ${avgTotal}, ${avgTotal}, ${avgTotal},
+              ${myLegsWon}, ${myLegsLost}, ${avgTotal}, ${avg9}, ${avg18},
               ${s80}, ${s100}, ${s140}, ${s180},
               ${hf >= 101 ? hf : 0}, ${shortLegs}, ${specialsCount},
-              ${season}, ${matchTeam}
+              ${season}, ${team}
             )
+            RETURNING id
           `;
+          if (insertedDm[0]?.id) {
+            await sql`
+              UPDATE analytics_matches SET league_match_id = ${Number(insertedDm[0].id)}
+              WHERE id = ${analyticsMatchId}
+            `;
+          }
           countLeagueDoubles++;
+
+          // Doppel-Specials synchronisieren (+0,5 Pkt Bonus in Rangliste)
+          if (s180 > 0 || s141_179 > 0 || hf >= 101 || shortLegs > 0) {
+            const p1Row = playerRows.find((p) => Number(p.id) === ld.p1);
+            const p2Row = playerRows.find((p) => Number(p.id) === ld.p2);
+            const p1NameStr = p1Row ? String(p1Row.name) : 'Partner';
+            const p2NameStr = p2Row ? String(p2Row.name) : 'Partner';
+            const oppTeam = opponent || ld.oppName;
+
+            if (s180 > 0) {
+              const chk = await sql`
+                SELECT id FROM doubles_specials
+                WHERE player_id = ${ld.p1} AND match_date = ${matchdayDate}
+                  AND special_type LIKE '%180%' AND season = ${season}
+              `;
+              if (chk.length === 0) {
+                for (let idx = 0; idx < s180; idx++) {
+                  await sql`
+                    INSERT INTO doubles_specials (
+                      player_id, partner_name, opponent_team, match_date, special_type, description, season
+                    ) VALUES (
+                      ${ld.p1}, ${p2NameStr}, ${oppTeam}, ${matchdayDate},
+                      '180er High Score 🎯', ${`180er im Doppel mit ${p2NameStr}`}, ${season}
+                    )
+                  `;
+                }
+              }
+            }
+
+            if (s141_179 > 0) {
+              for (const hs of myVisits.filter((s) => s >= 141 && s <= 179)) {
+                const chk = await sql`
+                  SELECT id FROM doubles_specials
+                  WHERE player_id = ${ld.p1} AND match_date = ${matchdayDate}
+                    AND special_type LIKE '%High Score%' AND description LIKE ${`%${hs}%`} AND season = ${season}
+                `;
+                if (chk.length === 0) {
+                  await sql`
+                    INSERT INTO doubles_specials (
+                      player_id, partner_name, opponent_team, match_date, special_type, description, season
+                    ) VALUES (
+                      ${ld.p1}, ${p2NameStr}, ${oppTeam}, ${matchdayDate},
+                      'High Score (141 - 171) 💥', ${`${hs}er High Score im Doppel mit ${p2NameStr}`}, ${season}
+                    )
+                  `;
+                }
+              }
+            }
+
+            if (hf >= 101) {
+              for (const [pid, partner] of [
+                [ld.p1, p2NameStr],
+                [ld.p2, p1NameStr],
+              ] as [number, string][]) {
+                const chk = await sql`
+                  SELECT id FROM doubles_specials
+                  WHERE player_id = ${pid} AND match_date = ${matchdayDate}
+                    AND special_type LIKE '%High Finish%' AND season = ${season}
+                `;
+                if (chk.length === 0) {
+                  await sql`
+                    INSERT INTO doubles_specials (
+                      player_id, partner_name, opponent_team, match_date, special_type, description, season
+                    ) VALUES (
+                      ${pid}, ${partner}, ${oppTeam}, ${matchdayDate},
+                      'High Finish (101 - 170) 🏁', ${`${hf}er Checkout im Doppel`}, ${season}
+                    )
+                  `;
+                }
+              }
+            }
+
+            if (shortLegs > 0) {
+              for (const [pid, partner] of [
+                [ld.p1, p2NameStr],
+                [ld.p2, p1NameStr],
+              ] as [number, string][]) {
+                const chk = await sql`
+                  SELECT id FROM doubles_specials
+                  WHERE player_id = ${pid} AND match_date = ${matchdayDate}
+                    AND special_type LIKE '%Short%' AND season = ${season}
+                `;
+                if (chk.length === 0) {
+                  await sql`
+                    INSERT INTO doubles_specials (
+                      player_id, partner_name, opponent_team, match_date, special_type, description, season
+                    ) VALUES (
+                      ${pid}, ${partner}, ${oppTeam}, ${matchdayDate},
+                      'Short Game (≤ 18 Darts) 🏹', 'Short Leg im Doppel', ${season}
+                    )
+                  `;
+                }
+              }
+            }
+          }
         }
       }
     }
   }
 
+  const updatedCount = Math.min(countMatches, existingBeforeCount);
+  const createdCount = Math.max(0, countMatches - updatedCount);
+
   return {
     success: true,
     importedMatches: countMatches,
+    created: createdCount,
+    updated: updatedCount,
     importedLegs: countLegs,
     importedVisits: countVisits,
     importedLeagueSingles: countLeagueSingles,
@@ -569,6 +1207,6 @@ export async function processSpieltagImport(
     matchdayDate,
     opponent,
     team,
-    message: `🎉 Spieltag erfolgreich importiert! ${countMatches} Matches, ${countLegs} Legs und ${countVisits} Aufnahmen wurden in Supabase gespeichert (${countLeagueSingles} Einzel & ${countLeagueDoubles} Doppel in die Lions League Rangliste synchronisiert).`,
+    message: `🎉 Spieltag erfolgreich importiert! ${countMatches} Matches (${createdCount} neu, ${updatedCount} aktualisiert), ${countLegs} Legs und ${countVisits} Aufnahmen wurden in Supabase gespeichert.`,
   };
 }

@@ -498,6 +498,7 @@ export async function importSpieltagAction(payload: {
       revalidatePath('/teams');
       revalidatePath('/spieler');
       revalidatePath('/verwaltung');
+      revalidatePath('/eingabe');
     }
 
     return result;
@@ -506,6 +507,8 @@ export async function importSpieltagAction(payload: {
     return {
       success: false,
       importedMatches: 0,
+      created: 0,
+      updated: 0,
       importedLegs: 0,
       importedVisits: 0,
       importedLeagueSingles: 0,
@@ -518,4 +521,60 @@ export async function importSpieltagAction(payload: {
     };
   }
 }
+
+export async function scanSpieltageDirectoryAction(
+  rootDir: string,
+  season: string = '2026/2027'
+) {
+  try {
+    const { scanDirectoryForSpieltage } = await import('@/lib/importSpieltag');
+    const items = await scanDirectoryForSpieltage(rootDir, season);
+    return { success: true, items };
+  } catch (err: any) {
+    console.error('Error in scanSpieltageDirectoryAction:', err);
+    return { success: false, items: [], error: err.message };
+  }
+}
+
+export async function batchImportSpieltageAction(
+  selectedSpieltage: {
+    dir_path: string;
+    slug?: string;
+    team_display?: string;
+    opp_display?: string;
+  }[],
+  season: string = '2026/2027',
+  syncLeague: boolean = true
+) {
+  try {
+    const { batchImportSpieltage } = await import('@/lib/importSpieltag');
+    const summary = await batchImportSpieltage(
+      selectedSpieltage,
+      season,
+      syncLeague
+    );
+
+    revalidatePath('/', 'layout');
+    revalidatePath('/analytics');
+    revalidatePath('/teams');
+    revalidatePath('/spieler');
+    revalidatePath('/verwaltung');
+    revalidatePath('/eingabe');
+
+    return { success: true, summary };
+  } catch (err: any) {
+    console.error('Error in batchImportSpieltageAction:', err);
+    return {
+      success: false,
+      error: err.message,
+      summary: {
+        imported_spieltage: 0,
+        total_created: 0,
+        total_updated: 0,
+        results: [],
+      },
+    };
+  }
+}
+
 
