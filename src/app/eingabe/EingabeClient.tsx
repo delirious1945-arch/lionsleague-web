@@ -90,12 +90,25 @@ export default function EingabeClient({
     null
   );
 
-  const handleScanDirectory = (customSeason?: string) => {
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+
+  const handleScanDirectory = async (customSeason?: string) => {
     const targetSeason = customSeason || season;
-    startTransition(async () => {
-      setMessage(null);
-      setBatchResult(null);
-      const res = await scanSpieltageDirectoryAction(rootDir, targetSeason);
+    setIsScanning(true);
+    setMessage(null);
+    setBatchResult(null);
+    try {
+      const resp = await fetch('/api/spieltage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'scan',
+          rootDir,
+          season: targetSeason,
+        }),
+      });
+      const res = await resp.json();
       if (res.success) {
         setScannedList(res.items);
         const nextSel: Record<string, boolean> = {};
@@ -103,13 +116,24 @@ export default function EingabeClient({
           nextSel[sp.dir_path] = sp.is_new_candidate;
         }
         setSelectedSlugs(nextSel);
+        setMessage({
+          text: `🔍 Hauptordner erfolgreich gescannt: ${res.items.length} Spieltags-Ordner gefunden.`,
+          type: 'success',
+        });
       } else {
         setMessage({
           text: `Fehler beim Scannen des Hauptordners: ${res.error}`,
           type: 'error',
         });
       }
-    });
+    } catch (err: any) {
+      setMessage({
+        text: `Netzwerkfehler beim Scannen: ${err.message}`,
+        type: 'error',
+      });
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const toggleSelectSpieltag = (dirPath: string) => {
@@ -125,6 +149,7 @@ export default function EingabeClient({
       next[sp.dir_path] = true;
     }
     setSelectedSlugs(next);
+    setMessage(null);
   };
 
   const selectOnlyNewSpieltage = () => {
@@ -143,48 +168,67 @@ export default function EingabeClient({
     (sp) => !!selectedSlugs[sp.dir_path]
   );
 
-  const handleBatchImport = () => {
-    if (selectedSpieltageForImport.length === 0) return;
+  const handleBatchImport = async () => {
+    if (selectedSpieltageForImport.length === 0) {
+      setMessage({
+        text: `⚠️ Es ist aktuell kein Spieltag angehakt (0 von ${scannedList.length} ausgewählt). Da alle Spieltage bereits den Status „⚪ VORHANDEN“ haben, setze bitte zuerst links einen Haken ☑️ bei den Spieltagen, die du erneut importieren möchtest (oder klicke auf „☑️ Alle auswählen“).`,
+        type: 'error',
+      });
+      return;
+    }
 
-    startTransition(async () => {
-      setMessage(null);
-      setBatchResult(null);
+    setIsImporting(true);
+    setMessage(null);
+    setBatchResult(null);
 
-      const res = await batchImportSpieltageAction(
-        selectedSpieltageForImport.map((sp) => ({
-          dir_path: sp.dir_path,
-          slug: sp.slug,
-          team_display: sp.team_display,
-          opp_display: sp.opp_display,
-        })),
-        season,
-        syncBatch
-      );
+    try {
+      const resp = await fetch('/api/spieltage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'batch_import',
+          selectedSpieltage: selectedSpieltageForImport.map((sp) => ({
+            dir_path: sp.dir_path,
+            slug: sp.slug,
+            team_display: sp.team_display,
+            opp_display: sp.opp_display,
+          })),
+          season,
+          syncLeague: syncBatch,
+          rootDir,
+        }),
+      });
+      const res = await resp.json();
 
-      if (res.success) {
+      if (res.success && res.summary) {
         setBatchResult(res.summary);
         setMessage({
-          text: `✅ Batch-Import abgeschlossen: ${res.summary.imported_spieltage} Spieltag(e) verarbeitet (${res.summary.total_created} Spiele neu angelegt, ${res.summary.total_updated} aktualisiert/ersetzt).`,
+          text: `✅ Batch-Import abgeschlossen: ${res.summary.imported_spieltage} Spieltag(e) erfolgreich verarbeitet (${res.summary.total_created} Spiele neu angelegt, ${res.summary.total_updated} aktualisiert/ersetzt).`,
           type: 'success',
         });
 
-        // Nach dem Import automatisch neu scannen, damit der Status auf ⚪ VORHANDEN aktualisiert wird
-        const scanRes = await scanSpieltageDirectoryAction(rootDir, season);
-        if (scanRes.success) {
-          setScannedList(scanRes.items);
+        if (res.items) {
+          setScannedList(res.items);
           const nextSel: Record<string, boolean> = {};
-          for (const sp of scanRes.items) {
+          for (const sp of res.items) {
             nextSel[sp.dir_path] = sp.is_new_candidate;
           }
           setSelectedSlugs(nextSel);
         }
       } else {
         setMessage({
-          text: `❌ Fehler beim Batch-Import: ${res.error}`,
+          text: `❌ Fehler beim Batch-Import: ${res.error || 'Unbekannter Fehler'}`,
           type: 'error',
         });
       }
-    });
+    } catch (err: any) {
+      setMessage({
+        text: `❌ Netzwerkfehler beim Batch-Import: ${err.message}`,
+        type: 'error',
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // Alternative: Manuelles Drag & Drop einzelner CSV-Dateien
@@ -654,11 +698,11 @@ export default function EingabeClient({
               <button
                 type="button"
                 onClick={() => handleScanDirectory()}
-                disabled={isPending}
+                disabled={isScanning || isImporting}
                 className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-300 font-bold py-2.5 px-4 rounded-xl text-sm transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <span>🔍</span>{' '}
-                {isPending ? 'Scanne...' : 'Hauptordner scannen'}
+                {isScanning ? 'Scanne...' : 'Hauptordner scannen'}
               </button>
             </div>
           </div>
@@ -837,19 +881,49 @@ export default function EingabeClient({
                   </span>
                 </label>
 
+                {selectedSpieltageForImport.length === 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs md:text-sm text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <span>
+                      ℹ️ Aktuell sind <b>0 Spieltage angehakt</b>, da alle{' '}
+                      {scannedList.length} Spieltage bereits in Supabase
+                      vorhanden sind (<b>⚪ VORHANDEN</b>). Setze oben links
+                      einen Haken ☑️ bei den gewünschten Spieltagen oder klicke
+                      rechts auf „Alle auswählen“, um sie erneut zu importieren:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={selectAllSpieltage}
+                      className="shrink-0 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 font-bold px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-colors"
+                    >
+                      ☑️ Alle {scannedList.length} Spieltage anhaken
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={handleBatchImport}
-                  disabled={
-                    isPending || selectedSpieltageForImport.length === 0
-                  }
+                  disabled={isImporting}
                   className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-3.5 rounded-xl text-base transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 cursor-pointer"
                 >
-                  {isPending
-                    ? `Importiere & Synchronisiere ${selectedSpieltageForImport.length} Spieltag(e)...`
+                  {isImporting
+                    ? `⏳ Importiere & Synchronisiere ${selectedSpieltageForImport.length} Spieltag(e) in Supabase...`
                     : `🚀 Alle ausgewählten Spieltage importieren (${selectedSpieltageForImport.length} von ${scannedList.length})`}
                 </button>
               </div>
+
+              {/* Direktes Feedback auch direkt unter dem Button */}
+              {message && (
+                <div
+                  className={`p-4 rounded-xl border text-sm font-semibold animate-fadeIn ${
+                    message.type === 'success'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                      : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                  }`}
+                >
+                  {message.text}
+                </div>
+              )}
 
               {/* Ergebnis-Details nach dem Batch-Import */}
               {batchResult && (

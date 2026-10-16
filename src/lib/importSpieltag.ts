@@ -102,31 +102,31 @@ export function parseCsv(text: string): Record<string, string>[] {
   return rows;
 }
 
-function parseIsoDate(rawDate?: string, fallbackSlug?: string): string {
-  if (rawDate) {
-    const dm = rawDate.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
-    if (dm) {
-      let y = dm[3];
-      if (y.length === 2) y = `20${y}`;
-      const m = dm[2].padStart(2, '0');
-      const d = dm[1].padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-    if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return rawDate;
-    }
+function extractIsoDateFromString(str?: string): string | null {
+  if (!str) return null;
+  // 1. Check YYYY-MM-DD first
+  const isoMatch = str.match(/(?:^|[^\d])(\d{4})-(\d{2})-(\d{2})(?:$|[^\d])/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
   }
+  // 2. Check DD.MM.YYYY or DD-MM-YYYY or DD.MM.YY
+  const dm = str.match(/(?:^|[^\d])(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})(?:$|[^\d])/);
+  if (dm) {
+    let y = dm[3];
+    if (y.length === 2) y = `20${y}`;
+    const m = dm[2].padStart(2, '0');
+    const d = dm[1].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+}
 
-  if (fallbackSlug) {
-    const dm = fallbackSlug.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
-    if (dm) {
-      let y = dm[3];
-      if (y.length === 2) y = `20${y}`;
-      const m = dm[2].padStart(2, '0');
-      const d = dm[1].padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-  }
+function parseIsoDate(rawDate?: string, fallbackSlug?: string): string {
+  const fromRaw = extractIsoDateFromString(rawDate);
+  if (fromRaw) return fromRaw;
+
+  const fromFallback = extractIsoDateFromString(fallbackSlug);
+  if (fromFallback) return fromFallback;
 
   return new Date().toISOString().split('T')[0];
 }
@@ -750,7 +750,7 @@ export async function processSpieltagImport(
       ) VALUES (
         ${pAId}, ${pBId}, ${homePlayer}, ${awayPlayer}, ${matchdayDate},
         ${eventName}, 'Liga-Spiel', ${Math.max(matchLegs.length, resHome + resAway, 3)},
-        ${locationStr}, ${winnerId || null}, ${season},
+        ${locationStr}, ${winnerId || 0}, ${season},
         ${durMin}, ${startTime}, ${endTime}, ${boardNr}, ${matchNr}, 1
       )
       RETURNING id
@@ -811,7 +811,7 @@ export async function processSpieltagImport(
           score_before_a, score_before_b, darts_thrown_a, darts_thrown_b,
           checkout_a, checkout_b, is_break
         ) VALUES (
-          ${analyticsMatchId}, ${lIdx}, ${starterPid || null}, ${winnerPid || null},
+          ${analyticsMatchId}, ${lIdx}, ${starterPid || 0}, ${winnerPid || 0},
           501, 501, ${dartsA}, ${dartsB}, ${coA}, ${coB}, ${isBrk}
         )
         RETURNING id
@@ -828,6 +828,14 @@ export async function processSpieltagImport(
 
       const visitsA: number[] = [];
       const visitsB: number[] = [];
+      const visitBatch: {
+        leg_id: number;
+        player_id: number;
+        visit_order: number;
+        score: number;
+        rest_score: number;
+        opponent_rest_at_visit: number;
+      }[] = [];
 
       for (let vIdx = 0; vIdx < legVisits.length; vIdx++) {
         const v = legVisits[vIdx];
@@ -846,14 +854,29 @@ export async function processSpieltagImport(
         if (isPlayerA) visitsA.push(score);
         else visitsB.push(score);
 
+        visitBatch.push({
+          leg_id: legId,
+          player_id: vPid || 0,
+          visit_order: vOrder,
+          score,
+          rest_score: restScore,
+          opponent_rest_at_visit: oppRest,
+        });
+      }
+
+      if (visitBatch.length > 0) {
         await sql`
-          INSERT INTO analytics_visits (
-            leg_id, player_id, visit_order, score, rest_score, opponent_rest_at_visit
-          ) VALUES (
-            ${legId}, ${vPid || null}, ${vOrder}, ${score}, ${restScore}, ${oppRest}
-          )
+          INSERT INTO analytics_visits ${sql(
+            visitBatch,
+            'leg_id',
+            'player_id',
+            'visit_order',
+            'score',
+            'rest_score',
+            'opponent_rest_at_visit'
+          )}
         `;
-        countVisits++;
+        countVisits += visitBatch.length;
       }
 
       processedLegs.push({
