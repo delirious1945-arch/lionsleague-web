@@ -741,20 +741,27 @@ export function computePlayerAnalytics(
   const lowScoreFollowUps: number[] = [];
   let shortLegsUnderPressure = 0;
   let highFinishesCount = 0;
+  let decidersPlayed = 0;
+  let decidersWon = 0;
 
   for (const leg of legsVisits) {
     if (!leg || leg.length === 0) continue;
     const isDecider = leg[0].leg_num >= 5;
+    if (isDecider) decidersPlayed++;
+
     const lastVisit = leg[leg.length - 1];
     const legWon = lastVisit.winner_player_id === playerId;
     const legDarts = lastVisit.darts_thrown && lastVisit.darts_thrown > 0 ? lastVisit.darts_thrown : leg.length * 3;
     const checkout = lastVisit.checkout;
 
-    if (legWon && checkout && checkout >= 70) {
-      highFinishesCount++;
-    }
-    if (legWon && isDecider && legDarts <= 24) {
-      shortLegsUnderPressure++;
+    if (legWon) {
+      if (checkout && checkout >= 70) {
+        highFinishesCount++;
+      }
+      if (isDecider) {
+        decidersWon++;
+        if (legDarts <= 24) shortLegsUnderPressure++;
+      }
     }
 
     for (let i = 0; i < leg.length; i++) {
@@ -926,20 +933,24 @@ export function computePlayerAnalytics(
     return { grade, label, stars, color };
   };
 
-  // 1. Nervenstärke (Clutch) - Im Amateurbereich: Siegquote + Druck-Scoring
-  const clutchScore = Math.min(
-    95,
-    Math.max(
-      25,
-      62 +
-        clutchDelta * 2.0 +
-        legWinPct * 26 +
-        highFinishesCount * 5 +
-        shortLegsUnderPressure * 4 +
-        (matchAvg >= 50 ? 5 : 0)
-    )
-  );
-  const gClutch = calcGrade(clutchScore, 40, 95);
+  // 1. Nervenstärke (Clutch) - Doppelkrise/Zitterzone, Decider, Leg-Siegquote & Druck-Scoring
+  const zitterRate = wonLegsCount > 0 ? cZitter / wonLegsCount : 0;
+  const cleanWinRate = wonLegsCount > 0 ? (cElite + cLigaTop + cNorm) / wonLegsCount : 0;
+
+  let clutchScore = 55;
+  clutchScore += cleanWinRate * 25; // Bonus für saubere Legs (<= 30 Darts)
+  clutchScore -= zitterRate * 28;   // Spürbarer Malus für Zitterzone (43+ Darts)
+  clutchScore += legWinPct * 15;
+  clutchScore += Math.max(-10, Math.min(10, clutchDelta * 1.5));
+  if (decidersPlayed > 0) {
+    clutchScore += (decidersWon / decidersPlayed) * 8;
+  }
+  clutchScore += highFinishesCount * 5;
+  if (matchAvg >= 50) clutchScore += 5;
+  else if (matchAvg < 40) clutchScore -= 6;
+
+  clutchScore = Math.min(95, Math.max(25, clutchScore));
+  const gClutch = calcGrade(clutchScore, 35, 92);
 
   // 2. Tilt-Resistenz & Fehlerverarbeitung
   const gTilt = calcGrade(tiltScore, 38, 92);
@@ -994,36 +1005,46 @@ export function computePlayerAnalytics(
       description:
         'Misst Fokus und Scoring unter akutem Druck (Gegner im Finish-Bereich ≤ 120 / Decider) sowie die eiskalte Vollendung in engen Legs.',
       formula_explanation:
-        'Gewichtet zu 35 % aus dem Scoring unter direktem Gegnerdruck vs. Baseline, zu 40 % aus der Leg-Gewinnquote sowie zu 25 % aus Boni für High-Finishes (≥ 70) und Decider-Short-Legs (≤ 24 Darts).',
+        'Gewichtet zu 40 % aus der Finish-Effizienz (saubere Legs ≤ 30 Darts vs. Zitterzone 43+ Darts bei Doppelfehlwürfen), zu 35 % aus der Leg-Gewinnquote & Decider-Härte (5. Leg) sowie zu 25 % aus Druck-Scoring und High-Finishes (≥ 70).',
       factors: [
         {
-          name: 'Scoring unter Druck',
-          weight: '35 %',
-          value: `${pressureAvg.toFixed(1)} Pkt (Base: ${baselineAvg.toFixed(1)})`,
+          name: 'Finish-Effizienz & Zitterzone',
+          weight: '40 %',
+          value: `${cElite + cLigaTop + cNorm}x sauber (≤30) • ${cArbeit}x Arbeit • ${cZitter}x Zitterzone (43+)`,
           impact:
-            clutchDelta >= 0
-              ? `+${clutchDelta.toFixed(1)} Pkt Steigerung`
-              : `${clutchDelta.toFixed(1)} Pkt Differenz`,
+            zitterRate >= 0.4
+              ? 'Hohe Zitteranfälligkeit auf Doppel'
+              : zitterRate > 0
+              ? 'Gelegentliche Doppelkrise'
+              : 'Eiskalt im Finish (0 % Zitterzone)',
         },
         {
-          name: 'Leg-Gewinnquote',
-          weight: '40 %',
-          value: `${(legWinPct * 100).toFixed(0)} % (${wonLegsCount}/${legsVisits.length} Legs)`,
+          name: 'Leg-Gewinnquote & Decider',
+          weight: '35 %',
+          value: `${(legWinPct * 100).toFixed(0)} % (${wonLegsCount}/${legsVisits.length} Legs) • ${
+            decidersPlayed > 0
+              ? `${decidersWon}/${decidersPlayed} Decider gewonnen`
+              : '0 Decider gespielt'
+          }`,
           impact:
-            legWinPct >= 0.7
-              ? 'Überragende Matchhärte'
-              : legWinPct >= 0.5
-              ? 'Solide Verlässlichkeit'
+            decidersPlayed > 0 && decidersWon === decidersPlayed
+              ? '100 % Decider-Siegquote (Matchhärte)'
+              : decidersPlayed > 0
+              ? `${Math.round((decidersWon / decidersPlayed) * 100)} % Decider-Siegquote`
+              : legWinPct >= 0.6
+              ? 'Souveräne Matchkontrolle'
               : 'Ausbaufähig',
         },
         {
-          name: 'High-Finishes & Decider',
+          name: 'Druck-Scoring & High-Finishes',
           weight: '25 %',
-          value: `${highFinishesCount}x Checks ≥ 70 / ${shortLegsUnderPressure}x Decider ≤ 24 Darts`,
+          value: `${pressureAvg.toFixed(1)} Pkt (Base: ${baselineAvg.toFixed(1)}) • ${highFinishesCount}x Checks ≥ 70`,
           impact:
-            highFinishesCount > 0
-              ? 'Kaltblütiger Finisher'
-              : 'Solide Matchverwaltung',
+            clutchDelta >= 1.0
+              ? `+${clutchDelta.toFixed(1)} Pkt Steigerung unter Druck`
+              : clutchDelta <= -1.0
+              ? `${clutchDelta.toFixed(1)} Pkt Abfall unter Druck`
+              : 'Konstantes Scoring unter Druck',
         },
       ],
     },
