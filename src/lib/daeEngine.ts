@@ -723,22 +723,27 @@ export function computePlayerAnalytics(
   // DAE 2.0 PSYCHOLOGY & PRESSURE ARCHITECT ENGINE (DEINE 30 FRAGEN & NOTIZEN)
   // =========================================================================
 
-  // 1. Definition von Druck (Q1: Dynamisch progressiv & Q2: Gestaffelt <=40 / 41-100 / 101-170)
-  const pressureScores: number[] = [];
-  const baselineScores: number[] = [];
+  // 1. Definition von Druck (Q1 & Q2): Trennung zwischen Scoring unter Druck und Checkout
+  const pressureScoringScores: number[] = [];
+  const baselineScoringScores: number[] = [];
+  const first9Scores: number[] = [];
+  const restOfLegScores: number[] = [];
+  const lowScoreFollowUps: number[] = [];
   let shortLegsUnderPressure = 0;
   let highFinishesCount = 0;
 
   for (const leg of legsVisits) {
-    const isDecider = leg.length > 0 && leg[0].leg_num >= 5;
-    const legWon = leg.length > 0 && leg[leg.length - 1].winner_player_id === playerId;
-    const legDarts = leg.length > 0 && leg[leg.length - 1].darts_thrown ? leg[leg.length - 1].darts_thrown! : leg.length * 3;
-    const checkout = leg.length > 0 ? leg[leg.length - 1].checkout : null;
+    if (!leg || leg.length === 0) continue;
+    const isDecider = leg[0].leg_num >= 5;
+    const lastVisit = leg[leg.length - 1];
+    const legWon = lastVisit.winner_player_id === playerId;
+    const legDarts = lastVisit.darts_thrown && lastVisit.darts_thrown > 0 ? lastVisit.darts_thrown : leg.length * 3;
+    const checkout = lastVisit.checkout;
 
-    if (legWon && checkout && checkout >= 80) {
+    if (legWon && checkout && checkout >= 70) {
       highFinishesCount++;
     }
-    if (legWon && isDecider && legDarts <= 21) {
+    if (legWon && isDecider && legDarts <= 24) {
       shortLegsUnderPressure++;
     }
 
@@ -747,73 +752,57 @@ export function computePlayerAnalytics(
       const oppRest = v.opponent_rest || 999;
       const myRest = v.rest_score;
       const order = v.visit_order || i + 1;
+      const s = v.score;
 
-      // Gestaffelter Druck nach Q2
-      const isExtremeOppPressure = oppRest <= 40;
-      const isModerateOppPressure = oppRest > 40 && oppRest <= 100;
-      const isLightOppPressure = oppRest > 100 && oppRest <= 170;
-
-      // Dynamischer Leg-Druck nach Q1: Höher je später im Leg und Match
-      const isLateLegPressure = order >= 6 && myRest <= 170;
-      const isPressure =
-        isExtremeOppPressure ||
-        (isModerateOppPressure && order >= 4) ||
-        (isLightOppPressure && isDecider) ||
-        isLateLegPressure;
-
-      if (isPressure) {
-        pressureScores.push(v.score);
+      if (order <= 3) {
+        first9Scores.push(s);
       } else {
-        baselineScores.push(v.score);
+        restOfLegScores.push(s);
+      }
+
+      // Echte Trennung: Scoring-Aufnahmen unter Druck (myRest > 100) vs Baseline
+      if (myRest > 100) {
+        const isPressure = oppRest <= 120 || isDecider || (order >= 5 && oppRest <= 170);
+        if (isPressure) {
+          pressureScoringScores.push(s);
+        } else {
+          baselineScoringScores.push(s);
+        }
+      }
+
+      // Tilt / Rebound nach Low-Score (Score <= 45)
+      if (i < leg.length - 1) {
+        const next = leg[i + 1];
+        if (s <= 45 && myRest > 80 && next.rest_score > 50) {
+          lowScoreFollowUps.push(next.score);
+        }
       }
     }
   }
 
-  const pressureAvg = pressureScores.length > 0 ? avgArr(pressureScores) : averageVisit;
-  const baselineAvg = baselineScores.length > 0 ? avgArr(baselineScores) : averageVisit;
+  const pressureAvg = pressureScoringScores.length > 0 ? avgArr(pressureScoringScores) : matchAvg;
+  const baselineAvg = baselineScoringScores.length > 0 ? avgArr(baselineScoringScores) : matchAvg;
   const clutchDelta = Math.round((pressureAvg - baselineAvg) * 10) / 10;
+  const legWinPct = legsVisits.length > 0 ? wonLegsCount / legsVisits.length : 0;
 
-  // 2. Tilt-Indikator: Mix aus A, B und C (Q11 Nutzerwunsch!)
-  // Komponente A: Reaktion nach Low-Scores (<= 45)
-  // Komponente B: Reaktion nach verpassten Doppeln (Aufnahme nach rest <= 50 ohne Check)
-  // Komponente C: Häufung von 26ern und 0ern
-  let lowScoreFollowUps: number[] = [];
-  let missedDoubleFollowUps: number[] = [];
-
-  for (const leg of legsVisits) {
-    for (let i = 0; i < leg.length - 1; i++) {
-      const cur = leg[i];
-      const next = leg[i + 1];
-
-      // Komponente A: Rebound nach Low-Score
-      if (cur.score <= 45 && cur.rest_score > 80 && next.rest_score > 50) {
-        lowScoreFollowUps.push(next.score);
-      }
-
-      // Komponente B: Folgeaufnahme nach verpasstem Doppel
-      if (cur.rest_score <= 50 && cur.score === 0 && next.rest_score <= 50) {
-        missedDoubleFollowUps.push(next.score);
-      }
-    }
-  }
-
-  const avgLowFollow = lowScoreFollowUps.length > 0 ? avgArr(lowScoreFollowUps) : averageVisit;
-  const avgDoubleMissFollow = missedDoubleFollowUps.length > 0 ? avgArr(missedDoubleFollowUps) : averageVisit;
-
-  // Tilt-Score berechnen (0 bis 100, wobei < 25 = extrem stabil, > 45 = anfällig)
-  const dropLowScore = Math.max(0, averageVisit - avgLowFollow);
-  const dropMissedDouble = Math.max(0, averageVisit - avgDoubleMissFollow);
+  // 2. Tilt-Indikator: Mix aus A, B und C (Amateur-gerecht kalibriert)
+  const avgLowFollow = lowScoreFollowUps.length > 0 ? avgArr(lowScoreFollowUps) : matchAvg;
+  const dropLowScore = Math.max(0, matchAvg - avgLowFollow);
   const rate26AndBust = totalVisits > 0 ? (count26 / totalVisits) * 100 : 0;
 
-  const tiltIndex = Math.round(
-    Math.min(
-      Math.max(
-        dropLowScore * 2.2 + dropMissedDouble * 2.0 + rate26AndBust * 3.5,
-        5
-      ),
-      95
+  // Tilt-Score: 100 = extrem stoisch, < 40 = anfällig
+  const tiltScore = Math.min(
+    95,
+    Math.max(
+      25,
+      72 -
+        dropLowScore * 0.8 -
+        rate26AndBust * 1.0 +
+        (avgLowFollow >= matchAvg ? 8 : 0) +
+        (matchAvg >= 45 ? 6 : 0)
     )
   );
+  const tiltIndex = Math.round(Math.max(5, Math.min(85, 100 - tiltScore)));
 
   // 3. Konstanz & Streuung (Q16, Q17, Q18)
   const sub40ScoresCount = allScores.filter((s) => s < 40).length;
@@ -822,15 +811,14 @@ export function computePlayerAnalytics(
     sub40ScoresCount > 0
       ? Math.round((count60Plus / sub40ScoresCount) * 10) / 10
       : count60Plus > 0
-      ? 10
-      : 1;
+      ? 2.0
+      : 1.0;
 
   const sub30ScoresCount = allScores.filter((s) => s <= 30).length;
   const instabilityIndex =
     totalVisits > 0 ? Math.round((sub30ScoresCount / totalVisits) * 1000) / 10 : 0;
 
-  // 4. Führungs-Verwaltung & Choke (Q4, Q12, Q13, Q14)
-  // Double-Trouble: Aufnahmen im Rest <= 50 über mehr als 3 Aufnahmen
+  // 4. Führungs-Verwaltung & Late-Leg (Q4, Q12, Q13, Q14)
   let doubleTroubleCount = 0;
   for (const leg of legsVisits) {
     let visitsInDoubleZone = 0;
@@ -839,23 +827,15 @@ export function computePlayerAnalytics(
         visitsInDoubleZone++;
       }
     }
-    if (visitsInDoubleZone >= 3) {
+    if (visitsInDoubleZone >= 4) {
       doubleTroubleCount++;
     }
   }
 
-  // Late-Leg Hesitation: First-9 vs Rest-of-Leg (Q14)
   const first9Avg = firstN.first_9_avg;
-  const restOfLegScores: number[] = [];
-  for (const leg of legsPlainScores) {
-    if (leg.length > 3) {
-      restOfLegScores.push(...leg.slice(3));
-    }
-  }
-  const restOfLegAvg = restOfLegScores.length > 0 ? avgArr(restOfLegScores) : averageVisit;
-  const lateLegDrop = Math.round((first9Avg - restOfLegAvg) * 10) / 10;
+  const restOfLegAvg = restOfLegScores.length > 0 ? avgArr(restOfLegScores) : matchAvg;
+  const lateLegDrop = Math.round(Math.max(0, first9Avg - restOfLegAvg) * 10) / 10;
 
-  // Lead Choke: 2:0 Führung verspielt? (Q12)
   let leadChokeCount = 0;
   const matchesMap = new Map<number, RawLegVisit[][]>();
   for (const leg of legsVisits) {
@@ -881,35 +861,31 @@ export function computePlayerAnalytics(
   });
 
   // 5. Gegnerstärke-Korrektur (Q10 Notiz: Leistung passt sich dem Gegner an!)
-  // Berechnen, ob Average in Legs mit hohem Gegner-Druck steigt oder sinkt
   let opponentAdaptationFactor = 0;
-  if (pressureAvg > baselineAvg + 3) {
-    opponentAdaptationFactor = 1.3; // Wächst an großen Herausforderungen
-  } else if (pressureAvg < baselineAvg - 4) {
-    opponentAdaptationFactor = -1.2; // Lässt sich runterziehen / verkrampft
+  if (clutchDelta >= 1.5) {
+    opponentAdaptationFactor = 1.3;
+  } else if (clutchDelta <= -6.0) {
+    opponentAdaptationFactor = -1.2;
   } else {
-    opponentAdaptationFactor = 0.2; // Neutral / spielt sein Spiel
+    opponentAdaptationFactor = 0.2;
   }
 
-  let opponentAdaptationLabel = 'Fokusiert auf eigenes Spiel';
+  let opponentAdaptationLabel = 'Fokussiert auf eigenes Spiel';
   if (opponentAdaptationFactor > 0.8) {
     opponentAdaptationLabel = 'Wächst mit Gegnerstärke (Match-Fighter)';
   } else if (opponentAdaptationFactor < -0.8) {
     opponentAdaptationLabel = 'Leistungsabfall bei Störfaktoren / schwachen Gegnern';
   }
 
-  // 6. SCHULNOTEN (1.0 bis 6.0) & STERNE (1 bis 5) (Q26)
+  // 6. SCHULNOTEN (1.0 bis 6.0) & STERNE (1 bis 5) (Amateur-Liga Benchmark)
   const calcGrade = (
     scoreVal: number,
-    optMin = 0,
-    optMax = 100,
-    invert = false
+    optMin = 30,
+    optMax = 95
   ): { grade: number; label: string; stars: number; color: string } => {
     let norm = (scoreVal - optMin) / (optMax - optMin);
     norm = Math.min(Math.max(norm, 0), 1);
-    if (invert) norm = 1 - norm;
 
-    // Schulnote 1.0 (beste) bis 6.0 (schlechteste)
     const grade = Math.round((6.0 - norm * 5.0) * 10) / 10;
     let label = 'Ausreichend';
     let stars = 2;
@@ -940,23 +916,59 @@ export function computePlayerAnalytics(
     return { grade, label, stars, color };
   };
 
-  // 5 Dimensionen Schulnoten:
-  // 1. Nervenstärke / Clutch
-  const clutchScoreNorm = Math.min(Math.max(50 + clutchDelta * 5 + highFinishesCount * 12, 10), 100);
-  const gClutch = calcGrade(clutchScoreNorm, 20, 95);
+  // 1. Nervenstärke (Clutch) - Im Amateurbereich: Siegquote + Druck-Scoring
+  const clutchScore = Math.min(
+    95,
+    Math.max(
+      25,
+      62 +
+        clutchDelta * 2.0 +
+        legWinPct * 26 +
+        highFinishesCount * 5 +
+        shortLegsUnderPressure * 4 +
+        (matchAvg >= 50 ? 5 : 0)
+    )
+  );
+  const gClutch = calcGrade(clutchScore, 40, 95);
 
   // 2. Tilt-Resistenz & Fehlerverarbeitung
-  const gTilt = calcGrade(tiltIndex, 10, 75, true);
+  const gTilt = calcGrade(tiltScore, 38, 92);
 
-  // 3. Wurfkonstanz & Korridor-Stabilität
-  const gKonstanz = calcGrade(scoreRatio60ToSub40 * 10 - instabilityIndex * 0.8, 5, 50);
+  // 3. Wurfkonstanz & Korridor-Stabilität (Ratio 60+ / <40 im Amateurbereich)
+  const konstanzScore = Math.min(
+    95,
+    Math.max(
+      25,
+      44 +
+        (scoreRatio60ToSub40 - 0.2) * 36 -
+        (instabilityIndex - 35) * 0.45 +
+        (matchAvg >= 50 ? 10 : matchAvg >= 45 ? 5 : 0) +
+        (volStd <= 28 ? 6 : 0)
+    )
+  );
+  const gKonstanz = calcGrade(konstanzScore, 28, 92);
 
-  // 4. Ziellinien-Souveränität (Kein Late-Leg Choke)
-  const finishHesitationScore = Math.max(0, 80 - lateLegDrop * 2.5 - doubleTroubleCount * 8 - leadChokeCount * 15);
-  const gFinishSouveraen = calcGrade(finishHesitationScore, 20, 90);
+  // 4. Ziellinien-Souveränität
+  const finishScore = Math.min(
+    95,
+    Math.max(
+      25,
+      60 +
+        legWinPct * 25 -
+        Math.max(0, lateLegDrop - 15) * 1.2 +
+        (bestLegDarts <= 24 ? 6 : 0) +
+        (matchAvg >= 48 ? 4 : 0) -
+        leadChokeCount * 12
+    )
+  );
+  const gFinishSouveraen = calcGrade(finishScore, 38, 92);
 
   // 5. Kaltstart & Anwurf-Mentalität
-  const gKaltstart = calcGrade(startIndex, 20, 85);
+  const startScore = Math.min(
+    95,
+    Math.max(25, 42 + (first9Avg - 32) * 1.5 + (matchAvg >= 50 ? 6 : 0))
+  );
+  const gKaltstart = calcGrade(startScore, 35, 92);
 
   const schoolGrades: MentalSchoolGrade[] = [
     {
@@ -976,7 +988,7 @@ export function computePlayerAnalytics(
       grade_label: gTilt.label,
       stars: gTilt.stars,
       color: gTilt.color,
-      detail: `Tilt-Index: ${tiltIndex} (Fehlwurf-Verarbeitung)`,
+      detail: `Tilt-Index: ${tiltIndex}/100`,
     },
     {
       dimension: 'Wurf-Konstanz',
@@ -992,10 +1004,7 @@ export function computePlayerAnalytics(
       grade_label: gFinishSouveraen.label,
       stars: gFinishSouveraen.stars,
       color: gFinishSouveraen.color,
-      detail:
-        lateLegDrop > 15
-          ? `Zögern vor Finish (-${lateLegDrop.toFixed(1)} Pkt)`
-          : `Konstant bis zum Checkout`,
+      detail: `Leg-Quote: ${(legWinPct * 100).toFixed(0)}%`,
     },
     {
       dimension: 'Kaltstart & Anwurf',
@@ -1003,7 +1012,7 @@ export function computePlayerAnalytics(
       grade_label: gKaltstart.label,
       stars: gKaltstart.stars,
       color: gKaltstart.color,
-      detail: `Start-Index: ${startIndex}/100`,
+      detail: `First-9 Avg: ${first9Avg.toFixed(1)}`,
     },
   ];
 
@@ -1011,7 +1020,7 @@ export function computePlayerAnalytics(
     clutch_delta: clutchDelta,
     pressure_average: Math.round(pressureAvg * 10) / 10,
     baseline_average: Math.round(baselineAvg * 10) / 10,
-    pressure_visits_count: pressureScores.length,
+    pressure_visits_count: pressureScoringScores.length,
     tilt_index: tiltIndex,
     instability_index: instabilityIndex,
     score_ratio_60_to_sub40: scoreRatio60ToSub40,
