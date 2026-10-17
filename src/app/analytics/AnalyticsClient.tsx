@@ -40,6 +40,7 @@ export default function AnalyticsClient({
   );
   const [simTargetAvg, setSimTargetAvg] = useState<number>(48);
   const [scoutingTone, setScoutingTone] = useState<'scout' | 'coach'>('scout');
+  const [selectedGradeIdx, setSelectedGradeIdx] = useState<number | null>(0);
 
   // H2H Tab
   const [h2hPlayerId1, setH2hPlayerId1] = useState<number>(
@@ -536,55 +537,184 @@ export default function AnalyticsClient({
             </div>
 
             {/* PSYCHOLOGISCHES NOTEN-ZEUGNIS (Schulnoten 1.0 bis 6.0 & Sterne) */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🎓</span> Psychologisches Noten-Zeugnis (Skala 1.0 – 6.0)
-                </h4>
-                <span className="text-[10px] font-bold text-slate-400">
-                  Basierend auf echten Matchdarts & Rohdaten-Druck
+            {/* PSYCHOLOGISCHES NOTEN-ZEUGNIS (Schulnoten 1.0 bis 6.0 & Sterne) MIT FORMEL-TRANSPARENZ */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-white/10 pb-2.5">
+                <div>
+                  <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🎓</span> Psychologisches Noten-Zeugnis (Skala 1.0 – 6.0)
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Klicke auf eine Kachel, um die genaue mathematische Zusammensetzung & Faktoren zu sehen
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-400/30 self-start sm:self-center">
+                  💡 100 % Transparente DAE-Methodik
                 </span>
               </div>
+
+              {/* 5 Kacheln (interaktiv anklickbar) */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                {singleAna.ai_profile.mental_metrics?.school_grades.map((sg, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-slate-900/70 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-cyan-500/40 transition-colors"
-                  >
-                    <div>
-                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight block truncate">
-                        {sg.dimension}
-                      </span>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <span
-                          className="text-2xl font-black"
-                          style={{ color: sg.color }}
-                        >
-                          {sg.grade.toFixed(1)}
-                        </span>
-                        <span
-                          className="text-[10px] font-black px-1.5 py-0.5 rounded"
-                          style={{
-                            color: sg.color,
-                            backgroundColor: `${sg.color}20`,
-                          }}
-                        >
-                          {sg.grade_label}
-                        </span>
+                {singleAna.ai_profile.mental_metrics?.school_grades.map((sg, idx) => {
+                  const isSelected = selectedGradeIdx === idx;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedGradeIdx(isSelected ? null : idx)}
+                      className={`text-left p-3.5 rounded-xl flex flex-col justify-between transition-all cursor-pointer relative ${
+                        isSelected
+                          ? 'bg-[#0d1e3d] border-2 border-cyan-400 shadow-xl shadow-cyan-500/20 scale-[1.02]'
+                          : 'bg-slate-900/70 border border-white/10 hover:border-cyan-500/40 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight block truncate">
+                            {sg.dimension}
+                          </span>
+                          <span className="text-[10px] text-cyan-400 font-bold">
+                            {isSelected ? '▼' : 'ℹ️'}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span
+                            className="text-2xl font-black"
+                            style={{ color: sg.color }}
+                          >
+                            {sg.grade.toFixed(1)}
+                          </span>
+                          <span
+                            className="text-[10px] font-black px-1.5 py-0.5 rounded"
+                            style={{
+                              color: sg.color,
+                              backgroundColor: `${sg.color}20`,
+                            }}
+                          >
+                            {sg.grade_label}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-2.5 pt-2 border-t border-white/5">
-                      <div className="text-[11px] text-amber-400 font-mono tracking-widest">
-                        {'★'.repeat(sg.stars)}
-                        <span className="text-slate-700">{'★'.repeat(5 - sg.stars)}</span>
+
+                      <div className="mt-2.5 pt-2 border-t border-white/5 w-full">
+                        <div className="text-[11px] text-amber-400 font-mono tracking-widest">
+                          {'★'.repeat(sg.stars)}
+                          <span className="text-slate-700">{'★'.repeat(5 - sg.stars)}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1 truncate">
+                          {sg.detail}
+                        </div>
+                        {isSelected && (
+                          <div className="text-[9px] font-black text-cyan-300 uppercase tracking-wider mt-1.5 flex items-center gap-1">
+                            <span>●</span> Formel geöffnet
+                          </div>
+                        )}
                       </div>
-                      <div className="text-[10px] text-slate-400 mt-1 truncate">
-                        {sg.detail}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* DETAIL-TRANSPARENZ CONTAINER (Wenn eine Kachel ausgewählt ist) */}
+              {selectedGradeIdx !== null &&
+                singleAna.ai_profile.mental_metrics?.school_grades[selectedGradeIdx] && (
+                  <div className="bg-[#08152e] border border-cyan-400/40 rounded-2xl p-5 shadow-2xl space-y-4 animate-fadeIn">
+                    {/* Header des ausgewählten Details */}
+                    {(() => {
+                      const cur =
+                        singleAna.ai_profile.mental_metrics.school_grades[selectedGradeIdx];
+                      return (
+                        <>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-xl">🔍</span>
+                              <div>
+                                <h5 className="text-base font-black text-white flex items-center gap-2">
+                                  <span>{cur.dimension}</span>
+                                  <span
+                                    className="text-xs font-black px-2 py-0.5 rounded"
+                                    style={{
+                                      color: cur.color,
+                                      backgroundColor: `${cur.color}25`,
+                                      border: `1px solid ${cur.color}50`,
+                                    }}
+                                  >
+                                    Note {cur.grade.toFixed(1)} ({cur.grade_label})
+                                  </span>
+                                </h5>
+                                <div className="text-[11px] text-amber-400 font-mono tracking-widest mt-0.5">
+                                  {'★'.repeat(cur.stars)}
+                                  <span className="text-slate-700">{'★'.repeat(5 - cur.stars)}</span>
+                                  <span className="text-slate-400 font-sans tracking-normal text-[10px] ml-2">
+                                    ({cur.stars} von 5 Sternen)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGradeIdx(null)}
+                              className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 self-start sm:self-center"
+                            >
+                              ✕ Schließen
+                            </button>
+                          </div>
+
+                          {/* 2 Erklärungskästen: Bedeutung & Mathematische Formel */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 space-y-1">
+                              <span className="text-[11px] font-black text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🎯</span> Was misst diese Kategorie?
+                              </span>
+                              <p className="text-slate-300 leading-relaxed">
+                                {cur.description}
+                              </p>
+                            </div>
+
+                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 space-y-1">
+                              <span className="text-[11px] font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>📐</span> Wie wird die Note berechnet?
+                              </span>
+                              <p className="text-slate-300 leading-relaxed">
+                                {cur.formula_explanation}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* 3 Konkrete Teilfaktoren mit echten Spieler-Daten */}
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
+                              Tatsächliche Messwerte & Gewichtung für {singleAna.playerName}:
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              {cur.factors?.map((f, fIdx) => (
+                                <div
+                                  key={fIdx}
+                                  className="bg-black/30 border border-white/10 rounded-xl p-3 flex flex-col justify-between space-y-2 text-xs"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-white truncate">
+                                      {f.name}
+                                    </span>
+                                    <span className="text-[10px] font-black text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded">
+                                      {f.weight}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm font-black text-cyan-100">
+                                    {f.value}
+                                  </div>
+                                  <div className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                                    ✓ {f.impact}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
             </div>
 
             {/* HARTE MENTALE METRIKEN */}

@@ -123,6 +123,13 @@ export interface AIScoutingCard {
 // PSYCHOLOGIE & DRUCKMODELL (DAE 2.0 ARCHITECT)
 // ----------------------------------------------------
 
+export interface GradeFactor {
+  name: string;
+  weight: string;
+  value: string;
+  impact: string;
+}
+
 export interface MentalSchoolGrade {
   dimension: string;
   grade: number; // 1.0 (sehr gut) bis 6.0 (ungenügend)
@@ -130,6 +137,9 @@ export interface MentalSchoolGrade {
   stars: number; // 1 bis 5 Sterne
   color: string;
   detail: string;
+  description: string;
+  formula_explanation: string;
+  factors: GradeFactor[];
 }
 
 export interface PsychologicalMetrics {
@@ -981,6 +991,41 @@ export function computePlayerAnalytics(
         clutchDelta >= 0
           ? `+${clutchDelta.toFixed(1)} Pkt unter Druck`
           : `${clutchDelta.toFixed(1)} Pkt unter Druck`,
+      description:
+        'Misst Fokus und Scoring unter akutem Druck (Gegner im Finish-Bereich ≤ 120 / Decider) sowie die eiskalte Vollendung in engen Legs.',
+      formula_explanation:
+        'Gewichtet zu 35 % aus dem Scoring unter direktem Gegnerdruck vs. Baseline, zu 40 % aus der Leg-Gewinnquote sowie zu 25 % aus Boni für High-Finishes (≥ 70) und Decider-Short-Legs (≤ 24 Darts).',
+      factors: [
+        {
+          name: 'Scoring unter Druck',
+          weight: '35 %',
+          value: `${pressureAvg.toFixed(1)} Pkt (Base: ${baselineAvg.toFixed(1)})`,
+          impact:
+            clutchDelta >= 0
+              ? `+${clutchDelta.toFixed(1)} Pkt Steigerung`
+              : `${clutchDelta.toFixed(1)} Pkt Differenz`,
+        },
+        {
+          name: 'Leg-Gewinnquote',
+          weight: '40 %',
+          value: `${(legWinPct * 100).toFixed(0)} % (${wonLegsCount}/${legsVisits.length} Legs)`,
+          impact:
+            legWinPct >= 0.7
+              ? 'Überragende Matchhärte'
+              : legWinPct >= 0.5
+              ? 'Solide Verlässlichkeit'
+              : 'Ausbaufähig',
+        },
+        {
+          name: 'High-Finishes & Decider',
+          weight: '25 %',
+          value: `${highFinishesCount}x Checks ≥ 70 / ${shortLegsUnderPressure}x Decider ≤ 24 Darts`,
+          impact:
+            highFinishesCount > 0
+              ? 'Kaltblütiger Finisher'
+              : 'Solide Matchverwaltung',
+        },
+      ],
     },
     {
       dimension: 'Tilt-Resistenz',
@@ -989,6 +1034,41 @@ export function computePlayerAnalytics(
       stars: gTilt.stars,
       color: gTilt.color,
       detail: `Tilt-Index: ${tiltIndex}/100`,
+      description:
+        'Misst die mentale Resilienz nach Fehlaufnahmen (≤ 45 Pkt) und verpassten Doppeln: Fängt sich der Spieler sofort wieder oder bricht der Rhythmus durch Frust ein?',
+      formula_explanation:
+        'Berechnet zu 50 % aus der Differenz zwischen dem Folgewurf nach Fehlaufnahmen und dem normalen Spielerschnitt, zu 30 % aus der Quote an 26ern/Busts und zu 20 % aus dem Gesamt-Tilt-Index.',
+      factors: [
+        {
+          name: 'Rebound nach Low-Scores',
+          weight: '50 %',
+          value: `Ø ${avgLowFollow.toFixed(1)} Pkt nach Fehlwurf ≤ 45`,
+          impact:
+            dropLowScore <= 3
+              ? 'Sofortiger mentaler Neustart'
+              : `Leichter Folgedrop (-${dropLowScore.toFixed(1)} Pkt)`,
+        },
+        {
+          name: 'Fehlerquote (26er & Busts)',
+          weight: '30 %',
+          value: `${rate26AndBust.toFixed(1)} % aller Aufnahmen (${count26}x 26er)`,
+          impact:
+            rate26AndBust <= 5
+              ? 'Minimale Fehleranfälligkeit'
+              : 'Gelegentliche Ausreißer',
+        },
+        {
+          name: 'Tilt-Index',
+          weight: '20 %',
+          value: `${tiltIndex} / 100`,
+          impact:
+            tiltIndex <= 20
+              ? 'Eiserne stoische Ruhe'
+              : tiltIndex <= 35
+              ? 'Guter Amateurschnitt'
+              : 'Emotionale Spielweise',
+        },
+      ],
     },
     {
       dimension: 'Wurf-Konstanz',
@@ -997,6 +1077,39 @@ export function computePlayerAnalytics(
       stars: gKonstanz.stars,
       color: gKonstanz.color,
       detail: `60+ / <40 Ratio: ${scoreRatio60ToSub40.toFixed(1)}`,
+      description:
+        'Misst die Wiederholgenauigkeit und die Streuung um die Triple-20: Verlässliche Grundwerte ohne Einsturz in Ausreißer-Zonen.',
+      formula_explanation:
+        'Basiert zu 45 % auf dem Verhältnis von 60+ Aufnahmen zu Aufnahmen unter 40 Punkten, zu 30 % auf der Standardabweichung (Sigma) und zu 25 % auf dem Instabilitäts-Index (Aufnahmen ≤ 30 Punkte).',
+      factors: [
+        {
+          name: '60+ zu <40 Verhältnis',
+          weight: '45 %',
+          value: `${scoreRatio60ToSub40.toFixed(1)} (Liga-Topwert ≥ 1.0)`,
+          impact:
+            scoreRatio60ToSub40 >= 1.0
+              ? 'Mehr 60er als Fehlwürfe (Spitzenklasse)'
+              : 'Solide Trefferdichte',
+        },
+        {
+          name: 'Streuungskorridor (± σ)',
+          weight: '30 %',
+          value: `± ${volStd.toFixed(1)} Punkte`,
+          impact:
+            volStd <= 28
+              ? 'Sehr enger Korridor'
+              : 'Normale Amateurschwankung',
+        },
+        {
+          name: 'Instabilitäts-Index (≤ 30)',
+          weight: '25 %',
+          value: `${instabilityIndex.toFixed(1)} % aller Aufnahmen`,
+          impact:
+            instabilityIndex <= 30
+              ? 'Hohe Grundstabilität'
+              : 'Potenzial zur Fehlervermeidung',
+        },
+      ],
     },
     {
       dimension: 'Ziellinien-Souveränität',
@@ -1005,6 +1118,39 @@ export function computePlayerAnalytics(
       stars: gFinishSouveraen.stars,
       color: gFinishSouveraen.color,
       detail: `Leg-Quote: ${(legWinPct * 100).toFixed(0)}%`,
+      description:
+        'Misst die Nerven im Finish-Bereich: Kann der Spieler ein erarbeitetes Leg zügig vollenden oder beginnt das Zittern vor dem Doppel?',
+      formula_explanation:
+        'Ermittelt zu 45 % aus der Leg-Vollendungsquote, zu 30 % aus der First-9 vs. Rest-of-Leg Differenz (Late-Leg Hesitation) und zu 25 % aus der Vermeidung von Double-Trouble und verspielten Führungen.',
+      factors: [
+        {
+          name: 'Leg-Abschlussquote',
+          weight: '45 %',
+          value: `${(legWinPct * 100).toFixed(0)} % der Legs vollendet`,
+          impact:
+            legWinPct >= 0.7
+              ? 'Eiskalt auf den Doppeln'
+              : 'Solide Verwertung',
+        },
+        {
+          name: 'Late-Leg Hesitation',
+          weight: '30 %',
+          value: `First-9 vs Rest: ${lateLegDrop <= 5 ? 'Kein Einbruch' : `-${lateLegDrop.toFixed(1)} Pkt`}`,
+          impact:
+            lateLegDrop <= 10
+              ? 'Flüssiger Wurf bis zum Checkout'
+              : 'Leichte Ziellinien-Hemmung',
+        },
+        {
+          name: 'Double-Trouble & Lead-Choke',
+          weight: '25 %',
+          value: `${doubleTroubleCount}x Feststecken / ${leadChokeCount}x Führung verspielt`,
+          impact:
+            doubleTroubleCount === 0 && leadChokeCount === 0
+              ? 'Kein Choke-Muster'
+              : 'Einzelne Zitterphasen',
+        },
+      ],
     },
     {
       dimension: 'Kaltstart & Anwurf',
@@ -1013,6 +1159,39 @@ export function computePlayerAnalytics(
       stars: gKaltstart.stars,
       color: gKaltstart.color,
       detail: `First-9 Avg: ${first9Avg.toFixed(1)}`,
+      description:
+        'Misst die Bereitschaft ab Dart 1: Kann der Spieler sofort Druck aufbauen und den eigenen Anwurf-Vorteil verteidigen?',
+      formula_explanation:
+        'Berechnet zu 50 % aus dem Durchschnitt der ersten 3 Aufnahmen (First-9 Schnitt), zu 30 % aus dem Schnitt der ersten Aufnahme (Visit 1) und zu 20 % aus dem Start-Index.',
+      factors: [
+        {
+          name: 'First-9 Schnitt',
+          weight: '50 %',
+          value: `Ø ${first9Avg.toFixed(1)} Punkte`,
+          impact:
+            first9Avg >= 55
+              ? 'Sofortige Betriebstemperatur'
+              : 'Solider Einstieg',
+        },
+        {
+          name: 'Visit 1 Auftakt',
+          weight: '30 %',
+          value: `Ø ${startData.avg_visit_1.toFixed(1)} Punkte`,
+          impact:
+            startData.avg_visit_1 >= 50
+              ? 'Gefürchteter Anwurf'
+              : 'Braucht 1-2 Würfe',
+        },
+        {
+          name: 'Start-Index',
+          weight: '20 %',
+          value: `${startData.start_index} / 100`,
+          impact:
+            startData.start_index >= 40
+              ? 'Starke Anwurf-Mentalität'
+              : 'Ausbaufähig',
+        },
+      ],
     },
   ];
 
