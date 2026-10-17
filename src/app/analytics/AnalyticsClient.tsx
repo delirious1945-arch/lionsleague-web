@@ -39,6 +39,7 @@ export default function AnalyticsClient({
     players.length > 0 ? players[0].id : 0
   );
   const [simTargetAvg, setSimTargetAvg] = useState<number>(48);
+  const [scoutingTone, setScoutingTone] = useState<'scout' | 'coach'>('scout');
 
   // H2H Tab
   const [h2hPlayerId1, setH2hPlayerId1] = useState<number>(
@@ -471,108 +472,326 @@ export default function AnalyticsClient({
             <LegAnatomyWidget anatomy={singleAna.leg_anatomy} />
           </div>
 
-          {/* DRITTE REIHE: KI-SCOUTING-PROFIL */}
-          <div className="bg-gradient-to-r from-[#091736] via-[#0b1d44] to-[#08132d] border border-cyan-500/30 rounded-2xl p-6 shadow-xl space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-3">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{singleAna.ai_profile.archetype_icon}</span>
+          {/* DRITTE REIHE: DAE 2.0 PSYCHOLOGIE & SCOUTING PROFIL */}
+          <div className="bg-gradient-to-r from-[#091736] via-[#0b1d44] to-[#08132d] border border-cyan-500/40 rounded-2xl p-6 shadow-2xl shadow-cyan-950/40 space-y-6">
+            {/* Header: Dual-Archetyp + Tonalitäts-Schalter */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-white/10 pb-5 gap-4">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <span className="text-4xl p-2.5 bg-white/5 rounded-2xl border border-white/10 shadow-inner">
+                  {singleAna.ai_profile.dual_archetype?.mental_icon || singleAna.ai_profile.archetype_icon}
+                </span>
                 <div>
-                  <div className="text-xs uppercase font-black text-cyan-400">
-                    KI-Scouting Archetyp
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="text-[11px] uppercase font-black text-cyan-400 tracking-wider">
+                      DAE 2.0 MENTALEINSTUFUNG
+                    </span>
+                    <span
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider"
+                      style={{
+                        backgroundColor: `${singleAna.ai_profile.dual_archetype?.role_badge_color || '#38BDF8'}20`,
+                        color: singleAna.ai_profile.dual_archetype?.role_badge_color || '#38BDF8',
+                        border: `1px solid ${singleAna.ai_profile.dual_archetype?.role_badge_color || '#38BDF8'}50`,
+                      }}
+                    >
+                      🏆 Team-Rolle: {singleAna.ai_profile.dual_archetype?.team_role || 'Punktegarant'}
+                    </span>
                   </div>
-                  <h3 className="text-xl font-black text-white">
-                    {singleAna.ai_profile.archetype}
+                  <h3 className="text-2xl font-black text-white">
+                    {singleAna.ai_profile.dual_archetype?.mental_type || singleAna.ai_profile.archetype}
                   </h3>
+                  <p className="text-xs text-slate-300 mt-1 italic max-w-xl">
+                    „{singleAna.ai_profile.dual_archetype?.mental_desc || singleAna.ai_profile.archetype_desc}“
+                  </p>
                 </div>
               </div>
-              <p className="text-xs text-slate-300 max-w-md italic sm:text-right">
-                „{singleAna.ai_profile.archetype_desc}“
-              </p>
-            </div>
 
-            {/* 3 Verhaltens-Karten (Rebound, Pressure, Focus) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Bounce-Back */}
-              <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-300">
-                    {singleAna.ai_profile.bounce_back.title}
-                  </span>
-                  <span
-                    className="text-[10px] font-black px-2 py-0.5 rounded"
-                    style={{
-                      color: singleAna.ai_profile.bounce_back.badge_color,
-                      backgroundColor: `${singleAna.ai_profile.bounce_back.badge_color}22`,
-                      border: `1px solid ${singleAna.ai_profile.bounce_back.badge_color}55`,
-                    }}
+              {/* Tonalitäts-Schalter (Scout vs. Coach) */}
+              <div className="flex flex-col items-start lg:items-end gap-1.5 self-start lg:self-center">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  DAE Tonalitäts-Modus (Q28)
+                </span>
+                <div className="bg-slate-900/90 p-1 rounded-xl border border-white/15 flex items-center gap-1 shadow-inner">
+                  <button
+                    onClick={() => setScoutingTone('scout')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                      scoutingTone === 'scout'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
                   >
-                    {singleAna.ai_profile.bounce_back.badge}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  {singleAna.ai_profile.bounce_back.text}
-                </p>
-              </div>
-
-              {/* Pressure */}
-              <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-300">
-                    {singleAna.ai_profile.pressure.title}
-                  </span>
-                  <span
-                    className="text-[10px] font-black px-2 py-0.5 rounded"
-                    style={{
-                      color: singleAna.ai_profile.pressure.badge_color,
-                      backgroundColor: `${singleAna.ai_profile.pressure.badge_color}22`,
-                      border: `1px solid ${singleAna.ai_profile.pressure.badge_color}55`,
-                    }}
+                    <span>⚡</span> Scout (Hart & Direkt)
+                  </button>
+                  <button
+                    onClick={() => setScoutingTone('coach')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                      scoutingTone === 'coach'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
                   >
-                    {singleAna.ai_profile.pressure.badge}
-                  </span>
+                    <span>🤝</span> Coach (Fördernd & Motivierend)
+                  </button>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  {singleAna.ai_profile.pressure.text}
-                </p>
-              </div>
-
-              {/* Focus */}
-              <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-300">
-                    {singleAna.ai_profile.focus.title}
-                  </span>
-                  <span
-                    className="text-[10px] font-black px-2 py-0.5 rounded"
-                    style={{
-                      color: singleAna.ai_profile.focus.badge_color,
-                      backgroundColor: `${singleAna.ai_profile.focus.badge_color}22`,
-                      border: `1px solid ${singleAna.ai_profile.focus.badge_color}55`,
-                    }}
-                  >
-                    {singleAna.ai_profile.focus.badge}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  {singleAna.ai_profile.focus.text}
-                </p>
               </div>
             </div>
 
-            {/* Taktische Empfehlungen */}
-            <div className="bg-cyan-950/30 border border-cyan-400/20 rounded-xl p-4">
-              <h4 className="text-xs font-black text-cyan-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <span>💡</span> Taktische Scouting-Empfehlungen
-              </h4>
-              <ul className="space-y-1.5 text-xs text-slate-300">
-                {singleAna.ai_profile.tactical_tips.map((tip, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-cyan-400 font-bold">•</span>
-                    <span>{tip}</span>
-                  </li>
+            {/* PSYCHOLOGISCHES NOTEN-ZEUGNIS (Schulnoten 1.0 bis 6.0 & Sterne) */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🎓</span> Psychologisches Noten-Zeugnis (Skala 1.0 – 6.0)
+                </h4>
+                <span className="text-[10px] font-bold text-slate-400">
+                  Basierend auf echten Matchdarts & Rohdaten-Druck
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {singleAna.ai_profile.mental_metrics?.school_grades.map((sg, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-slate-900/70 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-cyan-500/40 transition-colors"
+                  >
+                    <div>
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight block truncate">
+                        {sg.dimension}
+                      </span>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span
+                          className="text-2xl font-black"
+                          style={{ color: sg.color }}
+                        >
+                          {sg.grade.toFixed(1)}
+                        </span>
+                        <span
+                          className="text-[10px] font-black px-1.5 py-0.5 rounded"
+                          style={{
+                            color: sg.color,
+                            backgroundColor: `${sg.color}20`,
+                          }}
+                        >
+                          {sg.grade_label}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2.5 pt-2 border-t border-white/5">
+                      <div className="text-[11px] text-amber-400 font-mono tracking-widest">
+                        {'★'.repeat(sg.stars)}
+                        <span className="text-slate-700">{'★'.repeat(5 - sg.stars)}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-1 truncate">
+                        {sg.detail}
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
+
+            {/* HARTE MENTALE METRIKEN */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/[0.02] border border-white/10 rounded-xl p-3 text-xs">
+              <div className="bg-slate-900/60 rounded-lg p-2.5 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Clutch-Delta
+                </span>
+                <span
+                  className={`text-lg font-black block mt-0.5 ${
+                    singleAna.ai_profile.mental_metrics.clutch_delta >= 0
+                      ? 'text-emerald-400'
+                      : 'text-rose-400'
+                  }`}
+                >
+                  {singleAna.ai_profile.mental_metrics.clutch_delta >= 0 ? '+' : ''}
+                  {singleAna.ai_profile.mental_metrics.clutch_delta.toFixed(1)} Pkt
+                </span>
+                <span className="text-[9px] text-slate-500">
+                  Druck-Avg: {singleAna.ai_profile.mental_metrics.pressure_average} | Base: {singleAna.ai_profile.mental_metrics.baseline_average}
+                </span>
+              </div>
+
+              <div className="bg-slate-900/60 rounded-lg p-2.5 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Tilt-Index
+                </span>
+                <span className="text-lg font-black text-cyan-300 block mt-0.5">
+                  {singleAna.ai_profile.mental_metrics.tilt_index}
+                  <span className="text-xs text-slate-500 font-normal"> / 100</span>
+                </span>
+                <span className="text-[9px] text-slate-500">
+                  Fehlwurf-Reaktion & 26er
+                </span>
+              </div>
+
+              <div className="bg-slate-900/60 rounded-lg p-2.5 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Instabilitäts-Index
+                </span>
+                <span className="text-lg font-black text-amber-300 block mt-0.5">
+                  {singleAna.ai_profile.mental_metrics.instability_index.toFixed(1)} %
+                </span>
+                <span className="text-[9px] text-slate-500">
+                  Aufnahmen ≤ 30 Punkte
+                </span>
+              </div>
+
+              <div className="bg-slate-900/60 rounded-lg p-2.5 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Gegner-Kopplung
+                </span>
+                <span className="text-xs font-black text-white block mt-1.5 truncate">
+                  {singleAna.ai_profile.mental_metrics.opponent_adaptation_label}
+                </span>
+                <span className="text-[9px] text-slate-500">
+                  Leistungsanpassung an Gegner
+                </span>
+              </div>
+            </div>
+
+            {/* DYNAMISCHE KI-SCOUTING ANALYSETEXTE (Scout vs. Coach Modus) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                  <span>{scoutingTone === 'scout' ? '⚡' : '🤝'}</span>
+                  {scoutingTone === 'scout'
+                    ? 'Knallharte Scouting-Diagnose (Direkt & Schonungslos)'
+                    : 'Mentale Coaching-Analyse (Fördernd & Konstruktiv)'}
+                </h4>
+                <span className="text-[10px] font-bold text-slate-400">
+                  Modus: {scoutingTone === 'scout' ? 'Scout' : 'Coach'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Druck & Nerven */}
+                <div className="bg-slate-900/80 border border-white/10 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300 mb-1.5">
+                    <span>🎯</span> Nervenstärke & gegnerischer Druck
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {scoutingTone === 'scout'
+                      ? singleAna.ai_profile.scouting_texts?.scout_mode.pressure_summary
+                      : singleAna.ai_profile.scouting_texts?.coach_mode.pressure_summary}
+                  </p>
+                </div>
+
+                {/* Ziellinie & Choke */}
+                <div className="bg-slate-900/80 border border-white/10 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300 mb-1.5">
+                    <span>🏁</span> Ziellinien-Verhalten & Doppelkrise
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {scoutingTone === 'scout'
+                      ? singleAna.ai_profile.scouting_texts?.scout_mode.choke_analysis
+                      : singleAna.ai_profile.scouting_texts?.coach_mode.choke_analysis}
+                  </p>
+                </div>
+
+                {/* Konstanz & Streuung */}
+                <div className="bg-slate-900/80 border border-white/10 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300 mb-1.5">
+                    <span>⚡</span> Grundkonstanz & Streuungs-Profil
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {scoutingTone === 'scout'
+                      ? singleAna.ai_profile.scouting_texts?.scout_mode.consistency_verdict
+                      : singleAna.ai_profile.scouting_texts?.coach_mode.consistency_verdict}
+                  </p>
+                </div>
+
+                {/* Wahrheit / Motivation */}
+                <div
+                  className={`border rounded-xl p-4 ${
+                    scoutingTone === 'scout'
+                      ? 'bg-rose-950/20 border-rose-500/30'
+                      : 'bg-emerald-950/20 border-emerald-500/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs font-bold mb-1.5">
+                    <span>{scoutingTone === 'scout' ? '🔥' : '🌟'}</span>
+                    <span className={scoutingTone === 'scout' ? 'text-rose-300' : 'text-emerald-300'}>
+                      {scoutingTone === 'scout' ? 'Ungeschminktes Fazit' : 'Motivations-Impuls & Potenzial'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed">
+                    {scoutingTone === 'scout'
+                      ? singleAna.ai_profile.scouting_texts?.scout_mode.hard_truth
+                      : singleAna.ai_profile.scouting_texts?.coach_mode.motivational_boost}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* MASSGESCHNEIDERTE TRAININGSIMPULSE (Q29) */}
+            {singleAna.ai_profile.training_impulses && singleAna.ai_profile.training_impulses.length > 0 && (
+              <div className="bg-slate-900/60 border border-cyan-400/20 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <h4 className="text-xs font-black text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🏋️</span> Individuelle Trainingsimpulse (Q29)
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    Maßgeschneidert auf identifizierte Schwachstellen
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {singleAna.ai_profile.training_impulses.map((imp, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-white/[0.02] border border-white/10 rounded-lg p-3 text-xs space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <span>🎯</span> {imp.title}
+                        </span>
+                        <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">
+                          Fokus: {imp.focus}
+                        </span>
+                      </div>
+                      <div className="text-slate-300">
+                        <span className="text-slate-400 font-semibold">Übung: </span>
+                        {imp.exercise}
+                      </div>
+                      <div className="text-emerald-400 font-semibold text-[11px]">
+                        ✓ Trainingsziel: {imp.goal}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AUFSTELLUNGS- & MATCHPLAN-BERATER (Q30) */}
+            {singleAna.ai_profile.matchplan_advice && (
+              <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4">
+                <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <span>📋</span> Aufstellungs- & Matchplan-Berater (Q30)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-black/20 rounded-lg p-2.5">
+                    <span className="text-[10px] font-bold text-amber-400 block mb-1">
+                      Board-Empfehlung
+                    </span>
+                    <span className="text-slate-300">
+                      {singleAna.ai_profile.matchplan_advice.board_recommendation}
+                    </span>
+                  </div>
+                  <div className="bg-black/20 rounded-lg p-2.5">
+                    <span className="text-[10px] font-bold text-amber-400 block mb-1">
+                      Einzel-Position
+                    </span>
+                    <span className="text-slate-300">
+                      {singleAna.ai_profile.matchplan_advice.single_slot_recommendation}
+                    </span>
+                  </div>
+                  <div className="bg-black/20 rounded-lg p-2.5">
+                    <span className="text-[10px] font-bold text-amber-400 block mb-1">
+                      Idealer Doppel-Partner
+                    </span>
+                    <span className="text-slate-300">
+                      {singleAna.ai_profile.matchplan_advice.double_partner_profile}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -726,6 +945,26 @@ export default function AnalyticsClient({
                       v1: h2hAna1.dist_data.thresholds['100+']?.pct || 0,
                       v2: h2hAna2.dist_data.thresholds['100+']?.pct || 0,
                       format: (v: number) => `${v.toFixed(1)}%`,
+                    },
+                    {
+                      label: 'Clutch-Delta (Pkt unter Druck)',
+                      v1: h2hAna1.ai_profile.mental_metrics.clutch_delta,
+                      v2: h2hAna2.ai_profile.mental_metrics.clutch_delta,
+                      format: (v: number) => (v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1)),
+                    },
+                    {
+                      label: 'Nervenstärke (Schulnote)',
+                      v1: h2hAna1.ai_profile.mental_metrics.school_grades[0]?.grade || 3.0,
+                      v2: h2hAna2.ai_profile.mental_metrics.school_grades[0]?.grade || 3.0,
+                      format: (v: number) => `${v.toFixed(1)}`,
+                      inverse: true,
+                    },
+                    {
+                      label: 'Tilt-Index (0–100)',
+                      v1: h2hAna1.ai_profile.mental_metrics.tilt_index,
+                      v2: h2hAna2.ai_profile.mental_metrics.tilt_index,
+                      format: (v: number) => `${v}`,
+                      inverse: true,
                     },
                   ].map((row) => {
                     const lead1 = row.inverse ? row.v1 < row.v2 : row.v1 > row.v2;

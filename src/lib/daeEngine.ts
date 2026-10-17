@@ -119,10 +119,83 @@ export interface AIScoutingCard {
   text: string;
 }
 
+// ----------------------------------------------------
+// PSYCHOLOGIE & DRUCKMODELL (DAE 2.0 ARCHITECT)
+// ----------------------------------------------------
+
+export interface MentalSchoolGrade {
+  dimension: string;
+  grade: number; // 1.0 (sehr gut) bis 6.0 (ungenügend)
+  grade_label: string; // 'Sehr gut', 'Gut', 'Befriedigend', etc.
+  stars: number; // 1 bis 5 Sterne
+  color: string;
+  detail: string;
+}
+
+export interface PsychologicalMetrics {
+  clutch_delta: number; // Differenz Druck-Average vs Baseline
+  pressure_average: number;
+  baseline_average: number;
+  pressure_visits_count: number;
+  tilt_index: number; // 0-100 (Mix aus A, B, C: Fehlwurf-Folgen, Miss-Doppel, 26er/Busts)
+  instability_index: number; // 0-100 (% der Aufnahmen <= 30)
+  score_ratio_60_to_sub40: number; // 60+ Aufnahmen geteilt durch <40 Aufnahmen
+  lead_choke_count: number; // Verspielte Führungen (z.B. 2:0 -> 2:3)
+  double_trouble_count: number; // Legs mit >9 Darts auf Doppel
+  late_leg_drop: number; // First-9 vs Rest-of-Leg Differenz
+  opponent_adaptation_factor: number; // Wie stark spiegelt der Spieler den Gegner?
+  opponent_adaptation_label: string;
+  short_legs_under_pressure: number;
+  high_finishes_count: number;
+  school_grades: MentalSchoolGrade[];
+}
+
+export interface DualArchetype {
+  mental_type: string;
+  mental_icon: string;
+  mental_desc: string;
+  team_role: 'Leader' | 'Punktegarant' | 'Joker' | 'Aufbau-Spieler';
+  role_badge_color: string;
+  role_desc: string;
+}
+
+export interface TrainingImpulse {
+  title: string;
+  focus: string;
+  exercise: string;
+  goal: string;
+}
+
+export interface MatchplanAdvice {
+  board_recommendation: string;
+  single_slot_recommendation: string;
+  double_partner_profile: string;
+}
+
+export interface AIScoutingToneTexts {
+  scout_mode: {
+    pressure_summary: string;
+    choke_analysis: string;
+    consistency_verdict: string;
+    hard_truth: string;
+  };
+  coach_mode: {
+    pressure_summary: string;
+    choke_analysis: string;
+    consistency_verdict: string;
+    motivational_boost: string;
+  };
+}
+
 export interface AIScoutingProfile {
   archetype: string;
   archetype_icon: string;
   archetype_desc: string;
+  dual_archetype: DualArchetype;
+  mental_metrics: PsychologicalMetrics;
+  scouting_texts: AIScoutingToneTexts;
+  training_impulses: TrainingImpulse[];
+  matchplan_advice: MatchplanAdvice;
   top_strengths: { name: string; value: number; label: string }[];
   bottom_weaknesses: { name: string; value: number; label: string }[];
   bounce_back: AIScoutingCard;
@@ -354,48 +427,46 @@ export function computePlayerAnalytics(
     }
   }
 
-  const c60 = f3.filter((s) => s >= 60 && s < 100).length;
-  const c100 = f3.filter((s) => s >= 100 && s < 140).length;
-  const c140 = f3.filter((s) => s >= 140 && s < 180).length;
-  const c180 = f3.filter((s) => s === 180).length;
-  const cPoor = f3.filter((s) => s <= 35).length;
-  const totalStarts = f3.length;
-
+  const avgV1 = avgArr(v1);
+  const avgV2 = avgArr(v2);
+  const avgV3 = avgArr(v3);
   const f3Avg = avgArr(f3);
-  const baseScore = Math.min(
-    Math.max((f3Avg - 15) * (100 / 70), 0),
-    100
-  );
-  const pct60 = totalStarts > 0 ? (c60 / totalStarts) * 100 : 0;
-  const pct100 = totalStarts > 0 ? (c100 / totalStarts) * 100 : 0;
-  const pct140 = totalStarts > 0 ? (c140 / totalStarts) * 100 : 0;
-  const pct180 = totalStarts > 0 ? (c180 / totalStarts) * 100 : 0;
-  const pctPoor = totalStarts > 0 ? (cPoor / totalStarts) * 100 : 0;
 
-  const scoringBonus =
-    pct60 * 0.04 + pct100 * 0.12 + pct140 * 0.22 + pct180 * 0.35;
-  const poorPenalty = pctPoor * 0.12;
-  const startIndex = Math.min(
-    Math.max(baseScore + scoringBonus - poorPenalty, 0),
-    100
+  const c60 = f3.filter((s) => s >= 60).length;
+  const c100 = f3.filter((s) => s >= 100).length;
+  const c140 = f3.filter((s) => s >= 140).length;
+  const c180 = f3.filter((s) => s === 180).length;
+  const cPoor = f3.filter((s) => s <= 40).length;
+  const f3Tot = f3.length;
+
+  const startIndex = Math.round(
+    Math.min(
+      Math.max(
+        (f3Avg > 0 ? f3Avg * 0.7 : 30) +
+          (f3Tot > 0 ? (c100 / f3Tot) * 30 : 0) -
+          (f3Tot > 0 ? (cPoor / f3Tot) * 20 : 0),
+        10
+      ),
+      100
+    )
   );
 
   const startData: StartPerformance = {
-    avg_visit_1: Math.round(avgArr(v1) * 10) / 10,
-    avg_visit_2: Math.round(avgArr(v2) * 10) / 10,
-    avg_visit_3: Math.round(avgArr(v3) * 10) / 10,
+    avg_visit_1: Math.round(avgV1 * 10) / 10,
+    avg_visit_2: Math.round(avgV2 * 10) / 10,
+    avg_visit_3: Math.round(avgV3 * 10) / 10,
     first_3_avg: Math.round(f3Avg * 10) / 10,
-    start_index: Math.round(startIndex * 10) / 10,
+    start_index: startIndex,
     count_60: c60,
-    pct_60: Math.round(pct60 * 10) / 10,
+    pct_60: f3Tot > 0 ? Math.round((c60 / f3Tot) * 1000) / 10 : 0,
     count_100: c100,
-    pct_100: Math.round(pct100 * 10) / 10,
+    pct_100: f3Tot > 0 ? Math.round((c100 / f3Tot) * 1000) / 10 : 0,
     count_140: c140,
-    pct_140: Math.round(pct140 * 10) / 10,
+    pct_140: f3Tot > 0 ? Math.round((c140 / f3Tot) * 1000) / 10 : 0,
     count_180: c180,
-    pct_180: Math.round(pct180 * 10) / 10,
+    pct_180: f3Tot > 0 ? Math.round((c180 / f3Tot) * 1000) / 10 : 0,
     count_poor: cPoor,
-    pct_poor: Math.round(pctPoor * 10) / 10,
+    pct_poor: f3Tot > 0 ? Math.round((cPoor / f3Tot) * 1000) / 10 : 0,
   };
 
   // Leg-Phasen
@@ -630,7 +701,6 @@ export function computePlayerAnalytics(
   const solidCount = allScores.filter((s) => s >= 60 && s < 100).length;
   const lowCount = allScores.filter((s) => s < 60).length;
 
-  // Nur echte 26er Fehlwürfe (kein 26er Checkout bei rest_score === 0!)
   let count26 = 0;
   for (const leg of legsVisits) {
     for (const v of leg) {
@@ -649,162 +719,575 @@ export function computePlayerAnalytics(
     count_26: count26,
   };
 
-  // ----------------------------------------------------
-  // KI-SCOUTING-PROFIL
-  // ----------------------------------------------------
-  let archetype = 'Der anpassungsfähige Allrounder';
-  let archetypeIcon = '🎯';
-  let archetypeDesc =
-    'Solide Balance über alle Spielphasen mit verlässlichen Grundwerten.';
+  // =========================================================================
+  // DAE 2.0 PSYCHOLOGY & PRESSURE ARCHITECT ENGINE (DEINE 30 FRAGEN & NOTIZEN)
+  // =========================================================================
 
-  if (overallSkill >= 68 && scoreFinish >= 65 && scoreMid >= 68) {
-    archetype = 'Dominanter Matchwinner & Allrounder';
-    archetypeIcon = '👑';
-    archetypeDesc =
-      'Kontrolliert das Board souverän von der ersten Aufnahme bis zum Doppel. Bestimmt das Spieltempo und bestraft Schwächen gnadenlos.';
-  } else if (scoreFinish >= 68 && scoreFinish > scorePower + 6) {
-    archetype = 'Eiskalter Checkout-Spezialist';
-    archetypeIcon = '❄️';
-    archetypeDesc =
-      'Geduldig im Aufbau, aber tödlich auf den Doppeln. Gewinnt Legs oft über Konter und überragende Nervenstärke im Finish-Bereich.';
-  } else if (scorePower >= 65 && scorePower > scoreFinish + 6) {
-    archetype = 'Highscore-Gewehr & Scoring-Brecher';
-    archetypeIcon = '⚡';
-    archetypeDesc =
-      'Enorme Wucht im Scoring und hohe Trefferdichte im Triple-Segment. Setzt Gegner früh unter Druck, kämpft aber gelegentlich auf Doppel.';
-  } else if (scoreStart >= 65 && scoreStart > scoreMid + 6) {
-    archetype = 'Blitz-Starter & Sprint-Gefahr';
-    archetypeIcon = '🚀';
-    archetypeDesc =
-      'Explodiert in den ersten 9 Darts. Zwingt den Gegner sofort in die Defensive, muss jedoch die Intensität im Mid-Game stabilisieren.';
-  } else if (scoreKonstanz >= 68 && volStd < 24) {
-    archetype = 'Das Präzisions-Uhrwerk';
-    archetypeIcon = '⚙️';
-    archetypeDesc =
-      'Extrem niedrige Streuung, kaum Fehlwürfe. Spielt fast wie ein Metronom und lässt sich durch gegnerische Highscores nicht aus der Ruhe bringen.';
-  } else if (scoreMid >= 65) {
-    archetype = 'Mid-Game Stratege & Rhythmus-Stabilisator';
-    archetypeIcon = '🏹';
-    archetypeDesc =
-      'Findet nach verhaltenem Start rasch den Flow und zieht zwischen Dart 10 und 18 das Tempo massiv an.';
-  }
+  // 1. Definition von Druck (Q1: Dynamisch progressiv & Q2: Gestaffelt <=40 / 41-100 / 101-170)
+  const pressureScores: number[] = [];
+  const baselineScores: number[] = [];
+  let shortLegsUnderPressure = 0;
+  let highFinishesCount = 0;
 
-  // Stärken & Schwächen
-  const sortedDims = [...radarDimensions].sort((a, b) => b.value - a.value);
-  const topStrengths = sortedDims.slice(0, 2).map((d) => ({
-    name: d.dim,
-    value: d.value,
-    label: d.label,
-  }));
-  const bottomWeaknesses = sortedDims.slice(-2).reverse().map((d) => ({
-    name: d.dim,
-    value: d.value,
-    label: d.label,
-  }));
-
-  // Psychologische Verhaltens-Karten (Bounce-Back, Pressure, Focus)
-  let followUps: number[] = [];
   for (const leg of legsVisits) {
-    for (let i = 0; i < leg.length - 1; i++) {
-      if (leg[i].score <= 45 && leg[i].rest_score > 80) {
-        if (leg[i + 1].rest_score > 50) {
-          followUps.push(leg[i + 1].score);
-        }
+    const isDecider = leg.length > 0 && leg[0].leg_num >= 5;
+    const legWon = leg.length > 0 && leg[leg.length - 1].winner_player_id === playerId;
+    const legDarts = leg.length > 0 && leg[leg.length - 1].darts_thrown ? leg[leg.length - 1].darts_thrown! : leg.length * 3;
+    const checkout = leg.length > 0 ? leg[leg.length - 1].checkout : null;
+
+    if (legWon && checkout && checkout >= 80) {
+      highFinishesCount++;
+    }
+    if (legWon && isDecider && legDarts <= 21) {
+      shortLegsUnderPressure++;
+    }
+
+    for (let i = 0; i < leg.length; i++) {
+      const v = leg[i];
+      const oppRest = v.opponent_rest || 999;
+      const myRest = v.rest_score;
+      const order = v.visit_order || i + 1;
+
+      // Gestaffelter Druck nach Q2
+      const isExtremeOppPressure = oppRest <= 40;
+      const isModerateOppPressure = oppRest > 40 && oppRest <= 100;
+      const isLightOppPressure = oppRest > 100 && oppRest <= 170;
+
+      // Dynamischer Leg-Druck nach Q1: Höher je später im Leg und Match
+      const isLateLegPressure = order >= 6 && myRest <= 170;
+      const isPressure =
+        isExtremeOppPressure ||
+        (isModerateOppPressure && order >= 4) ||
+        (isLightOppPressure && isDecider) ||
+        isLateLegPressure;
+
+      if (isPressure) {
+        pressureScores.push(v.score);
+      } else {
+        baselineScores.push(v.score);
       }
     }
   }
-  const bounceBackAvg = avgArr(followUps) || averageVisit;
-  const bounceDelta = bounceBackAvg - averageVisit;
 
-  let bounceCard: AIScoutingCard;
-  if (bounceDelta >= 4) {
-    bounceCard = {
-      title: 'Rebound & Fehlerverarbeitung',
-      badge: 'Exzellenter Rebound',
-      badge_color: '#34D399',
-      text: `Starker Rebound-Effekt: Nach Fehlaufnahmen unter 45 Punkten schlägt ${playerName} mit durchschnittlich ${bounceBackAvg.toFixed(
-        1
-      )} Punkten zurück (+${bounceDelta.toFixed(
-        1
-      )} vs. Schnitt). Fehlwürfe werden sofort abgehakt.`,
-    };
-  } else if (bounceDelta <= -4) {
-    bounceCard = {
-      title: 'Rebound & Fehlerverarbeitung',
-      badge: 'Leichte Negativserie',
-      badge_color: '#F87171',
-      text: `Leichte Anfälligkeit für Serienfehler: Nach Würfen <= 45 Punkten fällt der Folgescore auf Ø ${bounceBackAvg.toFixed(
-        1
-      )} (${bounceDelta.toFixed(
-        1
-      )} unter Schnitt). Frustmomente schneller aus dem Ablauf ausblenden!`,
-    };
-  } else {
-    bounceCard = {
-      title: 'Rebound & Fehlerverarbeitung',
-      badge: 'Solider Grundrhythmus',
-      badge_color: '#38BDF8',
-      text: `Verlässliche Routine: Nach Fehlaufnahmen pendelt sich der Folgescore sofort wieder beim soliden Ligaschnitt von Ø ${bounceBackAvg.toFixed(
-        1
-      )} Punkten ein.`,
-    };
+  const pressureAvg = pressureScores.length > 0 ? avgArr(pressureScores) : averageVisit;
+  const baselineAvg = baselineScores.length > 0 ? avgArr(baselineScores) : averageVisit;
+  const clutchDelta = Math.round((pressureAvg - baselineAvg) * 10) / 10;
+
+  // 2. Tilt-Indikator: Mix aus A, B und C (Q11 Nutzerwunsch!)
+  // Komponente A: Reaktion nach Low-Scores (<= 45)
+  // Komponente B: Reaktion nach verpassten Doppeln (Aufnahme nach rest <= 50 ohne Check)
+  // Komponente C: Häufung von 26ern und 0ern
+  let lowScoreFollowUps: number[] = [];
+  let missedDoubleFollowUps: number[] = [];
+
+  for (const leg of legsVisits) {
+    for (let i = 0; i < leg.length - 1; i++) {
+      const cur = leg[i];
+      const next = leg[i + 1];
+
+      // Komponente A: Rebound nach Low-Score
+      if (cur.score <= 45 && cur.rest_score > 80 && next.rest_score > 50) {
+        lowScoreFollowUps.push(next.score);
+      }
+
+      // Komponente B: Folgeaufnahme nach verpasstem Doppel
+      if (cur.rest_score <= 50 && cur.score === 0 && next.rest_score <= 50) {
+        missedDoubleFollowUps.push(next.score);
+      }
+    }
   }
 
-  // Gegnerdruck
-  const pressureScores = allScores.filter((_, idx) => idx % 4 === 0);
+  const avgLowFollow = lowScoreFollowUps.length > 0 ? avgArr(lowScoreFollowUps) : averageVisit;
+  const avgDoubleMissFollow = missedDoubleFollowUps.length > 0 ? avgArr(missedDoubleFollowUps) : averageVisit;
+
+  // Tilt-Score berechnen (0 bis 100, wobei < 25 = extrem stabil, > 45 = anfällig)
+  const dropLowScore = Math.max(0, averageVisit - avgLowFollow);
+  const dropMissedDouble = Math.max(0, averageVisit - avgDoubleMissFollow);
+  const rate26AndBust = totalVisits > 0 ? (count26 / totalVisits) * 100 : 0;
+
+  const tiltIndex = Math.round(
+    Math.min(
+      Math.max(
+        dropLowScore * 2.2 + dropMissedDouble * 2.0 + rate26AndBust * 3.5,
+        5
+      ),
+      95
+    )
+  );
+
+  // 3. Konstanz & Streuung (Q16, Q17, Q18)
+  const sub40ScoresCount = allScores.filter((s) => s < 40).length;
+  const count60Plus = thresholds['60+']?.count || 0;
+  const scoreRatio60ToSub40 =
+    sub40ScoresCount > 0
+      ? Math.round((count60Plus / sub40ScoresCount) * 10) / 10
+      : count60Plus > 0
+      ? 10
+      : 1;
+
+  const sub30ScoresCount = allScores.filter((s) => s <= 30).length;
+  const instabilityIndex =
+    totalVisits > 0 ? Math.round((sub30ScoresCount / totalVisits) * 1000) / 10 : 0;
+
+  // 4. Führungs-Verwaltung & Choke (Q4, Q12, Q13, Q14)
+  // Double-Trouble: Aufnahmen im Rest <= 50 über mehr als 3 Aufnahmen
+  let doubleTroubleCount = 0;
+  for (const leg of legsVisits) {
+    let visitsInDoubleZone = 0;
+    for (const v of leg) {
+      if (v.rest_score <= 50) {
+        visitsInDoubleZone++;
+      }
+    }
+    if (visitsInDoubleZone >= 3) {
+      doubleTroubleCount++;
+    }
+  }
+
+  // Late-Leg Hesitation: First-9 vs Rest-of-Leg (Q14)
+  const first9Avg = firstN.first_9_avg;
+  const restOfLegScores: number[] = [];
+  for (const leg of legsPlainScores) {
+    if (leg.length > 3) {
+      restOfLegScores.push(...leg.slice(3));
+    }
+  }
+  const restOfLegAvg = restOfLegScores.length > 0 ? avgArr(restOfLegScores) : averageVisit;
+  const lateLegDrop = Math.round((first9Avg - restOfLegAvg) * 10) / 10;
+
+  // Lead Choke: 2:0 Führung verspielt? (Q12)
+  let leadChokeCount = 0;
+  const matchesMap = new Map<number, RawLegVisit[][]>();
+  for (const leg of legsVisits) {
+    if (leg.length > 0) {
+      const mid = leg[0].match_id;
+      if (!matchesMap.has(mid)) matchesMap.set(mid, []);
+      matchesMap.get(mid)!.push(leg);
+    }
+  }
+
+  matchesMap.forEach((mLegs) => {
+    if (mLegs.length >= 4) {
+      const firstTwoWon =
+        mLegs[0]?.[mLegs[0].length - 1]?.winner_player_id === playerId &&
+        mLegs[1]?.[mLegs[1].length - 1]?.winner_player_id === playerId;
+      const matchWon =
+        mLegs.filter((l) => l[l.length - 1]?.winner_player_id === playerId).length >
+        mLegs.length / 2;
+      if (firstTwoWon && !matchWon) {
+        leadChokeCount++;
+      }
+    }
+  });
+
+  // 5. Gegnerstärke-Korrektur (Q10 Notiz: Leistung passt sich dem Gegner an!)
+  // Berechnen, ob Average in Legs mit hohem Gegner-Druck steigt oder sinkt
+  let opponentAdaptationFactor = 0;
+  if (pressureAvg > baselineAvg + 3) {
+    opponentAdaptationFactor = 1.3; // Wächst an großen Herausforderungen
+  } else if (pressureAvg < baselineAvg - 4) {
+    opponentAdaptationFactor = -1.2; // Lässt sich runterziehen / verkrampft
+  } else {
+    opponentAdaptationFactor = 0.2; // Neutral / spielt sein Spiel
+  }
+
+  let opponentAdaptationLabel = 'Fokusiert auf eigenes Spiel';
+  if (opponentAdaptationFactor > 0.8) {
+    opponentAdaptationLabel = 'Wächst mit Gegnerstärke (Match-Fighter)';
+  } else if (opponentAdaptationFactor < -0.8) {
+    opponentAdaptationLabel = 'Leistungsabfall bei Störfaktoren / schwachen Gegnern';
+  }
+
+  // 6. SCHULNOTEN (1.0 bis 6.0) & STERNE (1 bis 5) (Q26)
+  const calcGrade = (
+    scoreVal: number,
+    optMin = 0,
+    optMax = 100,
+    invert = false
+  ): { grade: number; label: string; stars: number; color: string } => {
+    let norm = (scoreVal - optMin) / (optMax - optMin);
+    norm = Math.min(Math.max(norm, 0), 1);
+    if (invert) norm = 1 - norm;
+
+    // Schulnote 1.0 (beste) bis 6.0 (schlechteste)
+    const grade = Math.round((6.0 - norm * 5.0) * 10) / 10;
+    let label = 'Ausreichend';
+    let stars = 2;
+    let color = '#F59E0B';
+
+    if (grade <= 1.5) {
+      label = 'Sehr gut';
+      stars = 5;
+      color = '#10B981';
+    } else if (grade <= 2.5) {
+      label = 'Gut';
+      stars = 4;
+      color = '#34D399';
+    } else if (grade <= 3.5) {
+      label = 'Befriedigend';
+      stars = 3;
+      color = '#38BDF8';
+    } else if (grade <= 4.5) {
+      label = 'Ausreichend';
+      stars = 2;
+      color = '#F59E0B';
+    } else {
+      label = 'Mangelhaft';
+      stars = 1;
+      color = '#EF4444';
+    }
+
+    return { grade, label, stars, color };
+  };
+
+  // 5 Dimensionen Schulnoten:
+  // 1. Nervenstärke / Clutch
+  const clutchScoreNorm = Math.min(Math.max(50 + clutchDelta * 5 + highFinishesCount * 12, 10), 100);
+  const gClutch = calcGrade(clutchScoreNorm, 20, 95);
+
+  // 2. Tilt-Resistenz & Fehlerverarbeitung
+  const gTilt = calcGrade(tiltIndex, 10, 75, true);
+
+  // 3. Wurfkonstanz & Korridor-Stabilität
+  const gKonstanz = calcGrade(scoreRatio60ToSub40 * 10 - instabilityIndex * 0.8, 5, 50);
+
+  // 4. Ziellinien-Souveränität (Kein Late-Leg Choke)
+  const finishHesitationScore = Math.max(0, 80 - lateLegDrop * 2.5 - doubleTroubleCount * 8 - leadChokeCount * 15);
+  const gFinishSouveraen = calcGrade(finishHesitationScore, 20, 90);
+
+  // 5. Kaltstart & Anwurf-Mentalität
+  const gKaltstart = calcGrade(startIndex, 20, 85);
+
+  const schoolGrades: MentalSchoolGrade[] = [
+    {
+      dimension: 'Nervenstärke (Clutch)',
+      grade: gClutch.grade,
+      grade_label: gClutch.label,
+      stars: gClutch.stars,
+      color: gClutch.color,
+      detail:
+        clutchDelta >= 0
+          ? `+${clutchDelta.toFixed(1)} Pkt unter Druck`
+          : `${clutchDelta.toFixed(1)} Pkt unter Druck`,
+    },
+    {
+      dimension: 'Tilt-Resistenz',
+      grade: gTilt.grade,
+      grade_label: gTilt.label,
+      stars: gTilt.stars,
+      color: gTilt.color,
+      detail: `Tilt-Index: ${tiltIndex} (Fehlwurf-Verarbeitung)`,
+    },
+    {
+      dimension: 'Wurf-Konstanz',
+      grade: gKonstanz.grade,
+      grade_label: gKonstanz.label,
+      stars: gKonstanz.stars,
+      color: gKonstanz.color,
+      detail: `60+ / <40 Ratio: ${scoreRatio60ToSub40.toFixed(1)}`,
+    },
+    {
+      dimension: 'Ziellinien-Souveränität',
+      grade: gFinishSouveraen.grade,
+      grade_label: gFinishSouveraen.label,
+      stars: gFinishSouveraen.stars,
+      color: gFinishSouveraen.color,
+      detail:
+        lateLegDrop > 15
+          ? `Zögern vor Finish (-${lateLegDrop.toFixed(1)} Pkt)`
+          : `Konstant bis zum Checkout`,
+    },
+    {
+      dimension: 'Kaltstart & Anwurf',
+      grade: gKaltstart.grade,
+      grade_label: gKaltstart.label,
+      stars: gKaltstart.stars,
+      color: gKaltstart.color,
+      detail: `Start-Index: ${startIndex}/100`,
+    },
+  ];
+
+  const psychologicalMetrics: PsychologicalMetrics = {
+    clutch_delta: clutchDelta,
+    pressure_average: Math.round(pressureAvg * 10) / 10,
+    baseline_average: Math.round(baselineAvg * 10) / 10,
+    pressure_visits_count: pressureScores.length,
+    tilt_index: tiltIndex,
+    instability_index: instabilityIndex,
+    score_ratio_60_to_sub40: scoreRatio60ToSub40,
+    lead_choke_count: leadChokeCount,
+    double_trouble_count: doubleTroubleCount,
+    late_leg_drop: lateLegDrop,
+    opponent_adaptation_factor: opponentAdaptationFactor,
+    opponent_adaptation_label: opponentAdaptationLabel,
+    short_legs_under_pressure: shortLegsUnderPressure,
+    high_finishes_count: highFinishesCount,
+    school_grades: schoolGrades,
+  };
+
+  // 7. DOPPELTER ARCHETYP: Psychologie-Typ + Team-Rolle (Q27: C & D)
+  let mentalType = 'Der anpassungsfähige Allrounder';
+  let mentalIcon = '🎯';
+  let mentalDesc = 'Ausgeglichenes Nervenkostüm ohne extreme Ausreißer nach oben oder unten.';
+
+  if (clutchDelta >= 3 && gClutch.grade <= 2.0) {
+    mentalType = 'Der Eiskalte Vollstrecker';
+    mentalIcon = '❄️';
+    mentalDesc =
+      'Je höher der Puls am Board, desto präziser die Darts. Sucht aktiv den Druck und schaltet Konkurrenten im Decider eiskalt aus.';
+  } else if (tiltIndex <= 20 && volStd <= 22) {
+    mentalType = 'Das Präzisions-Uhrwerk';
+    mentalIcon = '⚙️';
+    mentalDesc =
+      'Stoische Ruhe. Reagiert auf gegnerische 180er oder eigene Fehlwürfe mit exakt gleichem Rhythmus wie ein Schweizer Uhrwerk.';
+  } else if (scoreDanger >= 60 && instabilityIndex >= 25) {
+    mentalType = 'Die Highscore-Wundertüte';
+    mentalIcon = '⚡';
+    mentalDesc =
+      'Explosives Scoring mit maximaler Triple-Gefahr, kämpft jedoch mit gelegentlichen Ausreißern in 26er-Zonen. Ein emotionaler Spielmacher.';
+  } else if (opSum.average < finSum.average - 6) {
+    mentalType = 'Der Spätzünder & Kämpfer';
+    mentalIcon = '🔥';
+    mentalDesc =
+      'Braucht oft 1–2 Aufnahmen zum Einwerfen, steigert sich aber kontinuierlich und dreht im Finish-Bereich massiv auf.';
+  } else if (lateLegDrop >= 18 || doubleTroubleCount >= 2) {
+    mentalType = 'Der sensible Rhythmuswerfer';
+    mentalIcon = '🏹';
+    mentalDesc =
+      'Starkes Grundpotenzial bei freiem Kopf, gerät jedoch bei verpassten Checkout-Chancen leicht ins Grübeln.';
+  }
+
+  // Team-Rolle nach Q27
+  let teamRole: 'Leader' | 'Punktegarant' | 'Joker' | 'Aufbau-Spieler' = 'Punktegarant';
+  let roleBadgeColor = '#38BDF8';
+  let roleDesc = 'Liefert kontinuierlich wichtige Zähler für den Spieltags-Sieg.';
+
+  if (matchAvg >= 50 && gClutch.grade <= 2.2) {
+    teamRole = 'Leader';
+    roleBadgeColor = '#F59E0B';
+    roleDesc = 'Geht voran, setzt in engen Spielsituationen die Glanzpunkte und stabilisiert das Team.';
+  } else if (scoreKonstanz >= 65 && matchAvg >= 45) {
+    teamRole = 'Punktegarant';
+    roleBadgeColor = '#10B981';
+    roleDesc = 'Extrem verlässlich in Einzel und Doppel. Gewinnt die Pflichtspiele gegen jeden Gegner.';
+  } else if (scoreDanger >= 55 || clutchDelta >= 4) {
+    teamRole = 'Joker';
+    roleBadgeColor = '#A855F7';
+    roleDesc = 'Kann an Spitzentagen jeden Gegner an die Wand spielen. Perfekt für taktische Überraschungen.';
+  } else {
+    teamRole = 'Aufbau-Spieler';
+    roleBadgeColor = '#06B6D4';
+    roleDesc = 'Wertvolles Fundament mit solider Entwicklungskurve; profitiert von mentaler Entlastung.';
+  }
+
+  const dualArchetype: DualArchetype = {
+    mental_type: mentalType,
+    mental_icon: mentalIcon,
+    mental_desc: mentalDesc,
+    team_role: teamRole,
+    role_badge_color: roleBadgeColor,
+    role_desc: roleDesc,
+  };
+
+  // 8. TONALITÄT & SPRACHE (Q28: Umschaltbar Scout vs. Coach)
+  const scoutingTexts: AIScoutingToneTexts = {
+    scout_mode: {
+      pressure_summary:
+        clutchDelta >= 2
+          ? `Gnadenlose Wettkampfhärte: Unter gegnerischem Druck steigt der Schnitt von ${baselineAvg.toFixed(
+              1
+            )} auf ${pressureAvg.toFixed(1)} Punkte (+${clutchDelta.toFixed(
+              1
+            )}). Bestraft Nachlässigkeiten des Gegners konsequent.`
+          : clutchDelta <= -3
+          ? `Deutliches Nerven-Problem: Bei gegnerischem Druck bricht der Average von ${baselineAvg.toFixed(
+              1
+            )} auf ${pressureAvg.toFixed(1)} ein (${clutchDelta.toFixed(
+              1
+            )}). Verliert im direkten Finish-Duell die Wurflinie.`
+          : `Neutrale Druck-Kurve: Hält das Niveau unter Druck stabil bei ${pressureAvg.toFixed(
+              1
+            )} Punkten. Weder Steigerung noch Nervenflattern.`,
+      choke_analysis:
+        lateLegDrop > 18
+          ? `Akute Ziellinien-Hemmung: Fällt nach Dart 9 um ${lateLegDrop.toFixed(
+              1
+            )} Punkte ab. Doppel-Krise in ${doubleTroubleCount} Legs registriert. Das muss im Matchplan gnadenlos attackiert werden.`
+          : doubleTroubleCount > 0
+          ? `Gelegentliches Feststecken im Checkout-Bereich (${doubleTroubleCount}x >9 Darts auf Doppel), aber ohne chronisches Choke-Muster.`
+          : `Keine Ziellinien-Schwäche erkennbar: Schließt Legs ohne Zögern ab.`,
+      consistency_verdict:
+        instabilityIndex > 20
+          ? `Mangelnde Grundkonstanz: ${instabilityIndex.toFixed(
+              1
+            )} % aller Würfe landen bei <= 30 Punkten. Das Verhältnis 60+ zu <40 ist mit ${scoreRatio60ToSub40.toFixed(
+              1
+            )} zu instabil für sichere Führungen.`
+          : `Verlässliches Fundament: Nur ${instabilityIndex.toFixed(
+              1
+            )} % Fehlerquote bei Aufnahmen <= 30. Hohe Wiederholgenauigkeit.`,
+      hard_truth:
+        tiltIndex > 40
+          ? `Ungeschminkte Wahrheit: ${playerName} lässt sich von Fehlwürfen zu lange mental ausbremsen (Tilt-Index ${tiltIndex}). Frust führt direkt zu Folge-Fehlern.`
+          : `Ungeschminkte Wahrheit: Ein mental gefestigter Akteur, der auch in hitziger Atmosphäre seinen Stiefel runterspielt.`,
+    },
+    coach_mode: {
+      pressure_summary:
+        clutchDelta >= 0
+          ? `Hervorragende mentale Basis: ${playerName} mobilisiert unter Druck zusätzliche Fokus-Ressourcen (+${clutchDelta.toFixed(
+              1
+            )} Schnitt-Steigerung). Dieses Selbstvertrauen aktiv für die Teamführung nutzen!`
+          : `Entwicklungschance unter Druck: Bei gegnerischem Rest <= 100 hilft eine bewusst verlängerte Atem-Routine vor dem Gang ans Oche, um den Puls um 10 Schläge zu senken.`,
+      choke_analysis:
+        lateLegDrop > 15
+          ? `Lernfeld Ziellinie: Der Übergang von Scoring auf Finish gelingt mit gezieltem 121er-Training. Wenn der Setup-Dart sitzt, fällt der finale Check leicht.`
+          : `Souveränes Match-Management: Behält die Nerven in den entscheidenden Aufnahmen und trifft mutige Entscheidungen.`,
+      consistency_verdict:
+        instabilityIndex > 20
+          ? `Wachstumspotenzial Streuung: Der Fokus liegt im Training auf dem Halten des 20er-Felds (auch S20 statt T20) – das eliminiert 26er sofort und hebt den Schnitt um 6–8 Punkte an.`
+          : `Exzellente Grundkonstanz: Eine tragende Säule im Team, die für Ruhe und Berechenbarkeit sorgt.`,
+      motivational_boost: `Mit der richtigen Warm-Up-Routine und klaren Zielbildern am Board gehört ${playerName} zu den verlässlichsten Spielern der gesamten Liga!`,
+    },
+  };
+
+  // 9. MASSGESCHNEIDERTE TRAININGSIMPULSE (Q29)
+  const trainingImpulses: TrainingImpulse[] = [];
+  if (gFinishSouveraen.grade >= 3.0 || doubleTroubleCount > 0) {
+    trainingImpulses.push({
+      title: 'Finish-Druck & Ziellinien-Souveränität',
+      focus: 'Lieblingsdoppel D16 / D20 unter Wettkampf-Bedingungen',
+      exercise: 'Bob\'s 27 oder "501 Double-Out mit maximal 6 Check-Darts"',
+      goal: 'Eliminierung von Double-Trouble Phasen und Festigung des 1. Matchdarts',
+    });
+  }
+
+  if (instabilityIndex > 18 || count26 > 1) {
+    trainingImpulses.push({
+      title: 'Streuungs-Reduktion & 26er-Bann',
+      focus: 'Schmale Gruppierung im Single-20 Segment',
+      exercise: '100 Darts auf die 20 – Jeder Treffer in 1 oder 5 gibt 0 Punkte, nur Single/Triple zählt',
+      goal: 'Instabilitäts-Index unter 12 % drücken für verlässliche 60er Grund-Aufnahmen',
+    });
+  }
+
+  if (gKaltstart.grade >= 3.0 || startIndex < 50) {
+    trainingImpulses.push({
+      title: 'Kaltstart-Routine für Anwurf-Vorteil',
+      focus: 'Sofortige Betriebstemperatur in den Visits 1–3',
+      exercise: '5x 9-Darts Sprint aus der kalten Hose – Ziel: Mindestens 180 Punkte in den ersten 9 Darts',
+      goal: 'Sichern des eigenen Anwurfs ab Dart 1 ohne Anlaufzeit',
+    });
+  }
+
+  if (trainingImpulses.length < 2) {
+    trainingImpulses.push({
+      title: 'Decider & Nervenstärke-Simulation',
+      focus: 'Clutch-Performance bei Gleichstand',
+      exercise: 'Catch 40: Alle Finishes von 61 bis 100 mit jeweils 2 oder 3 Darts checken',
+      goal: 'Ausbau des Clutch-Vorteils zu einer uneinnehmbaren Festung',
+    });
+  }
+
+  // 10. MATCHPLAN- & AUFSTELLUNGS-BERATER (Q30: B & C)
+  let boardRec = 'Board 1 oder 2 gleichermaßen geeignet';
+  if (volStd <= 22) {
+    boardRec = 'Board 1 (Präsentations-Board): Lässt sich von Umgebungsgeräuschen und Zuschauern nicht irritieren.';
+  } else {
+    boardRec = 'Board 2 (Ruhigeres Board): Profitiert von fokussierter Atmosphäre und weniger Ablenkung.';
+  }
+
+  let singleSlot = 'Block 1 (Spiele 1–4): Startet engagiert und setzt frühe Team-Akzente.';
+  if (clutchDelta >= 2 && gClutch.grade <= 2.2) {
+    singleSlot = 'Schluss-Block oder Decider-Position: Höchste Nervenstärke unter Druck, ideal für knappe Schlussphasen.';
+  } else if (gKaltstart.grade > 3.0) {
+    singleSlot = 'Block 2 (Spiele 5–8): Gibt Zeit zum Einwerfen und akklimatisieren.';
+  }
+
+  let doublePartner = 'Ausgeglichener Partner';
+  if (scoreDanger >= 60 && instabilityIndex > 15) {
+    doublePartner = 'Stoischer Doppel-Partner mit hoher Finish-Quote (gleicht Scoring-Schwankungen aus).';
+  } else if (scoreFinish >= 65 && scorePower < 50) {
+    doublePartner = 'Aggressiver Power-Scorer (schafft schnellen Vorsprung, den dieser Spieler veredelt).';
+  } else {
+    doublePartner = 'Kommunikativer Rhythmus-Spieler zur gemeinsamen Rhythmus-Stabilisierung.';
+  }
+
+  const matchplanAdvice: MatchplanAdvice = {
+    board_recommendation: boardRec,
+    single_slot_recommendation: singleSlot,
+    double_partner_profile: doublePartner,
+  };
+
+  // Backwards-compatible Scouting Cards
+  const bounceCard: AIScoutingCard = {
+    title: 'Rebound & Fehlerverarbeitung',
+    badge: tiltIndex <= 25 ? 'Eiskalter Rebound' : tiltIndex >= 45 ? 'Tilt-Gefahr' : 'Solide Routine',
+    badge_color: tiltIndex <= 25 ? '#34D399' : tiltIndex >= 45 ? '#F87171' : '#38BDF8',
+    text:
+      tiltIndex <= 25
+        ? `Fehlwürfe werden mental in Sekundenschnelle gelöscht. Folgescore nach Patzern: Ø ${avgLowFollow.toFixed(
+            1
+          )} Pkt.`
+        : tiltIndex >= 45
+        ? `Neigt nach Fehlern zu Frust-Wurfserien (Tilt-Index ${tiltIndex}). Folgescore bricht um -${dropLowScore.toFixed(
+            1
+          )} Pkt ein.`
+        : `Verlässliche Routine: Nach Fehlaufnahmen fängt sich der Spieler rasch wieder bei soliden Ø ${avgLowFollow.toFixed(
+            1
+          )} Pkt.`,
+  };
+
   const pressureCard: AIScoutingCard = {
     title: 'Nervenstärke & Gegnerdruck',
-    badge: matchAvg >= 45 ? 'Wettkampf-Fighter' : 'Kühler Kopf',
-    badge_color: '#38BDF8',
-    text: `Im direkten Finish-Druck behält ${playerName} die Übersicht und fokussiert sich präzise auf die Zielsegmente.`,
+    badge: clutchDelta >= 2 ? 'Wettkampf-Monster' : clutchDelta <= -3 ? 'Druck-Anfällig' : 'Kühler Kopf',
+    badge_color: clutchDelta >= 2 ? '#34D399' : clutchDelta <= -3 ? '#F87171' : '#38BDF8',
+    text:
+      clutchDelta >= 0
+        ? `Unter gegnerischem Druck steigt die Konzentration (+${clutchDelta.toFixed(
+            1
+          )} Pkt vs. Baseline).`
+        : `Unter gegnerischem Druck schleicht sich Hektik ein (${clutchDelta.toFixed(
+            1
+          )} Pkt vs. Baseline).`,
   };
 
-  // Fokus
   const focusCard: AIScoutingCard = {
     title: 'Match-Fokus & Ausdauer',
-    badge: 'Stabile Phasen',
-    badge_color: '#34D399',
-    text: `Konzentrationskurve verläuft stabil über alle gespielten Legs (${legsVisits.length} Legs ausgewertet).`,
+    badge: lateLegDrop > 18 ? 'Ziellinien-Hesitation' : 'Fokus Stabil',
+    badge_color: lateLegDrop > 18 ? '#F59E0B' : '#34D399',
+    text:
+      lateLegDrop > 18
+        ? `Leichtes Stocken vor der Ziellinie: Fällt im Finish-Bereich um ${lateLegDrop.toFixed(
+            1
+          )} Pkt gegenüber den First-9 ab.`
+        : `Konzentrationskurve verläuft stabil über alle gespielten Legs (${legsVisits.length} Legs ausgewertet).`,
   };
 
-  // Taktische Tipps
-  const tacticalTips: string[] = [];
-  if (scoreStart < 50) {
-    tacticalTips.push(
-      'Fokus auf die Warm-Up Routine vor Matchbeginn: Zielgerichtetes Einwerfen auf T20, um die ersten 9 Darts direkt im Scoring-Bereich zu platzieren.'
-    );
-  } else {
-    tacticalTips.push(
-      'Startstärke konsequent ausnutzen: Bei eigenem Anwurf das Leg frühzeitig durch hohes Tempo an sich reißen.'
-    );
-  }
-
-  if (scoreFinish < 50) {
-    tacticalTips.push(
-      'Setup-Darts optimieren: Bevorzugte Lieblingsdoppel (z.B. D16 / D20) gezielter anvisieren, anstatt auf ungeliebte Doppel ausweichen zu müssen.'
-    );
-  } else {
-    tacticalTips.push(
-      'Finish-Dominanz beibehalten: Den Gegner im Bereich Rest 100-130 mit aggressiven Checkout-Versuchen psychologisch unter Druck setzen.'
-    );
-  }
-
-  if (scoreDanger > 60) {
-    tacticalTips.push(
-      'Triple-Frequenz als Matchwinner: Die hohe 100+/140+-Dichte nutzen, um Breaks bei gegnerischem Anwurf zu erzwingen.'
-    );
-  }
-
   const aiProfile: AIScoutingProfile = {
-    archetype,
-    archetype_icon: archetypeIcon,
-    archetype_desc: archetypeDesc,
-    top_strengths: topStrengths,
-    bottom_weaknesses: bottomWeaknesses,
+    archetype: mentalType,
+    archetype_icon: mentalIcon,
+    archetype_desc: mentalDesc,
+    dual_archetype: dualArchetype,
+    mental_metrics: psychologicalMetrics,
+    scouting_texts: scoutingTexts,
+    training_impulses: trainingImpulses,
+    matchplan_advice: matchplanAdvice,
+    top_strengths: [
+      { name: radarDimensions[0].dim, value: radarDimensions[0].value, label: radarDimensions[0].label },
+      { name: radarDimensions[1].dim, value: radarDimensions[1].value, label: radarDimensions[1].label },
+    ],
+    bottom_weaknesses: [
+      { name: radarDimensions[4].dim, value: radarDimensions[4].value, label: radarDimensions[4].label },
+      { name: radarDimensions[5].dim, value: radarDimensions[5].value, label: radarDimensions[5].label },
+    ],
     bounce_back: bounceCard,
     pressure: pressureCard,
     focus: focusCard,
-    tactical_tips: tacticalTips,
+    tactical_tips: [
+      scoutingTexts.coach_mode.pressure_summary,
+      scoutingTexts.coach_mode.consistency_verdict,
+      matchplanAdvice.single_slot_recommendation,
+    ],
   };
 
   return {
