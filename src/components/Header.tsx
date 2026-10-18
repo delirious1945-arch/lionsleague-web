@@ -57,6 +57,24 @@ export default function Header({
     router.push(`${pathname}?${params.toString()}`);
   };
 
+  // Modus-Prüfung: Header soll NUR im Ranking-Bereich angezeigt werden!
+  // Auf dem Einstiegs-Hub (pathname === '/' und mode !== 'ranking') sowie im Trainingsbereich (/training, /doppelquote)
+  // darf die Liga-Navigationsleiste NICHT angezeigt werden.
+  const isRankingMode =
+    pathname.startsWith('/teams') ||
+    pathname.startsWith('/spieler') ||
+    pathname.startsWith('/liga') ||
+    pathname.startsWith('/analytics') ||
+    pathname.startsWith('/hilfe') ||
+    pathname.startsWith('/eingabe') ||
+    pathname.startsWith('/verwaltung') ||
+    pathname.startsWith('/optionen') ||
+    (pathname === '/' && searchParams.get('mode') === 'ranking');
+
+  if (!isRankingMode) {
+    return null;
+  }
+
   const mainNav = [
     { label: 'Dashboard', href: '/?mode=ranking' },
     { label: 'Teams', href: '/teams' },
@@ -77,7 +95,7 @@ export default function Header({
       <div className="max-w-[1400px] mx-auto flex flex-col xl:flex-row items-center justify-between gap-3">
         {/* Logo & Brand */}
         <div className="flex items-center justify-between w-full xl:w-auto shrink-0">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/?mode=ranking" className="flex items-center gap-2.5 group">
             <div className="relative w-9 h-9 shrink-0 transition-transform group-hover:scale-105">
               <Image
                 src="/logo.png"

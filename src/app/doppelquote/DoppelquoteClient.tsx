@@ -324,16 +324,16 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
 
         <div className="flex items-center gap-2">
           <Link
-            href="/"
+            href="/training"
             className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center gap-1"
-            title="Zurück zur Bereichsauswahl"
+            title="Zurück zu den Trainingsspielen"
           >
-            <span>🔄</span>
-            <span className="hidden sm:inline">Modus</span>
+            <span>🎯</span>
+            <span className="hidden sm:inline">Trainingsspiele</span>
           </Link>
           <Link
             href="/?mode=ranking"
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 transition-colors flex items-center gap-1 shadow-sm"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors flex items-center gap-1 shadow-sm"
             title="Zum Ranking-System"
           >
             <span>🏆</span>

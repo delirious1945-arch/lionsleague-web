@@ -3,8 +3,19 @@
 import React from 'react';
 import { Shield, Zap } from 'lucide-react';
 import CookieConsent from './CookieConsent';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 export default function Footer() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Auf dem Einstiegs-Hub (pathname === '/' und mode !== 'ranking') blenden wir die Fußzeile aus
+  const isHub = pathname === '/' && searchParams.get('mode') !== 'ranking';
+
+  if (isHub) {
+    return <CookieConsent />;
+  }
+
   return (
     <>
       <footer className="mt-12 border-t border-white/5 py-8 text-center text-xs text-slate-500">
