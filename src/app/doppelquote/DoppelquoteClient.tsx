@@ -332,6 +332,15 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
             <span className="hidden sm:inline">Trainingsspiele</span>
           </Link>
           <Link
+            href="/doppelquote/live"
+            target="_blank"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 transition-colors flex items-center gap-1 shadow-[0_0_15px_rgba(0,212,255,0.2)]"
+            title="Live-Übersicht für TV / Beamer im neuen Tab öffnen"
+          >
+            <span>📺</span>
+            <span className="hidden sm:inline">TV Live-Board</span>
+          </Link>
+          <Link
             href="/?mode=ranking"
             className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors flex items-center gap-1 shadow-sm"
             title="Zum Ranking-System"

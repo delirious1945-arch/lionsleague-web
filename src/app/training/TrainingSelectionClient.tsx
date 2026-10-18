@@ -141,13 +141,24 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
             <span className="text-xs text-slate-400">
               Bereit für deine nächste Aufnahme?
             </span>
-            <Link
-              href="/doppelquote"
-              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(0,212,255,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-            >
-              <span>🎯 Doppelquote-Spiel starten</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <Link
+                href="/doppelquote/live"
+                target="_blank"
+                className="w-full sm:w-auto px-4 py-3.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border border-cyan-500/40 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,212,255,0.15)] transition-all cursor-pointer"
+                title="Live-Ranking für Fernseher/Beamer im Vereinsheim öffnen"
+              >
+                <span>📺</span>
+                <span>TV Live-Board</span>
+              </Link>
+              <Link
+                href="/doppelquote"
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(0,212,255,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <span>🎯 Spiel starten</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </div>
 
