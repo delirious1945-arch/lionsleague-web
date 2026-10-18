@@ -22,8 +22,12 @@ const CACHE_KEY = 'lions_active_doppelquote_session_v2';
 
 export default function DoppelquoteClient({ players, initialHistory, user }: DoppelquoteClientProps) {
   const router = useRouter();
+  const isBoardUser = Boolean(user?.name && user.name.toLowerCase().startsWith('board'));
+  const userPlayerMatch = players.find(p => p.name.toLowerCase() === user?.name?.toLowerCase());
+  const defaultP1 = (!isBoardUser && userPlayerMatch) ? userPlayerMatch.name : (players[0]?.name || 'Sebastian Kirste');
+
   const [gameMode, setGameMode] = useState<'solo' | '1vs1'>('solo');
-  const [p1Name, setP1Name] = useState<string>(players[0]?.name || 'Sebastian Kirste');
+  const [p1Name, setP1Name] = useState<string>(defaultP1);
   const [p2Name, setP2Name] = useState<string>(players[1]?.name || 'Dirk Ostermann');
   const [activePlayer, setActivePlayer] = useState<1 | 2>(1);
   const [currentTargetIndex, setCurrentTargetIndex] = useState<number>(0);
@@ -128,8 +132,13 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             (cached.scoresP2 && cached.scoresP2[t] && cached.scoresP2[t].some((s: any) => s !== null))
           );
           if (hasScores) {
-            setGameMode(cached.gameMode || 'solo');
-            if (cached.p1Name) setP1Name(cached.p1Name);
+            const restoredMode = cached.gameMode || 'solo';
+            setGameMode(restoredMode);
+            if (!isBoardUser && userPlayerMatch && restoredMode === 'solo') {
+              setP1Name(userPlayerMatch.name);
+            } else if (cached.p1Name) {
+              setP1Name(cached.p1Name);
+            }
             if (cached.p2Name) setP2Name(cached.p2Name);
             setScoresP1(cached.scoresP1);
             if (cached.scoresP2) setScoresP2(cached.scoresP2);
@@ -147,6 +156,13 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       setIsGameInitialized(true);
     }
   }, []);
+
+  // Automatische Fixierung auf eigenen Account im Solo-Modus (außer bei Board 1-5 Usern)
+  useEffect(() => {
+    if (!isBoardUser && userPlayerMatch && gameMode === 'solo') {
+      setP1Name(userPlayerMatch.name);
+    }
+  }, [gameMode, isBoardUser, userPlayerMatch]);
 
   // 2. Automatisches Caching auf dem Endgerät nach jedem Wurf
   useEffect(() => {
@@ -543,7 +559,13 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         {/* Modus Switcher */}
         <div className="grid grid-cols-2 p-1 bg-slate-950/60 rounded-xl border border-white/5">
           <button
-            onClick={() => { setGameMode('solo'); setActivePlayer(1); }}
+            onClick={() => {
+              setGameMode('solo');
+              setActivePlayer(1);
+              if (!isBoardUser && userPlayerMatch) {
+                setP1Name(userPlayerMatch.name);
+              }
+            }}
             className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
               gameMode === 'solo' 
                 ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]' 
@@ -567,18 +589,38 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         {/* Spieler Auswahl */}
         <div className={`grid gap-2.5 ${gameMode === '1vs1' ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <div>
-            <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block mb-1">
-              Spieler 1
-            </label>
-            <select
-              value={p1Name}
-              onChange={(e) => setP1Name(e.target.value)}
-              className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-blue-500"
-            >
-              {players.map(p => (
-                <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
+                Spieler 1
+              </label>
+              {gameMode === 'solo' && !isBoardUser && (
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  (Fest mit Account verknüpft)
+                </span>
+              )}
+            </div>
+
+            {gameMode === 'solo' && !isBoardUser ? (
+              <div className="w-full bg-slate-950/90 border border-blue-500/40 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-white flex items-center justify-between shadow-inner">
+                <span className="flex items-center gap-2 truncate">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                  <span className="truncate">{p1Name}</span>
+                </span>
+                <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-950 border border-sky-800/60 px-2 py-0.5 rounded shrink-0 ml-2">
+                  Angemeldet
+                </span>
+              </div>
+            ) : (
+              <select
+                value={p1Name}
+                onChange={(e) => setP1Name(e.target.value)}
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-blue-500"
+              >
+                {players.map(p => (
+                  <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {gameMode === '1vs1' && (

@@ -2,6 +2,7 @@
 
 import { sql } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { getSessionAction } from '@/app/actions';
 
 export interface TrainingSessionData {
   session_id: string;
@@ -70,12 +71,23 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
 
 export async function getTrainingHistoryAction(limit: number = 50) {
   try {
-    const rows = await sql`
-      SELECT *
-      FROM training_doubles
-      ORDER BY created_at DESC
-      LIMIT ${limit}
-    `;
+    const session = await getSessionAction();
+    const isAdmin = session?.role === 'admin';
+
+    const rows = isAdmin
+      ? await sql`
+          SELECT *
+          FROM training_doubles
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : await sql`
+          SELECT *
+          FROM training_doubles
+          WHERE COALESCE(is_aborted, 0) = 0
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
     return rows.map((r: any) => ({
       id: Number(r.id),
       session_id: String(r.session_id || ''),
