@@ -7,6 +7,7 @@ import {
   getTop26Players,
   getAllAnalyticsLegVisits,
 } from '@/lib/data';
+import { redirect } from 'next/navigation';
 import { getSessionAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export default async function AnalyticsPage({
 }) {
   const session = await getSessionAction();
   if (!session) {
-    return null;
+    redirect('/');
   }
 
   const params = await searchParams;
@@ -42,6 +43,7 @@ export default async function AnalyticsPage({
         allLegVisits={allLegVisits}
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
+        isAdmin={session?.role === 'admin'}
       />
     </div>
   );

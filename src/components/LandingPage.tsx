@@ -86,7 +86,7 @@ export default function LandingPage() {
                 <span>🟢</span> LIONS 2.0
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-wider drop-shadow-[0_0_20px_rgba(37,99,235,0.5)]">
-                LIONS LEAGUE
+                LIONS WEYHAUSEN
               </h1>
               <p className="text-xs sm:text-sm font-extrabold text-blue-400 tracking-wider uppercase mt-1">
                 SC WEYHAUSEN VON 1921 E.V.

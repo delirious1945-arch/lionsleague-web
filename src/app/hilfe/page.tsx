@@ -33,7 +33,7 @@ export default async function HilfePage() {
           <span>❓</span> Hilfe & Erklärungen zum Ranking
         </h1>
         <p className="text-slate-400 text-sm mt-1">
-          Das Punkte- und Wertungssystem der Lions League verständlich erklärt.
+          Das Punkte- und Wertungssystem von Lions Weyhausen verständlich erklärt.
         </p>
       </div>
 

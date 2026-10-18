@@ -20,11 +20,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lions League 2.0 | SC Weyhausen Dartsport",
+  metadataBase: new URL("https://lionsweyhausen.vercel.app"),
+  title: "Lions Weyhausen | SC Weyhausen Dartsport",
   description:
     "Offizielles Ranglisten- und Leistungsdiagnostik-Portal des SC Weyhausen von 1921 e.V. Sparte Dartsport",
   icons: {
     icon: "/favicon.ico",
+  },
+  alternates: {
+    canonical: "https://lionsweyhausen.vercel.app",
+  },
+  openGraph: {
+    title: "Lions Weyhausen | SC Weyhausen Dartsport",
+    description:
+      "Offizielles Ranglisten- und Leistungsdiagnostik-Portal des SC Weyhausen von 1921 e.V. Sparte Dartsport",
+    url: "https://lionsweyhausen.vercel.app",
+    siteName: "Lions Weyhausen",
+    locale: "de_DE",
+    type: "website",
   },
 };
 

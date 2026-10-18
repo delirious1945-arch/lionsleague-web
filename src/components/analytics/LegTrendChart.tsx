@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { LegTrendPoint } from '@/lib/daeEngine';
 
 interface LegTrendChartProps {
@@ -19,6 +19,69 @@ export default function LegTrendChart({
   playerName,
 }: LegTrendChartProps) {
   const [hoveredPoint, setHoveredPoint] = useState<LegTrendPoint | null>(null);
+  const [filterScope, setFilterScope] = useState<'season' | 'all'>('season');
+
+  // Gefilterte Leg-Daten nach gewählter Zeitspanne (Standard: Nur aktuelle Saison 2026/27)
+  const {
+    displayData,
+    effectiveMatchAvg,
+    effectiveKorridorMin,
+    effectiveKorridorMax,
+    hasSeasonData,
+  } = useMemo(() => {
+    if (filterScope === 'all') {
+      return {
+        displayData: trendData,
+        effectiveMatchAvg: matchAvg,
+        effectiveKorridorMin: korridorMin,
+        effectiveKorridorMax: korridorMax,
+        hasSeasonData: true,
+      };
+    }
+
+    // Filter: Nur aktuelle Saison (2026/2027)
+    const filtered = trendData.filter((d) =>
+      d.season ? d.season === '2026/2027' : d.match_date >= '2026-08-01'
+    );
+
+    if (filtered.length === 0) {
+      return {
+        displayData: trendData,
+        effectiveMatchAvg: matchAvg,
+        effectiveKorridorMin: korridorMin,
+        effectiveKorridorMax: korridorMax,
+        hasSeasonData: false,
+      };
+    }
+
+    // Neu durchzählen und gleitenden 3-Leg-Schnitt für sauberen Graphen berechnen
+    const recent: number[] = [];
+    const recomputed: LegTrendPoint[] = filtered.map((d, i) => {
+      recent.push(d.leg_avg);
+      const last3 = recent.slice(-3);
+      const mAvg3 = Math.round((last3.reduce((a, b) => a + b, 0) / last3.length) * 10) / 10;
+      return {
+        ...d,
+        index: i + 1,
+        moving_avg_3: mAvg3,
+      };
+    });
+
+    const avgs = recomputed.map((d) => d.leg_avg);
+    const scopeAvg = Math.round((avgs.reduce((a, b) => a + b, 0) / avgs.length) * 10) / 10;
+    const variance = avgs.reduce((a, b) => a + Math.pow(b - scopeAvg, 2), 0) / (avgs.length || 1);
+    const std = Math.sqrt(variance);
+    const scopeMin = Math.round(Math.max(10, scopeAvg - std) * 10) / 10;
+    const scopeMax = Math.round((scopeAvg + std) * 10) / 10;
+
+    return {
+      displayData: recomputed,
+      effectiveMatchAvg: scopeAvg,
+      effectiveKorridorMin: scopeMin,
+      effectiveKorridorMax: scopeMax,
+      hasSeasonData: true,
+    };
+  }, [trendData, filterScope, matchAvg, korridorMin, korridorMax]);
 
   if (trendData.length === 0) {
     return (
@@ -35,15 +98,15 @@ export default function LegTrendChart({
   const plotW = width - padding.left - padding.right;
   const plotH = height - padding.top - padding.bottom;
 
-  // Skalierung Min/Max Y
-  const allAvgs = trendData.map((d) => d.leg_avg);
-  const minY = Math.max(15, Math.floor(Math.min(...allAvgs, korridorMin) / 5) * 5 - 5);
-  const maxY = Math.min(100, Math.ceil(Math.max(...allAvgs, korridorMax) / 5) * 5 + 5);
+  // Skalierung Min/Max Y anhand von displayData
+  const allAvgs = displayData.map((d) => d.leg_avg);
+  const minY = Math.max(15, Math.floor(Math.min(...allAvgs, effectiveKorridorMin) / 5) * 5 - 5);
+  const maxY = Math.min(100, Math.ceil(Math.max(...allAvgs, effectiveKorridorMax) / 5) * 5 + 5);
   const rangeY = maxY - minY || 1;
 
   const getX = (idx: number) => {
-    if (trendData.length === 1) return padding.left + plotW / 2;
-    return padding.left + (idx / (trendData.length - 1)) * plotW;
+    if (displayData.length === 1) return padding.left + plotW / 2;
+    return padding.left + (idx / (displayData.length - 1)) * plotW;
   };
 
   const getY = (val: number) => {
@@ -51,40 +114,76 @@ export default function LegTrendChart({
   };
 
   // Korridor SVG Pfad
-  const corridorTopY = getY(korridorMax);
-  const corridorBottomY = getY(korridorMin);
-  const matchAvgY = getY(matchAvg);
+  const corridorTopY = getY(effectiveKorridorMax);
+  const corridorBottomY = getY(effectiveKorridorMin);
+  const matchAvgY = getY(effectiveMatchAvg);
 
   // Gleitender Durchschnitt Pfad
-  const trendLinePath = trendData
+  const trendLinePath = displayData
     .map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.moving_avg_3)}`)
     .join(' ');
 
   return (
     <div className="relative bg-gradient-to-b from-[#091630] to-[#050c1e] border border-cyan-500/20 rounded-2xl p-5 shadow-xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-2 border-b border-white/10 gap-2">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between pb-3 mb-2 border-b border-white/10 gap-3">
         <div>
-          <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-            <span>📈</span> Chronologischer Leg-Trend & Konstanz-Korridor
-          </h3>
-          <p className="text-[11px] text-slate-400">
-            Jeder Punkt = 1 gespieltes Leg • Gelbe Linie = Gleitender Form-Schnitt (3-Leg-Ø Average)
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <span>📈</span> Chronologischer Leg-Trend & Konstanz-Korridor
+            </h3>
+            {filterScope === 'season' && !hasSeasonData && (
+              <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded">
+                Nur Vorsaison verfügbar
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            Jeder Punkt = 1 Leg • Gelbe Linie = Gleitender Form-Schnitt (3-Leg-Ø) • Schattiert = Wurfkorridor
           </p>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-3 text-[11px] font-bold">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-            <span className="text-slate-300">Leg gewonnen</span>
+        {/* Umschalter: Aktuelle Saison vs. Gesamt & Legende */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Umschalter Saison vs. Gesamt */}
+          <div className="bg-slate-900/90 p-1 rounded-xl border border-white/15 flex items-center gap-1 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setFilterScope('season')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                filterScope === 'season'
+                  ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/50 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>🎯</span> Aktuelle Saison
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterScope('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                filterScope === 'all'
+                  ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/50 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>🌐</span> Gesamt ({trendData.length})
+            </button>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
-            <span className="text-slate-400">Verloren</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-0.5 bg-amber-400" />
-            <span className="text-amber-300">Form-Trend (3-Leg-Ø)</span>
+
+          {/* Legend */}
+          <div className="flex items-center gap-2.5 text-[11px] font-bold pl-1 border-l border-white/10">
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              <span className="text-slate-300">Sieg</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
+              <span className="text-slate-400">Verlust</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-amber-400" />
+              <span className="text-amber-300">3-Leg-Ø</span>
+            </div>
           </div>
         </div>
       </div>
@@ -151,11 +250,11 @@ export default function LegTrendChart({
             dominantBaseline="central"
             className="text-[9px] font-extrabold fill-cyan-400"
           >
-            Ø {matchAvg.toFixed(1)}
+            Ø {effectiveMatchAvg.toFixed(1)}
           </text>
 
           {/* Gleitender Trend (Linie) */}
-          {trendData.length > 1 && (
+          {displayData.length > 1 && (
             <path
               d={trendLinePath}
               fill="none"
@@ -168,14 +267,14 @@ export default function LegTrendChart({
           )}
 
           {/* Datenpunkte pro Leg */}
-          {trendData.map((pt, idx) => {
+          {displayData.map((pt, idx) => {
             const cx = getX(idx);
             const cy = getY(pt.leg_avg);
             const isHovered = hoveredPoint?.index === pt.index;
 
             return (
               <g
-                key={pt.index}
+                key={`${pt.match_date}-${pt.index}`}
                 className="cursor-pointer transition-transform duration-150"
                 onMouseEnter={() => setHoveredPoint(pt)}
                 onMouseLeave={() => setHoveredPoint(null)}
@@ -231,7 +330,7 @@ export default function LegTrendChart({
             textAnchor="end"
             className="text-[10px] font-bold fill-slate-500"
           >
-            Leg {trendData.length}
+            Leg {displayData.length}
           </text>
         </svg>
 
@@ -284,16 +383,21 @@ export default function LegTrendChart({
         )}
       </div>
 
-      <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+      <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
         <div>
-          Korridor-Spannbreite:{' '}
+          Korridor-Spannbreite ({filterScope === 'season' ? 'Saison 2026/27' : 'Gesamt'}):{' '}
           <span className="text-cyan-300 font-bold">
-            {korridorMin} – {korridorMax} Pkt
+            {effectiveKorridorMin} – {effectiveKorridorMax} Pkt
           </span>
         </div>
         <div>
-          Gespielte Legs gesamt:{' '}
-          <span className="text-white font-bold">{trendData.length}</span>
+          Gespielte Legs:{' '}
+          <span className="text-cyan-300 font-bold">{displayData.length}</span>
+          {filterScope === 'season' && (
+            <span className="text-slate-500 ml-1">
+              (von {trendData.length} Legs historisch)
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -63,6 +63,7 @@ export default function Header({
     { label: 'Spieler', href: '/spieler' },
     { label: 'Liga', href: '/liga' },
     { label: 'Dart Analytics Engine', href: '/analytics' },
+    { label: '🎯 Doppelquote', href: '/doppelquote' },
     { label: 'Hilfe', href: '/hilfe' },
   ];
 
@@ -91,7 +92,7 @@ export default function Header({
             <div className="leading-tight">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black tracking-wider text-white">
-                  LIONS LEAGUE
+                  LIONS WEYHAUSEN
                 </span>
                 <span className="text-[10px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 px-1.5 py-0.2 rounded font-mono">
                   2.0

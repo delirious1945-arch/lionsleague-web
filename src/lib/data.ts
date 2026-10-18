@@ -772,6 +772,7 @@ export interface RawLegVisit {
   checkout: number | null;
   is_break: boolean;
   match_date: string;
+  season?: string;
 }
 
 export async function getAllAnalyticsLegVisits(
@@ -783,12 +784,12 @@ export async function getAllAnalyticsLegVisits(
           SELECT v.id, v.leg_id, v.player_id, v.visit_order, v.score, v.rest_score, v.opponent_rest_at_visit,
                  l.leg_num, l.starter_player_id, l.winner_player_id, l.darts_thrown_a, l.darts_thrown_b,
                  l.checkout_a, l.checkout_b, l.is_break,
-                 m.id as match_id, m.player_a_id, m.player_b_id, m.match_date
+                 m.id as match_id, m.player_a_id, m.player_b_id, m.match_date, m.season
           FROM analytics_visits v
           JOIN analytics_legs l ON v.leg_id = l.id
           JOIN analytics_matches m ON l.match_id = m.id
           JOIN players p ON v.player_id = p.id
-          WHERE m.season = ${season}
+          WHERE (m.season = ${season} OR m.season = '2025/2026')
             AND p.team IN ('A-Team', 'B-Team')
             AND m.player_a_name NOT LIKE '%&%'
             AND m.player_b_name NOT LIKE '%&%'
@@ -798,7 +799,7 @@ export async function getAllAnalyticsLegVisits(
           SELECT v.id, v.leg_id, v.player_id, v.visit_order, v.score, v.rest_score, v.opponent_rest_at_visit,
                  l.leg_num, l.starter_player_id, l.winner_player_id, l.darts_thrown_a, l.darts_thrown_b,
                  l.checkout_a, l.checkout_b, l.is_break,
-                 m.id as match_id, m.player_a_id, m.player_b_id, m.match_date
+                 m.id as match_id, m.player_a_id, m.player_b_id, m.match_date, m.season
           FROM analytics_visits v
           JOIN analytics_legs l ON v.leg_id = l.id
           JOIN analytics_matches m ON l.match_id = m.id
@@ -840,6 +841,7 @@ export async function getAllAnalyticsLegVisits(
         checkout: co > 0 ? co : null,
         is_break: Boolean(row.is_break),
         match_date: String(row.match_date),
+        season: row.season ? String(row.season) : '',
       });
     }
 

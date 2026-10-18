@@ -85,6 +85,7 @@ export interface LegTrendPoint {
   darts_thrown: number;
   checkout: number | null;
   match_date: string;
+  season?: string;
   moving_avg_3: number;
 }
 
@@ -164,7 +165,7 @@ export interface DualArchetype {
   mental_type: string;
   mental_icon: string;
   mental_desc: string;
-  team_role: 'Leader' | 'Punktegarant' | 'Joker' | 'Aufbau-Spieler';
+  team_role: string;
   role_badge_color: string;
   role_desc: string;
 }
@@ -229,6 +230,288 @@ export interface PlayerDAEAnalytics {
   leg_anatomy: LegAnatomy;
   ai_profile: AIScoutingProfile;
   legs_count: number;
+}
+
+export interface PlayerCustomProfile {
+  teamRole: string;
+  roleBadgeColor: string;
+  roleDesc: string;
+  mentalType: string;
+  mentalIcon: string;
+  mentalDesc: string;
+  hardTruth: string;
+  coachAdvice: string;
+  boardRec?: string;
+  singleSlot?: string;
+  doublePartner?: string;
+}
+
+export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
+  // 1. André Rathje: Teamcaptain B-Team
+  'andre rathje': {
+    teamRole: 'Teamcaptain B-Team',
+    roleBadgeColor: '#F59E0B',
+    roleDesc: 'Führt das B-Team als Kapitän an. Gibt taktische Marschrouten vor und hält die Mannschaft zusammen.',
+    mentalType: 'Der Teamkapitän & Leitwolf',
+    mentalIcon: '👑',
+    mentalDesc: 'Verantwortungsbewusster Kapitän, der das B-Team anführt. Geht in Pflichtspielen voran und setzt die Marschroute.',
+    hardTruth: 'Als Teamcaptain des B-Teams muss André vorangehen: Bei eigenem Rückstand darf er sich nicht verunsichern lassen, sondern muss die nötige Ruhe ausstrahlen, um das Team am Board zu stabilisieren.',
+    coachAdvice: 'Volles Vertrauen der Mannschaft: Wenn André mit freiem Kopf und Entschlossenheit ans Oche tritt, folgt das gesamte B-Team seinem Rhythmus.',
+    boardRec: 'Board 1: Als Kapitän im Rampenlicht präsent sein und von vorn führen.',
+    singleSlot: 'Block 1 (Spiel 1 oder 2): Setzt gleich zu Beginn das Kapitäns-Signal für das B-Team.',
+    doublePartner: 'Ruhiger, nervenstarker Partner, der André den Rücken stärkt (z.B. Martin Thomas oder Timo Feuerhahn).',
+  },
+
+  // 2. Dirk Ostermann: 2. Teamcaptain A-Team, eiskalt, behält immer die Ruhe
+  'dirk ostermann': {
+    teamRole: '2. Teamcaptain A-Team',
+    roleBadgeColor: '#38BDF8',
+    roleDesc: 'Eiskalt und stoisch. Behält in jeder brenzligen Spielsituation die Ruhe und bildet den Ruhepol des A-Teams.',
+    mentalType: 'Der Eiskalte Stratege',
+    mentalIcon: '❄️',
+    mentalDesc: 'Eiskalt, behält immer die Ruhe. Lässt sich durch vergebene Darts oder gegnerische Peaks nicht aus dem Konzept bringen.',
+    hardTruth: 'Schonungslose Diagnose: Dirk ist mental extrem stabil und lässt sich nicht aus der Ruhe bringen. Größter Hebel bleibt das konsequente Treffen der ersten Setup-Darts, um seine mentale Überlegenheit in mehr Leg-Gewinne umzumünzen.',
+    coachAdvice: 'Der Fels in der Brandung des A-Teams: Dirks stoische Gelassenheit ist für die Mitspieler Gold wert. Seine Ruhe überträgt sich sofort auf nervöse Teamkollegen.',
+    boardRec: 'Board 1 oder 2: Dirk lässt sich von keiner Kulisse aus der Ruhe bringen.',
+    singleSlot: 'Schluss-Block oder Decider-Position: Seine eiskalte Ruhe ist die perfekte Waffe für knappe Schlussphasen.',
+    doublePartner: 'Perfekter Ausgleichspartner für emotionale oder nervösere Scorer (z.B. Kevin Emde oder Nicholas Stedman).',
+  },
+
+  // 3. Erik Schremmer: Neu dabei, Aufbauspieler
+  'erik schremmer': {
+    teamRole: 'Aufbau-Spieler (Neu dabei)',
+    roleBadgeColor: '#06B6D4',
+    roleDesc: 'Neu im Team. Bringt viel Spielfreude mit und wird als Aufbauspieler gezielt an die Liga-Wettkampfhärte herangeführt.',
+    mentalType: 'Der lernhungrige Liga-Neuling',
+    mentalIcon: '🌱',
+    mentalDesc: 'Neu dabei mit großem Entwicklungspotenzial. Braucht noch Wettkampf-Routine, um sein Trainingskönnen im Ligaspiel abzurufen.',
+    hardTruth: 'Aufbau-Diagnose: Noch neu im Wettkampfmodus. Erik neigt dazu, sich in engen Legs zu viel Druck zu machen. Der Fokus muss rein auf der Wurfbewegung liegen, ohne auf das Scoreboard zu schielen.',
+    coachAdvice: 'Hervorragender Einstieg ins A-Team: Erik soll völlig ohne Druck aufspielen. Jeder Satzgewinn und jedes geworfene Leg festigt sein Selbstvertrauen.',
+    boardRec: 'Board 2: Ruhigere Umgebung zum entspannten Einwerfen ohne Zuschauerdruck.',
+    singleSlot: 'Block 2 (Spiele 5–8): Gibt vorab ausreichend Zeit zum Einwerfen und Zusehen.',
+    doublePartner: 'Erfahrener Ruhepol an seiner Seite (Dirk Ostermann oder Sebastian Kirste), der die Führung übernimmt.',
+  },
+
+  // 4. Jannik Baier (Jannik Beyer): Neu dabei, Aufbauspieler
+  'jannik baier': {
+    teamRole: 'Aufbau-Spieler (Neu dabei)',
+    roleBadgeColor: '#06B6D4',
+    roleDesc: 'Neu im B-Team. Zeigt bereits starke Einzelaufnahmen und wird als Aufbauspieler gezielt gefördert.',
+    mentalType: 'Der ehrgeizige Nachwuchs-Werfer',
+    mentalIcon: '🎯',
+    mentalDesc: 'Gute Wurftechnik und viel Ehrgeiz, hadert am Board noch mit der Konstanz im Checkout-Bereich.',
+    hardTruth: 'Schonungslose Diagnose: Jannik hat gute Phasen, gerät bei knappen Spielständen am Doppel aber noch ins Zögern. Muss lernen, Fehlwürfe schneller abzuhaken und intuitiver zu werfen.',
+    coachAdvice: 'Aufstrebendes Talent im B-Team: Spielpraxis ist der beste Lehrmeister. Im Training gezielt Doppel-Runden einstreuen, um am Oche instinktiv abzudrücken.',
+    boardRec: 'Board 2: Schützt vor Hektik und ermöglicht fokussierten Wurfablauf.',
+    singleSlot: 'Block 1 oder 2: Früher Einsatz ohne den Druck der entscheidenden Schlussspiele.',
+    doublePartner: 'Routinierter Führungsspieler wie Martin Thomas, der Druck vom Youngster wegnimmt.',
+  },
+
+  // 5. Jens Goltermann (Jens Goldmann): Neu dabei, jahrelange Liga-Erfahrung
+  'jens goltermann': {
+    teamRole: 'Erfahrener Liga-Routinier',
+    roleBadgeColor: '#10B981',
+    roleDesc: 'Neu bei den Lions, bringt aber schon jahrelange Liga-Erfahrung mit. Weiß genau, wie Druckspiele gewonnen werden.',
+    mentalType: 'Der abgezockte Liga-Veteran',
+    mentalIcon: '🛡️',
+    mentalDesc: 'Jahrelange Liga-Erfahrung am Oche. Kennt alle Spielsituationen und behält auch bei gegnerischen Serien die Übersicht.',
+    hardTruth: 'Scouting-Urteil: Jens bringt wertvolle Routine mit, muss aber im neuen Teamgefüge seine Rolle als Verlässlichkeitssäule voll ausfüllen und den jüngeren Spielern Halt geben.',
+    coachAdvice: 'Ein absoluter Gewinn fürs A-Team: Seine langjährige Liga-Erfahrung ist in hektischen Spielphasen unbezahlbar. Jens weiß genau, wann er das Tempo anziehen muss.',
+    boardRec: 'Board 1 oder 2: Als Routinier vollkommen flexibel einsetzbar.',
+    singleSlot: 'Block 1 oder Schluss-Einzel: Ideal, um zu Beginn für Ruhe zu sorgen oder knappe Führungen ins Ziel zu bringen.',
+    doublePartner: 'Optimaler Doppelpartner für junge oder neue Spieler (z.B. Erik Schremmer).',
+  },
+
+  // 6. Karen Schulz (Karen): Zweite Saison, sehr inkonstant
+  'karen schulz': {
+    teamRole: 'Gefühlsspielerin (2. Saison)',
+    roleBadgeColor: '#EC4899',
+    roleDesc: 'Zweite Saison im Team. Sehr inkonstant mit extremen Wechseln zwischen starken Aufnahmen und zähen Phasen.',
+    mentalType: 'Die sprunghafte Gefühlsspielerin',
+    mentalIcon: '⚡',
+    mentalDesc: 'Stark stimmungs- und rhythmusabhängig. Trifft sie das erste Triple, läuft es wie von selbst; bei Fehlern bricht der Wurf leicht ein.',
+    hardTruth: 'Knallharte Diagnose: Zweite Saison, aber sehr inkonstant. Karen leidet unter stark schwankenden Phasen. Sobald der Kopf einsetzt, geht die Wurfkurve verloren. Braucht feste Rituale, um Schwankungen abzufedern.',
+    coachAdvice: 'Riesiges Potenzial bei Lockerheit: Wenn Karen befreit wirft, trifft sie hervorragend. Der Schlüssel liegt im Erhalt des Lächelns und im Ausblenden des Gegners.',
+    boardRec: 'Board 2: Ruhe und weniger Blickkontakt mit dem gegnerischen Fanblock.',
+    singleSlot: 'Block 1: Am besten ohne langes Warten direkt nach dem Warm-Up ans Oche stellen.',
+    doublePartner: 'Empathischer, verlässlicher Partner (z.B. André Rathje oder Karsten Kohnert), der Sicherheit vermittelt.',
+  },
+
+  // 7. Karsten Kohnert (Karsten Konert): 2. Teamcaptain B-Team, spielt nicht viel
+  'karsten kohnert': {
+    teamRole: '2. Teamcaptain B-Team',
+    roleBadgeColor: '#F59E0B',
+    roleDesc: 'Zweiter Teamcaptain des B-Teams. Spielt nicht viel, ist aber als Co-Kapitän und Rückhalt unverzichtbar.',
+    mentalType: 'Der loyale Co-Kapitän & Standby-Joker',
+    mentalIcon: '🤝',
+    mentalDesc: 'Spielt nicht viele Matches, steht aber jederzeit bereit, wenn das Team ihn braucht. Hohe Loyalität und Teamgeist.',
+    hardTruth: 'Scouting-Urteil: Karsten spielt nicht viel, was sich in mangelnder Wettkampf-Präzision auf die Doppel niederschlägt. Wenn er ins Spiel kommt, muss er sich auf einfache Sicherheits-Aufnahmen konzentrieren.',
+    coachAdvice: 'Wichtige Säule abseits und am Board: Karsten entlastet André organisatorisch und bringt positive Energie ans Board, egal in welcher Spielsituation.',
+    boardRec: 'Board 2: Ermöglicht ruhiges Zurechtfinden bei seltenen Einsätzen.',
+    singleSlot: 'Gezielter Joker-Einsatz in Block 2 oder im Doppel.',
+    doublePartner: 'Guter Ergänzungsspieler im Doppel mit einem soliden Finisher.',
+  },
+
+  // 8. Kevin Emde: Spielt fürs A-Team eine tragende Rolle
+  'kevin emde': {
+    teamRole: 'Tragende Säule A-Team',
+    roleBadgeColor: '#10B981',
+    roleDesc: 'Spielt eine tragende Rolle im A-Team. Einer der wichtigsten Leistungsträger für den Spieltagssieg.',
+    mentalType: 'Die tragende Säule & Punktegarant',
+    mentalIcon: '🏛️',
+    mentalDesc: 'Zuverlässiger Leistungsträger des A-Teams. Zieht das Team durch konstante Scores und Kampfgeist mit.',
+    hardTruth: 'Schonungslose Diagnose: Kevin spielt eine tragende Rolle und spürt diese Verantwortung auch. Wenn er zu verbissen wird, verliert er im Finish-Bereich etwas Lockerheit. Darf sich nicht die Last des gesamten Teams aufbürden.',
+    coachAdvice: 'Absoluter Schlüsselspieler: Kevin ist das Rückgrat des A-Teams. Wenn er frei aufspielt, gewinnt er nahezu jedes Einzel in der Kreisklasse.',
+    boardRec: 'Board 1: Perfekt für die großen, spielentscheidenden Partien.',
+    singleSlot: 'Position 1 oder 2 im Einzel: Soll früh das Zeichen setzen, dass die Lions da sind.',
+    doublePartner: 'Harmoniert mit Dirk Ostermann oder Sebastian Kirste zu einem gefürchteten Power-Doppel.',
+  },
+
+  // 9. Martin Thomas: Neu dabei, Leader B-Team
+  'martin thomas': {
+    teamRole: 'Leader B-Team (Neu dabei)',
+    roleBadgeColor: '#F59E0B',
+    roleDesc: 'Neu im Team und sofort der sportliche Leader des B-Teams. Herausragende Scoring-Power und Zugpferd.',
+    mentalType: 'Der spielerische Führungsspieler',
+    mentalIcon: '🚀',
+    mentalDesc: 'Neu dabei und direkt sportlicher Leader des B-Teams. Wirft mit hoher Dynamik und zieht die Kollegen durch Power-Scoring mit.',
+    hardTruth: 'Scouting-Urteil: Martin ist neu und direkt der spielerische Leader. Die Gefahr besteht darin, dass er frustriert reagiert, wenn das B-Team als Kollektiv hinterherhinkt. Seine Führungsrolle muss er auch mental vorleben.',
+    coachAdvice: 'Das sportliche Zugpferd des B-Teams: Seine Klasse hebt das Niveau der gesamten Mannschaft. Martin soll mutig vorangehen und das Team mitreißen!',
+    boardRec: 'Board 1: Gehört als Leader auf das Hauptboard gegen die stärksten Gegner.',
+    singleSlot: 'Block 1 & Schluss-Block: Muss sowohl den Start als auch die Entscheidung für das B-Team bestreiten.',
+    doublePartner: 'Führt gerne neuere Spieler (z.B. Jannik Baier oder Michael Kranz) durch sein starkes Scoring.',
+  },
+
+  // 10. Michael Gehrt (Michael Gerd): 3. Saison, sehr durchwachsen, baut eher ab
+  'michael gehrt': {
+    teamRole: 'Kämpfer im Formtief (3. Saison)',
+    roleBadgeColor: '#EF4444',
+    roleDesc: 'Dritte Saison. Sehr durchwachsene Leistung, baut im Scoring eher ab und sucht nach seiner früheren Form.',
+    mentalType: 'Der hadernde Routinier',
+    mentalIcon: '📉',
+    mentalDesc: 'Dritte Saison im Team, kämpft aktuell mit Formverlust und Unzufriedenheit am Oche. Braucht ein Erfolgserlebnis.',
+    hardTruth: 'Knallharte Diagnose: Dritte Saison, sehr durchwachsene Leistung, baut eher ab. Michael hadert mit dem Niveauverlust. Solange er sich mit früheren Bestwerten vergleicht, blockiert der Kopf. Muss das Spiel neu vereinfachen.',
+    coachAdvice: 'Weg aus dem Tief: Michael hat die Erfahrung aus drei Saisons. Jetzt gilt: Kleine Ziele setzen, auf sichere 60er-Aufnahmen fokussieren und die Freude am Spiel zurückgewinnen.',
+    boardRec: 'Board 2: Entlastet von Blicken und gibt Raum für Formsuche.',
+    singleSlot: 'Block 2: Später Einsatz, um vorher im Training entspannt warmzuwerden.',
+    doublePartner: 'Stabiler Partner mit positiver Ausstrahlung, der ihn aufbaut (z.B. Martin Thomas).',
+  },
+
+  // 11. Michael Jochen: Neu dabei, 1. Saison, Aufbauspieler
+  'michael jochen': {
+    teamRole: 'Aufbau-Spieler (1. Saison)',
+    roleBadgeColor: '#06B6D4',
+    roleDesc: 'Neu dabei in seiner ersten Saison. Sammelt wertvolle Liga-Erfahrung und wird als Aufbauspieler integriert.',
+    mentalType: 'Der engagierte Liga-Debütant',
+    mentalIcon: '🆕',
+    mentalDesc: 'Neu dabei in seiner 1. Saison. Mit Feuereifer bei der Sache, muss sich an das Ligatempo und den Ergebnisdruck gewöhnen.',
+    hardTruth: 'Scouting-Urteil: Erste Saison für Michael. In engen Momenten fehlt noch die Abgeklärtheit auf die Doppel. Jeder Auftritt ist ein Lernprozess, Fehler sind in dieser Phase völlig normal.',
+    coachAdvice: 'Toller Neuzugang: Michael soll den Ligabetrieb genießen und ohne Erwartungsdruck spielen. Die Entwicklungskurve zeigt klar nach oben.',
+    boardRec: 'Board 2: Ruhiges Umfeld für den optimalen Einstieg.',
+    singleSlot: 'Block 2 im Einzel: Nach Akklimatisierung im Spieltag.',
+    doublePartner: 'Routinierter Spieler an seiner Seite, der ihm Sicherheit und Zuspruch gibt.',
+  },
+
+  // 12. Michael Kranz: 3. Saison, sehr nervös, hadert zu sehr mit sich selber
+  'michael kranz': {
+    teamRole: 'Emotionaler Rhythmuswerfer (3. Saison)',
+    roleBadgeColor: '#F59E0B',
+    roleDesc: 'Dritte Saison. Sehr nervös am Board, hadert zu sehr mit sich selber nach Fehlwürfen.',
+    mentalType: 'Der selbstkritische Perfektionist',
+    mentalIcon: '⚡',
+    mentalDesc: 'Sehr nervös, hadert zu sehr mit sich selber. Gute Ansätze werden oft durch Selbstzweifel nach einzelnen Fehlwürfen blockiert.',
+    hardTruth: 'Ungeschminkte Diagnose: Dritte Saison, aber Michael steht sich mental oft selbst im Weg. Er wird schnell nervös und hadert nach Fehlwürfen extrem mit sich. Diese Negativ-Spirale zieht den Schnitt nach unten. Der Kopf muss frei bleiben!',
+    coachAdvice: 'Mentale Hebel ansetzen: Michael wirft deutlich besser, wenn er sich Fehler verzeiht. Zwischen den Würfen kurz durchatmen, Schultern lockern und den nächsten Dart als neue Chance begreifen.',
+    boardRec: 'Board 2: Dringend nötig, um äußere Reize und Nervosität zu minimieren.',
+    singleSlot: 'Block 1: Am besten ohne lange Wartezeiten schnell ins Spiel werfen.',
+    doublePartner: 'Ein absolut stoischer, beruhigender Partner (z.B. Martin Thomas oder André Rathje), der ihn erdet.',
+  },
+
+  // 13. Nicholas Stedman (Nick Kollas-Stedmann): 3. Saison, teilweise solide, groß schwankend, häufig nervös
+  'nicholas stedman': {
+    teamRole: 'Wundertüte & Spitzenkraft (3. Saison)',
+    roleBadgeColor: '#8B5CF6',
+    roleDesc: 'Dritte Saison. Teilweise solide, groß schwankende Leistung und wird häufig nervös am Board, wenn das Spiel nicht läuft.',
+    mentalType: 'Der sensible Hochkaräter',
+    mentalIcon: '🎢',
+    mentalDesc: 'Teilweise extrem solide mit hohem Peak, aber großen Leistungsschwankungen. Wird am Board nervös, wenn das Spiel nicht läuft.',
+    hardTruth: 'Knallharte Diagnose: Dritte Saison. Nick hat das Zeug zum Matchwinner, leidet aber unter groß schwankenden Leistungen. Wenn das Spiel nicht nach Plan läuft, wird er am Board sichtlich nervös und verliert die Wurflinie. Muss lernen, auch "dreckige" Legs geduldig zu gewinnen.',
+    coachAdvice: 'Gewaltiges Potenzial: Wenn Nick seinen Rhythmus findet, gehört er zu den besten Spielern. Gegen die Nervosität hilft: Das Wurfintervall um 2 Sekunden verlangsamen, wenn der Gegner aufholt.',
+    boardRec: 'Board 1: Wenn er heiß ist, gehört er auf die große Bühne; bei wackliger Tagesform auf Board 2 absichern.',
+    singleSlot: 'Block 1 (Spiele 1–4): Nutzt frische Konzentration für frühe Breaks.',
+    doublePartner: 'Ein Fels in der Brandung (z.B. Dirk Ostermann), der die Ruhe bewahrt, wenn Nicks Nerven flattern.',
+  },
+
+  // 14. Sebastian Kirste: Teamcaptain A-Team & sportlicher Leader
+  'sebastian kirste': {
+    teamRole: 'Teamcaptain A-Team & Leader',
+    roleBadgeColor: '#F59E0B',
+    roleDesc: 'Teamcaptain A-Team, Top-Scorer und unumstrittener Leader. Geht in jeder Situation mit Spitzenleistungen voran.',
+    mentalType: 'Der Eiskalte Vollstrecker & Leitwolf',
+    mentalIcon: '👑',
+    mentalDesc: 'Herausragende Wettkampfhärte, überragendes Scoring und Nervenstärke in brenzligen Decidern.',
+    hardTruth: 'Schonungslose Diagnose: Sebastian ist das sportliche Maß aller Dinge im Team. Die Herausforderung besteht darin, trotz der hohen Erwartungshaltung bei knappen Partien die Lockerheit zu bewahren.',
+    coachAdvice: 'Der Leitwolf des A-Teams: Führt durch pure Leistung und mentale Stärke. In brenzligen Decidern die verlässlichste Bank des gesamten Vereins.',
+    boardRec: 'Board 1: Präsent auf dem Center-Board gegen die Spitzenleute der Liga.',
+    singleSlot: 'Position 1 und Decider-Schluss-Spiel: Setzt das Ausrufezeichen zum Start und macht den Sack zu.',
+    doublePartner: 'Perfektes Power-Duo mit Dirk Ostermann oder Kevin Emde.',
+  },
+
+  // 15. Timo Feuerhahn: Punktegarant B-Team
+  'timo feuerhahn': {
+    teamRole: 'Punktegarant B-Team',
+    roleBadgeColor: '#10B981',
+    roleDesc: 'Verlässlicher Top-Scorer im B-Team. Bringt hohe Wurfgewalt und sichere Finishes ans Board.',
+    mentalType: 'Der treffsichere Vollstrecker',
+    mentalIcon: '🎯',
+    mentalDesc: 'Starker Scorer mit gesundem Zug zum Doppel. Ein verlässlicher Punktesammler für das B-Team.',
+    hardTruth: 'Scouting-Urteil: Starker Scorer im B-Team. Muss darauf achten, bei deutlichen Führungen die Konzentration hochzuhalten und keine Legs leichtfertig herzuschenken.',
+    coachAdvice: 'Tragende Kraft im B-Team: Timos Scoring entlastet die Mannschaft enorm. Mit seiner Abschlussstärke entscheidet er enge Partien.',
+    boardRec: 'Board 1: Hohe Scoring-Power gehört auf das vordere Board.',
+    singleSlot: 'Block 1 & Doppel: Frühe Punkte für das B-Team einfahren.',
+    doublePartner: 'Harmoniert mit Martin Thomas oder André Rathje zu einem schlagkräftigen B-Team Doppel.',
+  },
+
+  // 16. Maik Feuerhahn: Solider Kaderspieler B-Team
+  'maik feuerhahn': {
+    teamRole: 'Solider Teamplayer B-Team',
+    roleBadgeColor: '#06B6D4',
+    roleDesc: 'Verlässlicher Kaderspieler im B-Team. Springt zuverlässig ein und kämpft um jedes Leg.',
+    mentalType: 'Der verlässliche Team-Kämpfer',
+    mentalIcon: '🛡️',
+    mentalDesc: 'Kämpft unermüdlich um jedes Leg. Wichtig für die Kaderbreite und den Teamzusammenhalt.',
+    hardTruth: 'Scouting-Urteil: Maik hat phasenweise gute Aufnahmen, verliert aber im Finish-Bereich noch zu viele Darts. Mehr Sicherheit auf D16/D8 bringt den nächsten Leistungssprung.',
+    coachAdvice: 'Verlässlicher Mannschaftsspieler: Maik gibt nie auf. Seine kämpferische Einstellung ist ein Vorbild fürs B-Team.',
+    boardRec: 'Board 2: Ruhige Umgebung für den sauberen Rhythmus.',
+    singleSlot: 'Block 2 oder Doppel.',
+    doublePartner: 'Erfahrener Partner, der das Finish absichert.',
+  },
+};
+
+export function getPlayerCustomProfile(name: string): PlayerCustomProfile | null {
+  if (!name) return null;
+  const n = name.trim().toLowerCase();
+
+  if (PLAYER_CUSTOM_REGISTRY[n]) return PLAYER_CUSTOM_REGISTRY[n];
+
+  if (n.includes('andre') || n.includes('andré') || n.includes('rathje')) return PLAYER_CUSTOM_REGISTRY['andre rathje'];
+  if (n.includes('dirk') || n.includes('ostermann')) return PLAYER_CUSTOM_REGISTRY['dirk ostermann'];
+  if (n.includes('erik') || n.includes('schremmer')) return PLAYER_CUSTOM_REGISTRY['erik schremmer'];
+  if (n.includes('jannik') || n.includes('baier') || n.includes('beyer')) return PLAYER_CUSTOM_REGISTRY['jannik baier'];
+  if (n.includes('jens') || n.includes('goltermann') || n.includes('goldmann')) return PLAYER_CUSTOM_REGISTRY['jens goltermann'];
+  if (n.includes('karen') || n.includes('schulz')) return PLAYER_CUSTOM_REGISTRY['karen schulz'];
+  if (n.includes('karsten') || n.includes('kohnert') || n.includes('konert')) return PLAYER_CUSTOM_REGISTRY['karsten kohnert'];
+  if (n.includes('kevin') || n.includes('emde')) return PLAYER_CUSTOM_REGISTRY['kevin emde'];
+  if (n.includes('martin') || n.includes('thomas')) return PLAYER_CUSTOM_REGISTRY['martin thomas'];
+  if (n.includes('gehrt') || n.includes('gerd')) return PLAYER_CUSTOM_REGISTRY['michael gehrt'];
+  if (n.includes('jochen')) return PLAYER_CUSTOM_REGISTRY['michael jochen'];
+  if (n.includes('kranz')) return PLAYER_CUSTOM_REGISTRY['michael kranz'];
+  if (n.includes('stedman') || n.includes('stadermann') || n.includes('kollas')) return PLAYER_CUSTOM_REGISTRY['nicholas stedman'];
+  if (n.includes('sebastian') || n.includes('kirste')) return PLAYER_CUSTOM_REGISTRY['sebastian kirste'];
+  if (n.includes('timo')) return PLAYER_CUSTOM_REGISTRY['timo feuerhahn'];
+  if (n.includes('maik')) return PLAYER_CUSTOM_REGISTRY['maik feuerhahn'];
+
+  return null;
 }
 
 // ----------------------------------------------------
@@ -656,6 +939,7 @@ export function computePlayerAnalytics(
       darts_thrown: darts,
       checkout: lastVisit.checkout || null,
       match_date: lastVisit.match_date || '',
+      season: lastVisit.season || (lastVisit.match_date >= '2026-08-01' ? '2026/2027' : '2025/2026'),
       moving_avg_3: Math.round(movingAvg3 * 10) / 10,
     });
   });
@@ -1235,58 +1519,64 @@ export function computePlayerAnalytics(
   };
 
   // 7. DOPPELTER ARCHETYP: Psychologie-Typ + Team-Rolle (Q27: C & D)
-  let mentalType = 'Der anpassungsfähige Allrounder';
-  let mentalIcon = '🎯';
-  let mentalDesc = 'Ausgeglichenes Nervenkostüm ohne extreme Ausreißer nach oben oder unten.';
+  const customProfile = getPlayerCustomProfile(playerName);
 
-  if (clutchDelta >= 3 && gClutch.grade <= 2.0) {
-    mentalType = 'Der Eiskalte Vollstrecker';
-    mentalIcon = '❄️';
-    mentalDesc =
-      'Je höher der Puls am Board, desto präziser die Darts. Sucht aktiv den Druck und schaltet Konkurrenten im Decider eiskalt aus.';
-  } else if (tiltIndex <= 20 && volStd <= 22) {
-    mentalType = 'Das Präzisions-Uhrwerk';
-    mentalIcon = '⚙️';
-    mentalDesc =
-      'Stoische Ruhe. Reagiert auf gegnerische 180er oder eigene Fehlwürfe mit exakt gleichem Rhythmus wie ein Schweizer Uhrwerk.';
-  } else if (scoreDanger >= 60 && instabilityIndex >= 25) {
-    mentalType = 'Die Highscore-Wundertüte';
-    mentalIcon = '⚡';
-    mentalDesc =
-      'Explosives Scoring mit maximaler Triple-Gefahr, kämpft jedoch mit gelegentlichen Ausreißern in 26er-Zonen. Ein emotionaler Spielmacher.';
-  } else if (opSum.average < finSum.average - 6) {
-    mentalType = 'Der Spätzünder & Kämpfer';
-    mentalIcon = '🔥';
-    mentalDesc =
-      'Braucht oft 1–2 Aufnahmen zum Einwerfen, steigert sich aber kontinuierlich und dreht im Finish-Bereich massiv auf.';
-  } else if (lateLegDrop >= 18 || doubleTroubleCount >= 2) {
-    mentalType = 'Der sensible Rhythmuswerfer';
-    mentalIcon = '🏹';
-    mentalDesc =
-      'Starkes Grundpotenzial bei freiem Kopf, gerät jedoch bei verpassten Checkout-Chancen leicht ins Grübeln.';
+  let mentalType = customProfile?.mentalType || 'Der anpassungsfähige Allrounder';
+  let mentalIcon = customProfile?.mentalIcon || '🎯';
+  let mentalDesc = customProfile?.mentalDesc || 'Ausgeglichenes Nervenkostüm ohne extreme Ausreißer nach oben oder unten.';
+
+  if (!customProfile) {
+    if (clutchDelta >= 3 && gClutch.grade <= 2.0) {
+      mentalType = 'Der Eiskalte Vollstrecker';
+      mentalIcon = '❄️';
+      mentalDesc =
+        'Je höher der Puls am Board, desto präziser die Darts. Sucht aktiv den Druck und schaltet Konkurrenten im Decider eiskalt aus.';
+    } else if (tiltIndex <= 20 && volStd <= 22) {
+      mentalType = 'Das Präzisions-Uhrwerk';
+      mentalIcon = '⚙️';
+      mentalDesc =
+        'Stoische Ruhe. Reagiert auf gegnerische 180er oder eigene Fehlwürfe mit exakt gleichem Rhythmus wie ein Schweizer Uhrwerk.';
+    } else if (scoreDanger >= 60 && instabilityIndex >= 25) {
+      mentalType = 'Die Highscore-Wundertüte';
+      mentalIcon = '⚡';
+      mentalDesc =
+        'Explosives Scoring mit maximaler Triple-Gefahr, kämpft jedoch mit gelegentlichen Ausreißern in 26er-Zonen. Ein emotionaler Spielmacher.';
+    } else if (opSum.average < finSum.average - 6) {
+      mentalType = 'Der Spätzünder & Kämpfer';
+      mentalIcon = '🔥';
+      mentalDesc =
+        'Braucht oft 1–2 Aufnahmen zum Einwerfen, steigert sich aber kontinuierlich und dreht im Finish-Bereich massiv auf.';
+    } else if (lateLegDrop >= 18 || doubleTroubleCount >= 2) {
+      mentalType = 'Der sensible Rhythmuswerfer';
+      mentalIcon = '🏹';
+      mentalDesc =
+        'Starkes Grundpotenzial bei freiem Kopf, gerät jedoch bei verpassten Checkout-Chancen leicht ins Grübeln.';
+    }
   }
 
   // Team-Rolle nach Q27
-  let teamRole: 'Leader' | 'Punktegarant' | 'Joker' | 'Aufbau-Spieler' = 'Punktegarant';
-  let roleBadgeColor = '#38BDF8';
-  let roleDesc = 'Liefert kontinuierlich wichtige Zähler für den Spieltags-Sieg.';
+  let teamRole: string = customProfile?.teamRole || 'Punktegarant';
+  let roleBadgeColor = customProfile?.roleBadgeColor || '#38BDF8';
+  let roleDesc = customProfile?.roleDesc || 'Liefert kontinuierlich wichtige Zähler für den Spieltags-Sieg.';
 
-  if (matchAvg >= 50 && gClutch.grade <= 2.2) {
-    teamRole = 'Leader';
-    roleBadgeColor = '#F59E0B';
-    roleDesc = 'Geht voran, setzt in engen Spielsituationen die Glanzpunkte und stabilisiert das Team.';
-  } else if (scoreKonstanz >= 65 && matchAvg >= 45) {
-    teamRole = 'Punktegarant';
-    roleBadgeColor = '#10B981';
-    roleDesc = 'Extrem verlässlich in Einzel und Doppel. Gewinnt die Pflichtspiele gegen jeden Gegner.';
-  } else if (scoreDanger >= 55 || clutchDelta >= 4) {
-    teamRole = 'Joker';
-    roleBadgeColor = '#A855F7';
-    roleDesc = 'Kann an Spitzentagen jeden Gegner an die Wand spielen. Perfekt für taktische Überraschungen.';
-  } else {
-    teamRole = 'Aufbau-Spieler';
-    roleBadgeColor = '#06B6D4';
-    roleDesc = 'Wertvolles Fundament mit solider Entwicklungskurve; profitiert von mentaler Entlastung.';
+  if (!customProfile) {
+    if (matchAvg >= 50 && gClutch.grade <= 2.2) {
+      teamRole = 'Leader';
+      roleBadgeColor = '#F59E0B';
+      roleDesc = 'Geht voran, setzt in engen Spielsituationen die Glanzpunkte und stabilisiert das Team.';
+    } else if (scoreKonstanz >= 65 && matchAvg >= 45) {
+      teamRole = 'Punktegarant';
+      roleBadgeColor = '#10B981';
+      roleDesc = 'Extrem verlässlich in Einzel und Doppel. Gewinnt die Pflichtspiele gegen jeden Gegner.';
+    } else if (scoreDanger >= 55 || clutchDelta >= 4) {
+      teamRole = 'Joker';
+      roleBadgeColor = '#A855F7';
+      roleDesc = 'Kann an Spitzentagen jeden Gegner an die Wand spielen. Perfekt für taktische Überraschungen.';
+    } else {
+      teamRole = 'Aufbau-Spieler';
+      roleBadgeColor = '#06B6D4';
+      roleDesc = 'Wertvolles Fundament mit solider Entwicklungskurve; profitiert von mentaler Entlastung.';
+    }
   }
 
   const dualArchetype: DualArchetype = {
@@ -1336,9 +1626,10 @@ export function computePlayerAnalytics(
               1
             )} % Fehlerquote bei Aufnahmen <= 30. Hohe Wiederholgenauigkeit.`,
       hard_truth:
-        tiltIndex > 40
+        customProfile?.hardTruth ||
+        (tiltIndex > 40
           ? `Ungeschminkte Wahrheit: ${playerName} lässt sich von Fehlwürfen zu lange mental ausbremsen (Tilt-Index ${tiltIndex}). Frust führt direkt zu Folge-Fehlern.`
-          : `Ungeschminkte Wahrheit: Ein mental gefestigter Akteur, der auch in hitziger Atmosphäre seinen Stiefel runterspielt.`,
+          : `Ungeschminkte Wahrheit: Ein mental gefestigter Akteur, der auch in hitziger Atmosphäre seinen Stiefel runterspielt.`),
     },
     coach_mode: {
       pressure_summary:
@@ -1355,7 +1646,9 @@ export function computePlayerAnalytics(
         instabilityIndex > 20
           ? `Wachstumspotenzial Streuung: Der Fokus liegt im Training auf dem Halten des 20er-Felds (auch S20 statt T20) – das eliminiert 26er sofort und hebt den Schnitt um 6–8 Punkte an.`
           : `Exzellente Grundkonstanz: Eine tragende Säule im Team, die für Ruhe und Berechenbarkeit sorgt.`,
-      motivational_boost: `Mit der richtigen Warm-Up-Routine und klaren Zielbildern am Board gehört ${playerName} zu den verlässlichsten Spielern der gesamten Liga!`,
+      motivational_boost:
+        customProfile?.coachAdvice ||
+        `Mit der richtigen Warm-Up-Routine und klaren Zielbildern am Board gehört ${playerName} zu den verlässlichsten Spielern der gesamten Liga!`,
     },
   };
 
@@ -1398,28 +1691,21 @@ export function computePlayerAnalytics(
   }
 
   // 10. MATCHPLAN- & AUFSTELLUNGS-BERATER (Q30: B & C)
-  let boardRec = 'Board 1 oder 2 gleichermaßen geeignet';
-  if (volStd <= 22) {
-    boardRec = 'Board 1 (Präsentations-Board): Lässt sich von Umgebungsgeräuschen und Zuschauern nicht irritieren.';
-  } else {
-    boardRec = 'Board 2 (Ruhigeres Board): Profitiert von fokussierter Atmosphäre und weniger Ablenkung.';
-  }
+  let boardRec = customProfile?.boardRec || (volStd <= 22
+    ? 'Board 1 (Präsentations-Board): Lässt sich von Umgebungsgeräuschen und Zuschauern nicht irritieren.'
+    : 'Board 2 (Ruhigeres Board): Profitiert von fokussierter Atmosphäre und weniger Ablenkung.');
 
-  let singleSlot = 'Block 1 (Spiele 1–4): Startet engagiert und setzt frühe Team-Akzente.';
-  if (clutchDelta >= 2 && gClutch.grade <= 2.2) {
-    singleSlot = 'Schluss-Block oder Decider-Position: Höchste Nervenstärke unter Druck, ideal für knappe Schlussphasen.';
-  } else if (gKaltstart.grade > 3.0) {
-    singleSlot = 'Block 2 (Spiele 5–8): Gibt Zeit zum Einwerfen und akklimatisieren.';
-  }
+  let singleSlot = customProfile?.singleSlot || (clutchDelta >= 2 && gClutch.grade <= 2.2
+    ? 'Schluss-Block oder Decider-Position: Höchste Nervenstärke unter Druck, ideal für knappe Schlussphasen.'
+    : gKaltstart.grade > 3.0
+    ? 'Block 2 (Spiele 5–8): Gibt Zeit zum Einwerfen und akklimatisieren.'
+    : 'Block 1 (Spiele 1–4): Startet engagiert und setzt frühe Team-Akzente.');
 
-  let doublePartner = 'Ausgeglichener Partner';
-  if (scoreDanger >= 60 && instabilityIndex > 15) {
-    doublePartner = 'Stoischer Doppel-Partner mit hoher Finish-Quote (gleicht Scoring-Schwankungen aus).';
-  } else if (scoreFinish >= 65 && scorePower < 50) {
-    doublePartner = 'Aggressiver Power-Scorer (schafft schnellen Vorsprung, den dieser Spieler veredelt).';
-  } else {
-    doublePartner = 'Kommunikativer Rhythmus-Spieler zur gemeinsamen Rhythmus-Stabilisierung.';
-  }
+  let doublePartner = customProfile?.doublePartner || (scoreDanger >= 60 && instabilityIndex > 15
+    ? 'Stoischer Doppel-Partner mit hoher Finish-Quote (gleicht Scoring-Schwankungen aus).'
+    : scoreFinish >= 65 && scorePower < 50
+    ? 'Aggressiver Power-Scorer (schafft schnellen Vorsprung, den dieser Spieler veredelt).'
+    : 'Kommunikativer Rhythmus-Spieler zur gemeinsamen Rhythmus-Stabilisierung.');
 
   const matchplanAdvice: MatchplanAdvice = {
     board_recommendation: boardRec,

@@ -21,6 +21,7 @@ interface AnalyticsClientProps {
   allLegVisits: Record<number, RawLegVisit[][]>;
   availableSeasons: string[];
   selectedSeason: string;
+  isAdmin?: boolean;
 }
 
 export default function AnalyticsClient({
@@ -30,6 +31,7 @@ export default function AnalyticsClient({
   allLegVisits,
   availableSeasons,
   selectedSeason,
+  isAdmin = false,
 }: AnalyticsClientProps) {
   // Tabs: 'single' | 'h2h' | 'matrix'
   const [activeTab, setActiveTab] = useState<'single' | 'h2h' | 'matrix'>('single');
@@ -473,8 +475,9 @@ export default function AnalyticsClient({
             <LegAnatomyWidget anatomy={singleAna.leg_anatomy} />
           </div>
 
-          {/* DRITTE REIHE: DAE 2.0 PSYCHOLOGIE & SCOUTING PROFIL */}
-          <div className="bg-gradient-to-r from-[#091736] via-[#0b1d44] to-[#08132d] border border-cyan-500/40 rounded-2xl p-6 shadow-2xl shadow-cyan-950/40 space-y-6">
+          {/* DRITTE REIHE: DAE 2.0 PSYCHOLOGIE & SCOUTING PROFIL (Exklusiv für Admin/Captains) */}
+          {isAdmin && (
+            <div className="bg-gradient-to-r from-[#091736] via-[#0b1d44] to-[#08132d] border border-cyan-500/40 rounded-2xl p-6 shadow-2xl shadow-cyan-950/40 space-y-6">
             {/* Header: Dual-Archetyp + Tonalitäts-Schalter */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-white/10 pb-5 gap-4">
               <div className="flex items-start sm:items-center gap-3.5">
@@ -508,20 +511,28 @@ export default function AnalyticsClient({
 
               {/* Tonalitäts-Schalter (Scout vs. Coach) */}
               <div className="flex flex-col items-start lg:items-end gap-1.5 self-start lg:self-center">
-                <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
-                  DAE Tonalitäts-Modus (Q28)
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                  <span>DAE Tonalitäts-Modus (Q28)</span>
+                  {isAdmin && (
+                    <span className="text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 px-1.5 py-0.2 rounded font-mono">
+                      🔒 ADMIN-SCOUTING
+                    </span>
+                  )}
                 </span>
                 <div className="bg-slate-900/90 p-1 rounded-xl border border-white/15 flex items-center gap-1 shadow-inner">
-                  <button
-                    onClick={() => setScoutingTone('scout')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-                      scoutingTone === 'scout'
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <span>⚡</span> Scout (Hart & Direkt)
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setScoutingTone('scout')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                        scoutingTone === 'scout'
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Knallharte Scouting-Diagnose (Exklusiv für den Admin / Kapitän)"
+                    >
+                      <span>⚡</span> Scout (Hart & Direkt)
+                    </button>
+                  )}
                   <button
                     onClick={() => setScoutingTone('coach')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
@@ -923,6 +934,7 @@ export default function AnalyticsClient({
               </div>
             )}
           </div>
+        )}
         </div>
       )}
 
@@ -1076,26 +1088,30 @@ export default function AnalyticsClient({
                       v2: h2hAna2.dist_data.thresholds['100+']?.pct || 0,
                       format: (v: number) => `${v.toFixed(1)}%`,
                     },
-                    {
-                      label: 'Clutch-Delta (Pkt unter Druck)',
-                      v1: h2hAna1.ai_profile.mental_metrics.clutch_delta,
-                      v2: h2hAna2.ai_profile.mental_metrics.clutch_delta,
-                      format: (v: number) => (v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1)),
-                    },
-                    {
-                      label: 'Nervenstärke (Schulnote)',
-                      v1: h2hAna1.ai_profile.mental_metrics.school_grades[0]?.grade || 3.0,
-                      v2: h2hAna2.ai_profile.mental_metrics.school_grades[0]?.grade || 3.0,
-                      format: (v: number) => `${v.toFixed(1)}`,
-                      inverse: true,
-                    },
-                    {
-                      label: 'Tilt-Index (0–100)',
-                      v1: h2hAna1.ai_profile.mental_metrics.tilt_index,
-                      v2: h2hAna2.ai_profile.mental_metrics.tilt_index,
-                      format: (v: number) => `${v}`,
-                      inverse: true,
-                    },
+                    ...(isAdmin
+                      ? [
+                          {
+                            label: 'Clutch-Delta (Pkt unter Druck)',
+                            v1: h2hAna1.ai_profile.mental_metrics.clutch_delta,
+                            v2: h2hAna2.ai_profile.mental_metrics.clutch_delta,
+                            format: (v: number) => (v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1)),
+                          },
+                          {
+                            label: 'Nervenstärke (Schulnote)',
+                            v1: h2hAna1.ai_profile.mental_metrics.school_grades[0]?.grade || 3.0,
+                            v2: h2hAna2.ai_profile.mental_metrics.school_grades[0]?.grade || 3.0,
+                            format: (v: number) => `${v.toFixed(1)}`,
+                            inverse: true,
+                          },
+                          {
+                            label: 'Tilt-Index (0–100)',
+                            v1: h2hAna1.ai_profile.mental_metrics.tilt_index,
+                            v2: h2hAna2.ai_profile.mental_metrics.tilt_index,
+                            format: (v: number) => `${v}`,
+                            inverse: true,
+                          },
+                        ]
+                      : []),
                   ].map((row) => {
                     const lead1 = row.inverse ? row.v1 < row.v2 : row.v1 > row.v2;
                     const lead2 = row.inverse ? row.v2 < row.v1 : row.v2 > row.v1;
