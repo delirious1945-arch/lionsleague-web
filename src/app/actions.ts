@@ -54,7 +54,8 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
 
       const matchesUser =
         u === pNameLower ||
-        u === firstNameLower ||
+        (u === firstNameLower && !pNameLower.startsWith('board')) ||
+        u === pNameLower.replace(/\s+/g, '') ||
         (u === 'admin' && pRole === 'admin');
 
       if (matchesUser) {
@@ -64,7 +65,7 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
 
         if (mustChange) {
           // Erstanmeldung noch erforderlich: Initial-Passwort 'Lions2026' (oder storedPass) akzeptieren
-          if (isInitialPw || p === storedPass) {
+          if (isInitialPw || p === storedPass || p.toLowerCase() === storedPass.toLowerCase()) {
             return {
               success: false,
               requiresPasswordChange: true,
@@ -88,7 +89,7 @@ export async function loginAction(usernameInput: string, passwordInput: string) 
             };
           }
 
-          if (p === storedPass) {
+          if (p === storedPass || p.toLowerCase() === storedPass.toLowerCase()) {
             const sessionData: UserSession = {
               id: Number(row.id),
               name: pName,

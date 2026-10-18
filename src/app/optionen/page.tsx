@@ -17,6 +17,7 @@ export default async function OptionenPage() {
   const playersRows = await sql`
     SELECT id, name, team, role, must_change_password
     FROM players
+    WHERE team IN ('A-Team', 'B-Team') AND name NOT LIKE 'Board %'
     ORDER BY team, name
   `;
 

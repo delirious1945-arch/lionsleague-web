@@ -608,6 +608,7 @@ export async function getPlayers(): Promise<Player[]> {
       SELECT id, name, team, role
       FROM players
       WHERE team IN ('A-Team', 'B-Team')
+        AND name NOT LIKE 'Board %'
       ORDER BY name ASC
     `;
     return rows.map((r) => ({

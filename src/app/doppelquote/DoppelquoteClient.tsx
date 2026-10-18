@@ -394,18 +394,13 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     }
   };
 
-  // Sichere Navigation mit Abbruch-Erfassung bei laufendem Spiel
+  // Sichere Navigation bei laufendem Spiel
   const handleSafeNavigation = async (targetUrl: string) => {
     if (isGameActive) {
-      const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
-      const confirmAbort = confirm(
-        `⚠️ Achtung: Du hast ein aktives Spiel begonnen (${dartsThrown} Darts geworfen).\n\n` +
-        `Wenn du die Seite jetzt verlässt, wird das Spiel als VORZEITIGER ABBRUCH im System gewertet (nur für Admins sichtbar).\n\n` +
-        `Möchtest du wirklich abbrechen und die Seite verlassen?`
-      );
-      if (!confirmAbort) return;
+      if (!confirm('Möchtest du das aktuelle Spiel wirklich abbrechen?')) return;
 
-      // In Datenbank als Abbruch registrieren
+      // Im Hintergrund in Datenbank als Abbruch registrieren
+      const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
       await recordAbortedSessionAction({
         player_name: p1Name,
         opponent_name: gameMode === '1vs1' ? p2Name : null,
@@ -422,28 +417,20 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     router.push(targetUrl);
   };
 
-  // Spiel zurücksetzen mit Abbruch-Erfassung
+  // Spiel zurücksetzen
   const resetGame = async () => {
     if (isGameActive) {
-      const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
-      const confirmAbort = confirm(
-        `⚠️ Laufendes Spiel wirklich abbrechen und neu starten?\n\n` +
-        `Es wurden bereits ${dartsThrown} Darts geworfen.\n` +
-        `Dieses Spiel wird als VORZEITIG ABGEBROCHEN in der Datenbank protokolliert (nur für Admins sichtbar).\n\n` +
-        `Möchtest du dieses Spiel jetzt abbrechen?`
-      );
-      if (!confirmAbort) return;
+      if (!confirm('Möchtest du das aktuelle Spiel wirklich abbrechen?')) return;
 
+      const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
       await recordAbortedSessionAction({
         player_name: p1Name,
         opponent_name: gameMode === '1vs1' ? p2Name : null,
         game_mode: gameMode,
         total_hits: gameMode === 'solo' ? p1Stats.hits : (p1Stats.hits + p2Stats.hits),
         total_darts: dartsThrown,
-        reason: 'Vorzeitiger Abbruch über "Neu" Button',
+        reason: 'Manueller Abbruch über "Neu" Button',
       });
-    } else {
-      if (!confirm('Aktuelles Training wirklich zurücksetzen?')) return;
     }
 
     localStorage.removeItem(CACHE_KEY);

@@ -89,9 +89,7 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
               </div>
 
               <p className="text-sm text-slate-300 mt-4 leading-relaxed">
-                Trainiere systematisch die fünf wichtigsten Doppel-Felder im Ligaspiel: 
-                <span className="font-bold text-cyan-300"> D20, D10, D16, D8 und D4</span>. 
-                Jedes Feld wird 2-mal angeworfen (10 Runden = 30 Darts). Treffer werden in Echtzeit berechnet und gespeichert.
+                Trainiere systematisch die fünf wichtigsten Doppel-Felder im Ligaspiel: D20, D10, D16, D8 und D4. Jedes Feld wird 10 Runden (30 Darts) angeworfen . Treffer werden in Echtzeit berechnet und gespeichert.
               </p>
             </div>
 
