@@ -2,6 +2,7 @@ import React from 'react';
 import EingabeClient from './EingabeClient';
 import { getAvailableSeasons, getPlayers } from '@/lib/data';
 import { getSessionAction } from '@/app/actions';
+import { redirect } from 'next/navigation';
 import {
   DEFAULT_SPIELTAGE_DIR,
   scanDirectoryForSpieltage,
@@ -12,7 +13,10 @@ export const dynamic = 'force-dynamic';
 export default async function EingabePage() {
   const session = await getSessionAction();
   if (!session) {
-    return null;
+    redirect('/');
+  }
+  if (session.role !== 'admin') {
+    redirect('/?mode=ranking');
   }
 
   const [players, seasons] = await Promise.all([

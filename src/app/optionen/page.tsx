@@ -3,13 +3,17 @@ import { getSettings } from '@/lib/data';
 import { sql } from '@/lib/db';
 import SettingsClient from './SettingsClient';
 import { getSessionAction } from '../actions';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OptionenPage() {
   const session = await getSessionAction();
   if (!session) {
-    return null;
+    redirect('/');
+  }
+  if (session.role !== 'admin') {
+    redirect('/?mode=ranking');
   }
 
   const settings = await getSettings();

@@ -23,25 +23,13 @@ export default function Header({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  // Admin status from user role or toggle
-  const userIsAdminRole = user?.role === 'admin';
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(true);
-
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    const savedMode = localStorage.getItem('lions_role_mode');
-    if (savedMode !== null) {
-      setIsAdminMode(savedMode === 'admin');
-    } else {
-      setIsAdminMode(userIsAdminRole);
-    }
-  }, [userIsAdminRole]);
-
-  const toggleAdmin = () => {
-    const newMode = !isAdminMode;
-    setIsAdminMode(newMode);
-    localStorage.setItem('lions_role_mode', newMode ? 'admin' : 'player');
-  };
+    try {
+      localStorage.removeItem('lions_role_mode');
+    } catch (e) {}
+  }, []);
 
   const handleLogout = () => {
     startTransition(async () => {
@@ -132,16 +120,6 @@ export default function Header({
               <span>Modus</span>
             </Link>
             <button
-              onClick={toggleAdmin}
-              className={`px-2 py-1 rounded-lg text-xs font-bold border transition-all ${
-                isAdminMode
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-blue-600/20 text-blue-300 border-blue-500/40'
-              }`}
-            >
-              {isAdminMode ? '👑' : '🎯'}
-            </button>
-            <button
               onClick={handleLogout}
               disabled={isPending}
               className="p-1.5 rounded-lg text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 transition-all"
@@ -172,8 +150,8 @@ export default function Header({
             );
           })}
 
-          {/* Trennlinie für Adminbereich */}
-          {isAdminMode && (
+          {/* Trennlinie für Adminbereich (NUR WENN ECHTE ADMIN-ROLLE) */}
+          {isAdmin && (
             <>
               <span className="text-white/20 px-1 hidden sm:inline select-none">
                 |
@@ -245,18 +223,6 @@ export default function Header({
             <span>🔄</span>
             <span className="hidden sm:inline">Bereich wechseln</span>
           </Link>
-
-          {/* Admin / Spieler Mode Switcher */}
-          <button
-            onClick={toggleAdmin}
-            className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all flex items-center gap-1.5 shadow-sm ${
-              isAdminMode
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 shadow-amber-500/10'
-                : 'bg-blue-600/20 text-blue-300 border-blue-500/40 hover:bg-blue-600/30 shadow-blue-500/10'
-            }`}
-          >
-            <span>{isAdminMode ? '👑 Admin' : '🎯 Spieler'}</span>
-          </button>
 
           {/* Logout Button */}
           <button
