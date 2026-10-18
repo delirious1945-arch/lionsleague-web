@@ -5,9 +5,14 @@ export interface DartThrow {
   score: number;
 }
 
+export interface RoundHitEntry {
+  multiplier: number; // 0..9 Treffer in den 3 Darts
+  isShanghai: boolean; // true, wenn die 6 per Shanghai (S + D + T) geworfen wurde
+}
+
 export interface ShanghaiTargetRound {
-  target: number; // e.g. 10, 11, ... 15, or 15, 16, ... 20
-  darts: (DartMultiplier | null)[]; // 3 darts
+  target: number; // z.B. 10..15 oder 15..20
+  multiplier: number; // 0..9
   roundScore: number;
   isShanghai: boolean;
 }
@@ -15,8 +20,8 @@ export interface ShanghaiTargetRound {
 export interface DoubleTargetRound {
   target: string; // 'D1' ... 'D20', 'Bull'
   targetNumber: number; // 1..20, 25
-  isHit: boolean | null; // true, false or null (not thrown yet)
-  score: number; // 50, 100 or 0
+  isHit: boolean | null; // true, false oder null
+  score: number; // 50, 100 oder 0
 }
 
 export const PART1_TARGETS = [10, 11, 12, 13, 14, 15];

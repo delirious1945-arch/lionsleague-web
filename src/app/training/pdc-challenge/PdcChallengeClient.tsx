@@ -12,12 +12,11 @@ import {
   PdcLeaderboardRow,
 } from './actions';
 import {
-  DartMultiplier,
+  RoundHitEntry,
   PART1_TARGETS,
   PART2_TARGETS,
   PART3_TARGETS,
   getPdcBadge,
-  PdcBadgeInfo,
 } from './types';
 import {
   Trophy,
@@ -32,9 +31,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Sparkles,
-  Flame,
   Award,
-  ChevronRight,
   Target,
   Tv,
 } from 'lucide-react';
@@ -46,36 +43,36 @@ interface PdcChallengeClientProps {
   user?: UserSession | null;
 }
 
-const CACHE_KEY = 'lions_active_pdc_challenge_session_v1';
+const CACHE_KEY = 'lions_active_pdc_challenge_session_v2';
 
 type GameStage = 'part1' | 'part2' | 'part3' | 'completed';
 
 interface PlayerGameState {
-  part1Darts: Record<number, (DartMultiplier | null)[]>; // 10..15 -> [d1, d2, d3]
+  part1Rounds: Record<number, RoundHitEntry | null>; // 10..15 -> RoundHitEntry | null
   part2Hits: Record<string, boolean | null>; // D1..D20, Bull -> true/false/null
-  part3Darts: Record<number, (DartMultiplier | null)[]>; // 15..20 -> [d1, d2, d3]
+  part3Rounds: Record<number, RoundHitEntry | null>; // 15..20 -> RoundHitEntry | null
 }
 
 const createInitialPlayerState = (): PlayerGameState => ({
-  part1Darts: {
-    10: [null, null, null],
-    11: [null, null, null],
-    12: [null, null, null],
-    13: [null, null, null],
-    14: [null, null, null],
-    15: [null, null, null],
+  part1Rounds: {
+    10: null,
+    11: null,
+    12: null,
+    13: null,
+    14: null,
+    15: null,
   },
   part2Hits: PART2_TARGETS.reduce((acc, t) => {
     acc[t] = null;
     return acc;
   }, {} as Record<string, boolean | null>),
-  part3Darts: {
-    15: [null, null, null],
-    16: [null, null, null],
-    17: [null, null, null],
-    18: [null, null, null],
-    19: [null, null, null],
-    20: [null, null, null],
+  part3Rounds: {
+    15: null,
+    16: null,
+    17: null,
+    18: null,
+    19: null,
+    20: null,
   },
 });
 
@@ -104,11 +101,13 @@ export default function PdcChallengeClient({
   // Flow State
   const [stage, setStage] = useState<GameStage>('part1');
   const [currentTargetIndex, setCurrentTargetIndex] = useState<number>(0);
-  const [currentDartIndex, setCurrentDartIndex] = useState<number>(0); // 0, 1, 2 for Shanghai
 
   // Scores
   const [stateP1, setStateP1] = useState<PlayerGameState>(createInitialPlayerState());
   const [stateP2, setStateP2] = useState<PlayerGameState>(createInitialPlayerState());
+
+  // Shanghai Confirmation Modal (wenn 6 eingegeben wird)
+  const [shanghaiPromptTarget, setShanghaiPromptTarget] = useState<number | null>(null);
 
   // UI / App State
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -143,12 +142,12 @@ export default function PdcChallengeClient({
     if (!soundEnabled) return;
     if (multiplier === 0) {
       playSound(220, 'sawtooth', 0.12);
-    } else if (multiplier === 1) {
+    } else if (multiplier <= 3) {
       playSound(440, 'sine', 0.12);
-    } else if (multiplier === 2) {
+    } else if (multiplier <= 6) {
       playSound(554.37, 'sine', 0.09);
       setTimeout(() => playSound(659.25, 'sine', 0.14), 100);
-    } else if (multiplier === 3) {
+    } else {
       playSound(523.25, 'triangle', 0.08);
       setTimeout(() => playSound(659.25, 'triangle', 0.08), 90);
       setTimeout(() => playSound(783.99, 'triangle', 0.22), 180);
@@ -183,24 +182,11 @@ export default function PdcChallengeClient({
     let dartsThrownPart1 = 0;
 
     PART1_TARGETS.forEach((target) => {
-      const darts = state.part1Darts[target] || [null, null, null];
-      let hasSingle = false;
-      let hasDouble = false;
-      let hasTriple = false;
-
-      darts.forEach((m) => {
-        if (m !== null) {
-          dartsThrownPart1 += 1;
-          scorePart1 += m * target;
-          if (m === 1) hasSingle = true;
-          if (m === 2) hasDouble = true;
-          if (m === 3) hasTriple = true;
-        }
-      });
-
-      if (hasSingle && hasDouble && hasTriple) {
-        scorePart1 += 100; // Shanghai Bonus
-        shanghaisPart1 += 1;
+      const entry = state.part1Rounds[target];
+      if (entry !== null) {
+        dartsThrownPart1 += 3;
+        scorePart1 += entry.multiplier * target + (entry.isShanghai ? 100 : 0);
+        if (entry.isShanghai) shanghaisPart1 += 1;
       }
     });
 
@@ -224,24 +210,11 @@ export default function PdcChallengeClient({
     let dartsThrownPart3 = 0;
 
     PART3_TARGETS.forEach((target) => {
-      const darts = state.part3Darts[target] || [null, null, null];
-      let hasSingle = false;
-      let hasDouble = false;
-      let hasTriple = false;
-
-      darts.forEach((m) => {
-        if (m !== null) {
-          dartsThrownPart3 += 1;
-          scorePart3 += m * target;
-          if (m === 1) hasSingle = true;
-          if (m === 2) hasDouble = true;
-          if (m === 3) hasTriple = true;
-        }
-      });
-
-      if (hasSingle && hasDouble && hasTriple) {
-        scorePart3 += 100; // Shanghai Bonus
-        shanghaisPart3 += 1;
+      const entry = state.part3Rounds[target];
+      if (entry !== null) {
+        dartsThrownPart3 += 3;
+        scorePart3 += entry.multiplier * target + (entry.isShanghai ? 100 : 0);
+        if (entry.isShanghai) shanghaisPart3 += 1;
       }
     });
 
@@ -298,7 +271,6 @@ export default function PdcChallengeClient({
           if (cached.stateP2) setStateP2(cached.stateP2);
           setStage(cached.stage || 'part1');
           setCurrentTargetIndex(cached.currentTargetIndex ?? 0);
-          setCurrentDartIndex(cached.currentDartIndex ?? 0);
           setActivePlayer(cached.activePlayer || 1);
           setNotes(cached.notes || '');
         }
@@ -330,7 +302,6 @@ export default function PdcChallengeClient({
         stateP2,
         stage,
         currentTargetIndex,
-        currentDartIndex,
         activePlayer,
         notes,
         updatedAt: Date.now(),
@@ -350,7 +321,6 @@ export default function PdcChallengeClient({
     stateP2,
     stage,
     currentTargetIndex,
-    currentDartIndex,
     activePlayer,
     notes,
   ]);
@@ -385,27 +355,31 @@ export default function PdcChallengeClient({
     };
   }, [isGameActive]);
 
-  // Wurf eintragen: Teil 1 oder Teil 3 (Shanghai)
-  const handleShanghaiDart = (multiplier: DartMultiplier) => {
-    playHitSound(multiplier);
-
+  // Wurf eintragen: Teil 1 oder Teil 3 (Shanghai Multiplier 0..9)
+  const commitShanghaiRound = (multiplier: number, isShanghai: boolean) => {
     const isPart1 = stage === 'part1';
     const targets = isPart1 ? PART1_TARGETS : PART3_TARGETS;
     const currentTarget = targets[currentTargetIndex];
 
-    const currentState = activePlayer === 1 ? { ...stateP1 } : { ...stateP2 };
-    const dartsMap = isPart1
-      ? { ...currentState.part1Darts }
-      : { ...currentState.part3Darts };
+    if (isShanghai) {
+      playShanghaiFanfare();
+      setShanghaiNotice(`🌟 SHANGHAI AUF DIE ${currentTarget}! +100 BONUS-PUNKTE! 🌟`);
+      setTimeout(() => setShanghaiNotice(null), 3500);
+    } else {
+      playHitSound(multiplier);
+    }
 
-    const currentDarts = [...(dartsMap[currentTarget] || [null, null, null])];
-    currentDarts[currentDartIndex] = multiplier;
-    dartsMap[currentTarget] = currentDarts;
+    const currentState = activePlayer === 1 ? { ...stateP1 } : { ...stateP2 };
+    const roundsMap = isPart1
+      ? { ...currentState.part1Rounds }
+      : { ...currentState.part3Rounds };
+
+    roundsMap[currentTarget] = { multiplier, isShanghai };
 
     if (isPart1) {
-      currentState.part1Darts = dartsMap;
+      currentState.part1Rounds = roundsMap;
     } else {
-      currentState.part3Darts = dartsMap;
+      currentState.part3Rounds = roundsMap;
     }
 
     if (activePlayer === 1) {
@@ -414,46 +388,43 @@ export default function PdcChallengeClient({
       setStateP2(currentState);
     }
 
-    // Prüfen, ob alle 3 Darts geworfen wurden
-    if (currentDartIndex < 2) {
-      setCurrentDartIndex(currentDartIndex + 1);
+    // Nächste Aufnahme oder nächster Spieler
+    if (gameMode === '1vs1' && activePlayer === 1) {
+      // Spieler 2 ist am Zug für dasselbe Target
+      setActivePlayer(2);
     } else {
-      // 3. Dart geworfen -> Shanghai-Check
-      const hasSingle = currentDarts.includes(1);
-      const hasDouble = currentDarts.includes(2);
-      const hasTriple = currentDarts.includes(3);
+      // Weiter zum nächsten Target
+      if (gameMode === '1vs1') setActivePlayer(1);
 
-      if (hasSingle && hasDouble && hasTriple) {
-        playShanghaiFanfare();
-        setShanghaiNotice(`🌟 SHANGHAI AUF DIE ${currentTarget}! +100 BONUS-PUNKTE! 🌟`);
-        setTimeout(() => setShanghaiNotice(null), 3000);
-      }
-
-      // Nächste Aufnahme oder nächster Spieler
-      if (gameMode === '1vs1' && activePlayer === 1) {
-        // Spieler 2 ist am Zug für dasselbe Target
-        setActivePlayer(2);
-        setCurrentDartIndex(0);
+      if (currentTargetIndex < targets.length - 1) {
+        setCurrentTargetIndex(currentTargetIndex + 1);
       } else {
-        // Weiter zum nächsten Target
-        if (gameMode === '1vs1') setActivePlayer(1);
-        setCurrentDartIndex(0);
-
-        if (currentTargetIndex < targets.length - 1) {
-          setCurrentTargetIndex(currentTargetIndex + 1);
+        // Abschnitt abgeschlossen!
+        if (isPart1) {
+          setStage('part2');
+          setCurrentTargetIndex(0);
         } else {
-          // Abschnitt abgeschlossen!
-          if (isPart1) {
-            setStage('part2');
-            setCurrentTargetIndex(0);
-          } else {
-            // Spielende!
-            setStage('completed');
-            handleGameEnd(currentState, activePlayer === 1 ? stateP2 : currentState);
-          }
+          // Spielende!
+          setStage('completed');
+          handleGameEnd(currentState, activePlayer === 1 ? stateP2 : currentState);
         }
       }
     }
+  };
+
+  const handleShanghaiInput = (multiplier: number) => {
+    const isPart1 = stage === 'part1';
+    const targets = isPart1 ? PART1_TARGETS : PART3_TARGETS;
+    const currentTarget = targets[currentTargetIndex];
+
+    // Wenn 6 eingegeben wird -> Nachfragen, ob per Shanghai geworfen
+    if (multiplier === 6) {
+      setShanghaiPromptTarget(currentTarget);
+      return;
+    }
+
+    // Bei allen anderen Werten direkt committen
+    commitShanghaiRound(multiplier, false);
   };
 
   // Wurf eintragen: Teil 2 (Doppelrunde)
@@ -484,7 +455,6 @@ export default function PdcChallengeClient({
         // Teil 2 abgeschlossen -> Weiter zu Teil 3
         setStage('part3');
         setCurrentTargetIndex(0);
-        setCurrentDartIndex(0);
       }
     }
   };
@@ -496,56 +466,35 @@ export default function PdcChallengeClient({
       const targets = isPart1 ? PART1_TARGETS : PART3_TARGETS;
       const currentTarget = targets[currentTargetIndex];
 
-      if (currentDartIndex > 0) {
-        // Vorherigen Dart auf demselben Target löschen
-        const targetDartIdx = currentDartIndex - 1;
-        if (activePlayer === 1) {
-          const newP1 = { ...stateP1 };
-          const dartsMap = isPart1 ? { ...newP1.part1Darts } : { ...newP1.part3Darts };
-          dartsMap[currentTarget][targetDartIdx] = null;
-          if (isPart1) newP1.part1Darts = dartsMap;
-          else newP1.part3Darts = dartsMap;
-          setStateP1(newP1);
-        } else {
-          const newP2 = { ...stateP2 };
-          const dartsMap = isPart1 ? { ...newP2.part1Darts } : { ...newP2.part3Darts };
-          dartsMap[currentTarget][targetDartIdx] = null;
-          if (isPart1) newP2.part1Darts = dartsMap;
-          else newP2.part3Darts = dartsMap;
-          setStateP2(newP2);
-        }
-        setCurrentDartIndex(targetDartIdx);
-      } else if (gameMode === '1vs1' && activePlayer === 2) {
-        // Zurück zu Spieler 1 Dart 3
+      if (gameMode === '1vs1' && activePlayer === 2) {
+        // Zurück zu Spieler 1 für aktuelles Target
         setActivePlayer(1);
-        setCurrentDartIndex(2);
         const newP1 = { ...stateP1 };
-        const dartsMap = isPart1 ? { ...newP1.part1Darts } : { ...newP1.part3Darts };
-        dartsMap[currentTarget][2] = null;
-        if (isPart1) newP1.part1Darts = dartsMap;
-        else newP1.part3Darts = dartsMap;
+        const roundsMap = isPart1 ? { ...newP1.part1Rounds } : { ...newP1.part3Rounds };
+        roundsMap[currentTarget] = null;
+        if (isPart1) newP1.part1Rounds = roundsMap;
+        else newP1.part3Rounds = roundsMap;
         setStateP1(newP1);
       } else if (currentTargetIndex > 0) {
         // Vorheriges Target
         const prevTargetIdx = currentTargetIndex - 1;
         const prevTarget = targets[prevTargetIdx];
         setCurrentTargetIndex(prevTargetIdx);
-        setCurrentDartIndex(2);
 
         if (gameMode === '1vs1') {
           setActivePlayer(2);
           const newP2 = { ...stateP2 };
-          const dartsMap = isPart1 ? { ...newP2.part1Darts } : { ...newP2.part3Darts };
-          dartsMap[prevTarget][2] = null;
-          if (isPart1) newP2.part1Darts = dartsMap;
-          else newP2.part3Darts = dartsMap;
+          const roundsMap = isPart1 ? { ...newP2.part1Rounds } : { ...newP2.part3Rounds };
+          roundsMap[prevTarget] = null;
+          if (isPart1) newP2.part1Rounds = roundsMap;
+          else newP2.part3Rounds = roundsMap;
           setStateP2(newP2);
         } else {
           const newP1 = { ...stateP1 };
-          const dartsMap = isPart1 ? { ...newP1.part1Darts } : { ...newP1.part3Darts };
-          dartsMap[prevTarget][2] = null;
-          if (isPart1) newP1.part1Darts = dartsMap;
-          else newP1.part3Darts = dartsMap;
+          const roundsMap = isPart1 ? { ...newP1.part1Rounds } : { ...newP1.part3Rounds };
+          roundsMap[prevTarget] = null;
+          if (isPart1) newP1.part1Rounds = roundsMap;
+          else newP1.part3Rounds = roundsMap;
           setStateP1(newP1);
         }
       } else if (!isPart1 && stage === 'part3') {
@@ -589,15 +538,14 @@ export default function PdcChallengeClient({
         // Von Teil 2 D1 zurück zu Teil 1 Target 15
         setStage('part1');
         setCurrentTargetIndex(PART1_TARGETS.length - 1);
-        setCurrentDartIndex(2);
         if (gameMode === '1vs1') {
           setActivePlayer(2);
           const newP2 = { ...stateP2 };
-          newP2.part1Darts[15][2] = null;
+          newP2.part1Rounds[15] = null;
           setStateP2(newP2);
         } else {
           const newP1 = { ...stateP1 };
-          newP1.part1Darts[15][2] = null;
+          newP1.part1Rounds[15] = null;
           setStateP1(newP1);
         }
       }
@@ -719,8 +667,8 @@ export default function PdcChallengeClient({
     setStateP2(createInitialPlayerState());
     setStage('part1');
     setCurrentTargetIndex(0);
-    setCurrentDartIndex(0);
     setActivePlayer(1);
+    setShanghaiPromptTarget(null);
     setNotes('');
     setSaveStatus(null);
     setActiveTab('game');
@@ -736,6 +684,68 @@ export default function PdcChallengeClient({
 
   return (
     <div className="max-w-5xl mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-5 animate-fadeIn">
+      {/* SHANGHAI FRAGE MODAL (wenn 6 eingegeben wird) */}
+      {shanghaiPromptTarget !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-gradient-to-b from-slate-900 via-[#0d172e] to-slate-950 border-2 border-amber-400 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center space-y-5 shadow-2xl shadow-amber-500/30">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/30">
+              🌟
+            </div>
+
+            <div>
+              <span className="text-xs uppercase font-black tracking-widest text-amber-400">
+                Aufnahme-Prüfung auf die {shanghaiPromptTarget}
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-black text-white mt-1">
+                6 Treffer erzielt!
+              </h3>
+              <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+                Wurde die 6 per <strong>Shanghai</strong> geworfen?
+                <br />
+                <span className="text-xs text-amber-300 font-semibold">
+                  (Genau 1x Single, 1x Double und 1x Triple = +100 Bonus-Punkte)
+                </span>
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setShanghaiPromptTarget(null);
+                  commitShanghaiRound(6, true);
+                }}
+                className="py-4 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 active:scale-95 text-slate-950 font-black text-sm sm:text-base flex flex-col items-center justify-center gap-1 shadow-xl shadow-amber-500/30 cursor-pointer"
+              >
+                <span>🌟 Ja, Shanghai!</span>
+                <span className="text-xs font-mono text-slate-900 font-bold">
+                  +{shanghaiPromptTarget * 6 + 100} Punkte
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShanghaiPromptTarget(null);
+                  commitShanghaiRound(6, false);
+                }}
+                className="py-4 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 border-2 border-slate-600 text-white font-black text-sm sm:text-base flex flex-col items-center justify-center gap-1 shadow-lg cursor-pointer"
+              >
+                <span>❌ Nein, reguläre 6</span>
+                <span className="text-xs font-mono text-slate-300">
+                  +{shanghaiPromptTarget * 6} Punkte
+                </span>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShanghaiPromptTarget(null)}
+              className="text-xs text-slate-400 hover:text-white underline pt-2 cursor-pointer"
+            >
+              Abbrechen / Wurf korrigieren
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Header & Navigation */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl">
         <div className="flex items-center gap-3">
@@ -855,10 +865,9 @@ export default function PdcChallengeClient({
         </div>
       )}
 
-      {/* MODE & PLAYER SELECTION (Nur veränderbar, wenn noch kein Dart geworfen wurde) */}
+      {/* MODE & PLAYER SELECTION */}
       <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4 space-y-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          {/* Mode Switcher */}
           <div className="flex items-center gap-2 bg-slate-950/80 p-1 rounded-xl border border-white/5">
             <button
               disabled={hasStarted}
@@ -887,7 +896,6 @@ export default function PdcChallengeClient({
             </button>
           </div>
 
-          {/* Darts Counter Progress */}
           <div className="flex items-center gap-3 text-xs">
             <span className="text-slate-400">Fortschritt:</span>
             <span className="font-mono font-bold text-amber-400 bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-800/40">
@@ -935,7 +943,6 @@ export default function PdcChallengeClient({
               </select>
             )}
 
-            {/* Badge Indicator P1 */}
             <div className="mt-2 flex items-center justify-between text-[11px]">
               <span className="text-slate-400">Abzeichen:</span>
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${p1Stats.badge.badgeClass}`}>
@@ -944,7 +951,7 @@ export default function PdcChallengeClient({
             </div>
           </div>
 
-          {/* Spieler 2 (nur 1vs1) */}
+          {/* Spieler 2 */}
           {gameMode === '1vs1' && (
             <div
               className={`p-3 rounded-xl border transition-all ${
@@ -976,7 +983,6 @@ export default function PdcChallengeClient({
                 ))}
               </select>
 
-              {/* Badge Indicator P2 */}
               <div className="mt-2 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">Abzeichen:</span>
                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${p2Stats.badge.badgeClass}`}>
@@ -1053,7 +1059,7 @@ export default function PdcChallengeClient({
                     {gameMode === '1vs1' ? (
                       <span>Am Board: {activePlayer === 1 ? p1Name : p2Name}</span>
                     ) : (
-                      <span>Aktives Ziel</span>
+                      <span>Aktives Ziel (3 Darts)</span>
                     )}
                   </div>
                   <div className="text-4xl sm:text-5xl font-black text-white tracking-tight mt-1">
@@ -1080,106 +1086,72 @@ export default function PdcChallengeClient({
                 </div>
               </div>
 
-              {/* STAGE 1 & 3: SHANGHAI WURFBEREICH (3 DARTS) */}
+              {/* STAGE 1 & 3: SHANGHAI WURFBEREICH (EINGABE DER ANZAHL 0 BIS 9) */}
               {(stage === 'part1' || stage === 'part3') && (
-                <div className="space-y-5">
-                  {/* Visual Darts Indicators */}
-                  <div className="flex items-center justify-center gap-3 sm:gap-6 py-2">
-                    {[0, 1, 2].map((idx) => {
-                      const isPart1 = stage === 'part1';
-                      const currentTarget = (isPart1 ? PART1_TARGETS : PART3_TARGETS)[currentTargetIndex];
-                      const currentState = activePlayer === 1 ? stateP1 : stateP2;
-                      const darts = isPart1
-                        ? currentState.part1Darts[currentTarget] || [null, null, null]
-                        : currentState.part3Darts[currentTarget] || [null, null, null];
-                      const val = darts[idx];
-                      const isCurrent = currentDartIndex === idx;
+                <div className="space-y-4">
+                  <div className="text-center space-y-1">
+                    <span className="text-xs uppercase font-bold text-slate-400">
+                      Aufnahme mit 3 Darts auf die {currentTargetLabel}
+                    </span>
+                    <h4 className="text-sm sm:text-base font-black text-white">
+                      Wie viele Treffer wurden mit den 3 Darts erzielt?
+                    </h4>
+                    <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                      Wähle die Summe der Treffer (Multiplikatoren: Single = 1, Double = 2, Triple = 3).
+                      <br />
+                      <span className="text-amber-300 font-bold">
+                        Bei 6 Treffern fragt das System nach Shanghai (+100 Bonus)!
+                      </span>
+                    </p>
+                  </div>
 
-                      let label = 'Dart ' + (idx + 1);
-                      let sub = '-';
-                      let bg = 'bg-slate-900/80 border-slate-700 text-slate-500';
+                  {/* 10 Button Grid (0 bis 9) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3 max-w-2xl mx-auto pt-2">
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((val) => {
+                      const targetNum = Number(currentTargetLabel);
+                      const basePts = val * targetNum;
+                      const isSix = val === 6;
 
-                      if (val !== null) {
-                        if (val === 0) {
-                          label = 'Daneben';
-                          sub = '0 Pkt';
-                          bg = 'bg-red-950/40 border-red-700/60 text-red-300';
-                        } else if (val === 1) {
-                          label = 'Single';
-                          sub = `${currentTarget} Pkt`;
-                          bg = 'bg-emerald-950/40 border-emerald-600/60 text-emerald-300';
-                        } else if (val === 2) {
-                          label = 'Double';
-                          sub = `${currentTarget * 2} Pkt`;
-                          bg = 'bg-blue-950/40 border-blue-600/60 text-blue-300';
-                        } else if (val === 3) {
-                          label = 'Triple';
-                          sub = `${currentTarget * 3} Pkt`;
-                          bg = 'bg-purple-950/40 border-purple-600/60 text-purple-300';
-                        }
-                      } else if (isCurrent) {
-                        bg = 'bg-amber-500/20 border-amber-400 text-amber-300 ring-2 ring-amber-400/40';
-                      }
+                      let btnStyle =
+                        val === 0
+                          ? 'bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-300'
+                          : isSix
+                          ? 'bg-gradient-to-br from-amber-600 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 border-amber-300 text-slate-950 font-black shadow-lg shadow-amber-500/30'
+                          : val >= 7
+                          ? 'bg-purple-900/60 hover:bg-purple-800 border-purple-500/50 text-purple-200'
+                          : val >= 4
+                          ? 'bg-blue-900/60 hover:bg-blue-800 border-blue-500/50 text-blue-200'
+                          : 'bg-emerald-900/60 hover:bg-emerald-800 border-emerald-500/50 text-emerald-200';
 
                       return (
-                        <div
-                          key={idx}
-                          className={`w-24 sm:w-32 py-3 rounded-2xl border text-center transition-all ${bg}`}
+                        <button
+                          key={val}
+                          onClick={() => handleShanghaiInput(val)}
+                          className={`py-3.5 sm:py-4 px-2 rounded-2xl border-2 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${btnStyle}`}
                         >
-                          <div className="text-[10px] uppercase font-black tracking-wider opacity-80">
-                            Dart {idx + 1}
+                          <div className="flex items-center gap-1 text-lg sm:text-2xl font-black">
+                            <span>{val}</span>
+                            {isSix && <span className="text-xs">🌟</span>}
                           </div>
-                          <div className="text-sm sm:text-base font-black">{val !== null ? label : 'Wurf'}</div>
-                          <div className="text-xs font-mono font-bold mt-0.5">{sub}</div>
-                        </div>
+                          <div
+                            className={`text-[10px] font-mono font-bold ${
+                              isSix ? 'text-slate-950' : 'text-slate-300'
+                            }`}
+                          >
+                            {basePts} Pkt
+                          </div>
+                          {isSix ? (
+                            <div className="text-[9px] uppercase font-black text-slate-950 bg-yellow-300 px-1.5 py-0.2 rounded mt-0.5">
+                              Shanghai?
+                            </div>
+                          ) : (
+                            <div className="text-[9px] text-slate-400">
+                              {val === 0 ? 'Fehlwurf' : `${val}x`}
+                            </div>
+                          )}
+                        </button>
                       );
                     })}
-                  </div>
-
-                  {/* Shanghai Tip Box */}
-                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-2.5 text-center text-xs text-slate-400">
-                    💡 <span className="font-bold text-amber-300">Shanghai-Bonus (+100 Pkt):</span> Triff in dieser Aufnahme 1x Single, 1x Double und 1x Triple auf die {currentTargetLabel}!
-                  </div>
-
-                  {/* Touch Action Buttons for Shanghai */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                    <button
-                      onClick={() => handleShanghaiDart(0)}
-                      className="py-4 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 border-2 border-slate-700 hover:border-slate-500 text-slate-200 font-black text-sm sm:text-base transition-all shadow-lg cursor-pointer flex flex-col items-center justify-center gap-1"
-                    >
-                      <span>❌ Fehlwurf</span>
-                      <span className="text-xs font-mono text-slate-400">0 Punkte</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleShanghaiDart(1)}
-                      className="py-4 px-3 rounded-2xl bg-emerald-700/80 hover:bg-emerald-600 active:scale-95 border-2 border-emerald-500 text-white font-black text-sm sm:text-base transition-all shadow-lg shadow-emerald-900/30 cursor-pointer flex flex-col items-center justify-center gap-1"
-                    >
-                      <span>🎯 Single (1x)</span>
-                      <span className="text-xs font-mono text-emerald-200">
-                        +{Number(currentTargetLabel)} Pkt
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => handleShanghaiDart(2)}
-                      className="py-4 px-3 rounded-2xl bg-blue-700/80 hover:bg-blue-600 active:scale-95 border-2 border-blue-500 text-white font-black text-sm sm:text-base transition-all shadow-lg shadow-blue-900/30 cursor-pointer flex flex-col items-center justify-center gap-1"
-                    >
-                      <span>🎯 Double (2x)</span>
-                      <span className="text-xs font-mono text-blue-200">
-                        +{Number(currentTargetLabel) * 2} Pkt
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => handleShanghaiDart(3)}
-                      className="py-4 px-3 rounded-2xl bg-purple-700/80 hover:bg-purple-600 active:scale-95 border-2 border-purple-500 text-white font-black text-sm sm:text-base transition-all shadow-lg shadow-purple-900/30 cursor-pointer flex flex-col items-center justify-center gap-1"
-                    >
-                      <span>🎯 Triple (3x)</span>
-                      <span className="text-xs font-mono text-purple-200">
-                        +{Number(currentTargetLabel) * 3} Pkt
-                      </span>
-                    </button>
                   </div>
                 </div>
               )}
@@ -1187,7 +1159,7 @@ export default function PdcChallengeClient({
               {/* STAGE 2: DOPPELRUNDE (D1-D20 + BULL) */}
               {stage === 'part2' && (
                 <div className="space-y-6">
-                  {/* Timeline of all 21 Doubles */}
+                  {/* Timeline der 21 Doppel */}
                   <div className="overflow-x-auto pb-2">
                     <div className="flex items-center gap-1.5 min-w-max justify-center">
                       {PART2_TARGETS.map((t, idx) => {
@@ -1216,7 +1188,6 @@ export default function PdcChallengeClient({
                     </div>
                   </div>
 
-                  {/* Target Description */}
                   <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 text-center text-xs text-slate-300">
                     {currentTargetLabel === 'Bull' ? (
                       <span>🎯 <strong>Bullseye (Inner Bull / Rot):</strong> Genau 1 Dart! Treffer = <strong>100 Punkte</strong>.</span>
@@ -1225,7 +1196,7 @@ export default function PdcChallengeClient({
                     )}
                   </div>
 
-                  {/* Fast Action Buttons for Doubles */}
+                  {/* Action Buttons Doppel */}
                   <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto pt-2">
                     <button
                       onClick={() => handleDoubleDart(false)}
@@ -1250,14 +1221,14 @@ export default function PdcChallengeClient({
                 </div>
               )}
 
-              {/* Undo & Quick Navigation footer */}
+              {/* Undo & Footer */}
               <div className="flex items-center justify-between pt-3 border-t border-white/10 text-xs">
                 <button
                   onClick={handleUndo}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold transition-all cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Letzten Dart korrigieren</span>
+                  <span>Letzte Aufnahme korrigieren</span>
                 </button>
 
                 <div className="text-slate-400 text-[11px]">
