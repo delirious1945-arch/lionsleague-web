@@ -593,14 +593,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
                 Spieler 1
               </label>
-              {gameMode === 'solo' && !isBoardUser && (
+              {gameMode === 'solo' && !isBoardUser && userPlayerMatch && (
                 <span className="text-[10px] text-slate-400 font-semibold">
                   (Fest mit Account verknüpft)
                 </span>
               )}
             </div>
 
-            {gameMode === 'solo' && !isBoardUser ? (
+            {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
               <div className="w-full bg-slate-950/90 border border-blue-500/40 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-white flex items-center justify-between shadow-inner">
                 <span className="flex items-center gap-2 truncate">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
