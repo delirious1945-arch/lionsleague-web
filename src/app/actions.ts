@@ -26,7 +26,7 @@ export async function getSessionAction(): Promise<UserSession | null> {
       return JSON.parse(sessionCookie.value) as UserSession;
     }
   } catch (err) {}
-  return DEFAULT_USER;
+  return null;
 }
 
 export async function loginAction(usernameInput: string, passwordInput: string) {
