@@ -270,7 +270,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der Eiskalte Stratege',
     mentalIcon: '❄️',
     mentalDesc: 'Eiskalt, behält immer die Ruhe. Lässt sich durch vergebene Darts oder gegnerische Peaks nicht aus dem Konzept bringen.',
-    hardTruth: 'Schonungslose Diagnose: Dirk ist mental extrem stabil und lässt sich nicht aus der Ruhe bringen. Größter Hebel bleibt das konsequente Treffen der ersten Setup-Darts, um seine mentale Überlegenheit in mehr Leg-Gewinne umzumünzen.',
+    hardTruth: 'Sportliche Einschätzung: Dirk ist mental sehr stabil und lässt sich nicht aus der Ruhe bringen. Größter Hebel bleibt das konsequente Treffen der ersten Setup-Darts, um seine Abgeklärtheit in mehr Leg-Gewinne umzumünzen.',
     coachAdvice: 'Der Fels in der Brandung des A-Teams: Dirks stoische Gelassenheit ist für die Mitspieler Gold wert. Seine Ruhe überträgt sich sofort auf nervöse Teamkollegen.',
     boardRec: 'Board 1 oder 2: Dirk lässt sich von keiner Kulisse aus der Ruhe bringen.',
     singleSlot: 'Schluss-Block oder Decider-Position: Seine eiskalte Ruhe ist die perfekte Waffe für knappe Schlussphasen.',
@@ -285,7 +285,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der lernhungrige Liga-Neuling',
     mentalIcon: '🌱',
     mentalDesc: 'Neu dabei mit großem Entwicklungspotenzial. Braucht noch Wettkampf-Routine, um sein Trainingskönnen im Ligaspiel abzurufen.',
-    hardTruth: 'Aufbau-Diagnose: Noch neu im Wettkampfmodus. Erik neigt dazu, sich in engen Legs zu viel Druck zu machen. Der Fokus muss rein auf der Wurfbewegung liegen, ohne auf das Scoreboard zu schielen.',
+    hardTruth: 'Sportliche Einschätzung: Noch neu im Ligabetrieb. Erik neigt dazu, sich in engen Legs zu viel Druck zu machen. Der Fokus sollte rein auf dem eigenen Wurfgefühl liegen.',
     coachAdvice: 'Hervorragender Einstieg ins A-Team: Erik soll völlig ohne Druck aufspielen. Jeder Satzgewinn und jedes geworfene Leg festigt sein Selbstvertrauen.',
     boardRec: 'Board 2: Ruhigere Umgebung zum entspannten Einwerfen ohne Zuschauerdruck.',
     singleSlot: 'Block 2 (Spiele 5–8): Gibt vorab ausreichend Zeit zum Einwerfen und Zusehen.',
@@ -300,7 +300,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der ehrgeizige Nachwuchs-Werfer',
     mentalIcon: '🎯',
     mentalDesc: 'Gute Wurftechnik und viel Ehrgeiz, hadert am Board noch mit der Konstanz im Checkout-Bereich.',
-    hardTruth: 'Schonungslose Diagnose: Jannik hat gute Phasen, gerät bei knappen Spielständen am Doppel aber noch ins Zögern. Muss lernen, Fehlwürfe schneller abzuhaken und intuitiver zu werfen.',
+    hardTruth: 'Sportliche Einschätzung: Jannik hat gute Phasen. Im Amateurbereich sind leichte Zögerer am Doppel ganz normal; mit mehr Spielpraxis wird der Wurf intuitiver.',
     coachAdvice: 'Aufstrebendes Talent im B-Team: Spielpraxis ist der beste Lehrmeister. Im Training gezielt Doppel-Runden einstreuen, um am Oche instinktiv abzudrücken.',
     boardRec: 'Board 2: Schützt vor Hektik und ermöglicht fokussierten Wurfablauf.',
     singleSlot: 'Block 1 oder 2: Früher Einsatz ohne den Druck der entscheidenden Schlussspiele.',
@@ -315,7 +315,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der abgezockte Liga-Veteran',
     mentalIcon: '🛡️',
     mentalDesc: 'Jahrelange Liga-Erfahrung am Oche. Kennt alle Spielsituationen und behält auch bei gegnerischen Serien die Übersicht.',
-    hardTruth: 'Scouting-Urteil: Jens bringt wertvolle Routine mit, muss aber im neuen Teamgefüge seine Rolle als Verlässlichkeitssäule voll ausfüllen und den jüngeren Spielern Halt geben.',
+    hardTruth: 'Sportliche Einschätzung: Jens bringt wertvolle Routine mit und ist eine wichtige Verlässlichkeitssäule im Team, an der sich andere orientieren können.',
     coachAdvice: 'Ein absoluter Gewinn fürs A-Team: Seine langjährige Liga-Erfahrung ist in hektischen Spielphasen unbezahlbar. Jens weiß genau, wann er das Tempo anziehen muss.',
     boardRec: 'Board 1 oder 2: Als Routinier vollkommen flexibel einsetzbar.',
     singleSlot: 'Block 1 oder Schluss-Einzel: Ideal, um zu Beginn für Ruhe zu sorgen oder knappe Führungen ins Ziel zu bringen.',
@@ -330,7 +330,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Die sprunghafte Gefühlsspielerin',
     mentalIcon: '⚡',
     mentalDesc: 'Stark stimmungs- und rhythmusabhängig. Trifft sie das erste Triple, läuft es wie von selbst; bei Fehlern bricht der Wurf leicht ein.',
-    hardTruth: 'Knallharte Diagnose: Zweite Saison, aber sehr inkonstant. Karen leidet unter stark schwankenden Phasen. Sobald der Kopf einsetzt, geht die Wurfkurve verloren. Braucht feste Rituale, um Schwankungen abzufedern.',
+    hardTruth: 'Sportliche Einschätzung: Zweite Saison im Team. Im Amateurbereich sind wechselhafte Phasen ganz normal. Wichtig ist, nach Fehlwürfen locker zu bleiben und dem eigenen Wurf zu vertrauen.',
     coachAdvice: 'Riesiges Potenzial bei Lockerheit: Wenn Karen befreit wirft, trifft sie hervorragend. Der Schlüssel liegt im Erhalt des Lächelns und im Ausblenden des Gegners.',
     boardRec: 'Board 2: Ruhe und weniger Blickkontakt mit dem gegnerischen Fanblock.',
     singleSlot: 'Block 1: Am besten ohne langes Warten direkt nach dem Warm-Up ans Oche stellen.',
@@ -345,7 +345,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der loyale Co-Kapitän & Standby-Joker',
     mentalIcon: '🤝',
     mentalDesc: 'Spielt nicht viele Matches, steht aber jederzeit bereit, wenn das Team ihn braucht. Hohe Loyalität und Teamgeist.',
-    hardTruth: 'Scouting-Urteil: Karsten spielt nicht viel, was sich in mangelnder Wettkampf-Präzision auf die Doppel niederschlägt. Wenn er ins Spiel kommt, muss er sich auf einfache Sicherheits-Aufnahmen konzentrieren.',
+    hardTruth: 'Sportliche Einschätzung: Karsten spielt nicht viel, weshalb im Ligabetrieb manchmal etwas Match-Rhythmus fehlt. Bei Einsätzen zählt die Konzentration auf saubere, einfache Aufnahmen.',
     coachAdvice: 'Wichtige Säule abseits und am Board: Karsten entlastet André organisatorisch und bringt positive Energie ans Board, egal in welcher Spielsituation.',
     boardRec: 'Board 2: Ermöglicht ruhiges Zurechtfinden bei seltenen Einsätzen.',
     singleSlot: 'Gezielter Joker-Einsatz in Block 2 oder im Doppel.',
@@ -360,7 +360,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Die tragende Säule & Punktegarant',
     mentalIcon: '🏛️',
     mentalDesc: 'Zuverlässiger Leistungsträger des A-Teams. Zieht das Team durch konstante Scores und Kampfgeist mit.',
-    hardTruth: 'Schonungslose Diagnose: Kevin spielt eine tragende Rolle und spürt diese Verantwortung auch. Wenn er zu verbissen wird, verliert er im Finish-Bereich etwas Lockerheit. Darf sich nicht die Last des gesamten Teams aufbürden.',
+    hardTruth: 'Sportliche Einschätzung: Kevin spielt eine tragende Rolle fürs A-Team. Wichtig ist, sich keinen zu großen Druck aufzuladen und die gewohnte Lockerheit beizubehalten.',
     coachAdvice: 'Absoluter Schlüsselspieler: Kevin ist das Rückgrat des A-Teams. Wenn er frei aufspielt, gewinnt er nahezu jedes Einzel in der Kreisklasse.',
     boardRec: 'Board 1: Perfekt für die großen, spielentscheidenden Partien.',
     singleSlot: 'Position 1 oder 2 im Einzel: Soll früh das Zeichen setzen, dass die Lions da sind.',
@@ -375,7 +375,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der spielerische Führungsspieler',
     mentalIcon: '🚀',
     mentalDesc: 'Neu dabei und direkt sportlicher Leader des B-Teams. Wirft mit hoher Dynamik und zieht die Kollegen durch Power-Scoring mit.',
-    hardTruth: 'Scouting-Urteil: Martin ist neu und direkt der spielerische Leader. Die Gefahr besteht darin, dass er frustriert reagiert, wenn das B-Team als Kollektiv hinterherhinkt. Seine Führungsrolle muss er auch mental vorleben.',
+    hardTruth: 'Sportliche Einschätzung: Martin ist neu und direkt der Leader des B-Teams. Seine sportliche Klasse hilft der Mannschaft am meisten, wenn er mit Geduld und positiver Ausstrahlung vorangeht.',
     coachAdvice: 'Das sportliche Zugpferd des B-Teams: Seine Klasse hebt das Niveau der gesamten Mannschaft. Martin soll mutig vorangehen und das Team mitreißen!',
     boardRec: 'Board 1: Gehört als Leader auf das Hauptboard gegen die stärksten Gegner.',
     singleSlot: 'Block 1 & Schluss-Block: Muss sowohl den Start als auch die Entscheidung für das B-Team bestreiten.',
@@ -390,7 +390,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der hadernde Routinier',
     mentalIcon: '📉',
     mentalDesc: 'Dritte Saison im Team, kämpft aktuell mit Formverlust und Unzufriedenheit am Oche. Braucht ein Erfolgserlebnis.',
-    hardTruth: 'Knallharte Diagnose: Dritte Saison, sehr durchwachsene Leistung, baut eher ab. Michael hadert mit dem Niveauverlust. Solange er sich mit früheren Bestwerten vergleicht, blockiert der Kopf. Muss das Spiel neu vereinfachen.',
+    hardTruth: 'Sportliche Einschätzung: Dritte Saison. Michael kämpft aktuell um seine gewohnte Form. Auf unserem Niveau hilft es, den Kopf freizubekommen und sich über einfache Aufnahmen Schritt für Schritt wieder Sicherheit zu holen.',
     coachAdvice: 'Weg aus dem Tief: Michael hat die Erfahrung aus drei Saisons. Jetzt gilt: Kleine Ziele setzen, auf sichere 60er-Aufnahmen fokussieren und die Freude am Spiel zurückgewinnen.',
     boardRec: 'Board 2: Entlastet von Blicken und gibt Raum für Formsuche.',
     singleSlot: 'Block 2: Später Einsatz, um vorher im Training entspannt warmzuwerden.',
@@ -405,7 +405,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der engagierte Liga-Debütant',
     mentalIcon: '🆕',
     mentalDesc: 'Neu dabei in seiner 1. Saison. Mit Feuereifer bei der Sache, muss sich an das Ligatempo und den Ergebnisdruck gewöhnen.',
-    hardTruth: 'Scouting-Urteil: Erste Saison für Michael. In engen Momenten fehlt noch die Abgeklärtheit auf die Doppel. Jeder Auftritt ist ein Lernprozess, Fehler sind in dieser Phase völlig normal.',
+    hardTruth: 'Sportliche Einschätzung: Erste Saison für Michael als Aufbauspieler. Fehlwürfe am Doppel gehören für Liganeulinge ganz normal dazu und bringen wertvolle Erfahrung.',
     coachAdvice: 'Toller Neuzugang: Michael soll den Ligabetrieb genießen und ohne Erwartungsdruck spielen. Die Entwicklungskurve zeigt klar nach oben.',
     boardRec: 'Board 2: Ruhiges Umfeld für den optimalen Einstieg.',
     singleSlot: 'Block 2 im Einzel: Nach Akklimatisierung im Spieltag.',
@@ -420,7 +420,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der selbstkritische Perfektionist',
     mentalIcon: '⚡',
     mentalDesc: 'Sehr nervös, hadert zu sehr mit sich selber. Gute Ansätze werden oft durch Selbstzweifel nach einzelnen Fehlwürfen blockiert.',
-    hardTruth: 'Ungeschminkte Diagnose: Dritte Saison, aber Michael steht sich mental oft selbst im Weg. Er wird schnell nervös und hadert nach Fehlwürfen extrem mit sich. Diese Negativ-Spirale zieht den Schnitt nach unten. Der Kopf muss frei bleiben!',
+    hardTruth: 'Sportliche Einschätzung: Dritte Saison. Michael neigt nach Fehlwürfen zu Selbstkritik. Auf unserem Amateurniveau hilft es, kurz durchzuatmen und den nächsten Wurf ohne Hadern anzugehen.',
     coachAdvice: 'Mentale Hebel ansetzen: Michael wirft deutlich besser, wenn er sich Fehler verzeiht. Zwischen den Würfen kurz durchatmen, Schultern lockern und den nächsten Dart als neue Chance begreifen.',
     boardRec: 'Board 2: Dringend nötig, um äußere Reize und Nervosität zu minimieren.',
     singleSlot: 'Block 1: Am besten ohne lange Wartezeiten schnell ins Spiel werfen.',
@@ -435,7 +435,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der sensible Hochkaräter',
     mentalIcon: '🎢',
     mentalDesc: 'Teilweise extrem solide mit hohem Peak, aber großen Leistungsschwankungen. Wird am Board nervös, wenn das Spiel nicht läuft.',
-    hardTruth: 'Knallharte Diagnose: Dritte Saison. Nick hat das Zeug zum Matchwinner, leidet aber unter groß schwankenden Leistungen. Wenn das Spiel nicht nach Plan läuft, wird er am Board sichtlich nervös und verliert die Wurflinie. Muss lernen, auch "dreckige" Legs geduldig zu gewinnen.',
+    hardTruth: 'Sportliche Einschätzung: Dritte Saison. Nick bringt hohes Potenzial mit, hat aber normale Leistungsschwankungen. Wenn ein Leg mal nicht nach Plan läuft: ruhig bleiben und geduldig weiterwerfen.',
     coachAdvice: 'Gewaltiges Potenzial: Wenn Nick seinen Rhythmus findet, gehört er zu den besten Spielern. Gegen die Nervosität hilft: Das Wurfintervall um 2 Sekunden verlangsamen, wenn der Gegner aufholt.',
     boardRec: 'Board 1: Wenn er heiß ist, gehört er auf die große Bühne; bei wackliger Tagesform auf Board 2 absichern.',
     singleSlot: 'Block 1 (Spiele 1–4): Nutzt frische Konzentration für frühe Breaks.',
@@ -450,7 +450,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der Eiskalte Vollstrecker & Leitwolf',
     mentalIcon: '👑',
     mentalDesc: 'Herausragende Wettkampfhärte, überragendes Scoring und Nervenstärke in brenzligen Decidern.',
-    hardTruth: 'Schonungslose Diagnose: Sebastian ist das sportliche Maß aller Dinge im Team. Die Herausforderung besteht darin, trotz der hohen Erwartungshaltung bei knappen Partien die Lockerheit zu bewahren.',
+    hardTruth: 'Sportliche Einschätzung: Sebastian ist sportlich die tragende Bank im Team. Ziel bleibt es, auch in engen Partien die nötige Lockerheit zu bewahren.',
     coachAdvice: 'Der Leitwolf des A-Teams: Führt durch pure Leistung und mentale Stärke. In brenzligen Decidern die verlässlichste Bank des gesamten Vereins.',
     boardRec: 'Board 1: Präsent auf dem Center-Board gegen die Spitzenleute der Liga.',
     singleSlot: 'Position 1 und Decider-Schluss-Spiel: Setzt das Ausrufezeichen zum Start und macht den Sack zu.',
@@ -465,7 +465,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der treffsichere Vollstrecker',
     mentalIcon: '🎯',
     mentalDesc: 'Starker Scorer mit gesundem Zug zum Doppel. Ein verlässlicher Punktesammler für das B-Team.',
-    hardTruth: 'Scouting-Urteil: Starker Scorer im B-Team. Muss darauf achten, bei deutlichen Führungen die Konzentration hochzuhalten und keine Legs leichtfertig herzuschenken.',
+    hardTruth: 'Sportliche Einschätzung: Starker Scorer im B-Team. Bei deutlichen Führungen die Konzentration hochhalten und Legs konzentriert zu Ende spielen.',
     coachAdvice: 'Tragende Kraft im B-Team: Timos Scoring entlastet die Mannschaft enorm. Mit seiner Abschlussstärke entscheidet er enge Partien.',
     boardRec: 'Board 1: Hohe Scoring-Power gehört auf das vordere Board.',
     singleSlot: 'Block 1 & Doppel: Frühe Punkte für das B-Team einfahren.',
@@ -480,7 +480,7 @@ export const PLAYER_CUSTOM_REGISTRY: Record<string, PlayerCustomProfile> = {
     mentalType: 'Der verlässliche Team-Kämpfer',
     mentalIcon: '🛡️',
     mentalDesc: 'Kämpft unermüdlich um jedes Leg. Wichtig für die Kaderbreite und den Teamzusammenhalt.',
-    hardTruth: 'Scouting-Urteil: Maik hat phasenweise gute Aufnahmen, verliert aber im Finish-Bereich noch zu viele Darts. Mehr Sicherheit auf D16/D8 bringt den nächsten Leistungssprung.',
+    hardTruth: 'Sportliche Einschätzung: Maik hat phasenweise gute Aufnahmen. Mit etwas mehr Sicherheit auf die Standard-Doppel kommt schnell der nächste Schritt.',
     coachAdvice: 'Verlässlicher Mannschaftsspieler: Maik gibt nie auf. Seine kämpferische Einstellung ist ein Vorbild fürs B-Team.',
     boardRec: 'Board 2: Ruhige Umgebung für den sauberen Rhythmus.',
     singleSlot: 'Block 2 oder Doppel.',
@@ -1592,44 +1592,46 @@ export function computePlayerAnalytics(
   const scoutingTexts: AIScoutingToneTexts = {
     scout_mode: {
       pressure_summary:
-        clutchDelta >= 2
-          ? `Gnadenlose Wettkampfhärte: Unter gegnerischem Druck steigt der Schnitt von ${baselineAvg.toFixed(
+        clutchDelta >= 4
+          ? `Guter Fokus in engen Momenten: Wenn der Gegner auf Check steht, steigt der Schnitt von ${baselineAvg.toFixed(
               1
             )} auf ${pressureAvg.toFixed(1)} Punkte (+${clutchDelta.toFixed(
               1
-            )}). Bestraft Nachlässigkeiten des Gegners konsequent.`
-          : clutchDelta <= -3
-          ? `Deutliches Nerven-Problem: Bei gegnerischem Druck bricht der Average von ${baselineAvg.toFixed(
+            )}). Ein erfreulicher Zuwachs in Drucksituationen.`
+          : clutchDelta <= -8
+          ? `Spürbarer Abfall unter Druck: Bei gegnerischem Rest bricht der Schnitt um ${Math.abs(clutchDelta).toFixed(
               1
-            )} auf ${pressureAvg.toFixed(1)} ein (${clutchDelta.toFixed(
+            )} Punkte ein (${baselineAvg.toFixed(1)} → ${pressureAvg.toFixed(1)}). Hier merkt man noch Nervosität am Oche.`
+          : clutchDelta < 0
+          ? `Solide Druck-Kurve: Mit ${clutchDelta.toFixed(
               1
-            )}). Verliert im direkten Finish-Duell die Wurflinie.`
-          : `Neutrale Druck-Kurve: Hält das Niveau unter Druck stabil bei ${pressureAvg.toFixed(
+            )} Punkten Differenz (${baselineAvg.toFixed(1)} → ${pressureAvg.toFixed(
               1
-            )} Punkten. Weder Steigerung noch Nervenflattern.`,
+            )}) liegt die Schwankung absolut im normalen Rahmen für unser Amateurniveau.`
+          : `Ruhiges Spielverhalten: Hält das Niveau unter Druck stabil bei rund ${pressureAvg.toFixed(
+              1
+            )} Punkten.`,
       choke_analysis:
-        lateLegDrop > 18
-          ? `Akute Ziellinien-Hemmung: Fällt nach Dart 9 um ${lateLegDrop.toFixed(
+        lateLegDrop > 22 && doubleTroubleCount >= 2
+          ? `Verzögerter Checkout: Nach Dart 9 fällt der Schnitt spürbar ab (-${lateLegDrop.toFixed(
               1
-            )} Punkte ab. Doppel-Krise in ${doubleTroubleCount} Legs registriert. Das muss im Matchplan gnadenlos attackiert werden.`
+            )} Pkt). In ${doubleTroubleCount} Legs brauchte es mehr als 9 Darts auf Doppel – ein typischer Ansatzpunkt für das nächste Training.`
           : doubleTroubleCount > 0
-          ? `Gelegentliches Feststecken im Checkout-Bereich (${doubleTroubleCount}x >9 Darts auf Doppel), aber ohne chronisches Choke-Muster.`
-          : `Keine Ziellinien-Schwäche erkennbar: Schließt Legs ohne Zögern ab.`,
+          ? `Gelegentliche Extradarts im Finish-Bereich (${doubleTroubleCount}x etwas länger auf Doppel gebraucht), ansonsten solides Match-Management.`
+          : `Gute Ziellinie: Schließt Legs ohne langes Feststecken ab.`,
       consistency_verdict:
-        instabilityIndex > 20
-          ? `Mangelnde Grundkonstanz: ${instabilityIndex.toFixed(
+        instabilityIndex > 30
+          ? `Erkennbare Streuung: Rund ${instabilityIndex.toFixed(
               1
-            )} % aller Würfe landen bei <= 30 Punkten. Das Verhältnis 60+ zu <40 ist mit ${scoreRatio60ToSub40.toFixed(
+            )} % der Aufnahmen landen unter 30 Punkten. Das ist in der 2. Kreisklasse normal; der nächste Schritt liegt im Vermeiden von Ausrutschern in die 1 und 5.`
+          : `Gute Grundkonstanz: Mit nur ${instabilityIndex.toFixed(
               1
-            )} zu instabil für sichere Führungen.`
-          : `Verlässliches Fundament: Nur ${instabilityIndex.toFixed(
-              1
-            )} % Fehlerquote bei Aufnahmen <= 30. Hohe Wiederholgenauigkeit.`,
+            )} % Fehlaufnahmen unter 30 Punkten eine verlässliche Basis am Board.`,
       hard_truth:
         customProfile?.hardTruth ||
         (tiltIndex > 40
-          ? `Ungeschminkte Wahrheit: ${playerName} lässt sich von Fehlwürfen zu lange mental ausbremsen (Tilt-Index ${tiltIndex}). Frust führt direkt zu Folge-Fehlern.`
-          : `Ungeschminkte Wahrheit: Ein mental gefestigter Akteur, der auch in hitziger Atmosphäre seinen Stiefel runterspielt.`),
+          ? `Sportliches Fazit: Lässt sich nach Fehlwürfen noch etwas zu sehr verunsichern. Wenn der Kopf frei bleibt, kommt der Wurf von allein.`
+          : `Sportliches Fazit: Bringt eine ruhige Grundeinstellung ans Oche und lässt sich selten aus dem Konzept bringen.`),
     },
     coach_mode: {
       pressure_summary:

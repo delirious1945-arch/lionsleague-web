@@ -515,7 +515,7 @@ export default function AnalyticsClient({
                   <span>DAE Tonalitäts-Modus (Q28)</span>
                   {isAdmin && (
                     <span className="text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 px-1.5 py-0.2 rounded font-mono">
-                      🔒 ADMIN-SCOUTING
+                      🔒 KAPITÄNS-ANALYSE
                     </span>
                   )}
                 </span>
@@ -528,9 +528,9 @@ export default function AnalyticsClient({
                           ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
                           : 'text-slate-400 hover:text-white'
                       }`}
-                      title="Knallharte Scouting-Diagnose (Exklusiv für den Admin / Kapitän)"
+                      title="Sportliche Analyse (Exklusiv für den Admin / Kapitän)"
                     >
-                      <span>⚡</span> Scout (Hart & Direkt)
+                      <span>⚡</span> Scout (Klar & Nüchtern)
                     </button>
                   )}
                   <button
@@ -793,7 +793,7 @@ export default function AnalyticsClient({
                 <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
                   <span>{scoutingTone === 'scout' ? '⚡' : '🤝'}</span>
                   {scoutingTone === 'scout'
-                    ? 'Knallharte Scouting-Diagnose (Direkt & Schonungslos)'
+                    ? 'Sportliche Analyse (Klar & Nüchtern)'
                     : 'Mentale Coaching-Analyse (Fördernd & Konstruktiv)'}
                 </h4>
                 <span className="text-[10px] font-bold text-slate-400">
@@ -849,7 +849,7 @@ export default function AnalyticsClient({
                   <div className="flex items-center gap-2 text-xs font-bold mb-1.5">
                     <span>{scoutingTone === 'scout' ? '🔥' : '🌟'}</span>
                     <span className={scoutingTone === 'scout' ? 'text-rose-300' : 'text-emerald-300'}>
-                      {scoutingTone === 'scout' ? 'Ungeschminktes Fazit' : 'Motivations-Impuls & Potenzial'}
+                      {scoutingTone === 'scout' ? 'Sportliches Fazit' : 'Motivations-Impuls & Potenzial'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-200 leading-relaxed">
