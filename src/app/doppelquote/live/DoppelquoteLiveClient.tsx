@@ -175,7 +175,7 @@ export default function DoppelquoteLiveClient({
                 </span>
               </div>
               <h1 className="text-lg sm:text-2xl font-black bg-gradient-to-r from-cyan-300 via-blue-400 to-amber-300 bg-clip-text text-transparent">
-                Doppelquote Vereinsmeisterschaft
+                Checkout Battle
               </h1>
             </div>
           </div>
