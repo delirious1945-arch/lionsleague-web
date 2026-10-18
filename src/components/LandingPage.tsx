@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { loginAction, firstLoginPasswordChangeAction } from '@/app/actions';
+import CookieConsent from './CookieConsent';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -202,10 +203,32 @@ export default function LandingPage() {
                   />
                 </div>
 
+                {/* Datenschutz & Cookie Zustimmung */}
+                <div className="flex items-start gap-2 pt-1 pb-1">
+                  <input
+                    type="checkbox"
+                    id="cookieConsentCheckbox"
+                    required
+                    defaultChecked
+                    className="mt-0.5 w-4 h-4 rounded border-white/20 bg-slate-900 text-cyan-500 focus:ring-cyan-400 accent-cyan-500 cursor-pointer"
+                  />
+                  <label htmlFor="cookieConsentCheckbox" className="text-[11px] text-slate-400 cursor-pointer select-none leading-tight">
+                    Ich stimme der Speicherung des technisch notwendigen Sitzungs-Cookies (<code className="text-cyan-300">lions_session</code>) sowie den{' '}
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-privacy-modal'))}
+                      className="text-cyan-400 hover:underline font-semibold inline"
+                    >
+                      Datenschutzbestimmungen (DSGVO)
+                    </button>{' '}
+                    zu.
+                  </label>
+                </div>
+
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-3.5 rounded-xl text-base transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 cursor-pointer mt-2"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black py-3.5 rounded-xl text-base transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 cursor-pointer mt-1"
                 >
                   {isPending ? 'Wird angemeldet...' : '🚀 Anmelden'}
                 </button>
@@ -222,17 +245,42 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="text-center text-[11px] sm:text-xs text-slate-500 mt-6 pt-4 border-t border-white/5 max-w-4xl mx-auto w-full">
-        © 2026 Sportclub Weyhausen von 1921 e.V. • Sparte Darts • Spartenleiter: Sebastian Kirste (
-        <a
-          href="mailto:sebastian.kirste@sc-weyhausen.de"
-          className="text-cyan-400 hover:underline"
-        >
-          sebastian.kirste@sc-weyhausen.de
-        </a>
-        )
+      {/* Footer mit Datenschutz-Links */}
+      <footer className="text-center text-[11px] sm:text-xs text-slate-500 mt-6 pt-4 border-t border-white/5 max-w-4xl mx-auto w-full space-y-1.5">
+        <div>
+          © 2026 Sportclub Weyhausen von 1921 e.V. • Sparte Darts • Spartenleiter: Sebastian Kirste (
+          <a
+            href="mailto:sebastian.kirste@sc-weyhausen.de"
+            className="text-cyan-400 hover:underline"
+          >
+            sebastian.kirste@sc-weyhausen.de
+          </a>
+          )
+        </div>
+        <div className="flex items-center justify-center gap-3 text-slate-400 text-[11px] pt-0.5">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-privacy-modal'))}
+            className="hover:text-cyan-300 transition-colors underline cursor-pointer"
+          >
+            🛡️ Datenschutzerklärung & Cookie-Richtlinie
+          </button>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('lions_cookie_consent');
+              window.location.reload();
+            }}
+            className="hover:text-cyan-300 transition-colors underline cursor-pointer"
+          >
+            🍪 Cookie-Einstellungen
+          </button>
+        </div>
       </footer>
+
+      {/* Cookie Consent Banner & Modal */}
+      <CookieConsent />
     </div>
   );
 }
