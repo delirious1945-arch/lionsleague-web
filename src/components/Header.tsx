@@ -58,12 +58,11 @@ export default function Header({
   };
 
   const mainNav = [
-    { label: 'Dashboard', href: '/' },
+    { label: 'Dashboard', href: '/?mode=ranking' },
     { label: 'Teams', href: '/teams' },
     { label: 'Spieler', href: '/spieler' },
     { label: 'Liga', href: '/liga' },
     { label: 'Dart Analytics Engine', href: '/analytics' },
-    { label: '🎯 Doppelquote', href: '/doppelquote' },
     { label: 'Hilfe', href: '/hilfe' },
   ];
 
@@ -105,16 +104,24 @@ export default function Header({
           </Link>
 
           {/* Mobile Right Controls */}
-          <div className="flex items-center gap-2 xl:hidden">
+          <div className="flex items-center gap-1.5 xl:hidden">
+            <Link
+              href="/"
+              className="px-2 py-1 rounded-lg text-xs font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 flex items-center gap-1"
+              title="Bereich wechseln (Training / Ranking)"
+            >
+              <span>🔄</span>
+              <span>Modus</span>
+            </Link>
             <button
               onClick={toggleAdmin}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+              className={`px-2 py-1 rounded-lg text-xs font-bold border transition-all ${
                 isAdminMode
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                   : 'bg-blue-600/20 text-blue-300 border-blue-500/40'
               }`}
             >
-              {isAdminMode ? '👑 Admin' : '🎯 Spieler'}
+              {isAdminMode ? '👑' : '🎯'}
             </button>
             <button
               onClick={handleLogout}
@@ -210,6 +217,16 @@ export default function Header({
               </span>
             </div>
           )}
+
+          {/* Bereichswechsel Hub Link */}
+          <Link
+            href="/"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 transition-all flex items-center gap-1.5 shadow-sm"
+            title="Zurück zur Bereichsauswahl (Training / Ranking)"
+          >
+            <span>🔄</span>
+            <span className="hidden sm:inline">Bereich wechseln</span>
+          </Link>
 
           {/* Admin / Spieler Mode Switcher */}
           <button

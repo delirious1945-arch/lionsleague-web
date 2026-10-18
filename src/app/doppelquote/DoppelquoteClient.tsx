@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Player } from '@/lib/data';
 import { saveTrainingSessionAction, TrainingSessionData } from './actions';
 import { 
@@ -322,6 +323,22 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center gap-1"
+            title="Zurück zur Bereichsauswahl"
+          >
+            <span>🔄</span>
+            <span className="hidden sm:inline">Modus</span>
+          </Link>
+          <Link
+            href="/?mode=ranking"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 transition-colors flex items-center gap-1 shadow-sm"
+            title="Zum Ranking-System"
+          >
+            <span>🏆</span>
+            <span className="hidden sm:inline">Ranking</span>
+          </Link>
           <button 
             onClick={() => setSoundEnabled(!soundEnabled)}
             className="w-9 h-9 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"

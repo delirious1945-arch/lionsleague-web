@@ -5,11 +5,12 @@ import KingsOf26 from '@/components/KingsOf26';
 import LeaderboardCard from '@/components/LeaderboardCard';
 import KPIBoxes from '@/components/KPIBoxes';
 import DetailedMatrixTable from '@/components/DetailedMatrixTable';
+import ModeSelectionHub from '@/components/ModeSelectionHub';
 import { getDashboardData } from '@/lib/data';
 import { getSessionAction } from './actions';
 
 interface PageProps {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; mode?: string }>;
 }
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   }
 
   const resolvedParams = await searchParams;
+  const mode = resolvedParams.mode;
+
+  // Wenn noch kein Modus (Ranking) gewählt wurde, zeigen wir den Einstiegs-Hub!
+  if (mode !== 'ranking') {
+    return <ModeSelectionHub user={session} />;
+  }
+
   const currentSeason = resolvedParams.season || '2026/2027';
 
   const data = await getDashboardData(currentSeason);
