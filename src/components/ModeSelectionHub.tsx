@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { UserSession, logoutAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
+import DynamicRankingTileContent from './DynamicRankingTileContent';
 
 interface ModeSelectionHubProps {
   user: UserSession;
@@ -52,7 +53,12 @@ export default function ModeSelectionHub({ user }: ModeSelectionHubProps) {
           />
           
           {/* Dunkler Gradient-Overlay für beste Lesbarkeit */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+
+          {/* Dynamisches Lions-Weyhausen Leaderboard mit echten Spielerfotos & Namen */}
+          <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-10">
+            <DynamicRankingTileContent />
+          </div>
 
           {/* Nur der Hauptname */}
           <div className="relative z-10 p-5 sm:p-7 flex items-center justify-between">
