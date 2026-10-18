@@ -1,22 +1,27 @@
 'use client';
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Player } from '@/lib/data';
-import { saveTrainingSessionAction, TrainingSessionData } from './actions';
+import { saveTrainingSessionAction, recordAbortedSessionAction, TrainingSessionData } from './actions';
+import { UserSession } from '@/app/actions';
 import { 
   Trophy, Users, User, ArrowRight, RotateCcw, Volume2, VolumeX, 
-  Save, Download, FileSpreadsheet, FileText, CheckCircle2, AlertCircle 
+  Save, Download, FileSpreadsheet, FileText, CheckCircle2, AlertCircle,
+  ArrowLeft, AlertTriangle, RefreshCw
 } from 'lucide-react';
 
 interface DoppelquoteClientProps {
   players: Player[];
   initialHistory: any[];
+  user?: UserSession | null;
 }
 
 const TARGETS = ['D20', 'D10', 'D16', 'D8', 'D4'];
+const CACHE_KEY = 'lions_active_doppelquote_session_v2';
 
-export default function DoppelquoteClient({ players, initialHistory }: DoppelquoteClientProps) {
+export default function DoppelquoteClient({ players, initialHistory, user }: DoppelquoteClientProps) {
+  const router = useRouter();
   const [gameMode, setGameMode] = useState<'solo' | '1vs1'>('solo');
   const [p1Name, setP1Name] = useState<string>(players[0]?.name || 'Sebastian Kirste');
   const [p2Name, setP2Name] = useState<string>(players[1]?.name || 'Dirk Ostermann');
@@ -28,6 +33,8 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
   const [history, setHistory] = useState<any[]>(initialHistory);
   const [activeTab, setActiveTab] = useState<'board' | 'table' | 'history'>('board');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isGameInitialized, setIsGameInitialized] = useState<boolean>(false);
+  const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
 
   // Scores State
   const [scoresP1, setScoresP1] = useState<Record<string, (number | null)[]>>({
@@ -101,6 +108,108 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
 
   const p1Stats = calcStats(scoresP1);
   const p2Stats = calcStats(scoresP2);
+
+  const isCompleted = (gameMode === 'solo' 
+    ? TARGETS.every(t => scoresP1[t].every(s => s !== null))
+    : (TARGETS.every(t => scoresP1[t].every(s => s !== null)) && TARGETS.every(t => scoresP2[t].every(s => s !== null)))
+  );
+  const hasStarted = (p1Stats.thrown > 0 || p2Stats.thrown > 0);
+  const isGameActive = hasStarted && !isCompleted;
+
+  // 1. Lokalen Geräte-Cache beim Start wiederherstellen
+  useEffect(() => {
+    try {
+      const cachedStr = localStorage.getItem(CACHE_KEY);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        if (cached && cached.scoresP1) {
+          const hasScores = TARGETS.some(t => 
+            (cached.scoresP1[t] && cached.scoresP1[t].some((s: any) => s !== null)) ||
+            (cached.scoresP2 && cached.scoresP2[t] && cached.scoresP2[t].some((s: any) => s !== null))
+          );
+          if (hasScores) {
+            setGameMode(cached.gameMode || 'solo');
+            if (cached.p1Name) setP1Name(cached.p1Name);
+            if (cached.p2Name) setP2Name(cached.p2Name);
+            setScoresP1(cached.scoresP1);
+            if (cached.scoresP2) setScoresP2(cached.scoresP2);
+            setCurrentTargetIndex(cached.currentTargetIndex ?? 0);
+            setCurrentShotIndex(cached.currentShotIndex ?? 0);
+            setActivePlayer(cached.activePlayer || 1);
+            setNotes(cached.notes || '');
+            setRestoredFromCache(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Fehler beim Laden des Caches:', e);
+    } finally {
+      setIsGameInitialized(true);
+    }
+  }, []);
+
+  // 2. Automatisches Caching auf dem Endgerät nach jedem Wurf
+  useEffect(() => {
+    if (!isGameInitialized) return;
+
+    if (hasStarted && !isCompleted) {
+      const sessionData = {
+        gameMode,
+        p1Name,
+        p2Name,
+        scoresP1,
+        scoresP2,
+        currentTargetIndex,
+        currentShotIndex,
+        activePlayer,
+        notes,
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(sessionData));
+    } else if (!hasStarted) {
+      localStorage.removeItem(CACHE_KEY);
+    }
+  }, [
+    isGameInitialized,
+    hasStarted,
+    isCompleted,
+    gameMode,
+    p1Name,
+    p2Name,
+    scoresP1,
+    scoresP2,
+    currentTargetIndex,
+    currentShotIndex,
+    activePlayer,
+    notes,
+  ]);
+
+  // 3. Refresh-Schutz (F5, Strg+R, Tab schliessen) während aktivem Spiel
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isGameActive) {
+        e.preventDefault();
+        e.returnValue = 'Ein aktives Trainingsspiel läuft! Wenn du die Seite schließt oder neu lädst, wird das Spiel unterbrochen.';
+        return e.returnValue;
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isGameActive) return;
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))) {
+        e.preventDefault();
+        alert('⚠️ Seite neu laden (F5 / Strg+R) ist während eines laufenden Trainingsspiels gesperrt, um Datenverlust zu verhindern. Dein Spielstand ist sicher im lokalen Geräte-Cache gespeichert!');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isGameActive]);
 
   // Wurf eintragen
   const handleScore = (hits: number) => {
@@ -267,10 +376,13 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
     const res = await saveTrainingSessionAction(sessionsToSave);
 
     if (res.success) {
+      // Nach erfolgreichem Speichern: Cache leeren
+      localStorage.removeItem(CACHE_KEY);
+      setRestoredFromCache(false);
       setSaveStatus('✅ Erfolgreich in Supabase Cloud gespeichert!');
       setTimeout(() => setSaveStatus(null), 4000);
       // Lokal in Historie einfügen
-      setHistory(prev => [...sessionsToSave.map(s => ({ ...s, created_at: new Date().toISOString() })), ...prev]);
+      setHistory(prev => [...sessionsToSave.map(s => ({ ...s, is_aborted: 0, created_at: new Date().toISOString() })), ...prev]);
     } else {
       setSaveStatus('⚠️ Fehler beim Speichern: ' + res.error);
     }
@@ -282,20 +394,71 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
     }
   };
 
-  const resetGame = () => {
-    if (confirm('Aktuelles Training wirklich zurücksetzen?')) {
-      const empty = () => ({
-        D20: Array(10).fill(null), D10: Array(10).fill(null),
-        D16: Array(10).fill(null), D8:  Array(10).fill(null),
-        D4:  Array(10).fill(null),
+  // Sichere Navigation mit Abbruch-Erfassung bei laufendem Spiel
+  const handleSafeNavigation = async (targetUrl: string) => {
+    if (isGameActive) {
+      const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
+      const confirmAbort = confirm(
+        `⚠️ Achtung: Du hast ein aktives Spiel begonnen (${dartsThrown} Darts geworfen).\n\n` +
+        `Wenn du die Seite jetzt verlässt, wird das Spiel als VORZEITIGER ABBRUCH im System gewertet (nur für Admins sichtbar).\n\n` +
+        `Möchtest du wirklich abbrechen und die Seite verlassen?`
+      );
+      if (!confirmAbort) return;
+
+      // In Datenbank als Abbruch registrieren
+      await recordAbortedSessionAction({
+        player_name: p1Name,
+        opponent_name: gameMode === '1vs1' ? p2Name : null,
+        game_mode: gameMode,
+        total_hits: gameMode === 'solo' ? p1Stats.hits : (p1Stats.hits + p2Stats.hits),
+        total_darts: dartsThrown,
+        reason: 'Vorzeitige Navigation / Seite verlassen',
       });
-      setScoresP1(empty());
-      setScoresP2(empty());
-      setCurrentTargetIndex(0);
-      setCurrentShotIndex(0);
-      setActivePlayer(1);
-      setNotes('');
+
+      // Cache auf dem Endgerät leeren
+      localStorage.removeItem(CACHE_KEY);
+      setRestoredFromCache(false);
     }
+    router.push(targetUrl);
+  };
+
+  // Spiel zurücksetzen mit Abbruch-Erfassung
+  const resetGame = async () => {
+    if (isGameActive) {
+      const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
+      const confirmAbort = confirm(
+        `⚠️ Laufendes Spiel wirklich abbrechen und neu starten?\n\n` +
+        `Es wurden bereits ${dartsThrown} Darts geworfen.\n` +
+        `Dieses Spiel wird als VORZEITIG ABGEBROCHEN in der Datenbank protokolliert (nur für Admins sichtbar).\n\n` +
+        `Möchtest du dieses Spiel jetzt abbrechen?`
+      );
+      if (!confirmAbort) return;
+
+      await recordAbortedSessionAction({
+        player_name: p1Name,
+        opponent_name: gameMode === '1vs1' ? p2Name : null,
+        game_mode: gameMode,
+        total_hits: gameMode === 'solo' ? p1Stats.hits : (p1Stats.hits + p2Stats.hits),
+        total_darts: dartsThrown,
+        reason: 'Vorzeitiger Abbruch über "Neu" Button',
+      });
+    } else {
+      if (!confirm('Aktuelles Training wirklich zurücksetzen?')) return;
+    }
+
+    localStorage.removeItem(CACHE_KEY);
+    setRestoredFromCache(false);
+    const empty = () => ({
+      D20: Array(10).fill(null), D10: Array(10).fill(null),
+      D16: Array(10).fill(null), D8:  Array(10).fill(null),
+      D4:  Array(10).fill(null),
+    });
+    setScoresP1(empty());
+    setScoresP2(empty());
+    setCurrentTargetIndex(0);
+    setCurrentShotIndex(0);
+    setActivePlayer(1);
+    setNotes('');
   };
 
   const curTargetHits = curShots.reduce<number>((a, b) => a + (b !== null ? b : 0), 0);
@@ -303,8 +466,38 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
   const curTargetPct = curTargetThrown > 0 ? ((curTargetHits / curTargetThrown) * 100).toFixed(1) : '0.0';
 
   return (
-    <div className="max-w-[700px] mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4">
-      
+    <div 
+      className="max-w-[700px] mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4"
+      style={{ overscrollBehaviorY: 'contain' }}
+    >
+      {/* TOP NAVIGATION BREADCRUMB MIT BACK-BUTTON */}
+      <div className="flex items-center justify-between text-xs pb-1">
+        <button
+          onClick={() => handleSafeNavigation('/training')}
+          className="inline-flex items-center gap-1.5 text-slate-300 hover:text-cyan-400 bg-slate-900/80 hover:bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl transition-all font-bold text-xs shadow-sm cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+          <span>← Zurück zur Trainingsauswahl</span>
+        </button>
+        <button
+          onClick={() => handleSafeNavigation('/?mode=ranking')}
+          className="inline-flex items-center gap-1 text-slate-400 hover:text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
+        >
+          <span>🏆</span> Zum Ranking
+        </button>
+      </div>
+
+      {/* LOKALER GERÄTE-CACHE HINWEIS BANNER */}
+      {restoredFromCache && isGameActive && (
+        <div className="bg-cyan-950/70 border border-cyan-500/40 rounded-xl p-2.5 px-3.5 flex items-center justify-between text-xs text-cyan-200 shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span><strong>Geräte-Cache aktiv:</strong> Laufendes Spiel wurde nahtlos aus deinem lokalen Speicher wiederhergestellt.</span>
+          </div>
+          <span className="text-[10px] font-mono font-bold bg-cyan-900/60 px-2 py-0.5 rounded border border-cyan-700/50">Lokal gesichert</span>
+        </div>
+      )}
+
       {/* HEADER CARD */}
       <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl backdrop-blur-md flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -323,14 +516,14 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
         </div>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/training"
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center gap-1"
+          <button
+            onClick={() => handleSafeNavigation('/training')}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center gap-1 cursor-pointer"
             title="Zurück zu den Trainingsspielen"
           >
             <span>🎯</span>
             <span className="hidden sm:inline">Trainingsspiele</span>
-          </Link>
+          </button>
           <Link
             href="/doppelquote/live"
             target="_blank"
@@ -340,14 +533,14 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
             <span>📺</span>
             <span className="hidden sm:inline">TV Live-Board</span>
           </Link>
-          <Link
-            href="/?mode=ranking"
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors flex items-center gap-1 shadow-sm"
+          <button
+            onClick={() => handleSafeNavigation('/?mode=ranking')}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
             title="Zum Ranking-System"
           >
             <span>🏆</span>
             <span className="hidden sm:inline">Ranking</span>
-          </Link>
+          </button>
           <button 
             onClick={() => setSoundEnabled(!soundEnabled)}
             className="w-9 h-9 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
@@ -711,74 +904,109 @@ export default function DoppelquoteClient({ players, initialHistory }: Doppelquo
       )}
 
       {/* VIEW 3: VERLAUF & VORLAGEN */}
-      {activeTab === 'history' && (
-        <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-sm font-bold text-white">📜 Gespeicherte Trainings in Supabase</h2>
-            <span className="text-xs text-slate-400">{history.length} Einheiten</span>
-          </div>
+      {activeTab === 'history' && (() => {
+        const visibleHistory = history.filter(h => {
+          if (Number(h.is_aborted || 0) === 1) {
+            return user?.role === 'admin';
+          }
+          return true;
+        });
 
-          <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto">
-            {history.length === 0 ? (
-              <div className="text-center py-6 text-xs text-slate-500">
-                Noch keine Trainingseinheiten vorhanden.
-              </div>
-            ) : (
-              history.map((h, idx) => {
-                const dateObj = new Date(h.training_date);
-                const dStr = isNaN(dateObj.getTime()) ? h.training_date : dateObj.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-                const qPct = ((h.total_quote ?? 0) * 100).toFixed(1) + '%';
-                const isWin = h.is_winner === 1;
+        return (
+          <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>📜</span> Gespeicherte Trainings in Supabase
+                {user?.role === 'admin' && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Admin-Ansicht
+                  </span>
+                )}
+              </h2>
+              <span className="text-xs text-slate-400">{visibleHistory.length} Einheiten</span>
+            </div>
 
-                return (
-                  <div key={idx} className="bg-slate-950/80 border border-white/5 rounded-xl p-3 flex justify-between items-center text-xs">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-slate-400 text-[10px]">
-                        <span>{dStr}</span>
-                        <span>•</span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                          {h.game_mode === '1vs1' ? `⚔️ vs ${h.opponent_name || 'Gegner'}` : '👤 Solo'}
-                        </span>
-                        {isWin && <span className="text-amber-400 font-bold">🏆 Sieg</span>}
+            <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto">
+              {visibleHistory.length === 0 ? (
+                <div className="text-center py-6 text-xs text-slate-500">
+                  Noch keine Trainingseinheiten vorhanden.
+                </div>
+              ) : (
+                visibleHistory.map((h, idx) => {
+                  const isAborted = Number(h.is_aborted || 0) === 1;
+                  const dateObj = new Date(h.training_date);
+                  const dStr = isNaN(dateObj.getTime()) ? h.training_date : dateObj.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+                  const qPct = ((h.total_quote ?? 0) * 100).toFixed(1) + '%';
+                  const isWin = h.is_winner === 1;
+
+                  return (
+                    <div key={idx} className={`border rounded-xl p-3 flex justify-between items-center text-xs transition-all ${
+                      isAborted 
+                        ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' 
+                        : 'bg-slate-950/80 border-white/5'
+                    }`}>
+                      <div>
+                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px]">
+                          <span>{dStr}</span>
+                          <span>•</span>
+                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                            {h.game_mode === '1vs1' ? `⚔️ vs ${h.opponent_name || 'Gegner'}` : '👤 Solo'}
+                          </span>
+                          {isWin && <span className="text-amber-400 font-bold">🏆 Sieg</span>}
+                          {isAborted && (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-black">
+                              ⚠️ ABGEBROCHEN (Admin-Sicht)
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-bold text-white text-sm mt-0.5 flex items-center gap-2">
+                          <span>{h.player_name}</span>
+                          {isAborted && h.notes && (
+                            <span className="text-[10px] font-normal text-rose-300/80 italic">({h.notes})</span>
+                          )}
+                        </div>
+                        <div className="text-slate-400 text-[11px]">
+                          {isAborted ? 'Vorzeitig abgebrochen' : `Best: ${h.best_double || '-'}`}
+                        </div>
                       </div>
-                      <div className="font-bold text-white text-sm mt-0.5">{h.player_name}</div>
-                      <div className="text-slate-400 text-[11px]">Best: {h.best_double || '-'}</div>
-                    </div>
 
-                    <div className="text-right">
-                      <div className="text-base font-black text-emerald-400">{qPct}</div>
-                      <div className="text-[10px] text-slate-400">{h.total_hits} / {h.total_darts} Darts</div>
+                      <div className="text-right">
+                        <div className={`text-base font-black ${isAborted ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {qPct}
+                        </div>
+                        <div className="text-[10px] text-slate-400">{h.total_hits} / {h.total_darts} Darts</div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                  );
+                })
+              )}
+            </div>
 
-          {/* DOWNLOADS */}
-          <div className="pt-3 border-t border-white/10">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-              Druckvorlagen für das Dartboard
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href="/Darts_Doppelquote_Trainingsblatt_A4.xlsx"
-                download
-                className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-xs font-bold text-white hover:bg-slate-700 transition-colors"
-              >
-                <FileSpreadsheet size={15} className="text-emerald-400" /> Excel (.xlsx)
-              </a>
-              <a
-                href="/Darts_Doppelquote_Trainingsblatt_A4.pdf"
-                target="_blank"
-                className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-xs font-bold text-white hover:bg-slate-700 transition-colors"
-              >
-                <FileText size={15} className="text-rose-400" /> PDF Druckblatt
-              </a>
+            {/* DOWNLOADS */}
+            <div className="pt-3 border-t border-white/10">
+              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                Druckvorlagen für das Dartboard
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href="/Darts_Doppelquote_Trainingsblatt_A4.xlsx"
+                  download
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-xs font-bold text-white hover:bg-slate-700 transition-colors"
+                >
+                  <FileSpreadsheet size={15} className="text-emerald-400" /> Excel (.xlsx)
+                </a>
+                <a
+                  href="/Darts_Doppelquote_Trainingsblatt_A4.pdf"
+                  target="_blank"
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-xs font-bold text-white hover:bg-slate-700 transition-colors"
+                >
+                  <FileText size={15} className="text-rose-400" /> PDF Druckblatt
+                </a>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* KPI STATUS BAR */}
       <div className="grid grid-cols-3 gap-2">

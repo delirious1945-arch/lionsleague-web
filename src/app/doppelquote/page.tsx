@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { getPlayers } from '@/lib/data';
 import { getTrainingHistoryAction } from './actions';
 import DoppelquoteClient from './DoppelquoteClient';
+import { getSessionAction } from '../actions';
 
 export const metadata: Metadata = {
   title: 'LionsDarts Doppelquote | Lions League',
@@ -11,12 +12,15 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function DoppelquotePage() {
-  const players = await getPlayers();
-  const history = await getTrainingHistoryAction(50);
+  const [players, history, session] = await Promise.all([
+    getPlayers(),
+    getTrainingHistoryAction(50),
+    getSessionAction(),
+  ]);
 
   return (
     <main className="min-h-screen py-4 sm:py-6 bg-[#050811] text-slate-100">
-      <DoppelquoteClient players={players} initialHistory={history} />
+      <DoppelquoteClient players={players} initialHistory={history} user={session} />
     </main>
   );
 }

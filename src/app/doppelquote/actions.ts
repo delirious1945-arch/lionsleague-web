@@ -31,6 +31,7 @@ export interface TrainingSessionData {
   best_double: string;
   notes?: string;
   is_winner?: number;
+  is_aborted?: number;
 }
 
 export async function saveTrainingSessionAction(sessions: TrainingSessionData[]) {
@@ -45,7 +46,7 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
           d8_hits, d8_darts, d8_quote,
           d4_hits, d4_darts, d4_quote,
           total_hits, total_darts, total_quote,
-          best_double, notes, is_winner
+          best_double, notes, is_winner, is_aborted
         ) VALUES (
           ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
           ${s.d20_hits}, ${s.d20_darts}, ${s.d20_quote},
@@ -54,7 +55,7 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
           ${s.d8_hits}, ${s.d8_darts}, ${s.d8_quote},
           ${s.d4_hits}, ${s.d4_darts}, ${s.d4_quote},
           ${s.total_hits}, ${s.total_darts}, ${s.total_quote},
-          ${s.best_double}, ${s.notes ?? ''}, ${s.is_winner ?? 0}
+          ${s.best_double}, ${s.notes ?? ''}, ${s.is_winner ?? 0}, ${s.is_aborted ?? 0}
         )
       `;
     }
@@ -88,11 +89,55 @@ export async function getTrainingHistoryAction(limit: number = 50) {
       best_double: String(r.best_double || ''),
       notes: String(r.notes || ''),
       is_winner: Number(r.is_winner || 0),
+      is_aborted: Number(r.is_aborted || 0),
       created_at: String(r.created_at)
     }));
   } catch (error) {
     console.error('Fehler beim Laden der Trainings-Historie:', error);
     return [];
+  }
+}
+
+export async function recordAbortedSessionAction(data: {
+  player_name: string;
+  opponent_name?: string | null;
+  game_mode: string;
+  total_hits: number;
+  total_darts: number;
+  reason?: string;
+}) {
+  try {
+    const sessionId = 'aborted_' + Date.now();
+    const dateStr = new Date().toISOString();
+    const quote = data.total_darts > 0 ? data.total_hits / data.total_darts : 0;
+    const noteText = data.reason || 'Vorzeitiger Spielabbruch';
+
+    await sql`
+      INSERT INTO training_doubles (
+        session_id, player_name, opponent_name, game_mode, training_date,
+        d20_hits, d20_darts, d20_quote,
+        d10_hits, d10_darts, d10_quote,
+        d16_hits, d16_darts, d16_quote,
+        d8_hits, d8_darts, d8_quote,
+        d4_hits, d4_darts, d4_quote,
+        total_hits, total_darts, total_quote,
+        best_double, notes, is_winner, is_aborted
+      ) VALUES (
+        ${sessionId}, ${data.player_name}, ${data.opponent_name ?? null}, ${data.game_mode}, ${dateStr},
+        0, 0, 0,
+        0, 0, 0,
+        0, 0, 0,
+        0, 0, 0,
+        0, 0, 0,
+        ${data.total_hits}, ${data.total_darts}, ${quote},
+        'Abgebrochen', ${noteText}, 0, 1
+      )
+    `;
+    revalidatePath('/doppelquote');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Fehler beim Protokollieren des Spielabbruchs:', error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -140,11 +185,14 @@ export async function getLiveDoppelquoteRankingAction(
   filter: 'today' | 'all' = 'today'
 ): Promise<LiveRankingResult> {
   try {
-    const allRows = await sql`
+    const rawRows = await sql`
       SELECT *
       FROM training_doubles
       ORDER BY created_at DESC
     `;
+
+    // Streng reguläre Spiele fürs Ranking filtern: Abgebrochene Spiele werden NICHT im TV-Ranking gewertet!
+    const allRows = rawRows.filter((r: any) => Number(r.is_aborted || 0) === 0);
 
     const todayDateStr = new Date().toISOString().split('T')[0];
 

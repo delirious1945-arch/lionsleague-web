@@ -100,12 +100,20 @@ export default function PlayerClient({
     <div className="space-y-6 animate-fadeIn">
       {/* Top Breadcrumb & Version 2.0 Badge */}
       <div className="flex items-center justify-between text-xs pb-1">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-slate-400 hover:text-cyan-400 transition-colors font-semibold"
-        >
-          <span>←</span> Zurück zum Dashboard
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/?mode=ranking"
+            className="inline-flex items-center gap-1.5 text-slate-300 hover:text-cyan-400 bg-slate-900/80 hover:bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl transition-all font-bold text-xs shadow-sm"
+          >
+            <span>←</span> Zurück zum Dashboard
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-200 text-xs font-semibold px-2 py-1 transition-colors"
+          >
+            <span>🔄</span> Hauptmenü
+          </Link>
+        </div>
         <span className="text-[10px] font-black bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded font-mono">
           VERSION 2.0
         </span>

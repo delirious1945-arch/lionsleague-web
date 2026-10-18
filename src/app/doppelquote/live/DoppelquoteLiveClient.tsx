@@ -148,10 +148,11 @@ export default function DoppelquoteLiveClient({
           <div className="flex items-center gap-3">
             <Link
               href="/doppelquote"
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors text-xs font-bold shadow-sm"
               title="Zurück zum Trainingsspiel"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4 text-cyan-400" />
+              <span>Zurück zum Spiel</span>
             </Link>
 
             <div className="relative w-10 h-10 sm:w-12 sm:h-12 shrink-0">
