@@ -998,7 +998,7 @@ export function computePlayerAnalytics(
   let count26 = 0;
   for (const leg of legsVisits) {
     for (const v of leg) {
-      if (v.score === 26 && v.rest_score > 0) {
+      if (v.score === 26 && v.rest_score > 0 && (v.rest_score + v.score) > 170) {
         count26++;
       }
     }

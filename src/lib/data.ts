@@ -191,6 +191,7 @@ export async function getTop26Players(season = '2026/2027'): Promise<Top26Player
         AND m.player_a_name NOT LIKE '%&%'
         AND m.player_b_name NOT LIKE '%&%'
         AND v.rest_score > 0
+        AND (v.rest_score + v.score) > 170
         AND p.team IN ('A-Team', 'B-Team')
       GROUP BY p.id, p.name, p.team
       ORDER BY count_26 DESC, p.name ASC
