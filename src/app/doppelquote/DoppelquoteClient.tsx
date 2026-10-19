@@ -65,6 +65,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [modalInputValue, setModalInputValue] = useState<string>('');
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSavingEstimate, setIsSavingEstimate] = useState<boolean>(false);
+  const [hasPromptedPlayers, setHasPromptedPlayers] = useState<Record<string, boolean>>({});
 
   // Scores State
   const [scoresP1, setScoresP1] = useState<Record<string, (number | null)[]>>({
@@ -259,15 +260,83 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     };
   }, [isGameActive]);
 
-  // Automatische Abfrage vor dem ersten Start für Spieler 1, falls noch keine Selbsteinschätzung vorliegt
+  // Automatische Abfrage vor dem ersten Start für Spieler 1, falls noch keine Selbsteinschätzung vorliegt (nur beim allerersten Mal)
   useEffect(() => {
-    if (!hasStarted && p1Name && !playerEstimates[p1Name]) {
+    if (!hasStarted && p1Name && !playerEstimates[p1Name] && !hasPromptedPlayers[p1Name]) {
       setModalTargetPlayer(p1Name);
       setModalInputValue('');
       setModalError(null);
       setShowEstimateModal(true);
+      setHasPromptedPlayers(prev => ({ ...prev, [p1Name]: true }));
     }
-  }, [p1Name, hasStarted, playerEstimates]);
+  }, [p1Name, hasStarted, playerEstimates, hasPromptedPlayers]);
+
+  // Numpad-Handler für freie Zahleneingabe (0 bis 9)
+  const handleNumpadPress = (digit: string) => {
+    setModalError(null);
+    setModalInputValue(prev => {
+      // Keine führende 0 erlauben
+      if (!prev && digit === '0') return '';
+      const next = prev + digit;
+      const num = parseInt(next, 10);
+      // Maximal 100% erlauben
+      if (num > 100) return prev;
+      return next;
+    });
+  };
+
+  const handleNumpadBackspace = () => {
+    setModalError(null);
+    setModalInputValue(prev => prev.slice(0, -1));
+  };
+
+  const handleNumpadClear = () => {
+    setModalError(null);
+    setModalInputValue('');
+  };
+
+  const handleConfirmEstimate = async () => {
+    const num = parseInt(modalInputValue, 10);
+    if (isNaN(num) || num < 1 || num > 100) {
+      setModalError('Bitte eine ganze Zahl zwischen 1 und 100 ohne Komma eingeben.');
+      return;
+    }
+    setIsSavingEstimate(true);
+    const res = await updateEstimatedDoubleQuoteAction(modalTargetPlayer, num);
+    setIsSavingEstimate(false);
+    if (res.success) {
+      setPlayerEstimates(prev => ({ ...prev, [modalTargetPlayer]: num }));
+      setShowEstimateModal(false);
+    } else {
+      setModalError(res.error || 'Fehler beim Speichern');
+    }
+  };
+
+  // Tastatur-Bedienung für das Numpad (0-9, Backspace, Delete/C, Enter, Escape)
+  useEffect(() => {
+    if (!showEstimateModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleNumpadPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleNumpadBackspace();
+      } else if (e.key === 'Delete' || e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        handleNumpadClear();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirmEstimate();
+      } else if (e.key === 'Escape' && playerEstimates[modalTargetPlayer]) {
+        e.preventDefault();
+        setShowEstimateModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showEstimateModal, modalInputValue, modalTargetPlayer, playerEstimates]);
+
 
   // Wurf eintragen
   const handleScore = (hits: number) => {
@@ -548,66 +617,35 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       className="max-w-[700px] mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4"
       style={{ overscrollBehaviorY: 'contain' }}
     >
-      {/* EINGABEMASKE: SELBSTEINSCHÄTZUNG DOPPELQUOTE */}
+      {/* EINGABEMASKE: SELBSTEINSCHÄTZUNG DOPPELQUOTE (0 BIS 9 NUMPAD OHNE VORLAGE) */}
       {showEstimateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-gradient-to-b from-slate-900 via-[#0d1829] to-slate-950 border-2 border-sky-400 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl shadow-sky-500/20 text-center space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="bg-gradient-to-b from-slate-900 via-[#0d1829] to-slate-950 border-2 border-sky-400 rounded-3xl p-5 sm:p-7 max-w-sm w-full shadow-2xl shadow-sky-500/25 text-center space-y-4">
             {/* Icon */}
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center text-3xl shadow-lg shadow-sky-500/30">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center text-3xl shadow-lg shadow-sky-500/30">
               🎯
             </div>
 
             {/* Header & Frage */}
             <div>
-              <span className="text-xs uppercase font-black tracking-widest text-sky-400">
+              <span className="text-[11px] uppercase font-black tracking-widest text-sky-400">
                 Selbsteinschätzung · {modalTargetPlayer}
               </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+              <h2 className="text-lg sm:text-xl font-black text-white mt-1 leading-snug">
                 Wie schätzt du dein Doppelquotenniveau ein?
               </h2>
-              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                Bitte hinterlege deinen geschätzten Prozentwert als <strong>ganze Zahl ohne Komma</strong>.
-                Dieser Wert dient als persönliche Zielvorgabe und wird am Ende mit deinem Ergebnis verglichen!
+              <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                Tippe deinen geschätzten Prozentwert (1–100%) über die Zahlen ein. Diese Abfrage erfolgt nur <strong>einmalig beim allerersten Mal</strong>.
               </p>
             </div>
 
-            {/* Input & Schnellauswahl */}
-            <div className="space-y-3">
-              <div className="relative max-w-[200px] mx-auto">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  autoFocus
-                  value={modalInputValue}
-                  onChange={(e) => {
-                    // Keine Kommazahlen erlauben: nur reine Ziffern
-                    const clean = e.target.value.replace(/[^0-9]/g, '');
-                    setModalInputValue(clean);
-                    setModalError(null);
-                  }}
-                  onKeyDown={async (e) => {
-                    if (e.key === 'Enter') {
-                      const num = parseInt(modalInputValue, 10);
-                      if (isNaN(num) || num < 1 || num > 100) {
-                        setModalError('Bitte eine ganze Zahl zwischen 1 und 100 ohne Komma eingeben.');
-                        return;
-                      }
-                      setIsSavingEstimate(true);
-                      const res = await updateEstimatedDoubleQuoteAction(modalTargetPlayer, num);
-                      setIsSavingEstimate(false);
-                      if (res.success) {
-                        setPlayerEstimates(prev => ({ ...prev, [modalTargetPlayer]: num }));
-                        setShowEstimateModal(false);
-                      } else {
-                        setModalError(res.error || 'Fehler beim Speichern');
-                      }
-                    }
-                  }}
-                  placeholder="z. B. 20"
-                  className="w-full bg-slate-950 border-2 border-sky-500/60 focus:border-sky-400 rounded-2xl py-3 px-4 text-center text-3xl font-black text-white focus:outline-none focus:ring-4 focus:ring-sky-500/20 transition-all font-mono shadow-inner"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-2xl font-black text-sky-400">
+            {/* Display der eingegebenen Prozentzahl */}
+            <div className="space-y-1.5">
+              <div className="w-full max-w-[240px] mx-auto bg-slate-950 border-2 border-sky-500/50 rounded-2xl py-3 px-4 flex items-center justify-center gap-1 shadow-inner">
+                <span className="text-4xl sm:text-5xl font-black font-mono tracking-wider text-white">
+                  {modalInputValue || <span className="text-slate-600 font-normal">--</span>}
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-sky-400 font-mono">
                   %
                 </span>
               </div>
@@ -617,35 +655,52 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   {modalError}
                 </div>
               )}
-
-              {/* Schnellauswahl-Pills */}
-              <div className="space-y-1.5 pt-1">
-                <div className="text-[11px] text-slate-400 font-semibold">
-                  Schnellauswahl:
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-1.5">
-                  {[10, 15, 20, 25, 30, 35, 40].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        setModalInputValue(String(val));
-                        setModalError(null);
-                      }}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        modalInputValue === String(val)
-                          ? 'bg-sky-500 text-slate-950 border-sky-300 font-black scale-105 shadow-md shadow-sky-500/30'
-                          : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-white/10'
-                      }`}
-                    >
-                      {val}%
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {/* Buttons */}
+            {/* 0 bis 9 Touch-Numpad (ohne Vorlagen) */}
+            <div className="grid grid-cols-3 gap-2 max-w-[260px] mx-auto select-none touch-manipulation pt-1">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
+                <button
+                  key={digit}
+                  type="button"
+                  onClick={() => handleNumpadPress(String(digit))}
+                  className="h-13 sm:h-14 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:bg-sky-600 active:scale-95 text-white text-2xl font-black border border-white/10 shadow-md hover:border-sky-400/40 transition-all flex items-center justify-center cursor-pointer"
+                >
+                  {digit}
+                </button>
+              ))}
+
+              {/* C (Löschen / Clear) */}
+              <button
+                type="button"
+                onClick={handleNumpadClear}
+                title="Eingabe löschen"
+                className="h-13 sm:h-14 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-600 active:text-white active:scale-95 text-rose-400 text-lg font-black border border-rose-500/30 shadow-md transition-all flex items-center justify-center cursor-pointer"
+              >
+                C
+              </button>
+
+              {/* 0 */}
+              <button
+                type="button"
+                onClick={() => handleNumpadPress('0')}
+                className="h-13 sm:h-14 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:bg-sky-600 active:scale-95 text-white text-2xl font-black border border-white/10 shadow-md hover:border-sky-400/40 transition-all flex items-center justify-center cursor-pointer"
+              >
+                0
+              </button>
+
+              {/* ⌫ (Backspace) */}
+              <button
+                type="button"
+                onClick={handleNumpadBackspace}
+                title="Letzte Ziffer löschen"
+                className="h-13 sm:h-14 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-600 active:text-white active:scale-95 text-amber-400 text-xl font-black border border-amber-500/30 shadow-md transition-all flex items-center justify-center cursor-pointer"
+              >
+                ⌫
+              </button>
+            </div>
+
+            {/* Action Buttons */}
             <div className="pt-2 flex flex-col sm:flex-row gap-2">
               {playerEstimates[modalTargetPlayer] && (
                 <button
@@ -658,24 +713,9 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               )}
               <button
                 type="button"
-                disabled={isSavingEstimate}
-                onClick={async () => {
-                  const num = parseInt(modalInputValue, 10);
-                  if (isNaN(num) || num < 1 || num > 100) {
-                    setModalError('Bitte eine ganze Zahl zwischen 1 und 100 ohne Komma eingeben.');
-                    return;
-                  }
-                  setIsSavingEstimate(true);
-                  const res = await updateEstimatedDoubleQuoteAction(modalTargetPlayer, num);
-                  setIsSavingEstimate(false);
-                  if (res.success) {
-                    setPlayerEstimates(prev => ({ ...prev, [modalTargetPlayer]: num }));
-                    setShowEstimateModal(false);
-                  } else {
-                    setModalError(res.error || 'Fehler beim Speichern');
-                  }
-                }}
-                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-95 text-white font-black text-sm shadow-xl shadow-sky-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                disabled={isSavingEstimate || !modalInputValue}
+                onClick={handleConfirmEstimate}
+                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-95 text-white font-black text-sm shadow-xl shadow-sky-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingEstimate ? (
                   <span>Speichere...</span>
