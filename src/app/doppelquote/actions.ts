@@ -33,6 +33,7 @@ export interface TrainingSessionData {
   notes?: string;
   is_winner?: number;
   is_aborted?: number;
+  estimated_quote?: number | null;
 }
 
 export async function saveTrainingSessionAction(sessions: TrainingSessionData[]) {
@@ -58,7 +59,8 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
             d8_hits = ${s.d8_hits}, d8_darts = ${s.d8_darts}, d8_quote = ${s.d8_quote},
             d4_hits = ${s.d4_hits}, d4_darts = ${s.d4_darts}, d4_quote = ${s.d4_quote},
             total_hits = ${s.total_hits}, total_darts = ${s.total_darts}, total_quote = ${s.total_quote},
-            best_double = ${s.best_double}, notes = ${s.notes ?? ''}, is_winner = ${s.is_winner ?? 0}, is_aborted = ${s.is_aborted ?? 0}
+            best_double = ${s.best_double}, notes = ${s.notes ?? ''}, is_winner = ${s.is_winner ?? 0}, is_aborted = ${s.is_aborted ?? 0},
+            estimated_quote = ${s.estimated_quote ?? null}
           WHERE id = ${existing[0].id}
         `;
       } else {
@@ -71,7 +73,8 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
             d8_hits, d8_darts, d8_quote,
             d4_hits, d4_darts, d4_quote,
             total_hits, total_darts, total_quote,
-            best_double, notes, is_winner, is_aborted
+            best_double, notes, is_winner, is_aborted,
+            estimated_quote
           ) VALUES (
             ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
             ${s.d20_hits}, ${s.d20_darts}, ${s.d20_quote},
@@ -80,7 +83,8 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
             ${s.d8_hits}, ${s.d8_darts}, ${s.d8_quote},
             ${s.d4_hits}, ${s.d4_darts}, ${s.d4_quote},
             ${s.total_hits}, ${s.total_darts}, ${s.total_quote},
-            ${s.best_double}, ${s.notes ?? ''}, ${s.is_winner ?? 0}, ${s.is_aborted ?? 0}
+            ${s.best_double}, ${s.notes ?? ''}, ${s.is_winner ?? 0}, ${s.is_aborted ?? 0},
+            ${s.estimated_quote ?? null}
           )
         `;
       }
@@ -160,11 +164,34 @@ export async function getTrainingHistoryAction(limit: number = 100, specificPlay
       notes: String(r.notes || ''),
       is_winner: Number(r.is_winner || 0),
       is_aborted: Number(r.is_aborted || 0),
+      estimated_quote:
+        r.estimated_quote !== null && r.estimated_quote !== undefined
+          ? Number(r.estimated_quote)
+          : null,
       created_at: String(r.created_at)
     }));
   } catch (error) {
     console.error('Fehler beim Laden der Trainings-Historie:', error);
     return [];
+  }
+}
+
+export async function updateEstimatedDoubleQuoteAction(playerName: string, estimatedQuote: number) {
+  try {
+    const val = Math.round(Number(estimatedQuote));
+    if (isNaN(val) || val < 1 || val > 100) {
+      return { success: false, error: 'Bitte gib eine ganze Zahl zwischen 1 und 100 ein.' };
+    }
+    await sql`
+      UPDATE players
+      SET estimated_double_quote = ${val}
+      WHERE LOWER(name) = LOWER(${playerName})
+    `;
+    revalidatePath('/doppelquote');
+    return { success: true, estimatedQuote: val };
+  } catch (error: any) {
+    console.error('Fehler beim Speichern der Doppelquoten-Einschätzung:', error);
+    return { success: false, error: error.message || 'Fehler beim Speichern' };
   }
 }
 

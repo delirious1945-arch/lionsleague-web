@@ -705,9 +705,16 @@ export default function VerwaltungClient({
                                   <Target size={13} className="text-cyan-400" />
                                   Trefferquote je Doppelfeld (10 Runden à 3 Darts):
                                 </span>
-                                <span className="text-slate-400 text-[10px]">
-                                  Bestes Feld: <strong className="text-amber-300">{s.best_double || '-'}</strong>
-                                </span>
+                                <div className="flex items-center gap-2 text-[10px]">
+                                  {s.estimated_quote !== null && s.estimated_quote !== undefined && (
+                                    <span className="bg-sky-950 border border-sky-500/40 text-sky-300 px-2 py-0.5 rounded-full font-bold">
+                                      🎯 Einschätzung: {s.estimated_quote}%
+                                    </span>
+                                  )}
+                                  <span className="text-slate-400">
+                                    Bestes Feld: <strong className="text-amber-300">{s.best_double || '-'}</strong>
+                                  </span>
+                                </div>
                               </div>
                               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
                                 {TARGETS.map((t) => {

@@ -3,7 +3,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Player } from '@/lib/data';
-import { saveTrainingSessionAction, recordAbortedSessionAction, TrainingSessionData } from './actions';
+import { 
+  saveTrainingSessionAction, 
+  recordAbortedSessionAction, 
+  updateEstimatedDoubleQuoteAction, 
+  TrainingSessionData 
+} from './actions';
 import { UserSession } from '@/app/actions';
 import { 
   Trophy, Users, User, ArrowRight, RotateCcw, Volume2, VolumeX, 
@@ -43,6 +48,23 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
   const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
   const [adminPlayerFilter, setAdminPlayerFilter] = useState<string>('all');
+
+  // Selbsteinschätzung Doppelquote
+  const [playerEstimates, setPlayerEstimates] = useState<Record<string, number | null>>(() => {
+    const init: Record<string, number | null> = {};
+    players.forEach((p) => {
+      if (p.estimated_double_quote !== null && p.estimated_double_quote !== undefined) {
+        init[p.name] = p.estimated_double_quote;
+      }
+    });
+    return init;
+  });
+
+  const [showEstimateModal, setShowEstimateModal] = useState<boolean>(false);
+  const [modalTargetPlayer, setModalTargetPlayer] = useState<string>(defaultP1);
+  const [modalInputValue, setModalInputValue] = useState<string>('');
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [isSavingEstimate, setIsSavingEstimate] = useState<boolean>(false);
 
   // Scores State
   const [scoresP1, setScoresP1] = useState<Record<string, (number | null)[]>>({
@@ -237,8 +259,27 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     };
   }, [isGameActive]);
 
+  // Automatische Abfrage vor dem ersten Start für Spieler 1, falls noch keine Selbsteinschätzung vorliegt
+  useEffect(() => {
+    if (!hasStarted && p1Name && !playerEstimates[p1Name]) {
+      setModalTargetPlayer(p1Name);
+      setModalInputValue('');
+      setModalError(null);
+      setShowEstimateModal(true);
+    }
+  }, [p1Name, hasStarted, playerEstimates]);
+
   // Wurf eintragen
   const handleScore = (hits: number) => {
+    const curPlayer = (gameMode === 'solo' || activePlayer === 1) ? p1Name : p2Name;
+    if (!playerEstimates[curPlayer]) {
+      setModalTargetPlayer(curPlayer);
+      setModalInputValue('');
+      setModalError('Bitte gib zuerst deine geschätzte Doppelquote an, bevor du startest.');
+      setShowEstimateModal(true);
+      return;
+    }
+
     playHitSound(hits);
 
     if (gameMode === 'solo') {
@@ -388,7 +429,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         total_quote: tThrown > 0 ? tHits / tThrown : 0,
         best_double: bestName,
         notes,
-        is_winner: isWin
+        is_winner: isWin,
+        estimated_quote: playerEstimates[pName] ?? null
       };
     };
 
@@ -425,7 +467,15 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   };
 
   const autoSavePrompt = (p1: any, p2: any) => {
-    if (confirm('🎉 Training abgeschlossen! Möchtest du das Ergebnis jetzt direkt in der Cloud-Datenbank (Supabase) speichern?')) {
+    const s1 = calcStats(p1);
+    const est1 = playerEstimates[p1Name];
+    let compMsg = '';
+    if (est1 !== null && est1 !== undefined) {
+      const diff = Number((s1.quote - est1).toFixed(1));
+      const sign = diff >= 0 ? '+' : '';
+      compMsg = `\n\n🎯 Deine Selbsteinschätzung: ${est1}%\nErreichte Doppelquote: ${s1.quote.toFixed(1)}%\nDifferenz: ${sign}${diff}% (${diff >= 0 ? 'Übertroffen! 🌟' : 'Knapp darunter'})`;
+    }
+    if (confirm(`🎉 Training abgeschlossen!${compMsg}\n\nMöchtest du das Ergebnis jetzt direkt in der Cloud-Datenbank (Supabase) speichern?`)) {
       saveSession(p1, p2);
     }
   };
@@ -498,6 +548,149 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       className="max-w-[700px] mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4"
       style={{ overscrollBehaviorY: 'contain' }}
     >
+      {/* EINGABEMASKE: SELBSTEINSCHÄTZUNG DOPPELQUOTE */}
+      {showEstimateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-gradient-to-b from-slate-900 via-[#0d1829] to-slate-950 border-2 border-sky-400 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl shadow-sky-500/20 text-center space-y-5">
+            {/* Icon */}
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center text-3xl shadow-lg shadow-sky-500/30">
+              🎯
+            </div>
+
+            {/* Header & Frage */}
+            <div>
+              <span className="text-xs uppercase font-black tracking-widest text-sky-400">
+                Selbsteinschätzung · {modalTargetPlayer}
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                Wie schätzt du dein Doppelquotenniveau ein?
+              </h2>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                Bitte hinterlege deinen geschätzten Prozentwert als <strong>ganze Zahl ohne Komma</strong>.
+                Dieser Wert dient als persönliche Zielvorgabe und wird am Ende mit deinem Ergebnis verglichen!
+              </p>
+            </div>
+
+            {/* Input & Schnellauswahl */}
+            <div className="space-y-3">
+              <div className="relative max-w-[200px] mx-auto">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoFocus
+                  value={modalInputValue}
+                  onChange={(e) => {
+                    // Keine Kommazahlen erlauben: nur reine Ziffern
+                    const clean = e.target.value.replace(/[^0-9]/g, '');
+                    setModalInputValue(clean);
+                    setModalError(null);
+                  }}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      const num = parseInt(modalInputValue, 10);
+                      if (isNaN(num) || num < 1 || num > 100) {
+                        setModalError('Bitte eine ganze Zahl zwischen 1 und 100 ohne Komma eingeben.');
+                        return;
+                      }
+                      setIsSavingEstimate(true);
+                      const res = await updateEstimatedDoubleQuoteAction(modalTargetPlayer, num);
+                      setIsSavingEstimate(false);
+                      if (res.success) {
+                        setPlayerEstimates(prev => ({ ...prev, [modalTargetPlayer]: num }));
+                        setShowEstimateModal(false);
+                      } else {
+                        setModalError(res.error || 'Fehler beim Speichern');
+                      }
+                    }
+                  }}
+                  placeholder="z. B. 20"
+                  className="w-full bg-slate-950 border-2 border-sky-500/60 focus:border-sky-400 rounded-2xl py-3 px-4 text-center text-3xl font-black text-white focus:outline-none focus:ring-4 focus:ring-sky-500/20 transition-all font-mono shadow-inner"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-2xl font-black text-sky-400">
+                  %
+                </span>
+              </div>
+
+              {modalError && (
+                <div className="text-xs font-bold text-rose-400 animate-fadeIn">
+                  {modalError}
+                </div>
+              )}
+
+              {/* Schnellauswahl-Pills */}
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[11px] text-slate-400 font-semibold">
+                  Schnellauswahl:
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                  {[10, 15, 20, 25, 30, 35, 40].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        setModalInputValue(String(val));
+                        setModalError(null);
+                      }}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        modalInputValue === String(val)
+                          ? 'bg-sky-500 text-slate-950 border-sky-300 font-black scale-105 shadow-md shadow-sky-500/30'
+                          : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-white/10'
+                      }`}
+                    >
+                      {val}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-2">
+              {playerEstimates[modalTargetPlayer] && (
+                <button
+                  type="button"
+                  onClick={() => setShowEstimateModal(false)}
+                  className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Abbrechen
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={isSavingEstimate}
+                onClick={async () => {
+                  const num = parseInt(modalInputValue, 10);
+                  if (isNaN(num) || num < 1 || num > 100) {
+                    setModalError('Bitte eine ganze Zahl zwischen 1 und 100 ohne Komma eingeben.');
+                    return;
+                  }
+                  setIsSavingEstimate(true);
+                  const res = await updateEstimatedDoubleQuoteAction(modalTargetPlayer, num);
+                  setIsSavingEstimate(false);
+                  if (res.success) {
+                    setPlayerEstimates(prev => ({ ...prev, [modalTargetPlayer]: num }));
+                    setShowEstimateModal(false);
+                  } else {
+                    setModalError(res.error || 'Fehler beim Speichern');
+                  }
+                }}
+                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-95 text-white font-black text-sm shadow-xl shadow-sky-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSavingEstimate ? (
+                  <span>Speichere...</span>
+                ) : (
+                  <>
+                    <span>Einschätzung bestätigen & starten</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOP NAVIGATION BREADCRUMB MIT BACK-BUTTON */}
       <div className="flex items-center justify-between text-xs pb-1">
         <button
@@ -664,6 +857,63 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               </select>
             </div>
           )}
+
+          {/* Selbsteinschätzung Doppelquotenniveau */}
+          <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-white/5">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 border border-sky-500/20">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base shrink-0">🎯</span>
+                <div className="min-w-0">
+                  <div className="text-[10px] text-slate-400 font-semibold truncate">{p1Name}</div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span className="text-slate-300">Niveau:</span>
+                    <span className={playerEstimates[p1Name] ? "text-sky-300 font-mono font-black" : "text-amber-400 text-[11px]"}>
+                      {playerEstimates[p1Name] ? `${playerEstimates[p1Name]}%` : 'Nicht festgelegt'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setModalTargetPlayer(p1Name);
+                  setModalInputValue(playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '');
+                  setModalError(null);
+                  setShowEstimateModal(true);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/30 text-sky-300 border border-sky-400/30 text-[11px] font-bold transition-all shrink-0 cursor-pointer"
+              >
+                {playerEstimates[p1Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+              </button>
+            </div>
+
+            {gameMode === '1vs1' && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 border border-amber-500/20">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base shrink-0">🎯</span>
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-slate-400 font-semibold truncate">{p2Name}</div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span className="text-slate-300">Niveau:</span>
+                      <span className={playerEstimates[p2Name] ? "text-amber-300 font-mono font-black" : "text-amber-400 text-[11px]"}>
+                        {playerEstimates[p2Name] ? `${playerEstimates[p2Name]}%` : 'Nicht festgelegt'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setModalTargetPlayer(p2Name);
+                    setModalInputValue(playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '');
+                    setModalError(null);
+                    setShowEstimateModal(true);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 text-[11px] font-bold transition-all shrink-0 cursor-pointer"
+                >
+                  {playerEstimates[p2Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -745,9 +995,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
           {/* Target Hero Display */}
           <div className="bg-gradient-to-b from-slate-950 to-slate-900 border border-white/10 rounded-2xl p-4 text-center relative overflow-hidden">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
-              Aktuelles Doppelfeld
-            </span>
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
+              <span className="uppercase tracking-widest">Aktuelles Doppelfeld</span>
+              {playerEstimates[(gameMode === 'solo' || activePlayer === 1) ? p1Name : p2Name] && (
+                <span className="text-sky-300 bg-sky-950/80 border border-sky-500/30 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm">
+                  🎯 Ziel: {playerEstimates[(gameMode === 'solo' || activePlayer === 1) ? p1Name : p2Name]}%
+                </span>
+              )}
+            </div>
             <div className="text-5xl font-black text-sky-400 tracking-wider my-1 drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]">
               {curTarget}
             </div>
@@ -1173,14 +1428,21 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                       {/* AUFGEKLAPPTE DETAIL-STATISTIK DER DOPPEL */}
                       {isExpanded && !isAborted && (
                         <div className="pt-3 border-t border-white/10 space-y-2.5 animate-fadeIn">
-                          <div className="flex items-center justify-between text-[11px] font-bold">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] font-bold gap-1">
                             <span className="text-cyan-300 flex items-center gap-1.5">
                               <Target size={13} className="text-cyan-400" />
                               Trefferquote je Doppelfeld (10 Runden à 3 Darts):
                             </span>
-                            <span className="text-slate-400 text-[10px]">
-                              Bester Wert: <strong className="text-amber-300">{h.best_double || '-'}</strong>
-                            </span>
+                            <div className="flex items-center gap-2 text-[10px]">
+                              {h.estimated_quote !== null && h.estimated_quote !== undefined && (
+                                <span className="bg-sky-950 border border-sky-500/40 text-sky-300 px-2 py-0.5 rounded-full font-bold">
+                                  🎯 Einschätzung: {h.estimated_quote}%
+                                </span>
+                              )}
+                              <span className="text-slate-400">
+                                Bester Wert: <strong className="text-amber-300">{h.best_double || '-'}</strong>
+                              </span>
+                            </div>
                           </div>
 
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">

@@ -10,6 +10,7 @@ export interface Player {
   name: string;
   team: string;
   role: string;
+  estimated_double_quote?: number | null;
 }
 
 export interface MatchRow {
@@ -606,7 +607,7 @@ export async function getDashboardData(season = '2026/2027') {
 export async function getPlayers(): Promise<Player[]> {
   try {
     const rows = await sql`
-      SELECT id, name, team, role
+      SELECT id, name, team, role, estimated_double_quote
       FROM players
       WHERE team IN ('A-Team', 'B-Team')
         AND name NOT LIKE 'Board %'
@@ -617,6 +618,10 @@ export async function getPlayers(): Promise<Player[]> {
       name: String(r.name),
       team: String(r.team),
       role: String(r.role || 'player'),
+      estimated_double_quote:
+        r.estimated_double_quote !== null && r.estimated_double_quote !== undefined
+          ? Number(r.estimated_double_quote)
+          : null,
     }));
   } catch (err) {
     console.error('Error fetching players:', err);
