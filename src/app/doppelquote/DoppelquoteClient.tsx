@@ -13,8 +13,9 @@ import { UserSession } from '@/app/actions';
 import { 
   Trophy, Users, User, ArrowRight, RotateCcw, Volume2, VolumeX, 
   Save, Download, FileSpreadsheet, FileText, CheckCircle2, AlertCircle,
-  ArrowLeft, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Target
+  ArrowLeft, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Target, Play, Settings
 } from 'lucide-react';
+import { getPlayerPhotoUrl, getPlayerInitials } from '@/lib/avatar';
 
 interface DoppelquoteClientProps {
   players: Player[];
@@ -48,6 +49,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
   const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
   const [adminPlayerFilter, setAdminPlayerFilter] = useState<string>('all');
+  const [isMatchStarted, setIsMatchStarted] = useState<boolean>(false);
+  const [showSetupSettings, setShowSetupSettings] = useState<boolean>(false);
 
   // Selbsteinschätzung Doppelquote
   const [playerEstimates, setPlayerEstimates] = useState<Record<string, number | null>>(() => {
@@ -145,7 +148,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     : (TARGETS.every(t => scoresP1[t].every(s => s !== null)) && TARGETS.every(t => scoresP2[t].every(s => s !== null)))
   );
   const hasStarted = (p1Stats.thrown > 0 || p2Stats.thrown > 0);
-  const isGameActive = hasStarted && !isCompleted;
+  const isPlaying = isMatchStarted || hasStarted;
+  const isGameActive = isPlaying && !isCompleted;
 
   // 1. Lokalen Geräte-Cache beim Start wiederherstellen
   useEffect(() => {
@@ -176,6 +180,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             if (cached.gameSessionId) setGameSessionId(cached.gameSessionId);
             if (cached.isSavedInCloud) setIsSavedInCloud(true);
             setRestoredFromCache(true);
+            setIsMatchStarted(true);
           }
         }
       }
@@ -355,13 +360,39 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         }
       }
 
-      // 3. Wenn alle Spieler versorgt sind: Modal schliessen
+      // 3. Wenn alle Spieler versorgt sind: Modal schliessen & direkt ins Spiel starten
       setShowEstimateModal(false);
       setModalInputValue('');
       setModalError(null);
+      setIsMatchStarted(true);
+      setShowSetupSettings(false);
     } else {
       setModalError(res.error || 'Fehler beim Speichern in der Datenbank');
     }
+  };
+
+  // Expliziter Startbutton-Handler
+  const handleStartMatch = () => {
+    // 1. Prüfen, ob Spieler 1 eine Selbsteinschätzung benötigt
+    if (!playerEstimates[p1Name]) {
+      setModalTargetPlayer(p1Name);
+      setModalInputValue('');
+      setModalError(null);
+      setShowEstimateModal(true);
+      return;
+    }
+    // 2. Bei 1vs1 prüfen, ob Spieler 2 eine Selbsteinschätzung benötigt
+    if (gameMode === '1vs1' && !playerEstimates[p2Name]) {
+      setModalTargetPlayer(p2Name);
+      setModalInputValue('');
+      setModalError(null);
+      setShowEstimateModal(true);
+      return;
+    }
+    // Beide Spieler sind startbereit: Spiel aktivieren
+    setIsMatchStarted(true);
+    setShowSetupSettings(false);
+    playHitSound(1);
   };
 
   // Tastatur-Bedienung für das Numpad (0-9, Backspace, Delete/C, Enter, Escape)
@@ -647,6 +678,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     setSaveStatus(null);
     localStorage.removeItem(CACHE_KEY);
     setRestoredFromCache(false);
+    setIsMatchStarted(false);
+    setShowSetupSettings(false);
     const empty = () => ({
       D20: Array(10).fill(null), D10: Array(10).fill(null),
       D16: Array(10).fill(null), D8:  Array(10).fill(null),
@@ -663,6 +696,11 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const curTargetHits = curShots.reduce<number>((a, b) => a + (b !== null ? b : 0), 0);
   const curTargetThrown = curShots.filter(s => s !== null).length * 3;
   const curTargetPct = curTargetThrown > 0 ? ((curTargetHits / curTargetThrown) * 100).toFixed(1) : '0.0';
+
+  const curPlayerName = (gameMode === 'solo' || activePlayer === 1) ? p1Name : p2Name;
+  const curPlayerPhoto = getPlayerPhotoUrl(curPlayerName);
+  const curPlayerInitials = getPlayerInitials(curPlayerName);
+  const curPlayerEstimate = playerEstimates[curPlayerName];
 
   return (
     <div 
@@ -783,21 +821,41 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         </div>
       )}
 
-      {/* TOP NAVIGATION BREADCRUMB MIT BACK-BUTTON */}
+      {/* SCHLANKE TOP-NAVIGATION (OBERE ANSICHT ENTSCHLACKT) */}
       <div className="flex items-center justify-between text-xs pb-1">
         <button
           onClick={() => handleSafeNavigation('/training')}
-          className="inline-flex items-center gap-1.5 text-slate-300 hover:text-cyan-400 bg-slate-900/80 hover:bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl transition-all font-bold text-xs shadow-sm cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-slate-300 hover:text-cyan-400 bg-slate-900/90 hover:bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl transition-all font-bold text-xs shadow-sm cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
-          <span>← Zurück zur Trainingsauswahl</span>
+          <span>← Trainingsauswahl</span>
         </button>
-        <button
-          onClick={() => handleSafeNavigation('/?mode=ranking')}
-          className="inline-flex items-center gap-1 text-slate-400 hover:text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
-        >
-          <span>🏆</span> Zum Ranking
-        </button>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/doppelquote/live"
+            target="_blank"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-400/30 transition-colors flex items-center gap-1 shadow-sm"
+            title="Live-Board für Beamer/TV"
+          >
+            <span>📺</span>
+            <span className="hidden sm:inline">TV Live-Board</span>
+          </Link>
+          <button
+            onClick={() => handleSafeNavigation('/?mode=ranking')}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
+          >
+            <span>🏆</span>
+            <span className="hidden sm:inline">Ranking</span>
+          </button>
+          <button 
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="w-8 h-8 rounded-xl bg-slate-800/90 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title="Ton an/aus"
+          >
+            {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+          </button>
+        </div>
       </div>
 
       {/* LOKALER GERÄTE-CACHE HINWEIS BANNER */}
@@ -811,222 +869,323 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         </div>
       )}
 
-      {/* HEADER CARD */}
-      <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl backdrop-blur-md flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(37,99,235,0.3)]">
-            🎯
-          </div>
-          <div>
-            <h1 className="text-lg font-black text-white tracking-wide flex items-center gap-2">
-              LionsDarts Trainer
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                Cloud Sync
-              </span>
-            </h1>
-            <p className="text-xs text-slate-400">Doppelquote-Ermittlung (10 Aufnahmen à 3 Darts)</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleSafeNavigation('/training')}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center gap-1 cursor-pointer"
-            title="Zurück zu den Trainingsspielen"
-          >
-            <span>🎯</span>
-            <span className="hidden sm:inline">Trainingsspiele</span>
-          </button>
-          <Link
-            href="/doppelquote/live"
-            target="_blank"
-            className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 transition-colors flex items-center gap-1 shadow-[0_0_15px_rgba(0,212,255,0.2)]"
-            title="Live-Übersicht für TV / Beamer im neuen Tab öffnen"
-          >
-            <span>📺</span>
-            <span className="hidden sm:inline">TV Live-Board</span>
-          </Link>
-          <button
-            onClick={() => handleSafeNavigation('/?mode=ranking')}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
-            title="Zum Ranking-System"
-          >
-            <span>🏆</span>
-            <span className="hidden sm:inline">Ranking</span>
-          </button>
-          <button 
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="w-9 h-9 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
-            title="Ton umschalten"
-          >
-            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-          </button>
-        </div>
-      </div>
-
       {/* SETUP CARD (MODUS & SPIELER) */}
-      <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3.5 shadow-lg flex flex-col gap-3">
-        {/* Modus Switcher */}
-        <div className="grid grid-cols-2 p-1 bg-slate-950/60 rounded-xl border border-white/5">
-          <button
-            onClick={() => {
-              setGameMode('solo');
-              setActivePlayer(1);
-              if (!isBoardUser && userPlayerMatch) {
-                setP1Name(userPlayerMatch.name);
-              }
-            }}
-            className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
-              gameMode === 'solo' 
-                ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <User size={15} /> Solo-Training
-          </button>
-          <button
-            onClick={() => setGameMode('1vs1')}
-            className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
-              gameMode === '1vs1' 
-                ? 'bg-amber-600 text-white shadow-[0_0_12px_rgba(217,119,6,0.5)]' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Users size={15} /> 1 vs 1 Duell
-          </button>
-        </div>
-
-        {/* Spieler Auswahl */}
-        <div className={`grid gap-2.5 ${gameMode === '1vs1' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
-                Spieler 1
-              </label>
-              {gameMode === 'solo' && !isBoardUser && userPlayerMatch && (
-                <span className="text-[10px] text-slate-400 font-semibold">
-                  (Fest mit Account verknüpft)
-                </span>
-              )}
+      {(!isPlaying || showSetupSettings) ? (
+        <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-3.5 animate-fadeIn">
+          <div className="flex items-center justify-between pb-1 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚙️</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-200">
+                Spiel-Setup & Spieler
+              </span>
             </div>
-
-            {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
-              <div className="w-full bg-slate-950/90 border border-blue-500/40 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-white flex items-center justify-between shadow-inner">
-                <span className="flex items-center gap-2 truncate">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                  <span className="truncate">{p1Name}</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-950 border border-sky-800/60 px-2 py-0.5 rounded shrink-0 ml-2">
-                  Angemeldet
-                </span>
-              </div>
-            ) : (
-              <select
-                value={p1Name}
-                onChange={(e) => setP1Name(e.target.value)}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-blue-500"
+            {isPlaying && (
+              <button
+                onClick={() => setShowSetupSettings(false)}
+                className="text-xs font-bold text-slate-400 hover:text-white px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
               >
-                {players.map(p => (
-                  <option key={p.id} value={p.name}>
-                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
-                  </option>
-                ))}
-              </select>
+                ✕ Schließen
+              </button>
             )}
           </div>
 
-          {gameMode === '1vs1' && (
+          {/* Modus Switcher */}
+          <div className="grid grid-cols-2 p-1 bg-slate-950/60 rounded-xl border border-white/5">
+            <button
+              onClick={() => {
+                setGameMode('solo');
+                setActivePlayer(1);
+                if (!isBoardUser && userPlayerMatch) {
+                  setP1Name(userPlayerMatch.name);
+                }
+              }}
+              className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
+                gameMode === 'solo' 
+                  ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]' 
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <User size={15} /> Solo-Training
+            </button>
+            <button
+              onClick={() => setGameMode('1vs1')}
+              className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
+                gameMode === '1vs1' 
+                  ? 'bg-amber-600 text-white shadow-[0_0_12px_rgba(217,119,6,0.5)]' 
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Users size={15} /> 1 vs 1 Duell
+            </button>
+          </div>
+
+          {/* Spieler Auswahl */}
+          <div className={`grid gap-2.5 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             <div>
-              <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
-                Spieler 2 (Gegner)
-              </label>
-              <select
-                value={p2Name}
-                onChange={(e) => setP2Name(e.target.value)}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-amber-500"
-              >
-                {players.map(p => (
-                  <option key={p.id} value={p.name}>
-                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
+                  Spieler 1
+                </label>
+                {gameMode === 'solo' && !isBoardUser && userPlayerMatch && (
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    (Fest mit Account verknüpft)
+                  </span>
+                )}
+              </div>
+
+              {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
+                <div className="w-full bg-slate-950/90 border border-blue-500/40 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-white flex items-center justify-between shadow-inner">
+                  <span className="flex items-center gap-2 truncate">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <span className="truncate">{p1Name}</span>
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-950 border border-sky-800/60 px-2 py-0.5 rounded shrink-0 ml-2">
+                    Angemeldet
+                  </span>
+                </div>
+              ) : (
+                <select
+                  value={p1Name}
+                  onChange={(e) => setP1Name(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-blue-500"
+                >
+                  {players.map(p => (
+                    <option key={p.id} value={p.name}>
+                      {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
-          )}
+
+            {gameMode === '1vs1' && (
+              <div>
+                <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
+                  Spieler 2 (Gegner)
+                </label>
+                <select
+                  value={p2Name}
+                  onChange={(e) => setP2Name(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-amber-500"
+                >
+                  {players.map(p => (
+                    <option key={p.id} value={p.name}>
+                      {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
           {/* Selbsteinschätzung Doppelquotenniveau */}
-          <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-white/5">
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 border border-sky-500/20">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-base shrink-0">🎯</span>
-                <div className="min-w-0">
-                  <div className="text-[10px] text-slate-400 font-semibold truncate">{p1Name}</div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span className="text-slate-300">Niveau:</span>
-                    <span className={playerEstimates[p1Name] ? "text-sky-300 font-mono font-black" : "text-amber-400 text-[11px]"}>
+          <div className="space-y-2 pt-2 border-t border-white/5">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Zielvorgabe (Selbsteinschätzung)
+            </div>
+            <div className={`grid gap-2 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-sky-500/25">
+                <div className="min-w-0 pr-2">
+                  <div className="text-xs font-bold text-white truncate">{p1Name}</div>
+                  <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5">
+                    <span>Niveau:</span>
+                    <span className={playerEstimates[p1Name] ? "text-sky-300 font-mono font-black text-xs" : "text-amber-400 font-bold"}>
                       {playerEstimates[p1Name] ? `${playerEstimates[p1Name]}%` : 'Nicht festgelegt'}
                     </span>
                   </div>
                 </div>
+                <button
+                  onClick={() => {
+                    setModalTargetPlayer(p1Name);
+                    setModalInputValue(playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '');
+                    setModalError(null);
+                    setShowEstimateModal(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/35 text-sky-300 border border-sky-400/40 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                >
+                  {playerEstimates[p1Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setModalTargetPlayer(p1Name);
-                  setModalInputValue(playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '');
-                  setModalError(null);
-                  setShowEstimateModal(true);
-                }}
-                className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/30 text-sky-300 border border-sky-400/30 text-[11px] font-bold transition-all shrink-0 cursor-pointer"
-              >
-                {playerEstimates[p1Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
-              </button>
-            </div>
 
-            {gameMode === '1vs1' && (
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 border border-amber-500/20">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-base shrink-0">🎯</span>
-                  <div className="min-w-0">
-                    <div className="text-[10px] text-slate-400 font-semibold truncate">{p2Name}</div>
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span className="text-slate-300">Niveau:</span>
-                      <span className={playerEstimates[p2Name] ? "text-amber-300 font-mono font-black" : "text-amber-400 text-[11px]"}>
+              {gameMode === '1vs1' && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-amber-500/25">
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-bold text-white truncate">{p2Name}</div>
+                    <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5">
+                      <span>Niveau:</span>
+                      <span className={playerEstimates[p2Name] ? "text-amber-300 font-mono font-black text-xs" : "text-amber-400 font-bold"}>
                         {playerEstimates[p2Name] ? `${playerEstimates[p2Name]}%` : 'Nicht festgelegt'}
                       </span>
                     </div>
                   </div>
+                  <button
+                    onClick={() => {
+                      setModalTargetPlayer(p2Name);
+                      setModalInputValue(playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '');
+                      setModalError(null);
+                      setShowEstimateModal(true);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-400/40 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                  >
+                    {playerEstimates[p2Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setModalTargetPlayer(p2Name);
-                    setModalInputValue(playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '');
-                    setModalError(null);
-                    setShowEstimateModal(true);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 text-[11px] font-bold transition-all shrink-0 cursor-pointer"
-                >
-                  {playerEstimates[p2Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
-                </button>
-              </div>
+              )}
+            </div>
+          </div>
+
+          {/* START-BUTTON */}
+          <div className="pt-2">
+            {!isPlaying ? (
+              <button
+                type="button"
+                onClick={handleStartMatch}
+                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 active:scale-95 text-slate-950 font-black text-lg sm:text-xl shadow-[0_0_25px_rgba(16,185,129,0.35)] transition-all flex items-center justify-center gap-3 cursor-pointer select-none"
+              >
+                <Play className="w-6 h-6 fill-current" />
+                <span>Spiel starten</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowSetupSettings(false)}
+                className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>✓ Einstellungen schließen & weiterspielen</span>
+              </button>
             )}
           </div>
         </div>
-      </div>
+      ) : (
+        /* WÄHREND DES SPIELS: SCHLANKER SETUP-EXPAND BUTTON */
+        <div className="flex items-center justify-between px-1">
+          <button
+            onClick={() => setShowSetupSettings(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+          >
+            <Settings size={14} className="text-cyan-400" />
+            <span>Setup anpassen ({gameMode === 'solo' ? 'Solo' : '1 vs 1'})</span>
+          </button>
+          <div className="text-[11px] font-semibold text-slate-400">
+            Doppelquote-Training
+          </div>
+        </div>
+      )}
 
-      {/* 1 VS 1 LIVE STATUS BANNER */}
-      {gameMode === '1vs1' && (
-        <div className={`p-3 rounded-xl border flex items-center justify-between font-bold text-sm shadow-md transition-all ${
-          activePlayer === 1 
-            ? 'bg-blue-950/80 border-blue-500/50 text-sky-200' 
-            : 'bg-amber-950/80 border-amber-500/50 text-amber-200'
+      {/* GROSSE HERO-ANZEIGE: WER IST AM ZUG */}
+      {isPlaying && (
+        <div className={`p-4 sm:p-5 rounded-3xl border-2 shadow-2xl transition-all duration-300 relative overflow-hidden ${
+          (gameMode === 'solo' || activePlayer === 1)
+            ? 'bg-gradient-to-r from-blue-950 via-[#0a1832] to-slate-950 border-sky-400/80 shadow-[0_0_30px_rgba(56,189,248,0.2)]'
+            : 'bg-gradient-to-r from-amber-950 via-[#261706] to-slate-950 border-amber-400/80 shadow-[0_0_30px_rgba(245,158,11,0.2)]'
         }`}>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] px-2 py-0.5 rounded bg-black/40 uppercase">Am Wurf</span>
-            <span className="text-base text-white">{activePlayer === 1 ? p1Name : p2Name}</span>
+          {/* Ambient Glow */}
+          <div className={`absolute -right-10 -bottom-10 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20 ${
+            (gameMode === 'solo' || activePlayer === 1) ? 'bg-sky-400' : 'bg-amber-400'
+          }`} />
+
+          <div className="flex items-center justify-between gap-3 relative z-10">
+            <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
+              {/* Foto / Initialen mit Live Pulse */}
+              <div className="relative shrink-0">
+                {curPlayerPhoto ? (
+                  <img
+                    src={curPlayerPhoto}
+                    alt={curPlayerName}
+                    className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 shadow-xl ${
+                      (gameMode === 'solo' || activePlayer === 1) ? 'border-sky-400 ring-4 ring-sky-500/20' : 'border-amber-400 ring-4 ring-amber-500/20'
+                    }`}
+                  />
+                ) : (
+                  <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-2xl sm:text-3xl font-black shadow-xl ${
+                    (gameMode === 'solo' || activePlayer === 1)
+                      ? 'bg-sky-500/20 border-sky-400 text-sky-300 ring-4 ring-sky-500/20'
+                      : 'bg-amber-500/20 border-amber-400 text-amber-300 ring-4 ring-amber-500/20'
+                  }`}>
+                    {curPlayerInitials}
+                  </div>
+                )}
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    (gameMode === 'solo' || activePlayer === 1) ? 'bg-sky-400' : 'bg-amber-400'
+                  }`} />
+                  <span className={`relative inline-flex rounded-full h-4 w-4 border-2 border-slate-950 ${
+                    (gameMode === 'solo' || activePlayer === 1) ? 'bg-sky-400' : 'bg-amber-400'
+                  }`} />
+                </span>
+              </div>
+
+              {/* Spieler Name & Badge */}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                    (gameMode === 'solo' || activePlayer === 1)
+                      ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50 shadow-sm'
+                      : 'bg-amber-500/25 text-amber-300 border border-amber-400/50 shadow-sm'
+                  }`}>
+                    🎯 JETZT AM WURF {gameMode === '1vs1' ? `· SPIELER ${activePlayer}` : ''}
+                  </span>
+                  {curPlayerEstimate && (
+                    <span className="text-[10px] font-bold text-slate-300 bg-black/40 px-2 py-0.5 rounded-md border border-white/10">
+                      Ziel: {curPlayerEstimate}%
+                    </span>
+                  )}
+                </div>
+                <div className="text-2xl sm:text-4xl font-black text-white tracking-wide truncate mt-1">
+                  {curPlayerName}
+                </div>
+              </div>
+            </div>
+
+            {/* Aufnahme Zähler */}
+            <div className="shrink-0 text-right">
+              <div className="text-[10px] sm:text-xs uppercase font-bold text-slate-400 tracking-wider">
+                Aufnahme
+              </div>
+              <div className="text-2xl sm:text-4xl font-black font-mono text-cyan-300">
+                {currentShotIndex + 1}
+                <span className="text-xs sm:text-sm text-slate-400 font-sans font-bold"> / 10</span>
+              </div>
+            </div>
           </div>
-          <div className="text-xs opacity-90">
-            Aufnahme {currentShotIndex + 1} / 10
-          </div>
+
+          {/* 1 vs 1 Duell Score-Vergleich */}
+          {gameMode === '1vs1' && (
+            <div className="mt-3.5 pt-3 border-t border-white/10 grid grid-cols-2 gap-2 text-xs">
+              <div className={`p-2 sm:p-2.5 rounded-xl transition-all flex items-center justify-between ${
+                activePlayer === 1 
+                  ? 'bg-sky-500/20 border-2 border-sky-400/80 text-white font-black shadow-md' 
+                  : 'bg-slate-900/60 border border-white/5 text-slate-400 font-semibold'
+              }`}>
+                <div className="truncate flex items-center gap-1.5">
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                    activePlayer === 1 ? 'bg-sky-400 text-slate-950' : 'bg-black/40 text-sky-300'
+                  }`}>P1</span>
+                  <span className="truncate">{p1Name}</span>
+                </div>
+                <div className="font-mono text-sky-300 text-xs shrink-0 ml-1">
+                  {p1Stats.hits} Tr. ({p1Stats.quote.toFixed(0)}%)
+                </div>
+              </div>
+
+              <div className={`p-2 sm:p-2.5 rounded-xl transition-all flex items-center justify-between ${
+                activePlayer === 2 
+                  ? 'bg-amber-500/20 border-2 border-amber-400/80 text-white font-black shadow-md' 
+                  : 'bg-slate-900/60 border border-white/5 text-slate-400 font-semibold'
+              }`}>
+                <div className="truncate flex items-center gap-1.5">
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                    activePlayer === 2 ? 'bg-amber-400 text-slate-950' : 'bg-black/40 text-amber-300'
+                  }`}>P2</span>
+                  <span className="truncate">{p2Name}</span>
+                </div>
+                <div className="font-mono text-amber-300 text-xs shrink-0 ml-1">
+                  {p2Stats.hits} Tr. ({p2Stats.quote.toFixed(0)}%)
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
