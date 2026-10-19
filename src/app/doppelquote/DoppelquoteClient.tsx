@@ -260,16 +260,48 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     };
   }, [isGameActive]);
 
-  // Automatische Abfrage vor dem ersten Start für Spieler 1, falls noch keine Selbsteinschätzung vorliegt (nur beim allerersten Mal)
+  // Automatische Synchronisation mit Server-Props
   useEffect(() => {
-    if (!hasStarted && p1Name && !playerEstimates[p1Name] && !hasPromptedPlayers[p1Name]) {
-      setModalTargetPlayer(p1Name);
-      setModalInputValue('');
-      setModalError(null);
-      setShowEstimateModal(true);
-      setHasPromptedPlayers(prev => ({ ...prev, [p1Name]: true }));
+    setPlayerEstimates(prev => {
+      const updated = { ...prev };
+      players.forEach((p) => {
+        if (p.estimated_double_quote !== null && p.estimated_double_quote !== undefined) {
+          if (updated[p.name] === undefined || updated[p.name] === null) {
+            updated[p.name] = p.estimated_double_quote;
+          }
+        }
+      });
+      return updated;
+    });
+  }, [players]);
+
+  // Automatische Abfrage vor dem ersten Start für Spieler ohne hinterlegte Selbsteinschätzung (Solo & 1vs1)
+  useEffect(() => {
+    if (hasStarted) return;
+
+    // 1. Spieler 1 prüfen
+    if (p1Name && !playerEstimates[p1Name]) {
+      if (!hasPromptedPlayers[p1Name]) {
+        setModalTargetPlayer(p1Name);
+        setModalInputValue('');
+        setModalError(null);
+        setShowEstimateModal(true);
+        setHasPromptedPlayers(prev => ({ ...prev, [p1Name]: true }));
+      }
+      return;
     }
-  }, [p1Name, hasStarted, playerEstimates, hasPromptedPlayers]);
+
+    // 2. Bei 1vs1: Spieler 2 prüfen (sobald Spieler 1 erledigt ist und Modal nicht offen ist)
+    if (gameMode === '1vs1' && p2Name && !playerEstimates[p2Name]) {
+      if (!hasPromptedPlayers[p2Name] && !showEstimateModal) {
+        setModalTargetPlayer(p2Name);
+        setModalInputValue('');
+        setModalError(null);
+        setShowEstimateModal(true);
+        setHasPromptedPlayers(prev => ({ ...prev, [p2Name]: true }));
+      }
+    }
+  }, [p1Name, p2Name, gameMode, hasStarted, playerEstimates, hasPromptedPlayers, showEstimateModal]);
 
   // Numpad-Handler für freie Zahleneingabe (0 bis 9)
   const handleNumpadPress = (digit: string) => {
@@ -302,13 +334,33 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       return;
     }
     setIsSavingEstimate(true);
-    const res = await updateEstimatedDoubleQuoteAction(modalTargetPlayer, num);
+    const targetPlayer = modalTargetPlayer;
+    const res = await updateEstimatedDoubleQuoteAction(targetPlayer, num);
     setIsSavingEstimate(false);
     if (res.success) {
-      setPlayerEstimates(prev => ({ ...prev, [modalTargetPlayer]: num }));
+      // 1. Lokalen State und Server-Props sofort synchronisieren
+      setPlayerEstimates(prev => ({ ...prev, [targetPlayer]: num }));
+      router.refresh();
+
+      // 2. Bei 1vs1 prüfen: Braucht der andere Spieler auch noch eine Selbsteinschätzung?
+      if (gameMode === '1vs1') {
+        const otherPlayer = targetPlayer === p1Name ? p2Name : p1Name;
+        if (otherPlayer && !playerEstimates[otherPlayer]) {
+          // Nahtlos direkt für Spieler 2 öffnen
+          setModalTargetPlayer(otherPlayer);
+          setModalInputValue('');
+          setModalError(null);
+          setHasPromptedPlayers(prev => ({ ...prev, [otherPlayer]: true }));
+          return;
+        }
+      }
+
+      // 3. Wenn alle Spieler versorgt sind: Modal schliessen
       setShowEstimateModal(false);
+      setModalInputValue('');
+      setModalError(null);
     } else {
-      setModalError(res.error || 'Fehler beim Speichern');
+      setModalError(res.error || 'Fehler beim Speichern in der Datenbank');
     }
   };
 
@@ -629,13 +681,13 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             {/* Header & Frage */}
             <div>
               <span className="text-[11px] uppercase font-black tracking-widest text-sky-400">
-                Selbsteinschätzung · {modalTargetPlayer}
+                Selbsteinschätzung · {modalTargetPlayer} {gameMode === '1vs1' ? (modalTargetPlayer === p1Name ? '(Spieler 1)' : '(Spieler 2)') : ''}
               </span>
               <h2 className="text-lg sm:text-xl font-black text-white mt-1 leading-snug">
                 Wie schätzt du dein Doppelquotenniveau ein?
               </h2>
               <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-                Tippe deinen geschätzten Prozentwert (1–100%) über die Zahlen ein. Diese Abfrage erfolgt nur <strong>einmalig beim allerersten Mal</strong>.
+                Tippe deinen geschätzten Prozentwert (1–100%) über das Zahlenfeld ein. Diese Abfrage erfolgt nur <strong>einmalig</strong> und wird fest in der Datenbank gespeichert!
               </p>
             </div>
 

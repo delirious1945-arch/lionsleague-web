@@ -182,16 +182,32 @@ export async function updateEstimatedDoubleQuoteAction(playerName: string, estim
     if (isNaN(val) || val < 1 || val > 100) {
       return { success: false, error: 'Bitte gib eine ganze Zahl zwischen 1 und 100 ein.' };
     }
-    await sql`
+    const cleanName = playerName.trim();
+    let result = await sql`
       UPDATE players
       SET estimated_double_quote = ${val}
-      WHERE LOWER(name) = LOWER(${playerName})
+      WHERE LOWER(TRIM(name)) = LOWER(${cleanName})
+      RETURNING id, name, estimated_double_quote
     `;
+
+    if (result.length === 0) {
+      // Fallback: ILIKE Suche falls minimale Unterschiede existieren
+      result = await sql`
+        UPDATE players
+        SET estimated_double_quote = ${val}
+        WHERE name ILIKE ${cleanName}
+        RETURNING id, name, estimated_double_quote
+      `;
+    }
+
     revalidatePath('/doppelquote');
-    return { success: true, estimatedQuote: val };
+    revalidatePath('/doppelquote/live');
+    revalidatePath('/training');
+    revalidatePath('/verwaltung');
+    return { success: true, estimatedQuote: val, affectedPlayer: result[0]?.name || cleanName };
   } catch (error: any) {
-    console.error('Fehler beim Speichern der Doppelquoten-Einschätzung:', error);
-    return { success: false, error: error.message || 'Fehler beim Speichern' };
+    console.error('Fehler beim Speichern der Doppelquoten-Einschätzung in Supabase:', error);
+    return { success: false, error: error.message || 'Fehler beim Speichern in der Datenbank' };
   }
 }
 
