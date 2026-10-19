@@ -154,6 +154,7 @@ export async function recordAbortedSessionAction(data: {
 }
 
 export interface PlayerOverallRank {
+  session_id?: string;
   player_name: string;
   sessions_count: number;
   total_hits: number;
@@ -167,6 +168,10 @@ export interface PlayerOverallRank {
   d16_quote: number;
   d8_quote: number;
   d4_quote: number;
+  attempt_nr?: number;
+  attempt_label?: string;
+  time_label?: string;
+  opponent_name?: string | null;
 }
 
 export interface TargetLeader {
@@ -219,78 +224,214 @@ export async function getLiveDoppelquoteRankingAction(
     // Wenn heute gewählt ist, aber noch keine Daten existieren, Fallback auf alle oder leere Menge
     const activeRows = filter === 'today' ? todayRows : allRows;
 
-    // Aggregation pro Spieler
-    const playerMap = new Map<
-      string,
-      {
-        player_name: string;
-        sessions_count: number;
-        total_hits: number;
-        total_darts: number;
-        best_session_quote: number;
-        d20_hits: number;
-        d20_darts: number;
-        d10_hits: number;
-        d10_darts: number;
-        d16_hits: number;
-        d16_darts: number;
-        d8_hits: number;
-        d8_darts: number;
-        d4_hits: number;
-        d4_darts: number;
-      }
-    >();
+    let overallRanking: PlayerOverallRank[] = [];
+    let targetRankings = {
+      D20: [] as TargetLeader[],
+      D10: [] as TargetLeader[],
+      D16: [] as TargetLeader[],
+      D8: [] as TargetLeader[],
+      D4: [] as TargetLeader[],
+    };
 
-    for (const r of activeRows) {
-      const pName = String(r.player_name || '').trim();
-      if (!pName) continue;
+    if (filter === 'today') {
+      // HEUTIGES TRAINING: Jedes gespielte Spiel einzeln eintragen (nicht kumulieren!)
+      const chronoSorted = [...todayRows].sort(
+        (a, b) => new Date(a.created_at || a.training_date).getTime() - new Date(b.created_at || b.training_date).getTime()
+      );
 
-      if (!playerMap.has(pName)) {
-        playerMap.set(pName, {
+      const playerAttemptCounter = new Map<string, number>();
+
+      for (const r of chronoSorted) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+
+        const attemptNr = (playerAttemptCounter.get(pName) || 0) + 1;
+        playerAttemptCounter.set(pName, attemptNr);
+
+        const darts = Number(r.total_darts || 0);
+        const hits = Number(r.total_hits || 0);
+        const quote_percent = darts > 0 ? (hits / darts) * 100 : 0;
+
+        const d20_darts = Number(r.d20_darts || 0);
+        const d20_hits = Number(r.d20_hits || 0);
+        const d20_quote = d20_darts > 0 ? (d20_hits / d20_darts) * 100 : 0;
+
+        const d10_darts = Number(r.d10_darts || 0);
+        const d10_hits = Number(r.d10_hits || 0);
+        const d10_quote = d10_darts > 0 ? (d10_hits / d10_darts) * 100 : 0;
+
+        const d16_darts = Number(r.d16_darts || 0);
+        const d16_hits = Number(r.d16_hits || 0);
+        const d16_quote = d16_darts > 0 ? (d16_hits / d16_darts) * 100 : 0;
+
+        const d8_darts = Number(r.d8_darts || 0);
+        const d8_hits = Number(r.d8_hits || 0);
+        const d8_quote = d8_darts > 0 ? (d8_hits / d8_darts) * 100 : 0;
+
+        const d4_darts = Number(r.d4_darts || 0);
+        const d4_hits = Number(r.d4_hits || 0);
+        const d4_quote = d4_darts > 0 ? (d4_hits / d4_darts) * 100 : 0;
+
+        const targetQuotes = [
+          { name: 'D20', q: d20_quote },
+          { name: 'D10', q: d10_quote },
+          { name: 'D16', q: d16_quote },
+          { name: 'D8', q: d8_quote },
+          { name: 'D4', q: d4_quote },
+        ];
+        targetQuotes.sort((a, b) => b.q - a.q);
+        const bestDoubleName =
+          targetQuotes[0].q > 0
+            ? `${targetQuotes[0].name} (${targetQuotes[0].q.toFixed(1)}%)`
+            : (r.best_double || '-');
+
+        const timeLabel = r.created_at
+          ? new Date(r.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr'
+          : '';
+
+        overallRanking.push({
+          session_id: String(r.session_id || r.id || ''),
           player_name: pName,
-          sessions_count: 0,
-          total_hits: 0,
-          total_darts: 0,
-          best_session_quote: 0,
-          d20_hits: 0,
-          d20_darts: 0,
-          d10_hits: 0,
-          d10_darts: 0,
-          d16_hits: 0,
-          d16_darts: 0,
-          d8_hits: 0,
-          d8_darts: 0,
-          d4_hits: 0,
-          d4_darts: 0,
+          sessions_count: 1,
+          attempt_nr: attemptNr,
+          attempt_label: `Durchgang #${attemptNr}`,
+          time_label: timeLabel,
+          total_hits: hits,
+          total_darts: darts,
+          quote_percent,
+          best_session_quote: quote_percent,
+          best_double: bestDoubleName,
+          rank: 0,
+          d20_quote,
+          d10_quote,
+          d16_quote,
+          d8_quote,
+          d4_quote,
+          opponent_name: r.opponent_name ? String(r.opponent_name) : null,
         });
       }
 
-      const p = playerMap.get(pName)!;
-      p.sessions_count += 1;
-      p.total_hits += Number(r.total_hits || 0);
-      p.total_darts += Number(r.total_darts || 0);
+      // Ranking nach Quote absteigend sortieren
+      overallRanking.sort((a, b) => {
+        if (b.quote_percent !== a.quote_percent) {
+          return b.quote_percent - a.quote_percent;
+        }
+        return b.total_hits - a.total_hits;
+      });
+      overallRanking.forEach((p, idx) => {
+        p.rank = idx + 1;
+      });
 
-      // Quote in Prozent (r.total_quote ist 0.0 bis 1.0)
-      const sessionQuote = Number(r.total_quote || 0) * 100;
-      if (sessionQuote > p.best_session_quote) {
-        p.best_session_quote = sessionQuote;
+      // Target Rankings für Heute: Aus allen einzelnen Sessions
+      const buildTargetRankingToday = (
+        target: 'D20' | 'D10' | 'D16' | 'D8' | 'D4',
+        quoteKey: 'd20_quote' | 'd10_quote' | 'd16_quote' | 'd8_quote' | 'd4_quote',
+        hitsKey: 'd20_hits' | 'd10_hits' | 'd16_hits' | 'd8_hits' | 'd4_hits',
+        dartsKey: 'd20_darts' | 'd10_darts' | 'd16_darts' | 'd8_darts' | 'd4_darts'
+      ): TargetLeader[] => {
+        const list: TargetLeader[] = [];
+        for (const s of overallRanking) {
+          const r = todayRows.find(
+            (x) => String(x.session_id || x.id) === s.session_id && x.player_name === s.player_name
+          );
+          if (r) {
+            const d = Number(r[dartsKey] || 0);
+            const h = Number(r[hitsKey] || 0);
+            if (d > 0) {
+              list.push({
+                target,
+                player_name: `${s.player_name} (#${s.attempt_nr})`,
+                quote_percent: s[quoteKey],
+                hits: h,
+                darts: d,
+              });
+            }
+          }
+        }
+        list.sort((a, b) => {
+          if (b.quote_percent !== a.quote_percent) return b.quote_percent - a.quote_percent;
+          return b.hits - a.hits;
+        });
+        return list;
+      };
+
+      targetRankings = {
+        D20: buildTargetRankingToday('D20', 'd20_quote', 'd20_hits', 'd20_darts'),
+        D10: buildTargetRankingToday('D10', 'd10_quote', 'd10_hits', 'd10_darts'),
+        D16: buildTargetRankingToday('D16', 'd16_quote', 'd16_hits', 'd16_darts'),
+        D8: buildTargetRankingToday('D8', 'd8_quote', 'd8_hits', 'd8_darts'),
+        D4: buildTargetRankingToday('D4', 'd4_quote', 'd4_hits', 'd4_darts'),
+      };
+    } else {
+      // GESAMT-HISTORIE: Kumulierte Aggregation pro Spieler
+      const playerMap = new Map<
+        string,
+        {
+          player_name: string;
+          sessions_count: number;
+          total_hits: number;
+          total_darts: number;
+          best_session_quote: number;
+          d20_hits: number;
+          d20_darts: number;
+          d10_hits: number;
+          d10_darts: number;
+          d16_hits: number;
+          d16_darts: number;
+          d8_hits: number;
+          d8_darts: number;
+          d4_hits: number;
+          d4_darts: number;
+        }
+      >();
+
+      for (const r of allRows) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+
+        if (!playerMap.has(pName)) {
+          playerMap.set(pName, {
+            player_name: pName,
+            sessions_count: 0,
+            total_hits: 0,
+            total_darts: 0,
+            best_session_quote: 0,
+            d20_hits: 0,
+            d20_darts: 0,
+            d10_hits: 0,
+            d10_darts: 0,
+            d16_hits: 0,
+            d16_darts: 0,
+            d8_hits: 0,
+            d8_darts: 0,
+            d4_hits: 0,
+            d4_darts: 0,
+          });
+        }
+
+        const p = playerMap.get(pName)!;
+        p.sessions_count += 1;
+        p.total_hits += Number(r.total_hits || 0);
+        p.total_darts += Number(r.total_darts || 0);
+
+        const sessionQuote = Number(r.total_quote || 0) * 100;
+        if (sessionQuote > p.best_session_quote) {
+          p.best_session_quote = sessionQuote;
+        }
+
+        p.d20_hits += Number(r.d20_hits || 0);
+        p.d20_darts += Number(r.d20_darts || 0);
+        p.d10_hits += Number(r.d10_hits || 0);
+        p.d10_darts += Number(r.d10_darts || 0);
+        p.d16_hits += Number(r.d16_hits || 0);
+        p.d16_darts += Number(r.d16_darts || 0);
+        p.d8_hits += Number(r.d8_hits || 0);
+        p.d8_darts += Number(r.d8_darts || 0);
+        p.d4_hits += Number(r.d4_hits || 0);
+        p.d4_darts += Number(r.d4_darts || 0);
       }
 
-      p.d20_hits += Number(r.d20_hits || 0);
-      p.d20_darts += Number(r.d20_darts || 0);
-      p.d10_hits += Number(r.d10_hits || 0);
-      p.d10_darts += Number(r.d10_darts || 0);
-      p.d16_hits += Number(r.d16_hits || 0);
-      p.d16_darts += Number(r.d16_darts || 0);
-      p.d8_hits += Number(r.d8_hits || 0);
-      p.d8_darts += Number(r.d8_darts || 0);
-      p.d4_hits += Number(r.d4_hits || 0);
-      p.d4_darts += Number(r.d4_darts || 0);
-    }
-
-    // Gesamtranking berechnen
-    const overallRanking: PlayerOverallRank[] = Array.from(playerMap.values()).map(
-      (p) => {
+      overallRanking = Array.from(playerMap.values()).map((p) => {
         const quote_percent =
           p.total_darts > 0 ? (p.total_hits / p.total_darts) * 100 : 0;
 
@@ -305,7 +446,6 @@ export async function getLiveDoppelquoteRankingAction(
         const d4_quote =
           p.d4_darts > 0 ? (p.d4_hits / p.d4_darts) * 100 : 0;
 
-        // Ermittlung der besten Zahl
         const targetQuotes = [
           { name: 'D20', q: d20_quote },
           { name: 'D10', q: d10_quote },
@@ -334,59 +474,57 @@ export async function getLiveDoppelquoteRankingAction(
           d8_quote,
           d4_quote,
         };
-      }
-    );
+      });
 
-    // Sortierung nach Gesamtquote absteigend, bei Gleichstand Treffer
-    overallRanking.sort((a, b) => {
-      if (b.quote_percent !== a.quote_percent) {
-        return b.quote_percent - a.quote_percent;
-      }
-      return b.total_hits - a.total_hits;
-    });
-
-    overallRanking.forEach((p, idx) => {
-      p.rank = idx + 1;
-    });
-
-    // Ranking pro Zahl / Doppel (D20, D10, D16, D8, D4)
-    const buildTargetRanking = (
-      target: 'D20' | 'D10' | 'D16' | 'D8' | 'D4',
-      quoteKey: 'd20_quote' | 'd10_quote' | 'd16_quote' | 'd8_quote' | 'd4_quote',
-      hitsKey: 'd20_hits' | 'd10_hits' | 'd16_hits' | 'd8_hits' | 'd4_hits',
-      dartsKey: 'd20_darts' | 'd10_darts' | 'd16_darts' | 'd8_darts' | 'd4_darts'
-    ): TargetLeader[] => {
-      const list: TargetLeader[] = [];
-      for (const p of playerMap.values()) {
-        const darts = p[dartsKey];
-        if (darts > 0) {
-          const hits = p[hitsKey];
-          const quote_percent = (hits / darts) * 100;
-          list.push({
-            target,
-            player_name: p.player_name,
-            quote_percent,
-            hits,
-            darts,
-          });
-        }
-      }
-      list.sort((a, b) => {
+      overallRanking.sort((a, b) => {
         if (b.quote_percent !== a.quote_percent) {
           return b.quote_percent - a.quote_percent;
         }
-        return b.hits - a.hits;
+        return b.total_hits - a.total_hits;
       });
-      return list;
-    };
 
-    const targetRankings = {
-      D20: buildTargetRanking('D20', 'd20_quote', 'd20_hits', 'd20_darts'),
-      D10: buildTargetRanking('D10', 'd10_quote', 'd10_hits', 'd10_darts'),
-      D16: buildTargetRanking('D16', 'd16_quote', 'd16_hits', 'd16_darts'),
-      D8: buildTargetRanking('D8', 'd8_quote', 'd8_hits', 'd8_darts'),
-      D4: buildTargetRanking('D4', 'd4_quote', 'd4_hits', 'd4_darts'),
-    };
+      overallRanking.forEach((p, idx) => {
+        p.rank = idx + 1;
+      });
+
+      const buildTargetRankingAll = (
+        target: 'D20' | 'D10' | 'D16' | 'D8' | 'D4',
+        quoteKey: 'd20_quote' | 'd10_quote' | 'd16_quote' | 'd8_quote' | 'd4_quote',
+        hitsKey: 'd20_hits' | 'd10_hits' | 'd16_hits' | 'd8_hits' | 'd4_hits',
+        dartsKey: 'd20_darts' | 'd10_darts' | 'd16_darts' | 'd8_darts' | 'd4_darts'
+      ): TargetLeader[] => {
+        const list: TargetLeader[] = [];
+        for (const p of playerMap.values()) {
+          const darts = p[dartsKey];
+          if (darts > 0) {
+            const hits = p[hitsKey];
+            const quote_percent = (hits / darts) * 100;
+            list.push({
+              target,
+              player_name: p.player_name,
+              quote_percent,
+              hits,
+              darts,
+            });
+          }
+        }
+        list.sort((a, b) => {
+          if (b.quote_percent !== a.quote_percent) {
+            return b.quote_percent - a.quote_percent;
+          }
+          return b.hits - a.hits;
+        });
+        return list;
+      };
+
+      targetRankings = {
+        D20: buildTargetRankingAll('D20', 'd20_quote', 'd20_hits', 'd20_darts'),
+        D10: buildTargetRankingAll('D10', 'd10_quote', 'd10_hits', 'd10_darts'),
+        D16: buildTargetRankingAll('D16', 'd16_quote', 'd16_hits', 'd16_darts'),
+        D8: buildTargetRankingAll('D8', 'd8_quote', 'd8_hits', 'd8_darts'),
+        D4: buildTargetRankingAll('D4', 'd4_quote', 'd4_hits', 'd4_darts'),
+      };
+    }
 
     const totalDartsThrown = activeRows.reduce(
       (acc: number, r: any) => acc + Number(r.total_darts || 0),

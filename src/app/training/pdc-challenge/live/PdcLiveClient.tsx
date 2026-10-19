@@ -241,7 +241,14 @@ export default function PdcLiveClient({
                 </div>
 
                 <div className="my-4">
-                  <div className="text-2xl sm:text-3xl font-black text-white">{leader.player_name}</div>
+                  <div className="text-2xl sm:text-3xl font-black text-white flex items-center gap-2 flex-wrap">
+                    <span>{leader.player_name}</span>
+                    {filter === 'today' && leader.attempt_label && (
+                      <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 font-sans">
+                        {leader.attempt_label}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-4xl sm:text-5xl font-black text-amber-300 font-mono mt-1">
                     {leader.best_score} <span className="text-base font-normal text-slate-400">Pkt</span>
                   </div>
@@ -267,7 +274,14 @@ export default function PdcLiveClient({
                 </div>
 
                 <div className="my-4">
-                  <div className="text-2xl font-black text-white">{bestDoublesPlayer.player_name}</div>
+                  <div className="text-2xl font-black text-white flex items-center gap-2 flex-wrap">
+                    <span>{bestDoublesPlayer.player_name}</span>
+                    {filter === 'today' && bestDoublesPlayer.attempt_label && (
+                      <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-sans">
+                        {bestDoublesPlayer.attempt_label}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-4xl font-black text-emerald-300 font-mono mt-1">
                     {bestDoublesPlayer.best_doubles_hit} <span className="text-base font-normal text-slate-400">/ 21 Doppel</span>
                   </div>
@@ -293,7 +307,14 @@ export default function PdcLiveClient({
                 </div>
 
                 <div className="my-4">
-                  <div className="text-2xl font-black text-white">{bestShanghaiPlayer.player_name}</div>
+                  <div className="text-2xl font-black text-white flex items-center gap-2 flex-wrap">
+                    <span>{bestShanghaiPlayer.player_name}</span>
+                    {filter === 'today' && bestShanghaiPlayer.attempt_label && (
+                      <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-sans">
+                        {bestShanghaiPlayer.attempt_label}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-4xl font-black text-purple-300 font-mono mt-1">
                     {bestShanghaiPlayer.total_shanghais} <span className="text-base font-normal text-slate-400">Shanghais</span>
                   </div>
@@ -315,7 +336,10 @@ export default function PdcLiveClient({
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
-              <span>Gesamtranking ({data.leaderboard.length} Spieler)</span>
+              <span>
+                {filter === 'today' ? 'Heutige Durchgänge' : 'Gesamtranking'} ({data.leaderboard.length}{' '}
+                {filter === 'today' ? 'Durchgänge' : 'Spieler'})
+              </span>
             </h2>
             <div className="text-xs text-slate-400">
               Absolvierte Spiele: <strong className="text-white font-mono">{data.totalSessions}</strong>
@@ -340,22 +364,35 @@ export default function PdcLiveClient({
                 <thead>
                   <tr className="border-b border-white/10 text-slate-400 text-xs uppercase tracking-wider">
                     <th className="py-3 px-4">Rang</th>
-                    <th className="py-3 px-4">Spieler</th>
-                    <th className="py-3 px-4 text-right">Highscore</th>
+                    <th className="py-3 px-4">
+                      {filter === 'today' ? 'Spieler / Durchgang' : 'Spieler'}
+                    </th>
+                    <th className="py-3 px-4 text-right">
+                      {filter === 'today' ? 'Punkte' : 'Highscore'}
+                    </th>
                     <th className="py-3 px-4 text-center">Abzeichen</th>
                     <th className="py-3 px-4 text-right">Doppel (Teil 2)</th>
                     <th className="py-3 px-4 text-right">Shanghais</th>
-                    <th className="py-3 px-4 text-right">Ø Punkte</th>
-                    <th className="py-3 px-4 text-right">Spiele</th>
+                    {filter === 'today' ? (
+                      <>
+                        <th className="py-3 px-4 text-right">Teil 1 (10-15)</th>
+                        <th className="py-3 px-4 text-right">Teil 3 (15-20)</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="py-3 px-4 text-right">Ø Punkte</th>
+                        <th className="py-3 px-4 text-right">Spiele</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-mono">
-                  {data.leaderboard.map((row) => {
+                  {data.leaderboard.map((row, idx) => {
                     const badge = getPdcBadge(row.best_score);
                     const isPodium = row.rank <= 3;
                     return (
                       <tr
-                        key={row.player_name}
+                        key={`${row.player_name}_${row.session_id || idx}_${row.attempt_nr || idx}`}
                         className={`transition-colors ${
                           row.rank === 1
                             ? 'bg-amber-500/10 hover:bg-amber-500/15'
@@ -379,7 +416,19 @@ export default function PdcLiveClient({
                         </td>
 
                         <td className="py-4 px-4 font-sans font-black text-white text-base">
-                          {row.player_name}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{row.player_name}</span>
+                            {filter === 'today' && row.attempt_label && (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                                {row.attempt_label}
+                              </span>
+                            )}
+                            {filter === 'today' && row.time_label && (
+                              <span className="text-[10px] font-medium text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-white/5">
+                                🕒 {row.time_label}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-4 px-4 text-right font-black text-xl text-amber-300">
@@ -402,13 +451,25 @@ export default function PdcLiveClient({
                           {row.total_shanghais}
                         </td>
 
-                        <td className="py-4 px-4 text-right text-slate-300">
-                          {row.avg_score}
-                        </td>
-
-                        <td className="py-4 px-4 text-right text-slate-500">
-                          {row.sessions_count}
-                        </td>
+                        {filter === 'today' ? (
+                          <>
+                            <td className="py-4 px-4 text-right text-cyan-300 font-bold">
+                              {row.score_part1 ?? 0} Pkt
+                            </td>
+                            <td className="py-4 px-4 text-right text-indigo-300 font-bold">
+                              {row.score_part3 ?? 0} Pkt
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-4 px-4 text-right text-slate-300">
+                              {row.avg_score}
+                            </td>
+                            <td className="py-4 px-4 text-right text-slate-500">
+                              {row.sessions_count}
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}

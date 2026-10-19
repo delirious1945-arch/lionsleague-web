@@ -133,6 +133,7 @@ export async function recordAbortedPdcAction(data: {
 }
 
 export interface PdcLeaderboardRow {
+  session_id?: string;
   player_name: string;
   sessions_count: number;
   best_score: number;
@@ -141,6 +142,13 @@ export interface PdcLeaderboardRow {
   total_shanghais: number;
   best_doubles_hit: number;
   rank: number;
+  attempt_nr?: number;
+  attempt_label?: string;
+  time_label?: string;
+  score_part1?: number;
+  score_part2?: number;
+  score_part3?: number;
+  opponent_name?: string | null;
 }
 
 export interface PdcLiveRankingResult {
@@ -175,70 +183,137 @@ export async function getLivePdcRankingAction(
     const hasTodayData = todayRows.length > 0;
     const activeRows = filter === 'today' ? todayRows : allRows;
 
-    const playerMap = new Map<
-      string,
-      {
-        player_name: string;
-        sessions_count: number;
-        total_score_sum: number;
-        best_score: number;
-        best_badge: string;
-        total_shanghais: number;
-        best_doubles_hit: number;
-      }
-    >();
+    let leaderboard: PdcLeaderboardRow[] = [];
 
-    for (const r of activeRows) {
-      const pName = String(r.player_name || '').trim();
-      if (!pName) continue;
+    if (filter === 'today') {
+      // HEUTIGES TRAINING: Jedes gespielte Spiel einzeln eintragen (nicht kumulieren!)
+      const chronoSorted = [...todayRows].sort(
+        (a, b) =>
+          new Date(a.created_at || a.training_date).getTime() -
+          new Date(b.created_at || b.training_date).getTime()
+      );
 
-      if (!playerMap.has(pName)) {
-        playerMap.set(pName, {
+      const playerAttemptCounter = new Map<string, number>();
+
+      for (const r of chronoSorted) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+
+        const attemptNr = (playerAttemptCounter.get(pName) || 0) + 1;
+        playerAttemptCounter.set(pName, attemptNr);
+
+        const totalScore = Number(r.total_score || 0);
+        const part1 = Number(r.score_part1 || 0);
+        const part2 = Number(r.score_part2 || 0);
+        const part3 = Number(r.score_part3 || 0);
+        const shanghais = Number(r.shanghai_count || 0);
+        const doubles = Number(r.doubles_hit || 0);
+        const badgeColor = String(r.badge_color || 'Weiß');
+
+        const timeLabel = r.created_at
+          ? new Date(r.created_at).toLocaleTimeString('de-DE', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }) + ' Uhr'
+          : '';
+
+        leaderboard.push({
+          session_id: String(r.session_id || r.id || ''),
           player_name: pName,
-          sessions_count: 0,
-          total_score_sum: 0,
-          best_score: 0,
-          best_badge: 'Weiß',
-          total_shanghais: 0,
-          best_doubles_hit: 0,
+          sessions_count: 1,
+          best_score: totalScore,
+          avg_score: totalScore,
+          best_badge: badgeColor,
+          total_shanghais: shanghais,
+          best_doubles_hit: doubles,
+          score_part1: part1,
+          score_part2: part2,
+          score_part3: part3,
+          attempt_nr: attemptNr,
+          attempt_label: `Durchgang #${attemptNr}`,
+          time_label: timeLabel,
+          opponent_name: r.opponent_name ? String(r.opponent_name) : null,
+          rank: 0,
         });
       }
 
-      const p = playerMap.get(pName)!;
-      p.sessions_count += 1;
-      const score = Number(r.total_score || 0);
-      p.total_score_sum += score;
-      if (score >= p.best_score) {
-        p.best_score = score;
-        p.best_badge = String(r.badge_color || 'Weiß');
+      // Ranking nach Punkten absteigend sortieren
+      leaderboard.sort((a, b) => {
+        if (b.best_score !== a.best_score) return b.best_score - a.best_score;
+        if (b.total_shanghais !== a.total_shanghais) return b.total_shanghais - a.total_shanghais;
+        return b.best_doubles_hit - a.best_doubles_hit;
+      });
+
+      leaderboard.forEach((p, idx) => {
+        p.rank = idx + 1;
+      });
+    } else {
+      // GESAMT-HISTORIE: Kumulierte Aggregation pro Spieler
+      const playerMap = new Map<
+        string,
+        {
+          player_name: string;
+          sessions_count: number;
+          total_score_sum: number;
+          best_score: number;
+          best_badge: string;
+          total_shanghais: number;
+          best_doubles_hit: number;
+        }
+      >();
+
+      for (const r of allRows) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+
+        if (!playerMap.has(pName)) {
+          playerMap.set(pName, {
+            player_name: pName,
+            sessions_count: 0,
+            total_score_sum: 0,
+            best_score: 0,
+            best_badge: 'Weiß',
+            total_shanghais: 0,
+            best_doubles_hit: 0,
+          });
+        }
+
+        const p = playerMap.get(pName)!;
+        p.sessions_count += 1;
+        const score = Number(r.total_score || 0);
+        p.total_score_sum += score;
+        if (score >= p.best_score) {
+          p.best_score = score;
+          p.best_badge = String(r.badge_color || 'Weiß');
+        }
+        p.total_shanghais += Number(r.shanghai_count || 0);
+        const doubles = Number(r.doubles_hit || 0);
+        if (doubles > p.best_doubles_hit) {
+          p.best_doubles_hit = doubles;
+        }
       }
-      p.total_shanghais += Number(r.shanghai_count || 0);
-      const doubles = Number(r.doubles_hit || 0);
-      if (doubles > p.best_doubles_hit) {
-        p.best_doubles_hit = doubles;
-      }
+
+      leaderboard = Array.from(playerMap.values()).map((p) => ({
+        player_name: p.player_name,
+        sessions_count: p.sessions_count,
+        best_score: p.best_score,
+        avg_score: p.sessions_count > 0 ? Math.round(p.total_score_sum / p.sessions_count) : 0,
+        best_badge: p.best_badge,
+        total_shanghais: p.total_shanghais,
+        best_doubles_hit: p.best_doubles_hit,
+        rank: 0,
+      }));
+
+      leaderboard.sort((a, b) => {
+        if (b.best_score !== a.best_score) return b.best_score - a.best_score;
+        if (b.avg_score !== a.avg_score) return b.avg_score - a.avg_score;
+        return b.total_shanghais - a.total_shanghais;
+      });
+
+      leaderboard.forEach((p, idx) => {
+        p.rank = idx + 1;
+      });
     }
-
-    const leaderboard: PdcLeaderboardRow[] = Array.from(playerMap.values()).map(p => ({
-      player_name: p.player_name,
-      sessions_count: p.sessions_count,
-      best_score: p.best_score,
-      avg_score: p.sessions_count > 0 ? Math.round(p.total_score_sum / p.sessions_count) : 0,
-      best_badge: p.best_badge,
-      total_shanghais: p.total_shanghais,
-      best_doubles_hit: p.best_doubles_hit,
-      rank: 0,
-    }));
-
-    leaderboard.sort((a, b) => {
-      if (b.best_score !== a.best_score) return b.best_score - a.best_score;
-      if (b.avg_score !== a.avg_score) return b.avg_score - a.avg_score;
-      return b.total_shanghais - a.total_shanghais;
-    });
-
-    leaderboard.forEach((p, idx) => {
-      p.rank = idx + 1;
-    });
 
     return {
       leaderboard,

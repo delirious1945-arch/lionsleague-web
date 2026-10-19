@@ -378,7 +378,7 @@ export default function DoppelquoteLiveClient({
 
                   return (
                     <div
-                      key={player.player_name}
+                      key={`${player.player_name}_${player.session_id || idx}_${player.attempt_nr || idx}`}
                       className={`relative flex items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl border transition-all duration-300 ${
                         isFirst
                           ? 'bg-gradient-to-r from-amber-950/60 via-slate-900/90 to-amber-950/40 border-amber-400/60 shadow-[0_0_30px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/40'
@@ -435,18 +435,39 @@ export default function DoppelquoteLiveClient({
                             <span className="text-base sm:text-xl font-black text-white truncate">
                               {player.player_name}
                             </span>
-                            {isFirst && (
+                            {filter === 'today' && player.attempt_label && (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                                {player.attempt_label}
+                              </span>
+                            )}
+                            {isFirst && filter === 'all' && (
                               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 hidden sm:inline-block">
                                 LEADER
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                            <span>{player.sessions_count} Durchgang{player.sessions_count > 1 ? 'e' : ''}</span>
-                            <span>•</span>
-                            <span className="font-mono text-cyan-300">{player.total_hits}/{player.total_darts} Treffer</span>
-                            <span>•</span>
-                            <span className="hidden sm:inline text-amber-300/90 font-medium">Top: {player.best_double}</span>
+                          <div className="text-xs text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
+                            {filter === 'today' ? (
+                              <>
+                                {player.time_label && (
+                                  <span className="font-mono text-slate-400 text-[11px]">{player.time_label}</span>
+                                )}
+                                <span>•</span>
+                                <span className="font-mono text-cyan-300 font-bold">{player.total_hits}/{player.total_darts} Treffer</span>
+                                <span>•</span>
+                                <span className="text-amber-300/90 font-medium">Top: {player.best_double}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>{player.sessions_count} Durchgang{player.sessions_count > 1 ? 'e' : ''}</span>
+                                <span>•</span>
+                                <span className="font-mono text-cyan-300 font-bold">{player.total_hits}/{player.total_darts} Treffer</span>
+                                <span>•</span>
+                                <span className="text-amber-300/90 font-medium">Bestwert: {player.best_session_quote.toFixed(1)}%</span>
+                                <span>•</span>
+                                <span className="hidden sm:inline">Top: {player.best_double}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
