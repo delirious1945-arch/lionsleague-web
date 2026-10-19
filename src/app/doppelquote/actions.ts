@@ -96,25 +96,41 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
   }
 }
 
-export async function getTrainingHistoryAction(limit: number = 50) {
+export async function getTrainingHistoryAction(limit: number = 100, specificPlayer?: string) {
   try {
     const session = await getSessionAction();
     const isAdmin = session?.role === 'admin';
+    const userName = specificPlayer?.trim() || session?.name?.trim();
 
-    const rows = isAdmin
-      ? await sql`
-          SELECT *
-          FROM training_doubles
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `
-      : await sql`
-          SELECT *
-          FROM training_doubles
-          WHERE COALESCE(is_aborted, 0) = 0
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `;
+    let rows: any[] = [];
+    if (isAdmin && !specificPlayer) {
+      rows = await sql`
+        SELECT *
+        FROM training_doubles
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    } else if (isAdmin && specificPlayer) {
+      rows = await sql`
+        SELECT *
+        FROM training_doubles
+        WHERE LOWER(player_name) = LOWER(${specificPlayer})
+           OR LOWER(COALESCE(opponent_name, '')) = LOWER(${specificPlayer})
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    } else if (userName) {
+      rows = await sql`
+        SELECT *
+        FROM training_doubles
+        WHERE COALESCE(is_aborted, 0) = 0
+          AND (LOWER(player_name) = LOWER(${userName}) OR LOWER(COALESCE(opponent_name, '')) = LOWER(${userName}))
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    } else {
+      rows = [];
+    }
     return rows.map((r: any) => ({
       id: Number(r.id),
       session_id: String(r.session_id || ''),

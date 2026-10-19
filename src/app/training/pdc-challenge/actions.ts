@@ -81,25 +81,41 @@ export async function savePdcChallengeAction(sessions: PdcChallengeSessionData[]
   }
 }
 
-export async function getPdcChallengeHistoryAction(limit: number = 50) {
+export async function getPdcChallengeHistoryAction(limit: number = 100, specificPlayer?: string) {
   try {
     const session = await getSessionAction();
     const isAdmin = session?.role === 'admin';
+    const userName = specificPlayer?.trim() || session?.name?.trim();
 
-    const rows = isAdmin
-      ? await sql`
-          SELECT *
-          FROM training_pdc_challenge
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `
-      : await sql`
-          SELECT *
-          FROM training_pdc_challenge
-          WHERE COALESCE(is_aborted, 0) = 0
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `;
+    let rows: any[] = [];
+    if (isAdmin && !specificPlayer) {
+      rows = await sql`
+        SELECT *
+        FROM training_pdc_challenge
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    } else if (isAdmin && specificPlayer) {
+      rows = await sql`
+        SELECT *
+        FROM training_pdc_challenge
+        WHERE LOWER(player_name) = LOWER(${specificPlayer})
+           OR LOWER(COALESCE(opponent_name, '')) = LOWER(${specificPlayer})
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    } else if (userName) {
+      rows = await sql`
+        SELECT *
+        FROM training_pdc_challenge
+        WHERE COALESCE(is_aborted, 0) = 0
+          AND (LOWER(player_name) = LOWER(${userName}) OR LOWER(COALESCE(opponent_name, '')) = LOWER(${userName}))
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    } else {
+      rows = [];
+    }
 
     return rows.map((r: any) => ({
       id: Number(r.id),

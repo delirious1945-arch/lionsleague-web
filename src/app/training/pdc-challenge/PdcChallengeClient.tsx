@@ -124,6 +124,7 @@ export default function PdcChallengeClient({
   const [gameSessionId, setGameSessionId] = useState<string>(() => 'pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
   const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
   const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
+  const [adminPlayerFilter, setAdminPlayerFilter] = useState<string>('all');
 
   // Web Audio Synthesizer
   const playSound = (freq: number, type: OscillatorType = 'sine', duration: number = 0.1) => {
@@ -714,6 +715,41 @@ export default function PdcChallengeClient({
     return 'Fertig';
   }, [stage, currentTargetIndex]);
 
+  const isAdmin = user?.role === 'admin';
+  const currentUserName = user?.name?.trim().toLowerCase();
+
+  const uniquePlayers = useMemo(() => {
+    return Array.from(
+      new Set(
+        history
+          .map((h) => h.player_name)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [history]);
+
+  const visibleHistory = useMemo(() => {
+    return history.filter((h) => {
+      const isAborted = Boolean(h.is_aborted);
+      if (isAdmin) {
+        if (adminPlayerFilter !== 'all') {
+          const matchesPlayer =
+            h.player_name?.toLowerCase() === adminPlayerFilter.toLowerCase() ||
+            h.opponent_name?.toLowerCase() === adminPlayerFilter.toLowerCase();
+          if (!matchesPlayer) return false;
+        }
+        return true;
+      }
+
+      if (!currentUserName) return false;
+      if (isAborted) return false;
+      return (
+        h.player_name?.toLowerCase() === currentUserName ||
+        (h.opponent_name && h.opponent_name?.toLowerCase() === currentUserName)
+      );
+    });
+  }, [history, isAdmin, adminPlayerFilter, currentUserName]);
+
   return (
     <div className="max-w-5xl mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-5 animate-fadeIn">
       {/* SHANGHAI FRAGE MODAL (wenn 6 eingegeben wird) */}
@@ -879,7 +915,7 @@ export default function PdcChallengeClient({
           }`}
         >
           <span>📜</span>
-          <span>Historie ({history.length})</span>
+          <span>{isAdmin ? 'Verlauf (Admin)' : 'Mein Verlauf'} ({visibleHistory.length})</span>
         </button>
       </div>
 
@@ -1667,20 +1703,108 @@ export default function PdcChallengeClient({
       {/* TAB 4: HISTORY */}
       {activeTab === 'history' && (
         <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-black text-white flex items-center gap-2">
-              <span>📜</span> Historie aller Spiele
-            </h3>
-            <span className="text-xs text-slate-400">{history.length} Einträge</span>
-          </div>
+          {isAdmin ? (
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <span>📜</span> Trainingsverlauf
+                    </h3>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                      👑 Admin: Alle Verläufe
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Als Admin kannst du alle PDC Challenge Trainings aller Spieler einsehen und analysieren.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/verwaltung"
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    ⚙️ Admin-Bereich
+                  </Link>
+                  <span className="text-xs text-slate-400">{visibleHistory.length} Einträge</span>
+                </div>
+              </div>
 
-          {history.length === 0 ? (
+              {/* Admin Filter Bar */}
+              <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-white/10 text-xs">
+                <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <Users size={13} className="text-amber-400" />
+                  Spieler filtern:
+                </span>
+                <select
+                  value={adminPlayerFilter}
+                  onChange={(e) => setAdminPlayerFilter(e.target.value)}
+                  className="bg-slate-900 border border-white/15 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                >
+                  <option value="all">🌐 Alle Spieler ({history.length})</option>
+                  {uniquePlayers.map((p) => {
+                    const cnt = history.filter(h => h.player_name === p || h.opponent_name === p).length;
+                    return (
+                      <option key={p} value={p}>
+                        {p} ({cnt})
+                      </option>
+                    );
+                  })}
+                </select>
+                <button
+                  onClick={() => setAdminPlayerFilter('all')}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                    adminPlayerFilter === 'all'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
+                      : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                  }`}
+                >
+                  Alle ({history.length})
+                </button>
+                {user?.name && (
+                  <button
+                    onClick={() => setAdminPlayerFilter(user.name)}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                      adminPlayerFilter.toLowerCase() === user.name.toLowerCase()
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
+                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                    }`}
+                  >
+                    Nur meine ({history.filter(h => h.player_name?.toLowerCase() === user.name.toLowerCase() || h.opponent_name?.toLowerCase() === user.name.toLowerCase()).length})
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : user ? (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <span>📜</span> Mein Trainingsverlauf
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Persönliche PDC Challenge Durchgänge von <strong className="text-cyan-300">{user.name}</strong>
+                </p>
+              </div>
+              <span className="text-xs text-slate-400">{visibleHistory.length} Einträge</span>
+            </div>
+          ) : (
+            <div className="text-center py-6 px-4 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
+              <div className="text-2xl">🔒</div>
+              <div className="text-sm font-bold text-white">Privater Trainingsverlauf</div>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Trainingsverläufe sind geschützt: Jeder Spieler sieht nur seine eigenen Trainingseinheiten.
+                Bitte melde dich an, um deinen persönlichen Verlauf einzusehen.
+              </p>
+            </div>
+          )}
+
+          {visibleHistory.length === 0 ? (
             <div className="text-center py-8 text-slate-500 text-xs">
               Noch keine gespeicherten Spiele vorhanden.
             </div>
           ) : (
             <div className="space-y-2">
-              {history.map((h, i) => {
+              {visibleHistory.map((h, i) => {
                 const badge = getPdcBadge(h.total_score);
                 const isAborted = Boolean(h.is_aborted);
                 const sessionKey = h.session_id ? `${h.session_id}_${h.player_name}` : (h.id || i);

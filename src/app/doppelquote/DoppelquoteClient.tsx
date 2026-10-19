@@ -42,6 +42,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [gameSessionId, setGameSessionId] = useState<string>(() => 'dq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
   const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
   const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
+  const [adminPlayerFilter, setAdminPlayerFilter] = useState<string>('all');
 
   // Scores State
   const [scoresP1, setScoresP1] = useState<Record<string, (number | null)[]>>({
@@ -701,7 +702,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           onClick={() => setActiveTab('history')}
           className={`py-2 rounded-lg transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
         >
-          📜 Verlauf & Vorlagen
+          📜 Verlauf
         </button>
       </div>
 
@@ -956,28 +957,138 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         </div>
       )}
 
-      {/* VIEW 3: VERLAUF & VORLAGEN */}
+      {/* VIEW 3: VERLAUF */}
       {activeTab === 'history' && (() => {
+        const isAdmin = user?.role === 'admin';
+        const currentUserName = user?.name?.trim().toLowerCase();
+
+        // Unique players for admin filter
+        const uniquePlayers = Array.from(
+          new Set(
+            history
+              .map(h => h.player_name)
+              .filter(Boolean)
+          )
+        ).sort();
+
         const visibleHistory = history.filter(h => {
-          if (Number(h.is_aborted || 0) === 1) {
-            return user?.role === 'admin';
+          const isAborted = Number(h.is_aborted || 0) === 1;
+          if (isAdmin) {
+            if (adminPlayerFilter !== 'all') {
+              const matchesPlayer =
+                h.player_name?.toLowerCase() === adminPlayerFilter.toLowerCase() ||
+                h.opponent_name?.toLowerCase() === adminPlayerFilter.toLowerCase();
+              if (!matchesPlayer) return false;
+            }
+            return true;
           }
-          return true;
+
+          // Regular player: ONLY see own games!
+          if (!currentUserName) return false;
+          if (isAborted) return false;
+          return (
+            h.player_name?.toLowerCase() === currentUserName ||
+            (h.opponent_name && h.opponent_name?.toLowerCase() === currentUserName)
+          );
         });
 
         return (
           <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>📜</span> Gespeicherte Trainings in Supabase
-                {user?.role === 'admin' && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    Admin-Ansicht
+            {/* Header & Role Info */}
+            {isAdmin ? (
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                        <span>📜</span> Trainingsverlauf
+                      </h2>
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                        👑 Admin: Alle Verläufe
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Als Admin kannst du alle Verläufe aller Spieler einsehen und analysieren.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href="/verwaltung"
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      ⚙️ Admin-Bereich
+                    </Link>
+                    <span className="text-xs text-slate-400">{visibleHistory.length} Einheiten</span>
+                  </div>
+                </div>
+
+                {/* Admin Filter Bar */}
+                <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-white/10 text-xs">
+                  <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                    <Users size={13} className="text-amber-400" />
+                    Spieler filtern:
                   </span>
-                )}
-              </h2>
-              <span className="text-xs text-slate-400">{visibleHistory.length} Einheiten</span>
-            </div>
+                  <select
+                    value={adminPlayerFilter}
+                    onChange={(e) => setAdminPlayerFilter(e.target.value)}
+                    className="bg-slate-900 border border-white/15 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  >
+                    <option value="all">🌐 Alle Spieler ({history.length})</option>
+                    {uniquePlayers.map((p) => {
+                      const cnt = history.filter(h => h.player_name === p || h.opponent_name === p).length;
+                      return (
+                        <option key={p} value={p}>
+                          {p} ({cnt})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    onClick={() => setAdminPlayerFilter('all')}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                      adminPlayerFilter === 'all'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
+                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                    }`}
+                  >
+                    Alle ({history.length})
+                  </button>
+                  {user?.name && (
+                    <button
+                      onClick={() => setAdminPlayerFilter(user.name)}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                        adminPlayerFilter.toLowerCase() === user.name.toLowerCase()
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
+                          : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      Nur meine ({history.filter(h => h.player_name?.toLowerCase() === user.name.toLowerCase() || h.opponent_name?.toLowerCase() === user.name.toLowerCase()).length})
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : user ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <span>📜</span> Mein Trainingsverlauf
+                  </h2>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Persönliche Trainingseinheiten von <strong className="text-cyan-300">{user.name}</strong>
+                  </p>
+                </div>
+                <span className="text-xs text-slate-400">{visibleHistory.length} Einheiten</span>
+              </div>
+            ) : (
+              <div className="text-center py-6 px-4 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
+                <div className="text-2xl">🔒</div>
+                <div className="text-sm font-bold text-white">Privater Trainingsverlauf</div>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Trainingsverläufe sind geschützt: Jeder Spieler sieht nur seine eigenen Trainingseinheiten.
+                  Bitte melde dich an, um deinen persönlichen Verlauf einzusehen.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
               {visibleHistory.length === 0 ? (
