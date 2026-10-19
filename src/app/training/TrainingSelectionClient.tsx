@@ -16,6 +16,7 @@ import {
   Sparkles,
   Tv,
 } from 'lucide-react';
+import { PDC_BADGES_LIST } from './pdc-challenge/types';
 
 interface TrainingSelectionClientProps {
   user: UserSession;
@@ -223,14 +224,16 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
 
             {/* Badges Preview Pill Bar */}
             <div className="pt-1 flex items-center gap-1.5 overflow-x-auto text-[10px] font-black">
-              <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-900 border border-white">Weiß</span>
-              <span className="px-2 py-0.5 rounded bg-purple-600 text-white">Lila</span>
-              <span className="px-2 py-0.5 rounded bg-yellow-500 text-slate-950">Gelb</span>
-              <span className="px-2 py-0.5 rounded bg-emerald-600 text-white">Grün</span>
-              <span className="px-2 py-0.5 rounded bg-blue-600 text-white">Blau</span>
-              <span className="px-2 py-0.5 rounded bg-red-600 text-white">Rot</span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 text-white border border-slate-600">Schwarz</span>
-              <span className="px-2 py-0.5 rounded bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950">Gold</span>
+              {PDC_BADGES_LIST.slice().reverse().map((b) => (
+                <span
+                  key={b.name}
+                  className={`px-2 py-0.5 rounded flex items-center gap-1 shrink-0 ${b.badgeClass}`}
+                  title={`${b.name}: ${b.title} (${b.min}${b.max >= 9000 ? '+' : `–${b.max}`} Pkt)`}
+                >
+                  <span>{b.icon}</span>
+                  <span>{b.name}</span>
+                </span>
+              ))}
             </div>
           </div>
 

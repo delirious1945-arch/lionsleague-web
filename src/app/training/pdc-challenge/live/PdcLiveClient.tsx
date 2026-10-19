@@ -267,11 +267,17 @@ export default function PdcLiveClient({
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Abzeichen:</span>
-                  <span className={`px-2.5 py-0.5 rounded-md font-black ${getPdcBadge(leader.best_score).badgeClass}`}>
-                    {getPdcBadge(leader.best_score).name}
-                  </span>
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs flex-wrap gap-2">
+                  <span className="text-slate-400">Abzeichen & Einstufung:</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`px-2.5 py-0.5 rounded-md font-black flex items-center gap-1 shadow-sm ${getPdcBadge(leader.best_score).badgeClass}`}>
+                      <span>{getPdcBadge(leader.best_score).icon}</span>
+                      <span>{getPdcBadge(leader.best_score).name}</span>
+                    </span>
+                    <span className="text-xs font-bold text-white bg-slate-950 px-2.5 py-0.5 rounded-md border border-white/10">
+                      {getPdcBadge(leader.best_score).title}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -389,7 +395,7 @@ export default function PdcLiveClient({
                     <th className="py-3 px-4 text-right">
                       {filter === 'today' ? 'Punkte' : 'Highscore'}
                     </th>
-                    <th className="py-3 px-4 text-center">Abzeichen</th>
+                    <th className="py-3 px-4 text-center">Abzeichen & Einstufung</th>
                     <th className="py-3 px-4 text-right">Doppel (Teil 2)</th>
                     <th className="py-3 px-4 text-right">Shanghais</th>
                     {filter === 'today' ? (
@@ -455,11 +461,17 @@ export default function PdcLiveClient({
                         </td>
 
                         <td className="py-4 px-4 text-center">
-                          <span
-                            className={`inline-block px-3 py-1 rounded-md text-xs font-sans font-black ${badge.badgeClass}`}
-                          >
-                            {badge.name}
-                          </span>
+                          <div className="inline-flex flex-col items-center">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-sans font-black shadow-md ${badge.badgeClass}`}
+                            >
+                              <span>{badge.icon}</span>
+                              <span>{badge.name}</span>
+                            </span>
+                            <span className="text-xs font-sans font-bold text-slate-200 mt-1 whitespace-nowrap bg-slate-950/80 px-2 py-0.5 rounded border border-white/10">
+                              {badge.title}
+                            </span>
+                          </div>
                         </td>
 
                         <td className="py-4 px-4 text-right text-emerald-400 font-bold">

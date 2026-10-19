@@ -17,6 +17,7 @@ import {
   PART2_TARGETS,
   PART3_TARGETS,
   getPdcBadge,
+  PDC_BADGES_LIST,
 } from './types';
 import {
   Trophy,
@@ -1278,17 +1279,87 @@ export default function PdcChallengeClient({
               </div>
 
               {/* Score & Badge Highlight */}
-              <div className="max-w-md mx-auto bg-slate-900/90 border border-white/10 rounded-2xl p-6 space-y-3">
-                <div className="text-xs uppercase font-bold text-slate-400">Erreichte Gesamtpunktzahl</div>
-                <div className="text-5xl font-black text-amber-300 font-mono">
-                  {p1Stats.totalScore}
+              {gameMode === 'solo' ? (
+                <div className="max-w-xl mx-auto bg-slate-900/95 border-2 border-amber-400/50 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl backdrop-blur-sm">
+                  <div className="text-xs uppercase font-black tracking-widest text-slate-400">
+                    Erreichte Gesamtpunktzahl
+                  </div>
+                  <div className="text-6xl sm:text-7xl font-black text-amber-300 font-mono tracking-tight drop-shadow-md">
+                    {p1Stats.totalScore}
+                  </div>
+                  
+                  <div className="pt-2 flex flex-col items-center justify-center gap-3">
+                    <div className={`px-6 py-2.5 rounded-2xl text-base sm:text-xl font-black flex items-center justify-center gap-2.5 shadow-xl ${p1Stats.badge.badgeClass}`}>
+                      <span className="text-2xl">{p1Stats.badge.icon}</span>
+                      <span>{p1Stats.badge.name}es Abzeichen</span>
+                    </div>
+
+                    <div className="w-full bg-slate-950/80 border border-white/15 rounded-2xl p-4 text-center space-y-1 shadow-inner">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+                        Offizielle Leistungsstufe / Kategorie
+                      </span>
+                      <div className="text-xl sm:text-2xl font-black text-white">
+                        {p1Stats.badge.title}
+                      </div>
+                      {p1Stats.badge.subTitle && (
+                        <div className="text-xs font-semibold text-slate-400">
+                          {p1Stats.badge.subTitle}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className={`inline-block px-4 py-1.5 rounded-full text-sm font-black ${p1Stats.badge.badgeClass}`}>
-                    {p1Stats.badge.name}es Abzeichen
-                  </span>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+                  {/* Player 1 */}
+                  <div className={`bg-slate-900/95 border-2 rounded-3xl p-5 space-y-3 shadow-2xl ${
+                    p1Stats.totalScore >= p2Stats.totalScore ? 'border-amber-400' : 'border-white/15'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-white text-base">{p1Name}</span>
+                      {p1Stats.totalScore > p2Stats.totalScore && (
+                        <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                          Sieger 🏆
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-5xl font-black text-amber-300 font-mono">
+                      {p1Stats.totalScore} <span className="text-sm font-normal text-slate-400">Pkt</span>
+                    </div>
+                    <div className={`px-4 py-1.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 ${p1Stats.badge.badgeClass}`}>
+                      <span>{p1Stats.badge.icon}</span>
+                      <span>{p1Stats.badge.name}es Abzeichen</span>
+                    </div>
+                    <div className="text-sm font-black text-white bg-slate-950/80 p-2.5 rounded-xl border border-white/10">
+                      {p1Stats.badge.title}
+                    </div>
+                  </div>
+
+                  {/* Player 2 */}
+                  <div className={`bg-slate-900/95 border-2 rounded-3xl p-5 space-y-3 shadow-2xl ${
+                    p2Stats.totalScore >= p1Stats.totalScore ? 'border-amber-400' : 'border-white/15'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-white text-base">{p2Name}</span>
+                      {p2Stats.totalScore > p1Stats.totalScore && (
+                        <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                          Sieger 🏆
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-5xl font-black text-amber-300 font-mono">
+                      {p2Stats.totalScore} <span className="text-sm font-normal text-slate-400">Pkt</span>
+                    </div>
+                    <div className={`px-4 py-1.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 ${p2Stats.badge.badgeClass}`}>
+                      <span>{p2Stats.badge.icon}</span>
+                      <span>{p2Stats.badge.name}es Abzeichen</span>
+                    </div>
+                    <div className="text-sm font-black text-white bg-slate-950/80 p-2.5 rounded-xl border border-white/10">
+                      {p2Stats.badge.title}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
@@ -1331,82 +1402,174 @@ export default function PdcChallengeClient({
       {activeTab === 'summary' && (
         <div className="space-y-6">
           {/* Badge Matrix Reference */}
-          <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-400" />
-              <h3 className="text-base font-black text-white">
-                Offizielle PDC / JDC Leistungsabzeichen-Skala
-              </h3>
+          <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Offizielle PDC / JDC Leistungsabzeichen-Skala
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Einstufung nach 57 Darts basierend auf der offiziellen Junior Darts Corporation & PDC Routine
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              {[
-                { name: 'Weiß', range: '0–149 Pkt', class: 'bg-slate-200 text-slate-900 border border-white' },
-                { name: 'Lila', range: '150–299 Pkt', class: 'bg-purple-600 text-white' },
-                { name: 'Gelb', range: '300–449 Pkt', class: 'bg-yellow-500 text-slate-950' },
-                { name: 'Grün', range: '450–599 Pkt', class: 'bg-emerald-600 text-white' },
-                { name: 'Blau', range: '600–699 Pkt', class: 'bg-blue-600 text-white' },
-                { name: 'Rot', range: '700–849 Pkt', class: 'bg-red-600 text-white' },
-                { name: 'Schwarz', range: '850–1249 Pkt', class: 'bg-slate-900 text-white border border-slate-600' },
-                { name: 'Gold', range: '1250+ Pkt', class: 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black' },
-              ].map((b) => (
-                <div
-                  key={b.name}
-                  className={`p-3 rounded-xl border border-white/5 flex flex-col justify-between ${
-                    p1Stats.badge.name === b.name ? 'ring-2 ring-amber-400 bg-amber-500/10' : 'bg-slate-950/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-300">{b.name}</span>
-                    <span className={`w-3 h-3 rounded-full ${b.class}`} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs pt-1">
+              {PDC_BADGES_LIST.map((b) => {
+                const isCurrent = p1Stats.badge.name === b.name;
+                return (
+                  <div
+                    key={b.name}
+                    className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${
+                      isCurrent
+                        ? 'ring-2 ring-amber-400 bg-amber-500/10 border-amber-400/50 shadow-lg shadow-amber-500/20 scale-[1.02]'
+                        : 'bg-slate-950/60 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 shadow-sm ${b.badgeClass}`}>
+                          <span>{b.icon}</span>
+                          <span>{b.name}</span>
+                        </span>
+                        <span className="text-[11px] font-mono font-bold text-amber-300">
+                          {b.min} {b.max >= 9000 ? '+ Pkt' : `– ${b.max} Pkt`}
+                        </span>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="text-sm font-black text-white leading-snug">
+                          {b.title}
+                        </div>
+                        <div className="text-[11px] font-medium text-slate-400 mt-1">
+                          {b.subTitle}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isCurrent && (
+                      <div className="mt-3 pt-2.5 border-t border-amber-400/30 text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                        <span>🌟 Aktuelle Einstufung ({p1Name})</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[11px] font-mono font-bold text-slate-400 mt-2">
-                    {b.range}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Detaillierte Punkte-Tabelle Spieler 1 */}
-          <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-5 space-y-4">
-            <h3 className="text-base font-black text-white flex items-center justify-between">
-              <span>📊 Wurf-Analyse: {p1Name}</span>
-              <span className="text-amber-400 font-mono">{p1Stats.totalScore} Punkte</span>
-            </h3>
+          <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <span>📊 Wurf-Analyse: {p1Name}</span>
+              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 shadow-sm ${p1Stats.badge.badgeClass}`}>
+                  <span>{p1Stats.badge.icon}</span>
+                  <span>{p1Stats.badge.name}</span>
+                </span>
+                <span className="text-xs font-black text-slate-200 bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                  {p1Stats.badge.title}
+                </span>
+                <span className="text-amber-400 font-mono font-bold text-sm bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                  {p1Stats.totalScore} Pkt
+                </span>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5">
+              <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
                 <span className="text-slate-400">Teil 1 (Shanghai 10–15):</span>
-                <div className="text-lg font-black text-white font-mono mt-1">
+                <div className="text-xl font-black text-white font-mono">
                   {p1Stats.scorePart1} Pkt
                 </div>
-                <div className="text-[11px] text-amber-400">
-                  {p1Stats.shanghaisPart1}x Shanghai Bonus
+                <div className="text-[11px] text-amber-400 font-medium">
+                  {p1Stats.shanghaisPart1}x Shanghai Bonus (+{p1Stats.shanghaisPart1 * 100})
                 </div>
               </div>
 
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5">
+              <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
                 <span className="text-slate-400">Teil 2 (Doppel D1–D20 + Bull):</span>
-                <div className="text-lg font-black text-white font-mono mt-1">
+                <div className="text-xl font-black text-white font-mono">
                   {p1Stats.scorePart2} Pkt
                 </div>
-                <div className="text-[11px] text-emerald-400">
+                <div className="text-[11px] text-emerald-400 font-medium">
                   {p1Stats.doublesHit} von 21 Doppeln getroffen
                 </div>
               </div>
 
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-white/5">
+              <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
                 <span className="text-slate-400">Teil 3 (Shanghai 15–20):</span>
-                <div className="text-lg font-black text-white font-mono mt-1">
+                <div className="text-xl font-black text-white font-mono">
                   {p1Stats.scorePart3} Pkt
                 </div>
-                <div className="text-[11px] text-amber-400">
-                  {p1Stats.shanghaisPart3}x Shanghai Bonus
+                <div className="text-[11px] text-amber-400 font-medium">
+                  {p1Stats.shanghaisPart3}x Shanghai Bonus (+{p1Stats.shanghaisPart3 * 100})
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Detaillierte Punkte-Tabelle Spieler 2 (bei 1vs1) */}
+          {gameMode === '1vs1' && (
+            <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <span>📊 Wurf-Analyse: {p2Name}</span>
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 shadow-sm ${p2Stats.badge.badgeClass}`}>
+                    <span>{p2Stats.badge.icon}</span>
+                    <span>{p2Stats.badge.name}</span>
+                  </span>
+                  <span className="text-xs font-black text-slate-200 bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                    {p2Stats.badge.title}
+                  </span>
+                  <span className="text-amber-400 font-mono font-bold text-sm bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                    {p2Stats.totalScore} Pkt
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
+                  <span className="text-slate-400">Teil 1 (Shanghai 10–15):</span>
+                  <div className="text-xl font-black text-white font-mono">
+                    {p2Stats.scorePart1} Pkt
+                  </div>
+                  <div className="text-[11px] text-amber-400 font-medium">
+                    {p2Stats.shanghaisPart1}x Shanghai Bonus (+{p2Stats.shanghaisPart1 * 100})
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
+                  <span className="text-slate-400">Teil 2 (Doppel D1–D20 + Bull):</span>
+                  <div className="text-xl font-black text-white font-mono">
+                    {p2Stats.scorePart2} Pkt
+                  </div>
+                  <div className="text-[11px] text-emerald-400 font-medium">
+                    {p2Stats.doublesHit} von 21 Doppeln getroffen
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
+                  <span className="text-slate-400">Teil 3 (Shanghai 15–20):</span>
+                  <div className="text-xl font-black text-white font-mono">
+                    {p2Stats.scorePart3} Pkt
+                  </div>
+                  <div className="text-[11px] text-amber-400 font-medium">
+                    {p2Stats.shanghaisPart3}x Shanghai Bonus (+{p2Stats.shanghaisPart3 * 100})
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1442,7 +1605,7 @@ export default function PdcChallengeClient({
                     <th className="py-2.5 px-3">Rang</th>
                     <th className="py-2.5 px-3">Spieler</th>
                     <th className="py-2.5 px-3 text-right">Highscore</th>
-                    <th className="py-2.5 px-3 text-center">Abzeichen</th>
+                    <th className="py-2.5 px-3 text-center">Abzeichen & Einstufung</th>
                     <th className="py-2.5 px-3 text-right">Spiele</th>
                     <th className="py-2.5 px-3 text-right">Ø Punkte</th>
                     <th className="py-2.5 px-3 text-right">Shanghais</th>
@@ -1463,9 +1626,15 @@ export default function PdcChallengeClient({
                           {row.best_score}
                         </td>
                         <td className="py-2.5 px-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-black ${badge.badgeClass}`}>
-                            {badge.name}
-                          </span>
+                          <div className="inline-flex flex-col items-center">
+                            <span className={`px-2.5 py-0.5 rounded text-[11px] font-sans font-black flex items-center gap-1 shadow-sm ${badge.badgeClass}`}>
+                              <span>{badge.icon}</span>
+                              <span>{badge.name}</span>
+                            </span>
+                            <span className="text-[10px] font-sans font-bold text-slate-300 mt-0.5 whitespace-nowrap">
+                              {badge.shortTitle}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 text-right text-slate-400">
                           {row.sessions_count}
@@ -1526,12 +1695,16 @@ export default function PdcChallengeClient({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 font-mono">
+                    <div className="flex items-center gap-2.5 font-mono flex-wrap justify-end">
                       <span className="font-black text-amber-300 text-sm">
                         {h.total_score} Pkt
                       </span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${badge.badgeClass}`}>
-                        {badge.name}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-black flex items-center gap-1 shadow-sm ${badge.badgeClass}`}>
+                        <span>{badge.icon}</span>
+                        <span>{badge.name}</span>
+                      </span>
+                      <span className="text-[10px] font-sans font-semibold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-white/10 hidden sm:inline">
+                        {badge.shortTitle}
                       </span>
                       <span className="text-[11px] text-slate-500">
                         {h.training_date ? new Date(h.training_date).toLocaleDateString('de-DE') : ''}
