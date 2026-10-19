@@ -35,6 +35,8 @@ import {
   Award,
   Target,
   Tv,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface PdcChallengeClientProps {
@@ -121,6 +123,7 @@ export default function PdcChallengeClient({
   const [shanghaiNotice, setShanghaiNotice] = useState<string | null>(null);
   const [gameSessionId, setGameSessionId] = useState<string>(() => 'pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
   const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
+  const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
 
   // Web Audio Synthesizer
   const playSound = (freq: number, type: OscillatorType = 'sine', duration: number = 0.1) => {
@@ -582,7 +585,8 @@ export default function PdcChallengeClient({
       pId: number | null,
       oppName: string | null,
       stats: ReturnType<typeof calculatePlayerStats>,
-      isWin: number
+      isWin: number,
+      pState: PlayerGameState
     ): PdcChallengeSessionData => ({
       session_id: sessionId,
       player_id: pId,
@@ -597,6 +601,11 @@ export default function PdcChallengeClient({
       shanghai_count: stats.totalShanghais,
       doubles_hit: stats.doublesHit,
       badge_color: stats.badge.name,
+      details: JSON.stringify({
+        part1Rounds: pState.part1Rounds,
+        part2Hits: pState.part2Hits,
+        part3Rounds: pState.part3Rounds,
+      }),
       notes,
       is_winner: isWin,
       is_aborted: 0,
@@ -604,12 +613,12 @@ export default function PdcChallengeClient({
 
     let sessionsToSave: PdcChallengeSessionData[] = [];
     if (gameMode === 'solo') {
-      sessionsToSave.push(buildPayload(p1Name, p1Id, null, stats1, 0));
+      sessionsToSave.push(buildPayload(p1Name, p1Id, null, stats1, 0, customP1));
     } else {
       const w1 = stats1.totalScore > stats2.totalScore ? 1 : stats1.totalScore === stats2.totalScore ? -1 : 0;
       const w2 = stats2.totalScore > stats1.totalScore ? 1 : stats1.totalScore === stats2.totalScore ? -1 : 0;
-      sessionsToSave.push(buildPayload(p1Name, p1Id, p2Name, stats1, w1));
-      sessionsToSave.push(buildPayload(p2Name, p2Id, p1Name, stats2, w2));
+      sessionsToSave.push(buildPayload(p1Name, p1Id, p2Name, stats1, w1, customP1));
+      sessionsToSave.push(buildPayload(p2Name, p2Id, p1Name, stats2, w2, customP2));
     }
 
     setSaveStatus('Speichere PDC Challenge in Supabase...');
@@ -1674,42 +1683,254 @@ export default function PdcChallengeClient({
               {history.map((h, i) => {
                 const badge = getPdcBadge(h.total_score);
                 const isAborted = Boolean(h.is_aborted);
+                const sessionKey = h.session_id ? `${h.session_id}_${h.player_name}` : (h.id || i);
+                const isExpanded = expandedSessionKey === sessionKey;
+
+                let detailsObj: {
+                  part1Rounds?: Record<number, { multiplier: number; isShanghai: boolean } | null>;
+                  part2Hits?: Record<string, boolean | null>;
+                  part3Rounds?: Record<number, { multiplier: number; isShanghai: boolean } | null>;
+                } | null = null;
+
+                if (h.details) {
+                  try {
+                    detailsObj = typeof h.details === 'string' ? JSON.parse(h.details) : h.details;
+                  } catch (e) {}
+                }
+
                 return (
                   <div
-                    key={h.id || i}
-                    className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs ${
+                    key={sessionKey}
+                    onClick={() => !isAborted && setExpandedSessionKey(isExpanded ? null : sessionKey)}
+                    className={`border rounded-2xl p-4 flex flex-col gap-3 text-xs transition-all ${
+                      !isAborted ? 'cursor-pointer hover:border-white/20 hover:bg-slate-900/90' : ''
+                    } ${
                       isAborted
                         ? 'bg-red-950/20 border-red-800/40 opacity-75'
+                        : isExpanded
+                        ? 'bg-slate-900/95 border-amber-400/50 shadow-xl shadow-amber-500/10'
                         : 'bg-slate-950/60 border-white/5'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold text-white text-sm">{h.player_name}</span>
-                      {h.opponent_name && (
-                        <span className="text-slate-400 text-xs">vs. {h.opponent_name}</span>
-                      )}
-                      {isAborted && (
-                        <span className="px-2 py-0.5 rounded bg-red-900/60 text-red-300 text-[10px] font-bold">
-                          Abgebrochen
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-white text-sm">{h.player_name}</span>
+                        {h.opponent_name && (
+                          <span className="text-slate-400 text-xs">vs. {h.opponent_name}</span>
+                        )}
+                        {h.is_winner === 1 && (
+                          <span className="text-amber-400 font-bold text-xs">🏆 Sieger</span>
+                        )}
+                        {isAborted && (
+                          <span className="px-2 py-0.5 rounded bg-red-900/60 text-red-300 text-[10px] font-bold">
+                            Abgebrochen
+                          </span>
+                        )}
+                        {!isAborted && (
+                          <span className="text-amber-400/80 text-[11px] font-medium hidden sm:inline">
+                            {isExpanded ? '• Klicken zum Einklappen' : '• Klicken für Wurf- & Doppel-Statistik'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2.5 font-mono flex-wrap justify-end">
+                        <span className="font-black text-amber-300 text-base">
+                          {h.total_score} Pkt
                         </span>
-                      )}
+                        <span className={`px-2.5 py-0.5 rounded text-[10px] font-sans font-black flex items-center gap-1 shadow-sm ${badge.badgeClass}`}>
+                          <span>{badge.icon}</span>
+                          <span>{badge.name}</span>
+                        </span>
+                        <span className="text-[10px] font-sans font-semibold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-white/10 hidden sm:inline">
+                          {badge.shortTitle}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {h.training_date ? new Date(h.training_date).toLocaleDateString('de-DE') : ''}
+                        </span>
+                        {!isAborted && (
+                          <div className="text-slate-400 pl-1">
+                            {isExpanded ? <ChevronUp size={16} className="text-amber-400" /> : <ChevronDown size={16} />}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2.5 font-mono flex-wrap justify-end">
-                      <span className="font-black text-amber-300 text-sm">
-                        {h.total_score} Pkt
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-black flex items-center gap-1 shadow-sm ${badge.badgeClass}`}>
-                        <span>{badge.icon}</span>
-                        <span>{badge.name}</span>
-                      </span>
-                      <span className="text-[10px] font-sans font-semibold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-white/10 hidden sm:inline">
-                        {badge.shortTitle}
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        {h.training_date ? new Date(h.training_date).toLocaleDateString('de-DE') : ''}
-                      </span>
-                    </div>
+                    {/* AUFGEKLAPPTE DETAIL-STATISTIK */}
+                    {isExpanded && !isAborted && (
+                      <div className="pt-3 border-t border-white/10 space-y-4 animate-fadeIn">
+                        {/* 3 Sektionen Schnell-Übersicht */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div className="bg-slate-950/80 p-3 rounded-xl border border-white/5 space-y-0.5">
+                            <span className="text-slate-400 text-[11px]">Teil 1 (Shanghai 10–15):</span>
+                            <div className="text-lg font-black text-white font-mono">
+                              {h.score_part1} Pkt
+                            </div>
+                            <div className="text-[10px] text-amber-400">
+                              Scoring im mittleren Bereich
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-950/80 p-3 rounded-xl border border-white/5 space-y-0.5">
+                            <span className="text-slate-400 text-[11px]">Teil 2 (Doppel D1–D20 + Bull):</span>
+                            <div className="text-lg font-black text-emerald-400 font-mono">
+                              {h.score_part2} Pkt
+                            </div>
+                            <div className="text-[10px] text-emerald-300 font-bold">
+                              {h.doubles_hit} von 21 Doppeln getroffen ({((h.doubles_hit / 21) * 100).toFixed(1)}%)
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-950/80 p-3 rounded-xl border border-white/5 space-y-0.5">
+                            <span className="text-slate-400 text-[11px]">Teil 3 (Shanghai 15–20):</span>
+                            <div className="text-lg font-black text-white font-mono">
+                              {h.score_part3} Pkt
+                            </div>
+                            <div className="text-[10px] text-amber-400">
+                              {h.shanghai_count}x Shanghai-Bonus erzielt
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 🎯 TEIL 2: DOPPEL-TREFFER IM DETAIL (Wo man gut getroffen hat) */}
+                        <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/10 space-y-2.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-emerald-300 flex items-center gap-1.5">
+                              <Target size={14} className="text-emerald-400" />
+                              Doppel-Treffer Analyse (D1 bis D20 + Bull):
+                            </span>
+                            <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                              {h.doubles_hit} / 21 Treffer
+                            </span>
+                          </div>
+
+                          {detailsObj?.part2Hits ? (
+                            <div className="grid grid-cols-4 sm:grid-cols-7 lg:grid-cols-11 gap-1.5 pt-1">
+                              {PART2_TARGETS.map((target) => {
+                                const hit = detailsObj?.part2Hits?.[target];
+                                const isHit = hit === true;
+                                const isMiss = hit === false;
+                                return (
+                                  <div
+                                    key={target}
+                                    className={`py-1.5 px-2 rounded-lg border text-center transition-all flex flex-col items-center justify-center ${
+                                      isHit
+                                        ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300 shadow-sm shadow-emerald-500/20'
+                                        : isMiss
+                                        ? 'bg-slate-900/60 border-rose-500/30 text-rose-300/70'
+                                        : 'bg-slate-900/40 border-white/5 text-slate-500'
+                                    }`}
+                                  >
+                                    <span className="font-mono font-black text-xs">
+                                      {target}
+                                    </span>
+                                    <span className="text-[10px] font-bold mt-0.5">
+                                      {isHit ? (target === 'Bull' ? '✓ +100' : '✓ +50') : '✗ 0'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-400 py-2">
+                              Erfolgreich getroffene Doppel in Teil 2: <strong className="text-emerald-300">{h.doubles_hit} von 21</strong> (Quote: {((h.doubles_hit / 21) * 100).toFixed(1)}%)
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 📊 SCORING-ANALYSE (Wo man gut gescored hat) */}
+                        {detailsObj && (detailsObj.part1Rounds || detailsObj.part3Rounds) && (
+                          <div className="space-y-3">
+                            {/* Teil 1: 10 bis 15 */}
+                            {detailsObj.part1Rounds && (
+                              <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/10 space-y-2">
+                                <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                                  <span>🎯</span> Scoring Teil 1 (Aufnahmen 10 bis 15):
+                                </span>
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1 text-center">
+                                  {PART1_TARGETS.map((t) => {
+                                    const entry = detailsObj?.part1Rounds?.[t];
+                                    const mult = entry?.multiplier ?? 0;
+                                    const isSh = Boolean(entry?.isShanghai);
+                                    const pts = mult * t + (isSh ? 100 : 0);
+                                    return (
+                                      <div
+                                        key={t}
+                                        className={`p-2 rounded-xl border flex flex-col justify-between ${
+                                          isSh
+                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
+                                            : mult >= 4
+                                            ? 'bg-blue-500/15 border-blue-400/40 text-blue-200'
+                                            : 'bg-slate-900/60 border-white/5 text-slate-300'
+                                        }`}
+                                      >
+                                        <div className="text-[11px] font-bold text-slate-400">Target {t}</div>
+                                        <div className="text-sm font-black text-white font-mono my-0.5">
+                                          {pts} Pkt
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">
+                                          {isSh ? '🌟 SHANGHAI' : `${mult} Treffer`}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Teil 3: 15 bis 20 */}
+                            {detailsObj.part3Rounds && (
+                              <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/10 space-y-2">
+                                <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                                  <span>🎯</span> Scoring Teil 3 (Große Zahlen 15 bis 20):
+                                </span>
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1 text-center">
+                                  {PART3_TARGETS.map((t) => {
+                                    const entry = detailsObj?.part3Rounds?.[t];
+                                    const mult = entry?.multiplier ?? 0;
+                                    const isSh = Boolean(entry?.isShanghai);
+                                    const pts = mult * t + (isSh ? 100 : 0);
+                                    return (
+                                      <div
+                                        key={t}
+                                        className={`p-2 rounded-xl border flex flex-col justify-between ${
+                                          isSh
+                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
+                                            : mult >= 4
+                                            ? 'bg-blue-500/15 border-blue-400/40 text-blue-200'
+                                            : 'bg-slate-900/60 border-white/5 text-slate-300'
+                                        }`}
+                                      >
+                                        <div className="text-[11px] font-bold text-slate-400">Target {t}</div>
+                                        <div className="text-sm font-black text-white font-mono my-0.5">
+                                          {pts} Pkt
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">
+                                          {isSh ? '🌟 SHANGHAI' : `${mult} Treffer`}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Einstufungs-Badge & Notiz */}
+                        <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs border-t border-white/5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400">Erreichte Leistungsstufe:</span>
+                            <span className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] flex items-center gap-1 ${badge.badgeClass}`}>
+                              <span>{badge.icon}</span>
+                              <span>{badge.name} ({badge.title})</span>
+                            </span>
+                          </div>
+                          {h.notes && (
+                            <span className="text-slate-400 italic">Notiz: {h.notes}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

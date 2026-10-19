@@ -8,7 +8,7 @@ import { UserSession } from '@/app/actions';
 import { 
   Trophy, Users, User, ArrowRight, RotateCcw, Volume2, VolumeX, 
   Save, Download, FileSpreadsheet, FileText, CheckCircle2, AlertCircle,
-  ArrowLeft, AlertTriangle, RefreshCw
+  ArrowLeft, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Target
 } from 'lucide-react';
 
 interface DoppelquoteClientProps {
@@ -41,6 +41,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
   const [gameSessionId, setGameSessionId] = useState<string>(() => 'dq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
   const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
+  const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
 
   // Scores State
   const [scoresP1, setScoresP1] = useState<Record<string, (number | null)[]>>({
@@ -978,7 +979,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               <span className="text-xs text-slate-400">{visibleHistory.length} Einheiten</span>
             </div>
 
-            <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto">
+            <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
               {visibleHistory.length === 0 ? (
                 <div className="text-center py-6 text-xs text-slate-500">
                   Noch keine Trainingseinheiten vorhanden.
@@ -990,44 +991,148 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   const dStr = isNaN(dateObj.getTime()) ? h.training_date : dateObj.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
                   const qPct = ((h.total_quote ?? 0) * 100).toFixed(1) + '%';
                   const isWin = h.is_winner === 1;
+                  const sessionKey = h.session_id ? `${h.session_id}_${h.player_name}` : (h.id || idx);
+                  const isExpanded = expandedSessionKey === sessionKey;
 
                   return (
-                    <div key={idx} className={`border rounded-xl p-3 flex justify-between items-center text-xs transition-all ${
-                      isAborted 
-                        ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' 
-                        : 'bg-slate-950/80 border-white/5'
-                    }`}>
-                      <div>
-                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px]">
-                          <span>{dStr}</span>
-                          <span>•</span>
-                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                            {h.game_mode === '1vs1' ? `⚔️ vs ${h.opponent_name || 'Gegner'}` : '👤 Solo'}
-                          </span>
-                          {isWin && <span className="text-amber-400 font-bold">🏆 Sieg</span>}
-                          {isAborted && (
-                            <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-black">
-                              ⚠️ ABGEBROCHEN (Admin-Sicht)
+                    <div
+                      key={sessionKey}
+                      onClick={() => !isAborted && setExpandedSessionKey(isExpanded ? null : sessionKey)}
+                      className={`border rounded-2xl p-3.5 flex flex-col gap-2 text-xs transition-all ${
+                        !isAborted ? 'cursor-pointer hover:border-white/20 hover:bg-slate-900/90' : ''
+                      } ${
+                        isAborted 
+                          ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' 
+                          : isExpanded
+                          ? 'bg-slate-900/95 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                          : 'bg-slate-950/80 border-white/5'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="flex items-center gap-1.5 text-slate-400 text-[10px]">
+                            <span>{dStr}</span>
+                            <span>•</span>
+                            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                              {h.game_mode === '1vs1' ? `⚔️ vs ${h.opponent_name || 'Gegner'}` : '👤 Solo'}
                             </span>
-                          )}
+                            {isWin && <span className="text-amber-400 font-bold">🏆 Sieg</span>}
+                            {isAborted && (
+                              <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-black">
+                                ⚠️ ABGEBROCHEN (Admin-Sicht)
+                              </span>
+                            )}
+                          </div>
+                          <div className="font-bold text-white text-sm mt-0.5 flex items-center gap-2">
+                            <span>{h.player_name}</span>
+                            {isAborted && h.notes && (
+                              <span className="text-[10px] font-normal text-rose-300/80 italic">({h.notes})</span>
+                            )}
+                          </div>
+                          <div className="text-slate-400 text-[11px] flex items-center gap-1 mt-0.5">
+                            {isAborted ? (
+                              <span>Vorzeitig abgebrochen</span>
+                            ) : (
+                              <>
+                                <span className="text-amber-300 font-semibold">Best: {h.best_double || '-'}</span>
+                                <span className="text-slate-500">•</span>
+                                <span className="text-cyan-400/90 text-[10px]">
+                                  {isExpanded ? 'Klicken zum Einklappen' : 'Klicken für Details'}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="font-bold text-white text-sm mt-0.5 flex items-center gap-2">
-                          <span>{h.player_name}</span>
-                          {isAborted && h.notes && (
-                            <span className="text-[10px] font-normal text-rose-300/80 italic">({h.notes})</span>
+
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className={`text-base font-black ${isAborted ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {qPct}
+                            </div>
+                            <div className="text-[10px] text-slate-400">{h.total_hits} / {h.total_darts} Darts</div>
+                          </div>
+                          {!isAborted && (
+                            <div className="text-slate-400 pl-1">
+                              {isExpanded ? <ChevronUp size={16} className="text-emerald-400" /> : <ChevronDown size={16} />}
+                            </div>
                           )}
-                        </div>
-                        <div className="text-slate-400 text-[11px]">
-                          {isAborted ? 'Vorzeitig abgebrochen' : `Best: ${h.best_double || '-'}`}
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className={`text-base font-black ${isAborted ? 'text-rose-400' : 'text-emerald-400'}`}>
-                          {qPct}
+                      {/* AUFGEKLAPPTE DETAIL-STATISTIK DER DOPPEL */}
+                      {isExpanded && !isAborted && (
+                        <div className="pt-3 border-t border-white/10 space-y-2.5 animate-fadeIn">
+                          <div className="flex items-center justify-between text-[11px] font-bold">
+                            <span className="text-cyan-300 flex items-center gap-1.5">
+                              <Target size={13} className="text-cyan-400" />
+                              Trefferquote je Doppelfeld (10 Runden à 3 Darts):
+                            </span>
+                            <span className="text-slate-400 text-[10px]">
+                              Bester Wert: <strong className="text-amber-300">{h.best_double || '-'}</strong>
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                            {TARGETS.map((t) => {
+                              const key = t.toLowerCase();
+                              const hits = Number(h[`${key}_hits`] ?? 0);
+                              const darts = Number(h[`${key}_darts`] ?? (h.total_darts ? Math.round(h.total_darts / 5) : 30));
+                              const quote = Number(h[`${key}_quote`] ?? (darts > 0 ? hits / darts : 0));
+                              const pct = (quote * 100).toFixed(1);
+                              const isBest = h.best_double && h.best_double.startsWith(t);
+
+                              return (
+                                <div
+                                  key={t}
+                                  className={`p-2.5 rounded-xl border flex flex-col justify-between transition-all ${
+                                    isBest
+                                      ? 'bg-amber-500/10 border-amber-400/50 shadow-md shadow-amber-500/10 ring-1 ring-amber-400/30'
+                                      : 'bg-slate-900/90 border-white/10'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-black text-white">{t}</span>
+                                    {isBest ? (
+                                      <span className="text-[10px] font-black text-amber-300 bg-amber-400/20 px-1 py-0.2 rounded" title="Bestes Feld">
+                                        TOP 🌟
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-500">30 Darts</span>
+                                    )}
+                                  </div>
+
+                                  <div className="my-1.5">
+                                    <div className="text-base font-black text-emerald-300 font-mono">
+                                      {pct}%
+                                    </div>
+                                    <div className="text-[10px] font-mono text-slate-400">
+                                      {hits} / {darts} Hits
+                                    </div>
+                                  </div>
+
+                                  {/* Progress bar */}
+                                  <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
+                                    <div
+                                      className={`h-full rounded-full transition-all ${
+                                        isBest 
+                                          ? 'bg-gradient-to-r from-amber-400 to-yellow-300' 
+                                          : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                                      }`}
+                                      style={{ width: `${Math.min(100, Math.max(0, quote * 100))}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {h.notes && (
+                            <div className="text-[11px] text-slate-300 italic bg-slate-900/70 p-2.5 rounded-xl border border-white/5">
+                              💬 Notiz: {h.notes}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-[10px] text-slate-400">{h.total_hits} / {h.total_darts} Darts</div>
-                      </div>
+                      )}
                     </div>
                   );
                 })

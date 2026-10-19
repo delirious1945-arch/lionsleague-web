@@ -115,6 +115,7 @@ export async function getPdcChallengeHistoryAction(limit: number = 50) {
       shanghai_count: Number(r.shanghai_count || 0),
       doubles_hit: Number(r.doubles_hit || 0),
       badge_color: String(r.badge_color || 'Weiß'),
+      details: r.details ? String(r.details) : null,
       notes: String(r.notes || ''),
       is_winner: Number(r.is_winner || 0),
       is_aborted: Number(r.is_aborted || 0),
