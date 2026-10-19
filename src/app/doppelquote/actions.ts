@@ -38,29 +38,56 @@ export interface TrainingSessionData {
 export async function saveTrainingSessionAction(sessions: TrainingSessionData[]) {
   try {
     for (const s of sessions) {
-      await sql`
-        INSERT INTO training_doubles (
-          session_id, player_id, player_name, opponent_name, game_mode, training_date,
-          d20_hits, d20_darts, d20_quote,
-          d10_hits, d10_darts, d10_quote,
-          d16_hits, d16_darts, d16_quote,
-          d8_hits, d8_darts, d8_quote,
-          d4_hits, d4_darts, d4_quote,
-          total_hits, total_darts, total_quote,
-          best_double, notes, is_winner, is_aborted
-        ) VALUES (
-          ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
-          ${s.d20_hits}, ${s.d20_darts}, ${s.d20_quote},
-          ${s.d10_hits}, ${s.d10_darts}, ${s.d10_quote},
-          ${s.d16_hits}, ${s.d16_darts}, ${s.d16_quote},
-          ${s.d8_hits}, ${s.d8_darts}, ${s.d8_quote},
-          ${s.d4_hits}, ${s.d4_darts}, ${s.d4_quote},
-          ${s.total_hits}, ${s.total_darts}, ${s.total_quote},
-          ${s.best_double}, ${s.notes ?? ''}, ${s.is_winner ?? 0}, ${s.is_aborted ?? 0}
-        )
+      const existing = await sql`
+        SELECT id FROM training_doubles 
+        WHERE session_id = ${s.session_id} AND player_name = ${s.player_name}
+        LIMIT 1
       `;
+
+      if (existing.length > 0) {
+        // Bestehenden Eintrag mit gleicher Session-ID aktualisieren statt Duplikat einzufügen
+        await sql`
+          UPDATE training_doubles SET
+            player_id = ${s.player_id ?? null},
+            opponent_name = ${s.opponent_name ?? null},
+            game_mode = ${s.game_mode},
+            training_date = ${s.training_date},
+            d20_hits = ${s.d20_hits}, d20_darts = ${s.d20_darts}, d20_quote = ${s.d20_quote},
+            d10_hits = ${s.d10_hits}, d10_darts = ${s.d10_darts}, d10_quote = ${s.d10_quote},
+            d16_hits = ${s.d16_hits}, d16_darts = ${s.d16_darts}, d16_quote = ${s.d16_quote},
+            d8_hits = ${s.d8_hits}, d8_darts = ${s.d8_darts}, d8_quote = ${s.d8_quote},
+            d4_hits = ${s.d4_hits}, d4_darts = ${s.d4_darts}, d4_quote = ${s.d4_quote},
+            total_hits = ${s.total_hits}, total_darts = ${s.total_darts}, total_quote = ${s.total_quote},
+            best_double = ${s.best_double}, notes = ${s.notes ?? ''}, is_winner = ${s.is_winner ?? 0}, is_aborted = ${s.is_aborted ?? 0}
+          WHERE id = ${existing[0].id}
+        `;
+      } else {
+        await sql`
+          INSERT INTO training_doubles (
+            session_id, player_id, player_name, opponent_name, game_mode, training_date,
+            d20_hits, d20_darts, d20_quote,
+            d10_hits, d10_darts, d10_quote,
+            d16_hits, d16_darts, d16_quote,
+            d8_hits, d8_darts, d8_quote,
+            d4_hits, d4_darts, d4_quote,
+            total_hits, total_darts, total_quote,
+            best_double, notes, is_winner, is_aborted
+          ) VALUES (
+            ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
+            ${s.d20_hits}, ${s.d20_darts}, ${s.d20_quote},
+            ${s.d10_hits}, ${s.d10_darts}, ${s.d10_quote},
+            ${s.d16_hits}, ${s.d16_darts}, ${s.d16_quote},
+            ${s.d8_hits}, ${s.d8_darts}, ${s.d8_quote},
+            ${s.d4_hits}, ${s.d4_darts}, ${s.d4_quote},
+            ${s.total_hits}, ${s.total_darts}, ${s.total_quote},
+            ${s.best_double}, ${s.notes ?? ''}, ${s.is_winner ?? 0}, ${s.is_aborted ?? 0}
+          )
+        `;
+      }
     }
     revalidatePath('/doppelquote');
+    revalidatePath('/doppelquote/live');
+    revalidatePath('/training');
     revalidatePath('/analytics');
     return { success: true };
   } catch (error: any) {
@@ -111,6 +138,7 @@ export async function getTrainingHistoryAction(limit: number = 50) {
 }
 
 export async function recordAbortedSessionAction(data: {
+  session_id?: string;
   player_name: string;
   opponent_name?: string | null;
   game_mode: string;
@@ -119,7 +147,7 @@ export async function recordAbortedSessionAction(data: {
   reason?: string;
 }) {
   try {
-    const sessionId = 'aborted_' + Date.now();
+    const sessionId = data.session_id ? (data.session_id.startsWith('aborted_') ? data.session_id : 'aborted_' + data.session_id) : ('aborted_' + Date.now());
     const dateStr = new Date().toISOString();
     const quote = data.total_darts > 0 ? data.total_hits / data.total_darts : 0;
     const noteText = data.reason || 'Vorzeitiger Spielabbruch';

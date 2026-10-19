@@ -27,21 +27,51 @@ export interface PdcChallengeSessionData {
 export async function savePdcChallengeAction(sessions: PdcChallengeSessionData[]) {
   try {
     for (const s of sessions) {
-      await sql`
-        INSERT INTO training_pdc_challenge (
-          session_id, player_id, player_name, opponent_name, game_mode, training_date,
-          score_part1, score_part2, score_part3, total_score,
-          shanghai_count, doubles_hit, badge_color, details, notes,
-          is_winner, is_aborted
-        ) VALUES (
-          ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
-          ${s.score_part1}, ${s.score_part2}, ${s.score_part3}, ${s.total_score},
-          ${s.shanghai_count}, ${s.doubles_hit}, ${s.badge_color}, ${s.details ?? null}, ${s.notes ?? ''},
-          ${s.is_winner ?? 0}, ${s.is_aborted ?? 0}
-        )
+      const existing = await sql`
+        SELECT id FROM training_pdc_challenge 
+        WHERE session_id = ${s.session_id} AND player_name = ${s.player_name}
+        LIMIT 1
       `;
+
+      if (existing.length > 0) {
+        // Bestehenden Eintrag mit gleicher Session-ID aktualisieren statt Duplikat einzufügen
+        await sql`
+          UPDATE training_pdc_challenge SET
+            player_id = ${s.player_id ?? null},
+            opponent_name = ${s.opponent_name ?? null},
+            game_mode = ${s.game_mode},
+            training_date = ${s.training_date},
+            score_part1 = ${s.score_part1},
+            score_part2 = ${s.score_part2},
+            score_part3 = ${s.score_part3},
+            total_score = ${s.total_score},
+            shanghai_count = ${s.shanghai_count},
+            doubles_hit = ${s.doubles_hit},
+            badge_color = ${s.badge_color},
+            details = ${s.details ?? null},
+            notes = ${s.notes ?? ''},
+            is_winner = ${s.is_winner ?? 0},
+            is_aborted = ${s.is_aborted ?? 0}
+          WHERE id = ${existing[0].id}
+        `;
+      } else {
+        await sql`
+          INSERT INTO training_pdc_challenge (
+            session_id, player_id, player_name, opponent_name, game_mode, training_date,
+            score_part1, score_part2, score_part3, total_score,
+            shanghai_count, doubles_hit, badge_color, details, notes,
+            is_winner, is_aborted
+          ) VALUES (
+            ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
+            ${s.score_part1}, ${s.score_part2}, ${s.score_part3}, ${s.total_score},
+            ${s.shanghai_count}, ${s.doubles_hit}, ${s.badge_color}, ${s.details ?? null}, ${s.notes ?? ''},
+            ${s.is_winner ?? 0}, ${s.is_aborted ?? 0}
+          )
+        `;
+      }
     }
     revalidatePath('/training/pdc-challenge');
+    revalidatePath('/training/pdc-challenge/live');
     revalidatePath('/training');
     revalidatePath('/analytics');
     return { success: true };
@@ -97,6 +127,7 @@ export async function getPdcChallengeHistoryAction(limit: number = 50) {
 }
 
 export async function recordAbortedPdcAction(data: {
+  session_id?: string;
   player_name: string;
   opponent_name?: string | null;
   game_mode: string;
@@ -107,7 +138,7 @@ export async function recordAbortedPdcAction(data: {
   reason?: string;
 }) {
   try {
-    const sessionId = 'aborted_pdc_' + Date.now();
+    const sessionId = data.session_id ? (data.session_id.startsWith('aborted_pdc_') ? data.session_id : 'aborted_pdc_' + data.session_id) : ('aborted_pdc_' + Date.now());
     const dateStr = new Date().toISOString();
     const noteText = data.reason || 'Vorzeitiger Spielabbruch';
 

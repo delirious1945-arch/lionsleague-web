@@ -118,6 +118,8 @@ export default function PdcChallengeClient({
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [isGameInitialized, setIsGameInitialized] = useState<boolean>(false);
   const [shanghaiNotice, setShanghaiNotice] = useState<string | null>(null);
+  const [gameSessionId, setGameSessionId] = useState<string>(() => 'pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+  const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
 
   // Web Audio Synthesizer
   const playSound = (freq: number, type: OscillatorType = 'sine', duration: number = 0.1) => {
@@ -273,6 +275,8 @@ export default function PdcChallengeClient({
           setCurrentTargetIndex(cached.currentTargetIndex ?? 0);
           setActivePlayer(cached.activePlayer || 1);
           setNotes(cached.notes || '');
+          if (cached.gameSessionId) setGameSessionId(cached.gameSessionId);
+          if (cached.isSavedInCloud) setIsSavedInCloud(true);
         }
       }
     } catch (e) {
@@ -304,6 +308,8 @@ export default function PdcChallengeClient({
         currentTargetIndex,
         activePlayer,
         notes,
+        gameSessionId,
+        isSavedInCloud,
         updatedAt: Date.now(),
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(sessionData));
@@ -314,6 +320,8 @@ export default function PdcChallengeClient({
     isGameInitialized,
     hasStarted,
     isCompleted,
+    gameSessionId,
+    isSavedInCloud,
     gameMode,
     p1Name,
     p2Name,
@@ -554,12 +562,18 @@ export default function PdcChallengeClient({
 
   // Speichern in Supabase
   const saveSession = async (customP1 = stateP1, customP2 = stateP2) => {
+    if (isSavedInCloud) {
+      setSaveStatus('ℹ️ Dieses Spiel wurde bereits in der Supabase Cloud gespeichert!');
+      setTimeout(() => setSaveStatus(null), 3500);
+      return;
+    }
+
     const stats1 = calculatePlayerStats(customP1);
     const stats2 = calculatePlayerStats(customP2);
 
     const p1Id = players.find((p) => p.name === p1Name)?.id || null;
     const p2Id = players.find((p) => p.name === p2Name)?.id || null;
-    const sessionId = 'pdc_' + Date.now();
+    const sessionId = gameSessionId;
     const dateStr = new Date().toISOString();
 
     const buildPayload = (
@@ -601,17 +615,21 @@ export default function PdcChallengeClient({
     const res = await savePdcChallengeAction(sessionsToSave);
 
     if (res.success) {
+      setIsSavedInCloud(true);
       localStorage.removeItem(CACHE_KEY);
       setSaveStatus('✅ Erfolgreich in Supabase Cloud gespeichert!');
       setTimeout(() => setSaveStatus(null), 4000);
-      setHistory((prev) => [
-        ...sessionsToSave.map((s) => ({
-          ...s,
-          is_aborted: 0,
-          created_at: new Date().toISOString(),
-        })),
-        ...prev,
-      ]);
+      setHistory((prev) => {
+        const remaining = prev.filter((h) => h.session_id !== sessionId);
+        return [
+          ...sessionsToSave.map((s) => ({
+            ...s,
+            is_aborted: 0,
+            created_at: new Date().toISOString(),
+          })),
+          ...remaining,
+        ];
+      });
     } else {
       setSaveStatus('⚠️ Fehler beim Speichern: ' + res.error);
     }
@@ -630,6 +648,7 @@ export default function PdcChallengeClient({
       if (!confirm('Möchtest du das aktuelle Spiel wirklich abbrechen?')) return;
 
       await recordAbortedPdcAction({
+        session_id: gameSessionId,
         player_name: p1Name,
         opponent_name: gameMode === '1vs1' ? p2Name : null,
         game_mode: gameMode,
@@ -651,6 +670,7 @@ export default function PdcChallengeClient({
       if (!confirm('Möchtest du das aktuelle Spiel wirklich abbrechen?')) return;
 
       await recordAbortedPdcAction({
+        session_id: gameSessionId,
         player_name: p1Name,
         opponent_name: gameMode === '1vs1' ? p2Name : null,
         game_mode: gameMode,
@@ -663,6 +683,8 @@ export default function PdcChallengeClient({
     }
 
     localStorage.removeItem(CACHE_KEY);
+    setGameSessionId('pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+    setIsSavedInCloud(false);
     setStateP1(createInitialPlayerState());
     setStateP2(createInitialPlayerState());
     setStage('part1');
@@ -1272,10 +1294,24 @@ export default function PdcChallengeClient({
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
                 <button
                   onClick={() => saveSession()}
-                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 cursor-pointer"
+                  disabled={isSavedInCloud}
+                  className={`w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    isSavedInCloud
+                      ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed opacity-90 shadow-none'
+                      : 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-xl shadow-amber-500/30'
+                  }`}
                 >
-                  <Save className="w-4 h-4" />
-                  <span>In Supabase Cloud speichern</span>
+                  {isSavedInCloud ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Bereits in Cloud gespeichert</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>In Supabase Cloud speichern</span>
+                    </>
+                  )}
                 </button>
 
                 <button

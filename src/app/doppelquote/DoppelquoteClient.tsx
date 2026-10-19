@@ -39,6 +39,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [isGameInitialized, setIsGameInitialized] = useState<boolean>(false);
   const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
+  const [gameSessionId, setGameSessionId] = useState<string>(() => 'dq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+  const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
 
   // Scores State
   const [scoresP1, setScoresP1] = useState<Record<string, (number | null)[]>>({
@@ -146,6 +148,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             setCurrentShotIndex(cached.currentShotIndex ?? 0);
             setActivePlayer(cached.activePlayer || 1);
             setNotes(cached.notes || '');
+            if (cached.gameSessionId) setGameSessionId(cached.gameSessionId);
+            if (cached.isSavedInCloud) setIsSavedInCloud(true);
             setRestoredFromCache(true);
           }
         }
@@ -170,6 +174,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
     if (hasStarted && !isCompleted) {
       const sessionData = {
+        gameSessionId,
+        isSavedInCloud,
         gameMode,
         p1Name,
         p2Name,
@@ -189,6 +195,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     isGameInitialized,
     hasStarted,
     isCompleted,
+    gameSessionId,
+    isSavedInCloud,
     gameMode,
     p1Name,
     p2Name,
@@ -322,9 +330,15 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
   // Speichern in Supabase
   const saveSession = async (customP1 = scoresP1, customP2 = scoresP2) => {
+    if (isSavedInCloud) {
+      setSaveStatus('ℹ️ Dieses Spiel wurde bereits in der Cloud gespeichert.');
+      setTimeout(() => setSaveStatus(null), 3000);
+      return;
+    }
+
     const p1Id = players.find(p => p.name === p1Name)?.id || null;
     const p2Id = players.find(p => p.name === p2Name)?.id || null;
-    const sessionId = 'session_' + Date.now();
+    const sessionId = gameSessionId;
     const dateStr = new Date().toISOString();
 
     const buildPayload = (pName: string, pId: number | null, oppName: string | null, scores: Record<string, (number | null)[]>, isWin: number) => {
@@ -392,13 +406,17 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     const res = await saveTrainingSessionAction(sessionsToSave);
 
     if (res.success) {
+      setIsSavedInCloud(true);
       // Nach erfolgreichem Speichern: Cache leeren
       localStorage.removeItem(CACHE_KEY);
       setRestoredFromCache(false);
       setSaveStatus('✅ Erfolgreich in Supabase Cloud gespeichert!');
       setTimeout(() => setSaveStatus(null), 4000);
       // Lokal in Historie einfügen
-      setHistory(prev => [...sessionsToSave.map(s => ({ ...s, is_aborted: 0, created_at: new Date().toISOString() })), ...prev]);
+      setHistory(prev => {
+        const filtered = prev.filter(h => h.session_id !== sessionId);
+        return [...sessionsToSave.map(s => ({ ...s, is_aborted: 0, created_at: new Date().toISOString() })), ...filtered];
+      });
     } else {
       setSaveStatus('⚠️ Fehler beim Speichern: ' + res.error);
     }
@@ -418,6 +436,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       // Im Hintergrund in Datenbank als Abbruch registrieren
       const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
       await recordAbortedSessionAction({
+        session_id: gameSessionId,
         player_name: p1Name,
         opponent_name: gameMode === '1vs1' ? p2Name : null,
         game_mode: gameMode,
@@ -440,6 +459,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       const dartsThrown = gameMode === 'solo' ? p1Stats.thrown : (p1Stats.thrown + p2Stats.thrown);
       await recordAbortedSessionAction({
+        session_id: gameSessionId,
         player_name: p1Name,
         opponent_name: gameMode === '1vs1' ? p2Name : null,
         game_mode: gameMode,
@@ -449,6 +469,9 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       });
     }
 
+    setGameSessionId('dq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+    setIsSavedInCloud(false);
+    setSaveStatus(null);
     localStorage.removeItem(CACHE_KEY);
     setRestoredFromCache(false);
     const empty = () => ({
@@ -1071,9 +1094,22 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       <div className="flex gap-2">
         <button
           onClick={() => saveSession()}
-          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-[0.98] transition-all"
+          disabled={isSavedInCloud}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+            isSavedInCloud
+              ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed opacity-90'
+              : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-[0.98]'
+          }`}
         >
-          <Save size={16} /> In Supabase Cloud speichern
+          {isSavedInCloud ? (
+            <>
+              <CheckCircle2 size={16} className="text-emerald-400" /> Bereits in Cloud gespeichert
+            </>
+          ) : (
+            <>
+              <Save size={16} /> In Supabase Cloud speichern
+            </>
+          )}
         </button>
         <button
           onClick={resetGame}
