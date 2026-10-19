@@ -194,12 +194,14 @@ export interface LiveRankingResult {
   totalSessions: number;
   totalDartsThrown: number;
   hasTodayData: boolean;
-  filterUsed: 'today' | 'all';
+  hasMonthData: boolean;
+  filterUsed: 'today' | 'month' | 'all';
+  monthLabel: string;
   lastUpdate: string;
 }
 
 export async function getLiveDoppelquoteRankingAction(
-  filter: 'today' | 'all' = 'today'
+  filter: 'today' | 'month' | 'all' = 'today'
 ): Promise<LiveRankingResult> {
   try {
     const rawRows = await sql`
@@ -211,7 +213,10 @@ export async function getLiveDoppelquoteRankingAction(
     // Streng reguläre Spiele fürs Ranking filtern: Abgebrochene Spiele werden NICHT im TV-Ranking gewertet!
     const allRows = rawRows.filter((r: any) => Number(r.is_aborted || 0) === 0);
 
-    const todayDateStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const todayDateStr = now.toISOString().split('T')[0];
+    const currentYearMonth = now.toISOString().slice(0, 7);
+    const monthLabel = now.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
 
     // Prüfen, ob heute Daten vorhanden sind
     const todayRows = allRows.filter((r: any) => {
@@ -220,9 +225,16 @@ export async function getLiveDoppelquoteRankingAction(
       return rowDate === todayDateStr || createdDate === todayDateStr;
     });
 
+    // Prüfen, ob in diesem Kalendermonat Daten vorhanden sind (startet jeden 1. des Monats automatisch neu)
+    const monthRows = allRows.filter((r: any) => {
+      const rowDate = r.training_date ? String(r.training_date).slice(0, 7) : '';
+      const createdDate = r.created_at ? new Date(r.created_at).toISOString().slice(0, 7) : '';
+      return rowDate === currentYearMonth || createdDate === currentYearMonth;
+    });
+
     const hasTodayData = todayRows.length > 0;
-    // Wenn heute gewählt ist, aber noch keine Daten existieren, Fallback auf alle oder leere Menge
-    const activeRows = filter === 'today' ? todayRows : allRows;
+    const hasMonthData = monthRows.length > 0;
+    const activeRows = filter === 'today' ? todayRows : filter === 'month' ? monthRows : allRows;
 
     let overallRanking: PlayerOverallRank[] = [];
     let targetRankings = {
@@ -363,7 +375,8 @@ export async function getLiveDoppelquoteRankingAction(
         D4: buildTargetRankingToday('D4', 'd4_quote', 'd4_hits', 'd4_darts'),
       };
     } else {
-      // GESAMT-HISTORIE: Kumulierte Aggregation pro Spieler
+      // MONATSRANKING oder GESAMT-HISTORIE: Kumulierte Aggregation pro Spieler
+      const targetDataset = filter === 'month' ? monthRows : allRows;
       const playerMap = new Map<
         string,
         {
@@ -385,7 +398,7 @@ export async function getLiveDoppelquoteRankingAction(
         }
       >();
 
-      for (const r of allRows) {
+      for (const r of targetDataset) {
         const pName = String(r.player_name || '').trim();
         if (!pName) continue;
 
@@ -482,7 +495,6 @@ export async function getLiveDoppelquoteRankingAction(
         }
         return b.total_hits - a.total_hits;
       });
-
       overallRanking.forEach((p, idx) => {
         p.rank = idx + 1;
       });
@@ -537,7 +549,9 @@ export async function getLiveDoppelquoteRankingAction(
       totalSessions: activeRows.length,
       totalDartsThrown,
       hasTodayData,
+      hasMonthData,
       filterUsed: filter,
+      monthLabel,
       lastUpdate: new Date().toLocaleTimeString('de-DE', {
         hour: '2-digit',
         minute: '2-digit',
@@ -552,7 +566,9 @@ export async function getLiveDoppelquoteRankingAction(
       totalSessions: 0,
       totalDartsThrown: 0,
       hasTodayData: false,
+      hasMonthData: false,
       filterUsed: filter,
+      monthLabel: new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }),
       lastUpdate: new Date().toLocaleTimeString('de-DE'),
     };
   }

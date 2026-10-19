@@ -28,7 +28,7 @@ import {
 
 interface DoppelquoteLiveClientProps {
   initialData: LiveRankingResult;
-  initialFilter: 'today' | 'all';
+  initialFilter: 'today' | 'month' | 'all';
 }
 
 const TARGETS: ('D20' | 'D10' | 'D16' | 'D8' | 'D4')[] = ['D20', 'D10', 'D16', 'D8', 'D4'];
@@ -36,7 +36,7 @@ const TARGETS: ('D20' | 'D10' | 'D16' | 'D8' | 'D4')[] = ['D20', 'D10', 'D16', '
 const TARGET_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
   D20: { bg: 'bg-rose-500/15', border: 'border-rose-500/40', text: 'text-rose-300', glow: 'shadow-[0_0_20px_rgba(244,63,94,0.25)]' },
   D10: { bg: 'bg-blue-500/15', border: 'border-blue-500/40', text: 'text-blue-300', glow: 'shadow-[0_0_20px_rgba(59,130,246,0.25)]' },
-  D16: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', text: 'text-emerald-300', glow: 'shadow-[0_0_20px_rgba(16,185,129,0.25)]' },
+  D16: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/40', text: 'text-emerald-300', glow: 'shadow-[0_0_20px_rgba(160,185,129,0.25)]' },
   D8:  { bg: 'bg-amber-500/15', border: 'border-amber-500/40', text: 'text-amber-300', glow: 'shadow-[0_0_20px_rgba(245,158,11,0.25)]' },
   D4:  { bg: 'bg-purple-500/15', border: 'border-purple-500/40', text: 'text-purple-300', glow: 'shadow-[0_0_20px_rgba(168,85,247,0.25)]' },
 };
@@ -46,7 +46,7 @@ export default function DoppelquoteLiveClient({
   initialFilter,
 }: DoppelquoteLiveClientProps) {
   const [data, setData] = useState<LiveRankingResult>(initialData);
-  const [filter, setFilter] = useState<'today' | 'all'>(initialFilter);
+  const [filter, setFilter] = useState<'today' | 'month' | 'all'>(initialFilter);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(6);
@@ -190,14 +190,14 @@ export default function DoppelquoteLiveClient({
         {/* Center: Live-Sync Info & Filter */}
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
           
-          {/* Filter: Heute vs. Gesamt */}
+          {/* Filter: Heute vs. Monat vs. Gesamt */}
           <div className="bg-slate-950 p-1 rounded-xl border border-white/10 flex items-center gap-1 shadow-inner">
             <button
               onClick={() => {
                 setFilter('today');
                 refreshData('today');
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                 filter === 'today'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -207,16 +207,29 @@ export default function DoppelquoteLiveClient({
             </button>
             <button
               onClick={() => {
+                setFilter('month');
+                refreshData('month');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                filter === 'month'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-400/50 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>🗓️</span> Monatsranking
+            </button>
+            <button
+              onClick={() => {
                 setFilter('all');
                 refreshData('all');
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                 filter === 'all'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-sm'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <span>📅</span> Gesamt-Historie
+              <span>🏆</span> Gesamtranking
             </button>
           </div>
 
@@ -332,16 +345,24 @@ export default function DoppelquoteLiveClient({
                 </div>
                 <div>
                   <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide flex items-center gap-2">
-                    Gesamtranking Doppelquote
+                    {filter === 'today'
+                      ? 'Heutiges Training'
+                      : filter === 'month'
+                      ? `Monatsranking (${data.monthLabel || 'Monat'})`
+                      : 'Gesamtranking Doppelquote'}
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Gewertete Treffer über alle 10 Aufnahmen (D20, D10, D16, D8, D4)
+                    {filter === 'today'
+                      ? 'Alle absolvierten Einzeldurchgänge des heutigen Tages'
+                      : filter === 'month'
+                      ? 'Kumulierte Vereinswertung für den laufenden Kalendermonat'
+                      : 'Gewertete Treffer über alle 10 Aufnahmen (D20, D10, D16, D8, D4)'}
                   </p>
                 </div>
               </div>
 
               <span className="text-xs font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-xl">
-                {filter === 'today' ? 'Heute' : 'Gesamt'}
+                {filter === 'today' ? 'Heute' : filter === 'month' ? (data.monthLabel || 'Monat') : 'Gesamt'}
               </span>
             </div>
 
@@ -350,7 +371,7 @@ export default function DoppelquoteLiveClient({
               <div className="my-auto py-12 text-center space-y-3">
                 <div className="text-5xl animate-bounce">🎯</div>
                 <h3 className="text-lg font-bold text-white">
-                  Noch keine Ergebnisse für {filter === 'today' ? 'heute' : 'diesen Filter'} erfasst
+                  Noch keine Ergebnisse für {filter === 'today' ? 'heute' : filter === 'month' ? 'diesen Monat' : 'diesen Filter'} erfasst
                 </h3>
                 <p className="text-xs text-slate-400 max-w-md mx-auto">
                   Sobald die Spieler am Oche stehen und das Spiel beenden, synchronisiert sich dieses TV-Board automatisch im Sekundentakt.
@@ -440,9 +461,9 @@ export default function DoppelquoteLiveClient({
                                 {player.attempt_label}
                               </span>
                             )}
-                            {isFirst && filter === 'all' && (
+                            {isFirst && filter !== 'today' && (
                               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 hidden sm:inline-block">
-                                LEADER
+                                {filter === 'month' ? 'MONATSBESTER' : 'LEADER'}
                               </span>
                             )}
                           </div>
@@ -459,7 +480,7 @@ export default function DoppelquoteLiveClient({
                               </>
                             ) : (
                               <>
-                                <span>{player.sessions_count} Durchgang{player.sessions_count > 1 ? 'e' : ''}</span>
+                                <span>{player.sessions_count} Durchgang{player.sessions_count > 1 ? 'e' : ''} {filter === 'month' ? 'im Monat' : 'gesamt'}</span>
                                 <span>•</span>
                                 <span className="font-mono text-cyan-300 font-bold">{player.total_hits}/{player.total_darts} Treffer</span>
                                 <span>•</span>

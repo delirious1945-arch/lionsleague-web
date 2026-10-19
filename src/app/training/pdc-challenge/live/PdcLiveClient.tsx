@@ -27,7 +27,7 @@ import {
 
 interface PdcLiveClientProps {
   initialData: PdcLiveRankingResult;
-  initialFilter: 'today' | 'all';
+  initialFilter: 'today' | 'month' | 'all';
 }
 
 export default function PdcLiveClient({
@@ -35,7 +35,7 @@ export default function PdcLiveClient({
   initialFilter,
 }: PdcLiveClientProps) {
   const [data, setData] = useState<PdcLiveRankingResult>(initialData);
-  const [filter, setFilter] = useState<'today' | 'all'>(initialFilter);
+  const [filter, setFilter] = useState<'today' | 'month' | 'all'>(initialFilter);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(8);
@@ -83,7 +83,7 @@ export default function PdcLiveClient({
   };
 
   // Daten abrufen
-  const refreshData = async (selectedFilter = filter) => {
+  const refreshData = async (selectedFilter: 'today' | 'month' | 'all' = filter) => {
     setIsUpdating(true);
     try {
       const result = await getLivePdcRankingAction(selectedFilter);
@@ -178,6 +178,19 @@ export default function PdcLiveClient({
           </button>
           <button
             onClick={() => {
+              setFilter('month');
+              refreshData('month');
+            }}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              filter === 'month'
+                ? 'bg-purple-500 text-white shadow-md font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Monat ({data.hasMonthData ? (data.monthLabel || 'Aktiv') : 'Leer'})
+          </button>
+          <button
+            onClick={() => {
               setFilter('all');
               refreshData('all');
             }}
@@ -187,7 +200,7 @@ export default function PdcLiveClient({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Alle Zeiten
+            Gesamtranking
           </button>
         </div>
 
@@ -235,7 +248,7 @@ export default function PdcLiveClient({
               <div className="bg-gradient-to-br from-amber-500/20 via-slate-900/90 to-slate-950 border-2 border-amber-400/60 rounded-3xl p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5">
-                    👑 PDC CHAMPION
+                    {filter === 'today' ? '👑 TAGESBESTER' : filter === 'month' ? '👑 MONATSCHAMPION' : '👑 PDC CHAMPION'}
                   </span>
                   <Trophy className="w-6 h-6 text-amber-400" />
                 </div>
@@ -268,7 +281,7 @@ export default function PdcLiveClient({
               <div className="bg-gradient-to-br from-emerald-500/20 via-slate-900/90 to-slate-950 border-2 border-emerald-500/50 rounded-3xl p-5 shadow-2xl flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
-                    🎯 DOPPEL-KÖNIG (TEIL 2)
+                    {filter === 'today' ? '🎯 DOPPEL-KÖNIG (HEUTE)' : filter === 'month' ? '🎯 DOPPEL-KÖNIG (MONAT)' : '🎯 DOPPEL-KÖNIG (TEIL 2)'}
                   </span>
                   <Award className="w-6 h-6 text-emerald-400" />
                 </div>
@@ -301,7 +314,7 @@ export default function PdcLiveClient({
               <div className="bg-gradient-to-br from-purple-500/20 via-slate-900/90 to-slate-950 border-2 border-purple-500/50 rounded-3xl p-5 shadow-2xl flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1.5">
-                    ✨ SHANGHAI MASTER
+                    {filter === 'today' ? '✨ SHANGHAI MASTER (HEUTE)' : filter === 'month' ? '✨ SHANGHAI MASTER (MONAT)' : '✨ SHANGHAI MASTER'}
                   </span>
                   <Sparkles className="w-6 h-6 text-purple-400" />
                 </div>
@@ -337,8 +350,12 @@ export default function PdcLiveClient({
             <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
               <span>
-                {filter === 'today' ? 'Heutige Durchgänge' : 'Gesamtranking'} ({data.leaderboard.length}{' '}
-                {filter === 'today' ? 'Durchgänge' : 'Spieler'})
+                {filter === 'today'
+                  ? 'Heutige Durchgänge'
+                  : filter === 'month'
+                  ? `Monatsranking (${data.monthLabel || 'Monat'})`
+                  : 'Gesamtranking'}{' '}
+                ({data.leaderboard.length} {filter === 'today' ? 'Durchgänge' : 'Spieler'})
               </span>
             </h2>
             <div className="text-xs text-slate-400">
@@ -352,6 +369,8 @@ export default function PdcLiveClient({
               <div className="text-slate-400 text-sm font-bold">
                 {filter === 'today'
                   ? 'Heute wurden noch keine PDC Challenges gespielt.'
+                  : filter === 'month'
+                  ? 'In diesem Monat wurden noch keine PDC Challenges gespielt.'
                   : 'Noch keine Einträge in der Datenbank vorhanden.'}
               </div>
               <div className="text-xs text-slate-500">

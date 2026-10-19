@@ -12,14 +12,23 @@ export const dynamic = 'force-dynamic';
 
 export default async function PdcLivePage() {
   const initialDataToday = await getLivePdcRankingAction('today');
-  const initialDataAll = !initialDataToday.hasTodayData
-    ? await getLivePdcRankingAction('all')
-    : null;
+  let initialData = initialDataToday;
+  let initialFilter: 'today' | 'month' | 'all' = 'today';
+
+  if (!initialDataToday.hasTodayData) {
+    if (initialDataToday.hasMonthData) {
+      initialData = await getLivePdcRankingAction('month');
+      initialFilter = 'month';
+    } else {
+      initialData = await getLivePdcRankingAction('all');
+      initialFilter = 'all';
+    }
+  }
 
   return (
     <PdcLiveClient
-      initialData={initialDataToday.hasTodayData ? initialDataToday : (initialDataAll || initialDataToday)}
-      initialFilter={initialDataToday.hasTodayData ? 'today' : 'all'}
+      initialData={initialData}
+      initialFilter={initialFilter}
     />
   );
 }
