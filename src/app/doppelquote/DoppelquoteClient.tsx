@@ -927,7 +927,9 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-blue-500"
               >
                 {players.map(p => (
-                  <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
+                  <option key={p.id} value={p.name}>
+                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                  </option>
                 ))}
               </select>
             )}
@@ -944,7 +946,9 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-amber-500"
               >
                 {players.map(p => (
-                  <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
+                  <option key={p.id} value={p.name}>
+                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                  </option>
                 ))}
               </select>
             </div>

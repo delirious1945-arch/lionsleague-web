@@ -609,8 +609,9 @@ export async function getPlayers(): Promise<Player[]> {
     const rows = await sql`
       SELECT id, name, team, role, estimated_double_quote
       FROM players
-      WHERE team IN ('A-Team', 'B-Team')
-        AND name NOT LIKE 'Board %'
+      WHERE name NOT LIKE 'Board %'
+        AND name != 'User_Test'
+        AND name != 'Normal'
       ORDER BY name ASC
     `;
     return rows.map((r) => ({

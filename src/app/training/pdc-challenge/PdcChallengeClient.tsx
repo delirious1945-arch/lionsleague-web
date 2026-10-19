@@ -1005,7 +1005,7 @@ export default function PdcChallengeClient({
               >
                 {players.map((p) => (
                   <option key={p.id} value={p.name}>
-                    {p.name} ({p.team})
+                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
                   </option>
                 ))}
               </select>
@@ -1046,7 +1046,7 @@ export default function PdcChallengeClient({
               >
                 {players.map((p) => (
                   <option key={p.id} value={p.name}>
-                    {p.name} ({p.team})
+                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
                   </option>
                 ))}
               </select>
