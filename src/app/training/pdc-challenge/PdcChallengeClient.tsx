@@ -100,6 +100,8 @@ export default function PdcChallengeClient({
   const [p1Name, setP1Name] = useState<string>(defaultP1);
   const [p2Name, setP2Name] = useState<string>(players[1]?.name || 'Dirk Ostermann');
   const [activePlayer, setActivePlayer] = useState<1 | 2>(1);
+  const [isMatchStarted, setIsMatchStarted] = useState<boolean>(false);
+  const [showSetupSettings, setShowSetupSettings] = useState<boolean>(false);
 
   // Flow State
   const [stage, setStage] = useState<GameStage>('part1');
@@ -258,6 +260,7 @@ export default function PdcChallengeClient({
       : p1Stats.totalDartsThrown >= 57 && p2Stats.totalDartsThrown >= 57;
 
   const hasStarted = p1Stats.totalDartsThrown > 0 || p2Stats.totalDartsThrown > 0;
+  const isPlaying = (isMatchStarted || hasStarted) && !isCompleted;
   const isGameActive = hasStarted && !isCompleted;
 
   // 1. Lokalen Geräte-Cache beim Start wiederherstellen
@@ -282,6 +285,7 @@ export default function PdcChallengeClient({
           setNotes(cached.notes || '');
           if (cached.gameSessionId) setGameSessionId(cached.gameSessionId);
           if (cached.isSavedInCloud) setIsSavedInCloud(true);
+          if (cached.isMatchStarted) setIsMatchStarted(true);
         }
       }
     } catch (e) {
@@ -302,8 +306,9 @@ export default function PdcChallengeClient({
   useEffect(() => {
     if (!isGameInitialized) return;
 
-    if (hasStarted && !isCompleted) {
+    if ((isMatchStarted || hasStarted) && !isCompleted) {
       const sessionData = {
+        isMatchStarted,
         gameMode,
         p1Name,
         p2Name,
@@ -318,11 +323,12 @@ export default function PdcChallengeClient({
         updatedAt: Date.now(),
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(sessionData));
-    } else if (!hasStarted) {
+    } else if (!hasStarted && !isMatchStarted) {
       localStorage.removeItem(CACHE_KEY);
     }
   }, [
     isGameInitialized,
+    isMatchStarted,
     hasStarted,
     isCompleted,
     gameSessionId,
@@ -760,6 +766,8 @@ export default function PdcChallengeClient({
     setNotes('');
     setSaveStatus(null);
     setActiveTab('game');
+    setIsMatchStarted(false);
+    setShowSetupSettings(false);
   };
 
   // Aktuelles Target Label
@@ -806,12 +814,12 @@ export default function PdcChallengeClient({
   }, [history, isAdmin, adminPlayerFilter, currentUserName]);
 
   return (
-    <div className="max-w-5xl mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-5 animate-fadeIn">
+    <div className="pdc-container max-w-5xl mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-5 animate-fadeIn">
       {/* SHANGHAI FRAGE MODAL (wenn 6 eingegeben wird) */}
       {shanghaiPromptTarget !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-gradient-to-b from-slate-900 via-[#0d172e] to-slate-950 border-2 border-amber-400 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center space-y-5 shadow-2xl shadow-amber-500/30">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center space-y-5 shadow-2xl shadow-amber-500/20">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20">
               🌟
             </div>
 
@@ -822,10 +830,10 @@ export default function PdcChallengeClient({
               <h3 className="text-2xl sm:text-3xl font-black text-white mt-1">
                 6 Treffer erzielt!
               </h3>
-              <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+              <p className="text-sm text-zinc-300 mt-2 leading-relaxed">
                 Wurde die 6 per <strong>Shanghai</strong> geworfen?
                 <br />
-                <span className="text-xs text-amber-300 font-semibold">
+                <span className="text-xs text-amber-400 font-bold">
                   (Genau 1x Single, 1x Double und 1x Triple = +100 Bonus-Punkte)
                 </span>
               </p>
@@ -837,10 +845,10 @@ export default function PdcChallengeClient({
                   setShanghaiPromptTarget(null);
                   commitShanghaiRound(6, true);
                 }}
-                className="py-4 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 active:scale-95 text-slate-950 font-black text-sm sm:text-base flex flex-col items-center justify-center gap-1 shadow-xl shadow-amber-500/30 cursor-pointer"
+                className="py-4 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-zinc-950 font-black text-sm sm:text-base flex flex-col items-center justify-center gap-1 shadow-xl shadow-amber-500/30 cursor-pointer"
               >
                 <span>🌟 Ja, Shanghai!</span>
-                <span className="text-xs font-mono text-slate-900 font-bold">
+                <span className="text-xs font-mono text-zinc-950 font-bold">
                   +{shanghaiPromptTarget * 6 + 100} Punkte
                 </span>
               </button>
@@ -850,10 +858,10 @@ export default function PdcChallengeClient({
                   setShanghaiPromptTarget(null);
                   commitShanghaiRound(6, false);
                 }}
-                className="py-4 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 border-2 border-slate-600 text-white font-black text-sm sm:text-base flex flex-col items-center justify-center gap-1 shadow-lg cursor-pointer"
+                className="py-4 px-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 border-2 border-zinc-700 text-white font-black text-sm sm:text-base flex flex-col items-center justify-center gap-1 shadow-lg cursor-pointer"
               >
                 <span>❌ Nein, reguläre 6</span>
-                <span className="text-xs font-mono text-slate-300">
+                <span className="text-xs font-mono text-zinc-300">
                   +{shanghaiPromptTarget * 6} Punkte
                 </span>
               </button>
@@ -861,7 +869,7 @@ export default function PdcChallengeClient({
 
             <button
               onClick={() => setShanghaiPromptTarget(null)}
-              className="text-xs text-slate-400 hover:text-white underline pt-2 cursor-pointer"
+              className="text-xs text-zinc-400 hover:text-white underline pt-2 cursor-pointer"
             >
               Abbrechen / Wurf korrigieren
             </button>
@@ -869,312 +877,382 @@ export default function PdcChallengeClient({
         </div>
       )}
 
-      {/* Top Header & Navigation */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleSafeNavigation('/training')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Zurück zur Trainingsauswahl</span>
-          </button>
+      {/* TOP HEADER: SLIM & MINIMAL WÄHREND DES MATCHES, KOMPLETT IM VORGELAGERTEN SETUP */}
+      {isPlaying ? (
+        <div className="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl px-4 py-3 shadow-lg">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => handleSafeNavigation('/training')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Zurück</span>
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm sm:text-base font-black text-white">
+                PDC Challenge
+              </span>
+              <span className="text-xs font-mono font-bold text-amber-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
+                {gameMode === 'solo' ? 'Solo' : '1 vs 1'} • 57 Darts
+              </span>
+            </div>
+          </div>
 
-          <div>
-            <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1">
-              <Award className="w-3 h-3 text-amber-400" /> PDC Training Routine
-            </span>
-            <h1 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-              <span>🎯</span> PDC Challenge (57 Darts)
-            </h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSetupSettings((prev) => !prev)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                showSetupSettings
+                  ? 'bg-amber-500 text-zinc-950 border-amber-400'
+                  : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
+              }`}
+              title="Setup ansehen / anpassen"
+            >
+              <span>⚙️</span>
+              <span className="hidden sm:inline">Setup</span>
+            </button>
+
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                soundEnabled
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-zinc-800 text-zinc-500 border-zinc-700'
+              }`}
+              title={soundEnabled ? 'Sound aktiviert' : 'Sound stummgeschaltet'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+
+            <Link
+              href="/training/pdc-challenge/live"
+              target="_blank"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+              title="TV Live-Board öffnen"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>TV</span>
+            </Link>
+
+            <button
+              onClick={resetGame}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-red-950/60 text-zinc-300 hover:text-red-300 border border-zinc-700 hover:border-red-800/60 text-xs font-bold transition-all cursor-pointer"
+              title="Spiel abbrechen / neu starten"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Neu</span>
+            </button>
           </div>
         </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-4 shadow-xl">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleSafeNavigation('/training')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Zurück zur Trainingsauswahl</span>
+            </button>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div>
+              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1">
+                <Award className="w-3 h-3 text-amber-400" /> PDC Training Routine
+              </span>
+              <h1 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                <span>🎯</span> PDC Challenge (57 Darts)
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                soundEnabled
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-zinc-800 text-zinc-500 border-zinc-700'
+              }`}
+              title={soundEnabled ? 'Sound aktiviert' : 'Sound stummgeschaltet'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+
+            <Link
+              href="/training/pdc-challenge/live"
+              target="_blank"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
+              title="TV Live-Board öffnen"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>TV Live-Board</span>
+            </Link>
+
+            <button
+              onClick={resetGame}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Neu</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TABS: NUR SICHTBAR WENN KEIN SPIEL AKTIV LÄUFT */}
+      {!isPlaying && (
+        <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto text-xs font-bold">
           <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-              soundEnabled
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                : 'bg-slate-800 text-slate-500 border-slate-700'
+            onClick={() => setActiveTab('game')}
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'game'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
             }`}
-            title={soundEnabled ? 'Sound aktiviert' : 'Sound stummgeschaltet'}
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            <Target className="w-4 h-4" />
+            <span>Wurf-Board & Setup</span>
           </button>
 
-          <Link
-            href="/training/pdc-challenge/live"
-            target="_blank"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all shadow-sm cursor-pointer"
-            title="TV Live-Board öffnen"
+          <button
+            onClick={() => setActiveTab('summary')}
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'summary'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+            }`}
           >
-            <Tv className="w-3.5 h-3.5" />
-            <span>TV Live-Board</span>
-          </Link>
+            <Award className="w-4 h-4" />
+            <span>Übersicht & Abzeichen</span>
+          </button>
 
           <button
-            onClick={resetGame}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-800/50 text-xs font-bold transition-all cursor-pointer"
+            onClick={() => setActiveTab('leaderboard')}
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'leaderboard'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+            }`}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Neu</span>
+            <Trophy className="w-4 h-4" />
+            <span>Bestenliste</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'history'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+            }`}
+          >
+            <span>📜</span>
+            <span>{isAdmin ? 'Verlauf (Admin)' : 'Mein Verlauf'} ({visibleHistory.length})</span>
           </button>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto text-xs font-bold">
-        <button
-          onClick={() => setActiveTab('game')}
-          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'game'
-              ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Target className="w-4 h-4" />
-          <span>Wurf-Board</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('summary')}
-          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'summary'
-              ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Award className="w-4 h-4" />
-          <span>Übersicht & Abzeichen</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('leaderboard')}
-          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'leaderboard'
-              ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Trophy className="w-4 h-4" />
-          <span>Bestenliste</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'history'
-              ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <span>📜</span>
-          <span>{isAdmin ? 'Verlauf (Admin)' : 'Mein Verlauf'} ({visibleHistory.length})</span>
-        </button>
-      </div>
+      )}
 
       {/* Speichern Status Toast */}
       {saveStatus && (
-        <div className="p-3 bg-amber-950/80 border border-amber-500/40 rounded-xl text-xs font-bold text-amber-200 text-center animate-bounce">
+        <div className="p-3 bg-zinc-900 border border-amber-500/50 rounded-xl text-xs font-bold text-amber-400 text-center animate-bounce">
           {saveStatus}
         </div>
       )}
 
       {/* Shanghai Fanfare Toast */}
       {shanghaiNotice && (
-        <div className="p-4 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 border-2 border-white rounded-2xl text-slate-950 font-black text-center text-sm sm:text-base shadow-2xl shadow-amber-500/50 animate-pulse">
+        <div className="p-4 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 border-2 border-zinc-900 rounded-2xl text-zinc-950 font-black text-center text-sm sm:text-base shadow-2xl shadow-amber-500/30 animate-pulse">
           {shanghaiNotice}
         </div>
       )}
 
-      {/* MODE & PLAYER SELECTION */}
-      <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 bg-slate-950/80 p-1 rounded-xl border border-white/5">
-            <button
-              disabled={hasStarted}
-              onClick={() => setGameMode('solo')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                gameMode === 'solo'
-                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              } ${hasStarted ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Solo-Modus</span>
-            </button>
+      {/* VORGELAGERTE SETUP-ANSICHT (WENN NOCH KEIN MATCH GESTARTET WURDE) */}
+      {!isPlaying && activeTab === 'game' && (
+        <div className="space-y-5">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
+              <div>
+                <span className="text-xs font-black uppercase tracking-widest text-amber-400">
+                  Vorgelagertes Match-Setup
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white mt-0.5">
+                  Spieler & Modus festlegen
+                </h2>
+              </div>
+              <div className="text-xs text-zinc-400">
+                Offizielle PDC Challenge (57 Darts)
+              </div>
+            </div>
 
-            <button
-              disabled={hasStarted}
-              onClick={() => setGameMode('1vs1')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                gameMode === '1vs1'
-                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              } ${hasStarted ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>1 vs 1 Duell</span>
-            </button>
-          </div>
+            {/* Modus Auswahl */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                Spielmodus wählen:
+              </label>
+              <div className="grid grid-cols-2 gap-3 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setGameMode('solo')}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                    gameMode === 'solo'
+                      ? 'bg-amber-500 text-zinc-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+                      : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Solo-Modus</span>
+                </button>
 
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-slate-400">Fortschritt:</span>
-            <span className="font-mono font-bold text-amber-400 bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-800/40">
-              {p1Stats.totalDartsThrown} / 57 Darts
-            </span>
+                <button
+                  type="button"
+                  onClick={() => setGameMode('1vs1')}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                    gameMode === '1vs1'
+                      ? 'bg-amber-500 text-zinc-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+                      : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>1 vs 1 Duell</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Spieler Auswahl */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              {/* Spieler 1 */}
+              <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    Spieler 1 {gameMode === 'solo' && '(Du)'}
+                  </span>
+                  <span className="text-amber-400 font-bold text-[11px]">
+                    {p1Stats.badge.name}
+                  </span>
+                </div>
+
+                {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
+                  <div className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white">
+                    {p1Name} <span className="text-xs text-zinc-400">(Angemeldet)</span>
+                  </div>
+                ) : (
+                  <select
+                    value={p1Name}
+                    onChange={(e) => setP1Name(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                  >
+                    {players.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Spieler 2 (nur bei 1vs1) */}
+              {gameMode === '1vs1' ? (
+                <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-zinc-400" />
+                      Spieler 2 (Gegner)
+                    </span>
+                    <span className="text-amber-400 font-bold text-[11px]">
+                      {p2Stats.badge.name}
+                    </span>
+                  </div>
+
+                  <select
+                    value={p2Name}
+                    onChange={(e) => setP2Name(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                  >
+                    {players.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-zinc-950/40 border border-dashed border-zinc-800 flex flex-col items-center justify-center text-center text-xs text-zinc-500">
+                  <span>Solo-Modus aktiviert</span>
+                  <span className="text-[11px] text-zinc-600 mt-0.5">Spiele alleine für deine persönliche Bestenliste</span>
+                </div>
+              )}
+            </div>
+
+            {/* Großer prominenter Gold-Start-Button */}
+            <div className="pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMatchStarted(true);
+                }}
+                className="w-full py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-yellow-400 active:scale-[0.99] text-zinc-950 font-black text-lg sm:text-xl shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer"
+              >
+                <span className="text-2xl">🎯</span>
+                <span>SPIEL STARTEN</span>
+              </button>
+            </div>
+
+            {/* Info zur Routine */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs text-zinc-400">
+              <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800">
+                <span className="font-bold text-white block">Teil 1 (18 Darts):</span>
+                <span>Shanghai auf 10 bis 15</span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800">
+                <span className="font-bold text-white block">Teil 2 (21 Darts):</span>
+                <span>Doppel D1 bis D20 + Bull</span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800">
+                <span className="font-bold text-white block">Teil 3 (18 Darts):</span>
+                <span>Shanghai auf 15 bis 20</span>
+              </div>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Players Selector */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-          {/* Spieler 1 */}
-          <div
-            className={`p-3 rounded-xl border transition-all ${
-              activePlayer === 1 && gameMode === '1vs1'
-                ? 'bg-amber-500/10 border-amber-500/60 ring-2 ring-amber-500/30'
-                : 'bg-slate-950/60 border-white/5'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="font-bold text-slate-300 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                Spieler 1 {gameMode === 'solo' && '(Du)'}
-              </span>
-              <span className="font-mono font-black text-amber-300 text-sm">
-                {p1Stats.totalScore} Pkt
-              </span>
-            </div>
-
-            {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
-              <div className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-bold text-white">
-                {p1Name} <span className="text-[10px] text-slate-400">(Angemeldet)</span>
+      {/* AKTIVES LAUFENDES MATCH */}
+      {isPlaying && (
+        <div className="space-y-5">
+          {/* Optionales Collapsible Setup Drawer */}
+          {showSetupSettings && (
+            <div className="bg-zinc-900 border border-amber-500/40 rounded-2xl p-4 space-y-3 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                  Aktuelles Setup (Laufendes Spiel)
+                </span>
+                <button
+                  onClick={() => setShowSetupSettings(false)}
+                  className="text-xs text-zinc-400 hover:text-white underline cursor-pointer"
+                >
+                  Schließen ✕
+                </button>
               </div>
-            ) : (
-              <select
-                disabled={hasStarted}
-                value={p1Name}
-                onChange={(e) => setP1Name(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400 disabled:opacity-60 cursor-pointer"
-              >
-                {players.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <div className="mt-2 flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Abzeichen:</span>
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${p1Stats.badge.badgeClass}`}>
-                {p1Stats.badge.name}
-              </span>
-            </div>
-          </div>
-
-          {/* Spieler 2 */}
-          {gameMode === '1vs1' && (
-            <div
-              className={`p-3 rounded-xl border transition-all ${
-                activePlayer === 2
-                  ? 'bg-amber-500/10 border-amber-500/60 ring-2 ring-amber-500/30'
-                  : 'bg-slate-950/60 border-white/5'
-              }`}
-            >
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-bold text-slate-300 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                  Spieler 2 (Gegner)
-                </span>
-                <span className="font-mono font-black text-cyan-300 text-sm">
-                  {p2Stats.totalScore} Pkt
-                </span>
-              </div>
-
-              <select
-                disabled={hasStarted}
-                value={p2Name}
-                onChange={(e) => setP2Name(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400 disabled:opacity-60 cursor-pointer"
-              >
-                {players.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
-                  </option>
-                ))}
-              </select>
-
-              <div className="mt-2 flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Abzeichen:</span>
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${p2Stats.badge.badgeClass}`}>
-                  {p2Stats.badge.name}
-                </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                  <span className="text-zinc-400 block text-[11px]">Spieler 1:</span>
+                  <span className="text-white font-bold">{p1Name}</span>
+                </div>
+                {gameMode === '1vs1' && (
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                    <span className="text-zinc-400 block text-[11px]">Spieler 2:</span>
+                    <span className="text-white font-bold">{p2Name}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* TAB 1: BOARD / WURFBOARD */}
-      {activeTab === 'game' && (
-        <div className="space-y-5">
-          {/* Section Progress Stepper */}
-          <div className="grid grid-cols-3 gap-2">
-            <div
-              className={`p-3 rounded-xl border transition-all ${
-                stage === 'part1'
-                  ? 'bg-amber-500/15 border-amber-400 text-amber-200'
-                  : p1Stats.dartsThrownPart1 >= 18
-                  ? 'bg-slate-900/60 border-emerald-500/50 text-emerald-400'
-                  : 'bg-slate-900/40 border-white/5 text-slate-500'
-              }`}
-            >
-              <div className="text-[10px] font-black uppercase tracking-wider">Teil 1 (18 Darts)</div>
-              <div className="text-xs sm:text-sm font-black text-white">Shanghai 10–15</div>
-              <div className="text-[11px] font-mono mt-1 text-slate-400">
-                Score: <span className="text-amber-400 font-bold">{activeStats.scorePart1}</span>
-              </div>
-            </div>
-
-            <div
-              className={`p-3 rounded-xl border transition-all ${
-                stage === 'part2'
-                  ? 'bg-amber-500/15 border-amber-400 text-amber-200'
-                  : p1Stats.dartsThrownPart2 >= 21
-                  ? 'bg-slate-900/60 border-emerald-500/50 text-emerald-400'
-                  : 'bg-slate-900/40 border-white/5 text-slate-500'
-              }`}
-            >
-              <div className="text-[10px] font-black uppercase tracking-wider">Teil 2 (21 Darts)</div>
-              <div className="text-xs sm:text-sm font-black text-white">Doppel D1–D20 + Bull</div>
-              <div className="text-[11px] font-mono mt-1 text-slate-400">
-                Score: <span className="text-amber-400 font-bold">{activeStats.scorePart2}</span> ({activeStats.doublesHit}/21)
-              </div>
-            </div>
-
-            <div
-              className={`p-3 rounded-xl border transition-all ${
-                stage === 'part3'
-                  ? 'bg-amber-500/15 border-amber-400 text-amber-200'
-                  : p1Stats.dartsThrownPart3 >= 18
-                  ? 'bg-slate-900/60 border-emerald-500/50 text-emerald-400'
-                  : 'bg-slate-900/40 border-white/5 text-slate-500'
-              }`}
-            >
-              <div className="text-[10px] font-black uppercase tracking-wider">Teil 3 (18 Darts)</div>
-              <div className="text-xs sm:text-sm font-black text-white">Shanghai 15–20</div>
-              <div className="text-[11px] font-mono mt-1 text-slate-400">
-                Score: <span className="text-amber-400 font-bold">{activeStats.scorePart3}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* PROMINENTER HERO-BANNER: AKTIVER SPIELER AM WURF (OHNE FOTO, SCHLICHT, GEHIGHLIGHTED & VOM OCHE GUT SICHTBAR) */}
+          {/* PROMINENTER HERO-BANNER: AKTIVER SPIELER AM WURF */}
           <div className="space-y-3">
             {gameMode === 'solo' ? (
-              <div className="bg-gradient-to-r from-amber-500/20 via-slate-900 to-amber-500/10 border-2 border-amber-400/80 rounded-2xl p-4 sm:p-5 shadow-xl shadow-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="bg-zinc-900 border-2 border-amber-400/80 rounded-2xl p-4 sm:p-5 shadow-xl shadow-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-amber-400">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
@@ -1186,8 +1264,8 @@ export default function PdcChallengeClient({
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className="text-[10px] uppercase font-bold text-slate-400">Aktueller Stand</div>
-                    <div className="text-xl sm:text-2xl font-black font-mono text-amber-300">{p1Stats.totalScore} Pkt</div>
+                    <div className="text-[10px] uppercase font-bold text-zinc-400">Aktueller Stand</div>
+                    <div className="text-xl sm:text-2xl font-black font-mono text-amber-400">{p1Stats.totalScore} Pkt</div>
                   </div>
                   <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${p1Stats.badge.badgeClass}`}>
                     {p1Stats.badge.name}
@@ -1195,38 +1273,37 @@ export default function PdcChallengeClient({
                 </div>
               </div>
             ) : (
-              /* 1 vs 1 Duell-Anzeige: Aktiver Spieler leuchtend hervorgehoben */
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Spieler 1 Card */}
                 <div
                   className={`p-4 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden ${
                     activePlayer === 1
-                      ? 'bg-gradient-to-br from-amber-500/25 via-slate-900/95 to-amber-950/30 border-amber-400 shadow-xl shadow-amber-500/25 ring-4 ring-amber-400/30 scale-[1.01]'
-                      : 'bg-slate-950/60 border-slate-800/80 opacity-55 hover:opacity-75'
+                      ? 'bg-zinc-900 border-amber-400 shadow-xl shadow-amber-500/20 ring-4 ring-amber-400/30 scale-[1.01]'
+                      : 'bg-zinc-950/70 border-zinc-800 opacity-60'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       {activePlayer === 1 ? (
-                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black tracking-wider uppercase shadow-md shadow-amber-500/40 animate-pulse">
-                          <span className="w-2 h-2 rounded-full bg-slate-950" />
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-zinc-950 text-xs font-black tracking-wider uppercase shadow-md shadow-amber-500/30 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-zinc-950" />
                           🎯 JETZT AM WURF
                         </span>
                       ) : (
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
                           ⏸️ Wartet (Spieler 1)
                         </span>
                       )}
                     </div>
-                    <div className="font-mono font-black text-amber-300 text-lg sm:text-xl">
+                    <div className="font-mono font-black text-amber-400 text-lg sm:text-xl">
                       {p1Stats.totalScore} Pkt
                     </div>
                   </div>
-                  <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 1 ? 'text-white drop-shadow-md' : 'text-slate-400'}`}>
+                  <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 1 ? 'text-white drop-shadow-md' : 'text-zinc-400'}`}>
                     {p1Name}
                   </div>
-                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-white/5">
-                    <span className="text-slate-400">Darts geworfen: <strong className="text-slate-200">{p1Stats.totalDartsThrown}/57</strong></span>
+                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-zinc-800">
+                    <span className="text-zinc-400">Darts geworfen: <strong className="text-white">{p1Stats.totalDartsThrown}/57</strong></span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-black ${p1Stats.badge.badgeClass}`}>
                       {p1Stats.badge.name}
                     </span>
@@ -1237,32 +1314,32 @@ export default function PdcChallengeClient({
                 <div
                   className={`p-4 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden ${
                     activePlayer === 2
-                      ? 'bg-gradient-to-br from-cyan-500/25 via-slate-900/95 to-cyan-950/30 border-cyan-400 shadow-xl shadow-cyan-500/25 ring-4 ring-cyan-400/30 scale-[1.01]'
-                      : 'bg-slate-950/60 border-slate-800/80 opacity-55 hover:opacity-75'
+                      ? 'bg-zinc-900 border-amber-400 shadow-xl shadow-amber-500/20 ring-4 ring-amber-400/30 scale-[1.01]'
+                      : 'bg-zinc-950/70 border-zinc-800 opacity-60'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       {activePlayer === 2 ? (
-                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-400 text-slate-950 text-xs font-black tracking-wider uppercase shadow-md shadow-cyan-500/40 animate-pulse">
-                          <span className="w-2 h-2 rounded-full bg-slate-950" />
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-zinc-950 text-xs font-black tracking-wider uppercase shadow-md shadow-amber-500/30 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-zinc-950" />
                           🎯 JETZT AM WURF
                         </span>
                       ) : (
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
                           ⏸️ Wartet (Spieler 2)
                         </span>
                       )}
                     </div>
-                    <div className="font-mono font-black text-cyan-300 text-lg sm:text-xl">
+                    <div className="font-mono font-black text-amber-400 text-lg sm:text-xl">
                       {p2Stats.totalScore} Pkt
                     </div>
                   </div>
-                  <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 2 ? 'text-white drop-shadow-md' : 'text-slate-400'}`}>
+                  <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 2 ? 'text-white drop-shadow-md' : 'text-zinc-400'}`}>
                     {p2Name}
                   </div>
-                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-white/5">
-                    <span className="text-slate-400">Darts geworfen: <strong className="text-slate-200">{p2Stats.totalDartsThrown}/57</strong></span>
+                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-zinc-800">
+                    <span className="text-zinc-400">Darts geworfen: <strong className="text-white">{p2Stats.totalDartsThrown}/57</strong></span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-black ${p2Stats.badge.badgeClass}`}>
                       {p2Stats.badge.name}
                     </span>
@@ -1272,9 +1349,60 @@ export default function PdcChallengeClient({
             )}
           </div>
 
+          {/* Section Progress Stepper */}
+          <div className="grid grid-cols-3 gap-2">
+            <div
+              className={`p-3 rounded-xl border transition-all ${
+                stage === 'part1'
+                  ? 'bg-zinc-900 border-2 border-amber-400 text-amber-300 shadow-md shadow-amber-500/10'
+                  : p1Stats.dartsThrownPart1 >= 18
+                  ? 'bg-zinc-900/60 border-zinc-700 text-zinc-300'
+                  : 'bg-zinc-950/40 border-zinc-800/80 text-zinc-500'
+              }`}
+            >
+              <div className="text-[10px] font-black uppercase tracking-wider">Teil 1 (18 Darts)</div>
+              <div className="text-xs sm:text-sm font-black text-white">Shanghai 10–15</div>
+              <div className="text-[11px] font-mono mt-1 text-zinc-400">
+                Score: <span className="text-amber-400 font-bold">{activeStats.scorePart1}</span>
+              </div>
+            </div>
+
+            <div
+              className={`p-3 rounded-xl border transition-all ${
+                stage === 'part2'
+                  ? 'bg-zinc-900 border-2 border-amber-400 text-amber-300 shadow-md shadow-amber-500/10'
+                  : p1Stats.dartsThrownPart2 >= 21
+                  ? 'bg-zinc-900/60 border-zinc-700 text-zinc-300'
+                  : 'bg-zinc-950/40 border-zinc-800/80 text-zinc-500'
+              }`}
+            >
+              <div className="text-[10px] font-black uppercase tracking-wider">Teil 2 (21 Darts)</div>
+              <div className="text-xs sm:text-sm font-black text-white">Doppel D1–D20 + Bull</div>
+              <div className="text-[11px] font-mono mt-1 text-zinc-400">
+                Score: <span className="text-amber-400 font-bold">{activeStats.scorePart2}</span> ({activeStats.doublesHit}/21)
+              </div>
+            </div>
+
+            <div
+              className={`p-3 rounded-xl border transition-all ${
+                stage === 'part3'
+                  ? 'bg-zinc-900 border-2 border-amber-400 text-amber-300 shadow-md shadow-amber-500/10'
+                  : p1Stats.dartsThrownPart3 >= 18
+                  ? 'bg-zinc-900/60 border-zinc-700 text-zinc-300'
+                  : 'bg-zinc-950/40 border-zinc-800/80 text-zinc-500'
+              }`}
+            >
+              <div className="text-[10px] font-black uppercase tracking-wider">Teil 3 (18 Darts)</div>
+              <div className="text-xs sm:text-sm font-black text-white">Shanghai 15–20</div>
+              <div className="text-[11px] font-mono mt-1 text-zinc-400">
+                Score: <span className="text-amber-400 font-bold">{activeStats.scorePart3}</span>
+              </div>
+            </div>
+          </div>
+
           {/* AKTIVER WURFBEREICH */}
           {stage !== 'completed' ? (
-            <div className="bg-gradient-to-b from-[#0b162c] via-[#09142b] to-[#060e1f] border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-6">
+            <div className="bg-zinc-900 border-2 border-zinc-700/80 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-6">
               {/* Header Target Display */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
                 <div>
@@ -1288,9 +1416,9 @@ export default function PdcChallengeClient({
                 </div>
 
                 {/* Live Badge Preview Card */}
-                <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3 text-center sm:text-right min-w-[180px]">
-                  <div className="text-[10px] text-slate-400 uppercase font-black">Aktueller Score</div>
-                  <div className="text-2xl font-black text-amber-300 font-mono">
+                <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-center sm:text-right min-w-[180px]">
+                  <div className="text-[10px] text-zinc-400 uppercase font-black">Aktueller Score</div>
+                  <div className="text-2xl font-black text-amber-400 font-mono">
                     {activeStats.totalScore} Pkt
                   </div>
                   <div className="mt-1 flex items-center justify-center sm:justify-end gap-1.5">
@@ -1298,7 +1426,7 @@ export default function PdcChallengeClient({
                       {activeStats.badge.name}
                     </span>
                     {activeStats.badge.nextThreshold && (
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-zinc-400">
                         ({activeStats.badge.nextThreshold - activeStats.totalScore} Pkt bis nächste Stufe)
                       </span>
                     )}
@@ -1310,16 +1438,16 @@ export default function PdcChallengeClient({
               {(stage === 'part1' || stage === 'part3') && (
                 <div className="space-y-4">
                   <div className="text-center space-y-1">
-                    <span className="text-xs uppercase font-bold text-slate-400">
+                    <span className="text-xs uppercase font-bold text-zinc-400">
                       Aufnahme mit 3 Darts auf die {currentTargetLabel}
                     </span>
                     <h4 className="text-sm sm:text-base font-black text-white">
                       Wie viele Treffer wurden mit den 3 Darts erzielt?
                     </h4>
-                    <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                    <p className="text-[11px] text-zinc-400 max-w-md mx-auto">
                       Wähle die Summe der Treffer (Multiplikatoren: Single = 1, Double = 2, Triple = 3).
                       <br />
-                      <span className="text-amber-300 font-bold">
+                      <span className="text-amber-400 font-bold">
                         Bei 6 Treffern fragt das System nach Shanghai (+100 Bonus)!
                       </span>
                     </p>
@@ -1334,14 +1462,10 @@ export default function PdcChallengeClient({
 
                       let btnStyle =
                         val === 0
-                          ? 'bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-300'
+                          ? 'bg-zinc-800/80 hover:bg-zinc-700 border-zinc-700 text-zinc-400'
                           : isSix
-                          ? 'bg-gradient-to-br from-amber-600 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 border-amber-300 text-slate-950 font-black shadow-lg shadow-amber-500/30'
-                          : val >= 7
-                          ? 'bg-purple-900/60 hover:bg-purple-800 border-purple-500/50 text-purple-200'
-                          : val >= 4
-                          ? 'bg-blue-900/60 hover:bg-blue-800 border-blue-500/50 text-blue-200'
-                          : 'bg-emerald-900/60 hover:bg-emerald-800 border-emerald-500/50 text-emerald-200';
+                          ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-zinc-950 font-black border-amber-300 shadow-lg shadow-amber-500/30'
+                          : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-white font-black';
 
                       return (
                         <button
@@ -1355,17 +1479,17 @@ export default function PdcChallengeClient({
                           </div>
                           <div
                             className={`text-[10px] font-mono font-bold ${
-                              isSix ? 'text-slate-950' : 'text-slate-300'
+                              isSix ? 'text-zinc-950' : 'text-amber-400'
                             }`}
                           >
                             {basePts} Pkt
                           </div>
                           {isSix ? (
-                            <div className="text-[9px] uppercase font-black text-slate-950 bg-yellow-300 px-1.5 py-0.2 rounded mt-0.5">
+                            <div className="text-[9px] uppercase font-black text-zinc-950 bg-amber-300 px-1.5 py-0.2 rounded mt-0.5">
                               Shanghai?
                             </div>
                           ) : (
-                            <div className="text-[9px] text-slate-400">
+                            <div className="text-[9px] text-zinc-400">
                               {val === 0 ? 'Fehlwurf' : `${val}x`}
                             </div>
                           )}
@@ -1387,13 +1511,13 @@ export default function PdcChallengeClient({
                         const hit = currentState.part2Hits[t];
                         const isCur = currentTargetIndex === idx;
 
-                        let style = 'bg-slate-900 border-slate-700 text-slate-500';
+                        let style = 'bg-zinc-950 border-zinc-800 text-zinc-500';
                         if (hit === true) {
-                          style = 'bg-emerald-600 border-emerald-400 text-white font-black shadow-md shadow-emerald-500/30';
+                          style = 'bg-zinc-800 border-amber-400 text-amber-400 font-black shadow-md shadow-amber-500/20';
                         } else if (hit === false) {
-                          style = 'bg-red-950/60 border-red-800 text-red-400';
+                          style = 'bg-zinc-950/80 border-zinc-800 text-zinc-600';
                         } else if (isCur) {
-                          style = 'bg-amber-500 text-slate-950 font-black ring-2 ring-amber-300 scale-110';
+                          style = 'bg-amber-500 text-zinc-950 font-black ring-2 ring-amber-300 scale-110';
                         }
 
                         return (
@@ -1409,16 +1533,16 @@ export default function PdcChallengeClient({
                   </div>
 
                   {/* Aufnahme & 3 Darts Statusanzeige in Teil 2 */}
-                  <div className="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 sm:p-4 text-center space-y-2.5">
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 sm:p-4 text-center space-y-2.5">
                     <div className="flex flex-wrap items-center justify-center gap-2">
-                      <span className="text-xs uppercase font-black tracking-wider text-amber-400 bg-amber-950/70 px-3 py-1 rounded-full border border-amber-800/40">
+                      <span className="text-xs uppercase font-black tracking-wider text-amber-400 bg-zinc-900 px-3 py-1 rounded-full border border-amber-500/40">
                         Aufnahme {Math.floor(currentTargetIndex / 3) + 1} von 7
                       </span>
-                      <span className="text-xs uppercase font-black tracking-wider text-cyan-300 bg-cyan-950/70 px-3 py-1 rounded-full border border-cyan-800/40">
+                      <span className="text-xs uppercase font-black tracking-wider text-zinc-300 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-700">
                         Dart {(currentTargetIndex % 3) + 1} von 3
                       </span>
                       {gameMode === '1vs1' && (
-                        <span className="text-xs font-bold text-slate-300 bg-slate-900 px-2.5 py-1 rounded-full border border-white/10">
+                        <span className="text-xs font-bold text-zinc-300 bg-zinc-900 px-2.5 py-1 rounded-full border border-zinc-700">
                           Am Wurf: <strong className="text-white">{activePlayer === 1 ? p1Name : p2Name}</strong>
                         </span>
                       )}
@@ -1428,7 +1552,6 @@ export default function PdcChallengeClient({
                     <div className="flex items-center justify-center gap-2 pt-1">
                       {PART2_TARGETS.slice(Math.floor(currentTargetIndex / 3) * 3, Math.floor(currentTargetIndex / 3) * 3 + 3).map((targetName, dIdx) => {
                         const isCurrentDart = dIdx === (currentTargetIndex % 3);
-                        const isPastDart = dIdx < (currentTargetIndex % 3);
                         const curHits = (activePlayer === 1 ? stateP1 : stateP2).part2Hits;
                         const hitVal = curHits[targetName];
 
@@ -1437,12 +1560,12 @@ export default function PdcChallengeClient({
                             key={targetName}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-black transition-all ${
                               isCurrentDart
-                                ? 'bg-amber-500 text-slate-950 border-amber-300 ring-2 ring-amber-300 shadow-md shadow-amber-500/30 scale-105'
+                                ? 'bg-amber-500 text-zinc-950 border-amber-300 ring-2 ring-amber-300 shadow-md shadow-amber-500/30 scale-105'
                                 : hitVal === true
-                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60'
+                                ? 'bg-zinc-800 text-amber-400 border-amber-400/80'
                                 : hitVal === false
-                                ? 'bg-red-950/80 text-red-300 border-red-500/60'
-                                : 'bg-slate-900/60 text-slate-400 border-white/5'
+                                ? 'bg-zinc-950 text-zinc-500 border-zinc-800'
+                                : 'bg-zinc-900 text-zinc-600 border-zinc-800'
                             }`}
                           >
                             <span className="text-[11px] opacity-80">Dart {dIdx + 1}:</span>
@@ -1454,14 +1577,14 @@ export default function PdcChallengeClient({
                       })}
                     </div>
 
-                    <div className="text-xs text-slate-300 pt-1">
+                    <div className="text-xs text-zinc-300 pt-1">
                       {currentTargetLabel === 'Bull' ? (
                         <span>🎯 <strong>Bullseye (Inner Bull / Rot):</strong> Genau 1 Dart! Treffer = <strong>100 Punkte</strong>.</span>
                       ) : (
                         <span>🎯 <strong>{currentTargetLabel}:</strong> Genau 1 Dart auf dieses Doppel! Treffer = <strong>50 Punkte</strong>.</span>
                       )}
                       {gameMode === '1vs1' && (
-                        <div className="text-[11px] text-amber-300/80 mt-0.5">
+                        <div className="text-[11px] text-amber-400/90 mt-0.5">
                           Nach 3 Eintragungen wechselt der Wurf zu <strong>{activePlayer === 1 ? p2Name : p1Name}</strong>.
                         </div>
                       )}
@@ -1472,20 +1595,20 @@ export default function PdcChallengeClient({
                   <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto pt-2">
                     <button
                       onClick={() => handleDoubleDart(false)}
-                      className="py-6 px-4 rounded-3xl bg-slate-800 hover:bg-slate-700 active:scale-95 border-2 border-slate-700 text-slate-200 font-black text-lg transition-all shadow-xl cursor-pointer flex flex-col items-center justify-center gap-1"
+                      className="py-6 px-4 rounded-3xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 border-2 border-zinc-700 text-white font-black text-lg transition-all shadow-xl cursor-pointer flex flex-col items-center justify-center gap-1"
                     >
                       <span className="text-2xl">❌</span>
                       <span>Daneben</span>
-                      <span className="text-xs font-mono text-slate-400">0 Punkte</span>
+                      <span className="text-xs font-mono text-zinc-400">0 Punkte</span>
                     </button>
 
                     <button
                       onClick={() => handleDoubleDart(true)}
-                      className="py-6 px-4 rounded-3xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 border-2 border-emerald-400 text-white font-black text-lg transition-all shadow-xl shadow-emerald-900/40 cursor-pointer flex flex-col items-center justify-center gap-1"
+                      className="py-6 px-4 rounded-3xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 active:scale-95 border-2 border-amber-300 text-zinc-950 font-black text-lg transition-all shadow-xl shadow-amber-500/30 cursor-pointer flex flex-col items-center justify-center gap-1"
                     >
                       <span className="text-2xl">🎯</span>
                       <span>TREFFER!</span>
-                      <span className="text-xs font-mono text-emerald-200">
+                      <span className="text-xs font-mono text-zinc-950 font-bold">
                         +{currentTargetLabel === 'Bull' ? 100 : 50} Punkte
                       </span>
                     </button>
@@ -1494,16 +1617,16 @@ export default function PdcChallengeClient({
               )}
 
               {/* Undo & Footer */}
-              <div className="flex items-center justify-between pt-3 border-t border-white/10 text-xs">
+              <div className="flex items-center justify-between pt-3 border-t border-zinc-800 text-xs">
                 <button
                   onClick={handleUndo}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 font-bold transition-all cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Letzte Aufnahme korrigieren</span>
                 </button>
 
-                <div className="text-slate-400 text-[11px]">
+                <div className="text-zinc-400 text-[11px]">
                   Darts geworfen: <strong className="text-white">{activeStats.totalDartsThrown} / 57</strong>
                 </div>
               </div>
@@ -1522,18 +1645,18 @@ export default function PdcChallengeClient({
                 <h2 className="text-3xl sm:text-4xl font-black text-white mt-1">
                   PDC Challenge abgeschlossen!
                 </h2>
-                <p className="text-slate-300 text-sm mt-2 max-w-md mx-auto">
+                <p className="text-zinc-300 text-sm mt-2 max-w-md mx-auto">
                   Du hast alle 57 Darts geworfen. Hier ist deine offizielle Leistungsbewertung!
                 </p>
               </div>
 
               {/* Score & Badge Highlight */}
               {gameMode === 'solo' ? (
-                <div className="max-w-xl mx-auto bg-slate-900/95 border-2 border-amber-400/50 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl backdrop-blur-sm">
-                  <div className="text-xs uppercase font-black tracking-widest text-slate-400">
+                <div className="max-w-xl mx-auto bg-zinc-900 border-2 border-amber-400/80 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl">
+                  <div className="text-xs uppercase font-black tracking-widest text-zinc-400">
                     Erreichte Gesamtpunktzahl
                   </div>
-                  <div className="text-6xl sm:text-7xl font-black text-amber-300 font-mono tracking-tight drop-shadow-md">
+                  <div className="text-6xl sm:text-7xl font-black text-amber-400 font-mono tracking-tight drop-shadow-md">
                     {p1Stats.totalScore}
                   </div>
                   
@@ -1543,7 +1666,7 @@ export default function PdcChallengeClient({
                       <span>{p1Stats.badge.name}es Abzeichen</span>
                     </div>
 
-                    <div className="w-full bg-slate-950/80 border border-white/15 rounded-2xl p-4 text-center space-y-1 shadow-inner">
+                    <div className="w-full bg-zinc-950/80 border border-zinc-800 rounded-2xl p-4 text-center space-y-1 shadow-inner">
                       <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
                         Offizielle Leistungsstufe / Kategorie
                       </span>
@@ -1551,7 +1674,7 @@ export default function PdcChallengeClient({
                         {p1Stats.badge.title}
                       </div>
                       {p1Stats.badge.subTitle && (
-                        <div className="text-xs font-semibold text-slate-400">
+                        <div className="text-xs font-semibold text-zinc-400">
                           {p1Stats.badge.subTitle}
                         </div>
                       )}
@@ -1561,49 +1684,49 @@ export default function PdcChallengeClient({
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
                   {/* Player 1 */}
-                  <div className={`bg-slate-900/95 border-2 rounded-3xl p-5 space-y-3 shadow-2xl ${
-                    p1Stats.totalScore >= p2Stats.totalScore ? 'border-amber-400' : 'border-white/15'
+                  <div className={`bg-zinc-900 border-2 rounded-3xl p-5 space-y-3 shadow-2xl ${
+                    p1Stats.totalScore >= p2Stats.totalScore ? 'border-amber-400' : 'border-zinc-800'
                   }`}>
                     <div className="flex items-center justify-between">
                       <span className="font-black text-white text-base">{p1Name}</span>
                       {p1Stats.totalScore > p2Stats.totalScore && (
-                        <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                        <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-400/40">
                           Sieger 🏆
                         </span>
                       )}
                     </div>
-                    <div className="text-5xl font-black text-amber-300 font-mono">
-                      {p1Stats.totalScore} <span className="text-sm font-normal text-slate-400">Pkt</span>
+                    <div className="text-5xl font-black text-amber-400 font-mono">
+                      {p1Stats.totalScore} <span className="text-sm font-normal text-zinc-400">Pkt</span>
                     </div>
                     <div className={`px-4 py-1.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 ${p1Stats.badge.badgeClass}`}>
                       <span>{p1Stats.badge.icon}</span>
                       <span>{p1Stats.badge.name}es Abzeichen</span>
                     </div>
-                    <div className="text-sm font-black text-white bg-slate-950/80 p-2.5 rounded-xl border border-white/10">
+                    <div className="text-sm font-black text-white bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800">
                       {p1Stats.badge.title}
                     </div>
                   </div>
 
                   {/* Player 2 */}
-                  <div className={`bg-slate-900/95 border-2 rounded-3xl p-5 space-y-3 shadow-2xl ${
-                    p2Stats.totalScore >= p1Stats.totalScore ? 'border-amber-400' : 'border-white/15'
+                  <div className={`bg-zinc-900 border-2 rounded-3xl p-5 space-y-3 shadow-2xl ${
+                    p2Stats.totalScore >= p1Stats.totalScore ? 'border-amber-400' : 'border-zinc-800'
                   }`}>
                     <div className="flex items-center justify-between">
                       <span className="font-black text-white text-base">{p2Name}</span>
                       {p2Stats.totalScore > p1Stats.totalScore && (
-                        <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                        <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-400/40">
                           Sieger 🏆
                         </span>
                       )}
                     </div>
-                    <div className="text-5xl font-black text-amber-300 font-mono">
-                      {p2Stats.totalScore} <span className="text-sm font-normal text-slate-400">Pkt</span>
+                    <div className="text-5xl font-black text-amber-400 font-mono">
+                      {p2Stats.totalScore} <span className="text-sm font-normal text-zinc-400">Pkt</span>
                     </div>
                     <div className={`px-4 py-1.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 ${p2Stats.badge.badgeClass}`}>
                       <span>{p2Stats.badge.icon}</span>
                       <span>{p2Stats.badge.name}es Abzeichen</span>
                     </div>
-                    <div className="text-sm font-black text-white bg-slate-950/80 p-2.5 rounded-xl border border-white/10">
+                    <div className="text-sm font-black text-white bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800">
                       {p2Stats.badge.title}
                     </div>
                   </div>
@@ -1617,13 +1740,13 @@ export default function PdcChallengeClient({
                   disabled={isSavedInCloud}
                   className={`w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
                     isSavedInCloud
-                      ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed opacity-90 shadow-none'
-                      : 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-xl shadow-amber-500/30'
+                      ? 'bg-zinc-800 text-amber-400 border border-amber-500/30 cursor-not-allowed opacity-90 shadow-none'
+                      : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 shadow-xl shadow-amber-500/30'
                   }`}
                 >
                   {isSavedInCloud ? (
                     <>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-amber-400" />
                       <span>Bereits in Cloud gespeichert</span>
                     </>
                   ) : (
@@ -1636,7 +1759,7 @@ export default function PdcChallengeClient({
 
                 <button
                   onClick={resetGame}
-                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-sm flex items-center justify-center gap-2 border border-zinc-700 cursor-pointer"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Neues Spiel starten</span>
@@ -1651,8 +1774,8 @@ export default function PdcChallengeClient({
       {activeTab === 'summary' && (
         <div className="space-y-6">
           {/* Badge Matrix Reference */}
-          <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
                   <Award className="w-5 h-5" />
@@ -1661,7 +1784,7 @@ export default function PdcChallengeClient({
                   <h3 className="text-base sm:text-lg font-black text-white">
                     Offizielle PDC / JDC Leistungsabzeichen-Skala
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-zinc-400">
                     Einstufung nach 57 Darts basierend auf der offiziellen Junior Darts Corporation & PDC Routine
                   </p>
                 </div>
@@ -1677,7 +1800,7 @@ export default function PdcChallengeClient({
                     className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${
                       isCurrent
                         ? 'ring-2 ring-amber-400 bg-amber-500/10 border-amber-400/50 shadow-lg shadow-amber-500/20 scale-[1.02]'
-                        : 'bg-slate-950/60 border-white/10 hover:border-white/20'
+                        : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
                     }`}
                   >
                     <div>
@@ -1686,7 +1809,7 @@ export default function PdcChallengeClient({
                           <span>{b.icon}</span>
                           <span>{b.name}</span>
                         </span>
-                        <span className="text-[11px] font-mono font-bold text-amber-300">
+                        <span className="text-[11px] font-mono font-bold text-amber-400">
                           {b.min} {b.max >= 9000 ? '+ Pkt' : `– ${b.max} Pkt`}
                         </span>
                       </div>
@@ -1695,7 +1818,7 @@ export default function PdcChallengeClient({
                         <div className="text-sm font-black text-white leading-snug">
                           {b.title}
                         </div>
-                        <div className="text-[11px] font-medium text-slate-400 mt-1">
+                        <div className="text-[11px] font-medium text-zinc-400 mt-1">
                           {b.subTitle}
                         </div>
                       </div>
@@ -1713,8 +1836,8 @@ export default function PdcChallengeClient({
           </div>
 
           {/* Detaillierte Punkte-Tabelle Spieler 1 */}
-          <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
               <h3 className="text-base font-black text-white flex items-center gap-2">
                 <span>📊 Wurf-Analyse: {p1Name}</span>
               </h3>
@@ -1723,18 +1846,18 @@ export default function PdcChallengeClient({
                   <span>{p1Stats.badge.icon}</span>
                   <span>{p1Stats.badge.name}</span>
                 </span>
-                <span className="text-xs font-black text-slate-200 bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                <span className="text-xs font-black text-white bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
                   {p1Stats.badge.title}
                 </span>
-                <span className="text-amber-400 font-mono font-bold text-sm bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                <span className="text-amber-400 font-mono font-bold text-sm bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
                   {p1Stats.totalScore} Pkt
                 </span>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-slate-400">Teil 1 (Shanghai 10–15):</span>
+              <div className="bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800 space-y-1">
+                <span className="text-zinc-400">Teil 1 (Shanghai 10–15):</span>
                 <div className="text-xl font-black text-white font-mono">
                   {p1Stats.scorePart1} Pkt
                 </div>
@@ -1743,18 +1866,18 @@ export default function PdcChallengeClient({
                 </div>
               </div>
 
-              <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-slate-400">Teil 2 (Doppel D1–D20 + Bull):</span>
+              <div className="bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800 space-y-1">
+                <span className="text-zinc-400">Teil 2 (Doppel D1–D20 + Bull):</span>
                 <div className="text-xl font-black text-white font-mono">
                   {p1Stats.scorePart2} Pkt
                 </div>
-                <div className="text-[11px] text-emerald-400 font-medium">
+                <div className="text-[11px] text-amber-400 font-medium">
                   {p1Stats.doublesHit} von 21 Doppeln getroffen
                 </div>
               </div>
 
-              <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-slate-400">Teil 3 (Shanghai 15–20):</span>
+              <div className="bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800 space-y-1">
+                <span className="text-zinc-400">Teil 3 (Shanghai 15–20):</span>
                 <div className="text-xl font-black text-white font-mono">
                   {p1Stats.scorePart3} Pkt
                 </div>
@@ -1767,8 +1890,8 @@ export default function PdcChallengeClient({
 
           {/* Detaillierte Punkte-Tabelle Spieler 2 (bei 1vs1) */}
           {gameMode === '1vs1' && (
-            <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+            <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
                 <h3 className="text-base font-black text-white flex items-center gap-2">
                   <span>📊 Wurf-Analyse: {p2Name}</span>
                 </h3>
@@ -1777,18 +1900,18 @@ export default function PdcChallengeClient({
                     <span>{p2Stats.badge.icon}</span>
                     <span>{p2Stats.badge.name}</span>
                   </span>
-                  <span className="text-xs font-black text-slate-200 bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                  <span className="text-xs font-black text-white bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
                     {p2Stats.badge.title}
                   </span>
-                  <span className="text-amber-400 font-mono font-bold text-sm bg-slate-950 px-2.5 py-1 rounded-lg border border-white/10">
+                  <span className="text-amber-400 font-mono font-bold text-sm bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
                     {p2Stats.totalScore} Pkt
                   </span>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
-                  <span className="text-slate-400">Teil 1 (Shanghai 10–15):</span>
+                <div className="bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800 space-y-1">
+                  <span className="text-zinc-400">Teil 1 (Shanghai 10–15):</span>
                   <div className="text-xl font-black text-white font-mono">
                     {p2Stats.scorePart1} Pkt
                   </div>
@@ -1797,18 +1920,18 @@ export default function PdcChallengeClient({
                   </div>
                 </div>
 
-                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
-                  <span className="text-slate-400">Teil 2 (Doppel D1–D20 + Bull):</span>
+                <div className="bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800 space-y-1">
+                  <span className="text-zinc-400">Teil 2 (Doppel D1–D20 + Bull):</span>
                   <div className="text-xl font-black text-white font-mono">
                     {p2Stats.scorePart2} Pkt
                   </div>
-                  <div className="text-[11px] text-emerald-400 font-medium">
+                  <div className="text-[11px] text-amber-400 font-medium">
                     {p2Stats.doublesHit} von 21 Doppeln getroffen
                   </div>
                 </div>
 
-                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-1">
-                  <span className="text-slate-400">Teil 3 (Shanghai 15–20):</span>
+                <div className="bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800 space-y-1">
+                  <span className="text-zinc-400">Teil 3 (Shanghai 15–20):</span>
                   <div className="text-xl font-black text-white font-mono">
                     {p2Stats.scorePart3} Pkt
                   </div>
@@ -1824,7 +1947,7 @@ export default function PdcChallengeClient({
 
       {/* TAB 3: LEADERBOARD */}
       {activeTab === 'leaderboard' && (
-        <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-5 space-y-4">
+        <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
@@ -1843,14 +1966,14 @@ export default function PdcChallengeClient({
           </div>
 
           {leaderboard.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-xs">
+            <div className="text-center py-8 text-zinc-500 text-xs">
               Noch keine Spiele in der Bestenliste eingetragen. Schließe deine erste PDC Challenge ab!
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-white/10 text-slate-400">
+                  <tr className="border-b border-zinc-800 text-zinc-400">
                     <th className="py-2.5 px-3">Rang</th>
                     <th className="py-2.5 px-3">Spieler</th>
                     <th className="py-2.5 px-3 text-right">Highscore</th>
@@ -1860,18 +1983,18 @@ export default function PdcChallengeClient({
                     <th className="py-2.5 px-3 text-right">Shanghais</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 font-mono">
+                <tbody className="divide-y divide-zinc-800/60 font-mono">
                   {leaderboard.map((row) => {
                     const badge = getPdcBadge(row.best_score);
                     return (
-                      <tr key={row.player_name} className="hover:bg-white/5">
+                      <tr key={row.player_name} className="hover:bg-zinc-800/40">
                         <td className="py-2.5 px-3 font-bold text-amber-400">
                           #{row.rank}
                         </td>
                         <td className="py-2.5 px-3 font-sans font-bold text-white">
                           {row.player_name}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-black text-amber-300">
+                        <td className="py-2.5 px-3 text-right font-black text-amber-400">
                           {row.best_score}
                         </td>
                         <td className="py-2.5 px-3 text-center">
@@ -1880,15 +2003,15 @@ export default function PdcChallengeClient({
                               <span>{badge.icon}</span>
                               <span>{badge.name}</span>
                             </span>
-                            <span className="text-[10px] font-sans font-bold text-slate-300 mt-0.5 whitespace-nowrap">
+                            <span className="text-[10px] font-sans font-bold text-zinc-300 mt-0.5 whitespace-nowrap">
                               {badge.shortTitle}
                             </span>
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 text-right text-slate-400">
+                        <td className="py-2.5 px-3 text-right text-zinc-400">
                           {row.sessions_count}
                         </td>
-                        <td className="py-2.5 px-3 text-right text-slate-300">
+                        <td className="py-2.5 px-3 text-right text-zinc-300">
                           {row.avg_score}
                         </td>
                         <td className="py-2.5 px-3 text-right text-amber-400">
@@ -1906,7 +2029,7 @@ export default function PdcChallengeClient({
 
       {/* TAB 4: HISTORY */}
       {activeTab === 'history' && (
-        <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-5 space-y-4">
+        <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl p-5 space-y-4">
           {isAdmin ? (
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1915,35 +2038,35 @@ export default function PdcChallengeClient({
                     <h3 className="text-base font-black text-white flex items-center gap-2">
                       <span>📜</span> Trainingsverlauf
                     </h3>
-                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                       👑 Admin: Alle Verläufe
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
                     Als Admin kannst du alle PDC Challenge Trainings aller Spieler einsehen und analysieren.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link
                     href="/verwaltung"
-                    className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                    className="text-[11px] text-amber-400 hover:text-amber-300 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
                   >
                     ⚙️ Admin-Bereich
                   </Link>
-                  <span className="text-xs text-slate-400">{visibleHistory.length} Einträge</span>
+                  <span className="text-xs text-zinc-400">{visibleHistory.length} Einträge</span>
                 </div>
               </div>
 
               {/* Admin Filter Bar */}
-              <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-white/10 text-xs">
-                <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs">
+                <span className="text-zinc-300 font-semibold flex items-center gap-1.5">
                   <Users size={13} className="text-amber-400" />
                   Spieler filtern:
                 </span>
                 <select
                   value={adminPlayerFilter}
                   onChange={(e) => setAdminPlayerFilter(e.target.value)}
-                  className="bg-slate-900 border border-white/15 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  className="bg-zinc-900 border border-zinc-700 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
                 >
                   <option value="all">🌐 Alle Spieler ({history.length})</option>
                   {uniquePlayers.map((p) => {
@@ -1959,8 +2082,8 @@ export default function PdcChallengeClient({
                   onClick={() => setAdminPlayerFilter('all')}
                   className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
                     adminPlayerFilter === 'all'
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
-                      : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                      ? 'bg-amber-500 text-zinc-950 font-bold border-amber-400'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-white'
                   }`}
                 >
                   Alle ({history.length})
@@ -1970,8 +2093,8 @@ export default function PdcChallengeClient({
                     onClick={() => setAdminPlayerFilter(user.name)}
                     className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
                       adminPlayerFilter.toLowerCase() === user.name.toLowerCase()
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
-                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                        ? 'bg-amber-500 text-zinc-950 font-bold border-amber-400'
+                        : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-white'
                     }`}
                   >
                     Nur meine ({history.filter(h => h.player_name?.toLowerCase() === user.name.toLowerCase() || h.opponent_name?.toLowerCase() === user.name.toLowerCase()).length})
@@ -1985,17 +2108,17 @@ export default function PdcChallengeClient({
                 <h3 className="text-base font-black text-white flex items-center gap-2">
                   <span>📜</span> Mein Trainingsverlauf
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Persönliche PDC Challenge Durchgänge von <strong className="text-cyan-300">{user.name}</strong>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  Persönliche PDC Challenge Durchgänge von <strong className="text-white">{user.name}</strong>
                 </p>
               </div>
-              <span className="text-xs text-slate-400">{visibleHistory.length} Einträge</span>
+              <span className="text-xs text-zinc-400">{visibleHistory.length} Einträge</span>
             </div>
           ) : (
-            <div className="text-center py-6 px-4 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
+            <div className="text-center py-6 px-4 bg-zinc-950 rounded-xl border border-zinc-800 space-y-2">
               <div className="text-2xl">🔒</div>
               <div className="text-sm font-bold text-white">Privater Trainingsverlauf</div>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                 Trainingsverläufe sind geschützt: Jeder Spieler sieht nur seine eigenen Trainingseinheiten.
                 Bitte melde dich an, um deinen persönlichen Verlauf einzusehen.
               </p>
@@ -2003,7 +2126,7 @@ export default function PdcChallengeClient({
           )}
 
           {visibleHistory.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-xs">
+            <div className="text-center py-8 text-zinc-500 text-xs">
               Noch keine gespeicherten Spiele vorhanden.
             </div>
           ) : (
@@ -2031,26 +2154,26 @@ export default function PdcChallengeClient({
                     key={sessionKey}
                     onClick={() => !isAborted && setExpandedSessionKey(isExpanded ? null : sessionKey)}
                     className={`border rounded-2xl p-4 flex flex-col gap-3 text-xs transition-all ${
-                      !isAborted ? 'cursor-pointer hover:border-white/20 hover:bg-slate-900/90' : ''
+                      !isAborted ? 'cursor-pointer hover:border-zinc-700 hover:bg-zinc-800/80' : ''
                     } ${
                       isAborted
-                        ? 'bg-red-950/20 border-red-800/40 opacity-75'
+                        ? 'bg-zinc-950/80 border-zinc-800 opacity-60'
                         : isExpanded
-                        ? 'bg-slate-900/95 border-amber-400/50 shadow-xl shadow-amber-500/10'
-                        : 'bg-slate-950/60 border-white/5'
+                        ? 'bg-zinc-900 border-amber-400/80 shadow-xl shadow-amber-500/10'
+                        : 'bg-zinc-950/60 border-zinc-800'
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-white text-sm">{h.player_name}</span>
                         {h.opponent_name && (
-                          <span className="text-slate-400 text-xs">vs. {h.opponent_name}</span>
+                          <span className="text-zinc-400 text-xs">vs. {h.opponent_name}</span>
                         )}
                         {h.is_winner === 1 && (
                           <span className="text-amber-400 font-bold text-xs">🏆 Sieger</span>
                         )}
                         {isAborted && (
-                          <span className="px-2 py-0.5 rounded bg-red-900/60 text-red-300 text-[10px] font-bold">
+                          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-bold border border-zinc-700">
                             Abgebrochen
                           </span>
                         )}
@@ -2062,21 +2185,21 @@ export default function PdcChallengeClient({
                       </div>
 
                       <div className="flex items-center gap-2.5 font-mono flex-wrap justify-end">
-                        <span className="font-black text-amber-300 text-base">
+                        <span className="font-black text-amber-400 text-base">
                           {h.total_score} Pkt
                         </span>
                         <span className={`px-2.5 py-0.5 rounded text-[10px] font-sans font-black flex items-center gap-1 shadow-sm ${badge.badgeClass}`}>
                           <span>{badge.icon}</span>
                           <span>{badge.name}</span>
                         </span>
-                        <span className="text-[10px] font-sans font-semibold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-white/10 hidden sm:inline">
+                        <span className="text-[10px] font-sans font-semibold text-zinc-300 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-700 hidden sm:inline">
                           {badge.shortTitle}
                         </span>
-                        <span className="text-[11px] text-slate-500">
+                        <span className="text-[11px] text-zinc-500">
                           {h.training_date ? new Date(h.training_date).toLocaleDateString('de-DE') : ''}
                         </span>
                         {!isAborted && (
-                          <div className="text-slate-400 pl-1">
+                          <div className="text-zinc-400 pl-1">
                             {isExpanded ? <ChevronUp size={16} className="text-amber-400" /> : <ChevronDown size={16} />}
                           </div>
                         )}
@@ -2085,11 +2208,11 @@ export default function PdcChallengeClient({
 
                     {/* AUFGEKLAPPTE DETAIL-STATISTIK */}
                     {isExpanded && !isAborted && (
-                      <div className="pt-3 border-t border-white/10 space-y-4 animate-fadeIn">
+                      <div className="pt-3 border-t border-zinc-800 space-y-4 animate-fadeIn">
                         {/* 3 Sektionen Schnell-Übersicht */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                          <div className="bg-slate-950/80 p-3 rounded-xl border border-white/5 space-y-0.5">
-                            <span className="text-slate-400 text-[11px]">Teil 1 (Shanghai 10–15):</span>
+                          <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 space-y-0.5">
+                            <span className="text-zinc-400 text-[11px]">Teil 1 (Shanghai 10–15):</span>
                             <div className="text-lg font-black text-white font-mono">
                               {h.score_part1} Pkt
                             </div>
@@ -2098,18 +2221,18 @@ export default function PdcChallengeClient({
                             </div>
                           </div>
 
-                          <div className="bg-slate-950/80 p-3 rounded-xl border border-white/5 space-y-0.5">
-                            <span className="text-slate-400 text-[11px]">Teil 2 (Doppel D1–D20 + Bull):</span>
-                            <div className="text-lg font-black text-emerald-400 font-mono">
+                          <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 space-y-0.5">
+                            <span className="text-zinc-400 text-[11px]">Teil 2 (Doppel D1–D20 + Bull):</span>
+                            <div className="text-lg font-black text-amber-400 font-mono">
                               {h.score_part2} Pkt
                             </div>
-                            <div className="text-[10px] text-emerald-300 font-bold">
+                            <div className="text-[10px] text-zinc-300 font-bold">
                               {h.doubles_hit} von 21 Doppeln getroffen ({((h.doubles_hit / 21) * 100).toFixed(1)}%)
                             </div>
                           </div>
 
-                          <div className="bg-slate-950/80 p-3 rounded-xl border border-white/5 space-y-0.5">
-                            <span className="text-slate-400 text-[11px]">Teil 3 (Shanghai 15–20):</span>
+                          <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 space-y-0.5">
+                            <span className="text-zinc-400 text-[11px]">Teil 3 (Shanghai 15–20):</span>
                             <div className="text-lg font-black text-white font-mono">
                               {h.score_part3} Pkt
                             </div>
@@ -2120,13 +2243,13 @@ export default function PdcChallengeClient({
                         </div>
 
                         {/* 🎯 TEIL 2: DOPPEL-TREFFER IM DETAIL (Wo man gut getroffen hat) */}
-                        <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/10 space-y-2.5">
+                        <div className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800 space-y-2.5">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-emerald-300 flex items-center gap-1.5">
-                              <Target size={14} className="text-emerald-400" />
+                            <span className="font-bold text-white flex items-center gap-1.5">
+                              <Target size={14} className="text-amber-400" />
                               Doppel-Treffer Analyse (D1 bis D20 + Bull):
                             </span>
-                            <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                            <span className="text-[11px] font-mono text-amber-400 font-bold">
                               {h.doubles_hit} / 21 Treffer
                             </span>
                           </div>
@@ -2142,10 +2265,10 @@ export default function PdcChallengeClient({
                                     key={target}
                                     className={`py-1.5 px-2 rounded-lg border text-center transition-all flex flex-col items-center justify-center ${
                                       isHit
-                                        ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300 shadow-sm shadow-emerald-500/20'
+                                        ? 'bg-zinc-800 border-amber-400 text-amber-400 shadow-sm'
                                         : isMiss
-                                        ? 'bg-slate-900/60 border-rose-500/30 text-rose-300/70'
-                                        : 'bg-slate-900/40 border-white/5 text-slate-500'
+                                        ? 'bg-zinc-950 border-zinc-800 text-zinc-600'
+                                        : 'bg-zinc-950/40 border-zinc-850 text-zinc-600'
                                     }`}
                                   >
                                     <span className="font-mono font-black text-xs">
@@ -2159,8 +2282,8 @@ export default function PdcChallengeClient({
                               })}
                             </div>
                           ) : (
-                            <div className="text-xs text-slate-400 py-2">
-                              Erfolgreich getroffene Doppel in Teil 2: <strong className="text-emerald-300">{h.doubles_hit} von 21</strong> (Quote: {((h.doubles_hit / 21) * 100).toFixed(1)}%)
+                            <div className="text-xs text-zinc-400 py-2">
+                              Erfolgreich getroffene Doppel in Teil 2: <strong className="text-amber-400">{h.doubles_hit} von 21</strong> (Quote: {((h.doubles_hit / 21) * 100).toFixed(1)}%)
                             </div>
                           )}
                         </div>
@@ -2170,8 +2293,8 @@ export default function PdcChallengeClient({
                           <div className="space-y-3">
                             {/* Teil 1: 10 bis 15 */}
                             {detailsObj.part1Rounds && (
-                              <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/10 space-y-2">
-                                <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                              <div className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800 space-y-2">
+                                <span className="font-bold text-amber-400 text-xs flex items-center gap-1.5">
                                   <span>🎯</span> Scoring Teil 1 (Aufnahmen 10 bis 15):
                                 </span>
                                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1 text-center">
@@ -2185,17 +2308,17 @@ export default function PdcChallengeClient({
                                         key={t}
                                         className={`p-2 rounded-xl border flex flex-col justify-between ${
                                           isSh
-                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
+                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
                                             : mult >= 4
-                                            ? 'bg-blue-500/15 border-blue-400/40 text-blue-200'
-                                            : 'bg-slate-900/60 border-white/5 text-slate-300'
+                                            ? 'bg-zinc-800 border-zinc-700 text-white'
+                                            : 'bg-zinc-950 border-zinc-800 text-zinc-300'
                                         }`}
                                       >
-                                        <div className="text-[11px] font-bold text-slate-400">Target {t}</div>
+                                        <div className="text-[11px] font-bold text-zinc-400">Target {t}</div>
                                         <div className="text-sm font-black text-white font-mono my-0.5">
                                           {pts} Pkt
                                         </div>
-                                        <div className="text-[10px] text-slate-400">
+                                        <div className="text-[10px] text-zinc-400">
                                           {isSh ? '🌟 SHANGHAI' : `${mult} Treffer`}
                                         </div>
                                       </div>
@@ -2207,8 +2330,8 @@ export default function PdcChallengeClient({
 
                             {/* Teil 3: 15 bis 20 */}
                             {detailsObj.part3Rounds && (
-                              <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/10 space-y-2">
-                                <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                              <div className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800 space-y-2">
+                                <span className="font-bold text-amber-400 text-xs flex items-center gap-1.5">
                                   <span>🎯</span> Scoring Teil 3 (Große Zahlen 15 bis 20):
                                 </span>
                                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1 text-center">
@@ -2222,17 +2345,17 @@ export default function PdcChallengeClient({
                                         key={t}
                                         className={`p-2 rounded-xl border flex flex-col justify-between ${
                                           isSh
-                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
+                                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
                                             : mult >= 4
-                                            ? 'bg-blue-500/15 border-blue-400/40 text-blue-200'
-                                            : 'bg-slate-900/60 border-white/5 text-slate-300'
+                                            ? 'bg-zinc-800 border-zinc-700 text-white'
+                                            : 'bg-zinc-950 border-zinc-800 text-zinc-300'
                                         }`}
                                       >
-                                        <div className="text-[11px] font-bold text-slate-400">Target {t}</div>
+                                        <div className="text-[11px] font-bold text-zinc-400">Target {t}</div>
                                         <div className="text-sm font-black text-white font-mono my-0.5">
                                           {pts} Pkt
                                         </div>
-                                        <div className="text-[10px] text-slate-400">
+                                        <div className="text-[10px] text-zinc-400">
                                           {isSh ? '🌟 SHANGHAI' : `${mult} Treffer`}
                                         </div>
                                       </div>
@@ -2245,16 +2368,16 @@ export default function PdcChallengeClient({
                         )}
 
                         {/* Einstufungs-Badge & Notiz */}
-                        <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs border-t border-white/5">
+                        <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs border-t border-zinc-800">
                           <div className="flex items-center gap-2">
-                            <span className="text-slate-400">Erreichte Leistungsstufe:</span>
+                            <span className="text-zinc-400">Erreichte Leistungsstufe:</span>
                             <span className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] flex items-center gap-1 ${badge.badgeClass}`}>
                               <span>{badge.icon}</span>
                               <span>{badge.name} ({badge.title})</span>
                             </span>
                           </div>
                           {h.notes && (
-                            <span className="text-slate-400 italic">Notiz: {h.notes}</span>
+                            <span className="text-zinc-400 italic">Notiz: {h.notes}</span>
                           )}
                         </div>
                       </div>

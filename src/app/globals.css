@@ -102,3 +102,79 @@ html.monitor-landscape-force {
   width: 100vw;
   height: 100vh;
 }
+
+/* =========================================================
+   PDC CHALLENGE: SERIÖSES GRAU/GOLD & HELLMODUS-INVERSION
+   ========================================================= */
+.pdc-container {
+  --pdc-bg: #09090b;
+}
+
+/* Hellmodus für PDC Challenge */
+html.theme-light .pdc-container {
+  color: #000000 !important;
+}
+
+html.theme-light .pdc-container .text-white,
+html.theme-light .pdc-container .text-slate-100,
+html.theme-light .pdc-container .text-slate-200,
+html.theme-light .pdc-container .text-zinc-100,
+html.theme-light .pdc-container .text-zinc-200 {
+  color: #000000 !important;
+}
+
+html.theme-light .pdc-container .text-slate-300,
+html.theme-light .pdc-container .text-slate-400,
+html.theme-light .pdc-container .text-zinc-300,
+html.theme-light .pdc-container .text-zinc-400 {
+  color: #3f3f46 !important;
+}
+
+html.theme-light .pdc-container .text-amber-300,
+html.theme-light .pdc-container .text-amber-400,
+html.theme-light .pdc-container .text-yellow-300,
+html.theme-light .pdc-container .text-yellow-400 {
+  color: #b45309 !important; /* dunkelgold/amber für starken Kontrast auf hellem Grund */
+}
+
+html.theme-light .pdc-container .bg-zinc-900,
+html.theme-light .pdc-container .bg-zinc-900\/90,
+html.theme-light .pdc-container .bg-zinc-900\/80,
+html.theme-light .pdc-container .bg-zinc-900\/70,
+html.theme-light .pdc-container .bg-zinc-900\/60,
+html.theme-light .pdc-container .bg-zinc-950,
+html.theme-light .pdc-container .bg-zinc-950\/90,
+html.theme-light .pdc-container .bg-zinc-950\/80,
+html.theme-light .pdc-container .bg-zinc-950\/60,
+html.theme-light .pdc-container .bg-slate-900,
+html.theme-light .pdc-container .bg-slate-900\/90,
+html.theme-light .pdc-container .bg-slate-900\/80,
+html.theme-light .pdc-container .bg-slate-950,
+html.theme-light .pdc-container .bg-slate-950\/80,
+html.theme-light .pdc-container .bg-slate-950\/60 {
+  background-color: #ffffff !important;
+  border-color: #e4e4e7 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.theme-light .pdc-container .bg-zinc-800,
+html.theme-light .pdc-container .bg-zinc-800\/90,
+html.theme-light .pdc-container .bg-zinc-800\/80,
+html.theme-light .pdc-container .bg-slate-800,
+html.theme-light .pdc-container .bg-slate-800\/90 {
+  background-color: #f4f4f5 !important;
+  border-color: #d4d4d8 !important;
+  color: #000000 !important;
+}
+
+html.theme-light .pdc-container select {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #d4d4d8 !important;
+}
+
+html.theme-light .pdc-container select option {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
