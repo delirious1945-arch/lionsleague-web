@@ -138,7 +138,7 @@ export default function DoppelquoteLiveClient({
   };
 
   return (
-    <div className="min-h-screen bg-[#040711] text-slate-100 flex flex-col p-2 sm:p-5 select-none font-sans overflow-x-hidden">
+    <div className="forced-dark master-view min-h-screen bg-[#040711] text-slate-100 flex flex-col p-2 sm:p-5 select-none font-sans overflow-x-hidden" data-master="true">
       
       {/* TV TOP BAR */}
       <header className="bg-slate-900/90 border border-white/10 rounded-2xl p-3 sm:p-4 mb-4 shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-3 backdrop-blur-md">

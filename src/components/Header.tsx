@@ -57,6 +57,7 @@ export default function Header({
     pathname.startsWith('/eingabe') ||
     pathname.startsWith('/verwaltung') ||
     pathname.startsWith('/optionen') ||
+    pathname.startsWith('/einstellungen') ||
     (pathname === '/' && searchParams.get('mode') === 'ranking');
 
   if (!isRankingMode) {
@@ -69,6 +70,7 @@ export default function Header({
     { label: 'Spieler', href: '/spieler' },
     { label: 'Liga', href: '/liga' },
     { label: 'Dart Analytics Engine', href: '/analytics' },
+    { label: 'Einstellungen', href: '/einstellungen' },
     { label: 'Hilfe', href: '/hilfe' },
   ];
 

@@ -61,11 +61,33 @@ export default async function RootLayout({
   const isAuthenticated = Boolean(user && user.name);
   const seasons = isAuthenticated ? await getAvailableSeasons() : ["2026/2027"];
 
+  const themeCookie = cookieStore.get("lions_theme")?.value;
+  const isLight = themeCookie === "light";
+
   return (
     <html
       lang="de"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${isLight ? "theme-light" : ""}`}
+      data-theme={isLight ? "light" : "dark"}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var t = localStorage.getItem('lions_theme');
+                if (t === 'light') {
+                  document.documentElement.classList.add('theme-light');
+                  document.documentElement.setAttribute('data-theme', 'light');
+                } else if (t === 'dark') {
+                  document.documentElement.classList.remove('theme-light');
+                  document.documentElement.setAttribute('data-theme', 'dark');
+                }
+              } catch(e) {}
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-[#050811] text-slate-100">
         {!isAuthenticated ? (
           <LandingPage />

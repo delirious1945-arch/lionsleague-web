@@ -419,7 +419,9 @@ export default function PdcChallengeClient({
         } else {
           // Spielende!
           setStage('completed');
-          handleGameEnd(currentState, activePlayer === 1 ? stateP2 : currentState);
+          const finalP1 = activePlayer === 1 ? currentState : stateP1;
+          const finalP2 = activePlayer === 2 ? currentState : stateP2;
+          handleGameEnd(finalP1, finalP2);
         }
       }
     }
@@ -440,7 +442,7 @@ export default function PdcChallengeClient({
     commitShanghaiRound(multiplier, false);
   };
 
-  // Wurf eintragen: Teil 2 (Doppelrunde)
+  // Wurf eintragen: Teil 2 (Doppelrunde - 3 Darts / Eintragungen pro Aufnahme)
   const handleDoubleDart = (isHit: boolean) => {
     const currentTarget = PART2_TARGETS[currentTargetIndex];
     playDoubleHitSound(currentTarget === 'Bull' && isHit);
@@ -456,16 +458,38 @@ export default function PdcChallengeClient({
       setStateP2(currentState);
     }
 
-    // In 1 vs 1: abwechselnd je Doppel
-    if (gameMode === '1vs1' && activePlayer === 1) {
-      setActivePlayer(2);
-    } else {
-      if (gameMode === '1vs1') setActivePlayer(1);
+    const visitStart = Math.floor(currentTargetIndex / 3) * 3;
+    const isVisitEnd = currentTargetIndex % 3 === 2;
 
+    if (gameMode === '1vs1') {
+      if (!isVisitEnd) {
+        // Spieler bleibt am Zug für die nächsten Darts der gleichen 3er-Aufnahme (z.B. D1 -> D2 -> D3)
+        setCurrentTargetIndex(currentTargetIndex + 1);
+      } else {
+        // 3 Eintragungen vollendet!
+        if (activePlayer === 1) {
+          // Jetzt ist Spieler 2 für dieselbe 3er-Aufnahme am Zug!
+          setActivePlayer(2);
+          setCurrentTargetIndex(visitStart);
+        } else {
+          // Spieler 2 hat die 3er-Aufnahme ebenfalls abgeschlossen -> Beide Spieler fertig für diese Aufnahme!
+          if (currentTargetIndex < PART2_TARGETS.length - 1) {
+            // Weiter zur nächsten 3er-Aufnahme (z.B. D4..D6)
+            setActivePlayer(1);
+            setCurrentTargetIndex(visitStart + 3);
+          } else {
+            // Teil 2 komplett abgeschlossen -> Weiter zu Teil 3
+            setStage('part3');
+            setActivePlayer(1);
+            setCurrentTargetIndex(0);
+          }
+        }
+      }
+    } else {
+      // Solo Modus
       if (currentTargetIndex < PART2_TARGETS.length - 1) {
         setCurrentTargetIndex(currentTargetIndex + 1);
       } else {
-        // Teil 2 abgeschlossen -> Weiter zu Teil 3
         setStage('part3');
         setCurrentTargetIndex(0);
       }
@@ -526,40 +550,71 @@ export default function PdcChallengeClient({
         }
       }
     } else if (stage === 'part2') {
-      if (gameMode === '1vs1' && activePlayer === 2) {
-        setActivePlayer(1);
-        const currentTarget = PART2_TARGETS[currentTargetIndex];
-        const newP1 = { ...stateP1 };
-        newP1.part2Hits[currentTarget] = null;
-        setStateP1(newP1);
-      } else if (currentTargetIndex > 0) {
-        const prevTargetIdx = currentTargetIndex - 1;
-        const prevTarget = PART2_TARGETS[prevTargetIdx];
-        setCurrentTargetIndex(prevTargetIdx);
-
-        if (gameMode === '1vs1') {
-          setActivePlayer(2);
-          const newP2 = { ...stateP2 };
-          newP2.part2Hits[prevTarget] = null;
-          setStateP2(newP2);
-        } else {
+      if (gameMode === 'solo') {
+        if (currentTargetIndex > 0) {
+          const prevTargetIdx = currentTargetIndex - 1;
+          const prevTarget = PART2_TARGETS[prevTargetIdx];
+          setCurrentTargetIndex(prevTargetIdx);
           const newP1 = { ...stateP1 };
           newP1.part2Hits[prevTarget] = null;
           setStateP1(newP1);
-        }
-      } else {
-        // Von Teil 2 D1 zurück zu Teil 1 Target 15
-        setStage('part1');
-        setCurrentTargetIndex(PART1_TARGETS.length - 1);
-        if (gameMode === '1vs1') {
-          setActivePlayer(2);
-          const newP2 = { ...stateP2 };
-          newP2.part1Rounds[15] = null;
-          setStateP2(newP2);
         } else {
+          // Zurück zu Teil 1 Target 15
+          setStage('part1');
+          setCurrentTargetIndex(PART1_TARGETS.length - 1);
           const newP1 = { ...stateP1 };
           newP1.part1Rounds[15] = null;
           setStateP1(newP1);
+        }
+      } else {
+        // 1vs1 Modus mit 3 Eintragungen pro Aufnahme
+        if (activePlayer === 1) {
+          if (currentTargetIndex % 3 > 0) {
+            // P1 innerhalb der laufenden 3er-Aufnahme
+            const prevTargetIdx = currentTargetIndex - 1;
+            const prevTarget = PART2_TARGETS[prevTargetIdx];
+            setCurrentTargetIndex(prevTargetIdx);
+            const newP1 = { ...stateP1 };
+            newP1.part2Hits[prevTarget] = null;
+            setStateP1(newP1);
+          } else if (currentTargetIndex > 0) {
+            // P1 am Start von Aufnahme N -> Zurück zu P2 bei letztem Dart von Aufnahme N-1
+            const prevTargetIdx = currentTargetIndex - 1;
+            const prevTarget = PART2_TARGETS[prevTargetIdx];
+            setActivePlayer(2);
+            setCurrentTargetIndex(prevTargetIdx);
+            const newP2 = { ...stateP2 };
+            newP2.part2Hits[prevTarget] = null;
+            setStateP2(newP2);
+          } else {
+            // P1 am Start von D1 -> Zurück zu P2 bei Teil 1 Target 15
+            setStage('part1');
+            setCurrentTargetIndex(PART1_TARGETS.length - 1);
+            setActivePlayer(2);
+            const newP2 = { ...stateP2 };
+            newP2.part1Rounds[15] = null;
+            setStateP2(newP2);
+          }
+        } else {
+          // activePlayer === 2
+          if (currentTargetIndex % 3 > 0) {
+            // P2 innerhalb der laufenden 3er-Aufnahme
+            const prevTargetIdx = currentTargetIndex - 1;
+            const prevTarget = PART2_TARGETS[prevTargetIdx];
+            setCurrentTargetIndex(prevTargetIdx);
+            const newP2 = { ...stateP2 };
+            newP2.part2Hits[prevTarget] = null;
+            setStateP2(newP2);
+          } else {
+            // P2 am Start der laufenden 3er-Aufnahme -> Zurück zu P1 am 3. Dart derselben Aufnahme!
+            const prevTargetIdx = currentTargetIndex + 2;
+            const prevTarget = PART2_TARGETS[prevTargetIdx];
+            setActivePlayer(1);
+            setCurrentTargetIndex(prevTargetIdx);
+            const newP1 = { ...stateP1 };
+            newP1.part2Hits[prevTarget] = null;
+            setStateP1(newP1);
+          }
         }
       }
     }
@@ -1116,6 +1171,107 @@ export default function PdcChallengeClient({
             </div>
           </div>
 
+          {/* PROMINENTER HERO-BANNER: AKTIVER SPIELER AM WURF (OHNE FOTO, SCHLICHT, GEHIGHLIGHTED & VOM OCHE GUT SICHTBAR) */}
+          <div className="space-y-3">
+            {gameMode === 'solo' ? (
+              <div className="bg-gradient-to-r from-amber-500/20 via-slate-900 to-amber-500/10 border-2 border-amber-400/80 rounded-2xl p-4 sm:p-5 shadow-xl shadow-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-amber-400">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                    <span>🎯 Jetzt am Wurf</span>
+                  </div>
+                  <div className="text-2xl sm:text-4xl font-black text-white tracking-wide mt-1">
+                    {p1Name}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Aktueller Stand</div>
+                    <div className="text-xl sm:text-2xl font-black font-mono text-amber-300">{p1Stats.totalScore} Pkt</div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${p1Stats.badge.badgeClass}`}>
+                    {p1Stats.badge.name}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* 1 vs 1 Duell-Anzeige: Aktiver Spieler leuchtend hervorgehoben */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Spieler 1 Card */}
+                <div
+                  className={`p-4 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden ${
+                    activePlayer === 1
+                      ? 'bg-gradient-to-br from-amber-500/25 via-slate-900/95 to-amber-950/30 border-amber-400 shadow-xl shadow-amber-500/25 ring-4 ring-amber-400/30 scale-[1.01]'
+                      : 'bg-slate-950/60 border-slate-800/80 opacity-55 hover:opacity-75'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {activePlayer === 1 ? (
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black tracking-wider uppercase shadow-md shadow-amber-500/40 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-slate-950" />
+                          🎯 JETZT AM WURF
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          ⏸️ Wartet (Spieler 1)
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono font-black text-amber-300 text-lg sm:text-xl">
+                      {p1Stats.totalScore} Pkt
+                    </div>
+                  </div>
+                  <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 1 ? 'text-white drop-shadow-md' : 'text-slate-400'}`}>
+                    {p1Name}
+                  </div>
+                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-white/5">
+                    <span className="text-slate-400">Darts geworfen: <strong className="text-slate-200">{p1Stats.totalDartsThrown}/57</strong></span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${p1Stats.badge.badgeClass}`}>
+                      {p1Stats.badge.name}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Spieler 2 Card */}
+                <div
+                  className={`p-4 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden ${
+                    activePlayer === 2
+                      ? 'bg-gradient-to-br from-cyan-500/25 via-slate-900/95 to-cyan-950/30 border-cyan-400 shadow-xl shadow-cyan-500/25 ring-4 ring-cyan-400/30 scale-[1.01]'
+                      : 'bg-slate-950/60 border-slate-800/80 opacity-55 hover:opacity-75'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {activePlayer === 2 ? (
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-400 text-slate-950 text-xs font-black tracking-wider uppercase shadow-md shadow-cyan-500/40 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-slate-950" />
+                          🎯 JETZT AM WURF
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          ⏸️ Wartet (Spieler 2)
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono font-black text-cyan-300 text-lg sm:text-xl">
+                      {p2Stats.totalScore} Pkt
+                    </div>
+                  </div>
+                  <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 2 ? 'text-white drop-shadow-md' : 'text-slate-400'}`}>
+                    {p2Name}
+                  </div>
+                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-white/5">
+                    <span className="text-slate-400">Darts geworfen: <strong className="text-slate-200">{p2Stats.totalDartsThrown}/57</strong></span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${p2Stats.badge.badgeClass}`}>
+                      {p2Stats.badge.name}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* AKTIVER WURFBEREICH */}
           {stage !== 'completed' ? (
             <div className="bg-gradient-to-b from-[#0b162c] via-[#09142b] to-[#060e1f] border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-6">
@@ -1124,11 +1280,7 @@ export default function PdcChallengeClient({
                 <div>
                   <div className="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                    {gameMode === '1vs1' ? (
-                      <span>Am Board: {activePlayer === 1 ? p1Name : p2Name}</span>
-                    ) : (
-                      <span>Aktives Ziel (3 Darts)</span>
-                    )}
+                    <span>Aktives Wurfziel ({stage === 'part2' ? '1 Dart auf Doppel' : '3 Darts auf Shanghai'})</span>
                   </div>
                   <div className="text-4xl sm:text-5xl font-black text-white tracking-tight mt-1">
                     🎯 Ziel: <span className="text-amber-400 font-mono">{currentTargetLabel}</span>
@@ -1256,12 +1408,64 @@ export default function PdcChallengeClient({
                     </div>
                   </div>
 
-                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 text-center text-xs text-slate-300">
-                    {currentTargetLabel === 'Bull' ? (
-                      <span>🎯 <strong>Bullseye (Inner Bull / Rot):</strong> Genau 1 Dart! Treffer = <strong>100 Punkte</strong>.</span>
-                    ) : (
-                      <span>🎯 <strong>{currentTargetLabel}:</strong> Genau 1 Dart auf dieses Doppel! Treffer = <strong>50 Punkte</strong>.</span>
-                    )}
+                  {/* Aufnahme & 3 Darts Statusanzeige in Teil 2 */}
+                  <div className="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 sm:p-4 text-center space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <span className="text-xs uppercase font-black tracking-wider text-amber-400 bg-amber-950/70 px-3 py-1 rounded-full border border-amber-800/40">
+                        Aufnahme {Math.floor(currentTargetIndex / 3) + 1} von 7
+                      </span>
+                      <span className="text-xs uppercase font-black tracking-wider text-cyan-300 bg-cyan-950/70 px-3 py-1 rounded-full border border-cyan-800/40">
+                        Dart {(currentTargetIndex % 3) + 1} von 3
+                      </span>
+                      {gameMode === '1vs1' && (
+                        <span className="text-xs font-bold text-slate-300 bg-slate-900 px-2.5 py-1 rounded-full border border-white/10">
+                          Am Wurf: <strong className="text-white">{activePlayer === 1 ? p1Name : p2Name}</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Visuelle Anzeige der 3 Darts / Doppel dieser Aufnahme */}
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      {PART2_TARGETS.slice(Math.floor(currentTargetIndex / 3) * 3, Math.floor(currentTargetIndex / 3) * 3 + 3).map((targetName, dIdx) => {
+                        const isCurrentDart = dIdx === (currentTargetIndex % 3);
+                        const isPastDart = dIdx < (currentTargetIndex % 3);
+                        const curHits = (activePlayer === 1 ? stateP1 : stateP2).part2Hits;
+                        const hitVal = curHits[targetName];
+
+                        return (
+                          <div
+                            key={targetName}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-black transition-all ${
+                              isCurrentDart
+                                ? 'bg-amber-500 text-slate-950 border-amber-300 ring-2 ring-amber-300 shadow-md shadow-amber-500/30 scale-105'
+                                : hitVal === true
+                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60'
+                                : hitVal === false
+                                ? 'bg-red-950/80 text-red-300 border-red-500/60'
+                                : 'bg-slate-900/60 text-slate-400 border-white/5'
+                            }`}
+                          >
+                            <span className="text-[11px] opacity-80">Dart {dIdx + 1}:</span>
+                            <span className="font-mono text-sm sm:text-base">{targetName}</span>
+                            {hitVal === true && <span>🎯</span>}
+                            {hitVal === false && <span>❌</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="text-xs text-slate-300 pt-1">
+                      {currentTargetLabel === 'Bull' ? (
+                        <span>🎯 <strong>Bullseye (Inner Bull / Rot):</strong> Genau 1 Dart! Treffer = <strong>100 Punkte</strong>.</span>
+                      ) : (
+                        <span>🎯 <strong>{currentTargetLabel}:</strong> Genau 1 Dart auf dieses Doppel! Treffer = <strong>50 Punkte</strong>.</span>
+                      )}
+                      {gameMode === '1vs1' && (
+                        <div className="text-[11px] text-amber-300/80 mt-0.5">
+                          Nach 3 Eintragungen wechselt der Wurf zu <strong>{activePlayer === 1 ? p2Name : p1Name}</strong>.
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Action Buttons Doppel */}
