@@ -57,7 +57,6 @@ export default function Header({
     pathname.startsWith('/eingabe') ||
     pathname.startsWith('/verwaltung') ||
     pathname.startsWith('/optionen') ||
-    pathname.startsWith('/einstellungen') ||
     (pathname === '/' && searchParams.get('mode') === 'ranking');
 
   if (!isRankingMode) {
