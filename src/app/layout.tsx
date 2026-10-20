@@ -83,6 +83,10 @@ export default async function RootLayout({
                   document.documentElement.classList.remove('theme-light');
                   document.documentElement.setAttribute('data-theme', 'dark');
                 }
+                var ui = localStorage.getItem('lions_show_ui_labels');
+                if (ui === 'true') {
+                  document.documentElement.classList.add('show-ui-labels');
+                }
               } catch(e) {}
             `,
           }}

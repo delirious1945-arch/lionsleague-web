@@ -11,9 +11,12 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function EinstellungenPage() {
+  const session = await getSessionAction();
+  const isAdmin = session?.role === 'admin';
+
   return (
     <main className="min-h-screen px-2 sm:px-4 py-4 sm:py-6 flex flex-col justify-center">
-      <EinstellungenClient />
+      <EinstellungenClient isAdmin={isAdmin} />
     </main>
   );
 }

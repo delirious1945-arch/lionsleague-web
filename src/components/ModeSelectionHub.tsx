@@ -24,12 +24,13 @@ export default function ModeSelectionHub({ user }: ModeSelectionHubProps) {
     <div className="relative min-h-[calc(100dvh-2.5rem)] w-full flex flex-col justify-between gap-3 sm:gap-5 py-1 sm:py-2 select-none">
       
       {/* Obere Leiste mit dezentem Logout-Button */}
-      <div className="flex items-center justify-between w-full px-1">
-        <div className="text-xs font-bold text-slate-400">
+      <div className="flex items-center justify-between w-full px-1" data-ui-id="HOME.HEADER.BAR">
+        <div className="text-xs font-bold text-slate-400" data-ui-id="HOME.HEADER.USER_INFO">
           Angemeldet: <span className="text-white font-black">{user.name}</span>
         </div>
         <button
           onClick={handleLogout}
+          data-ui-id="HOME.HEADER.LOGOUT_BTN"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-red-500/20 text-slate-400 hover:text-red-300 border border-slate-800 hover:border-red-500/40 text-xs font-semibold transition-all cursor-pointer backdrop-blur-sm"
           title={`Abmelden (${user.name})`}
         >
@@ -39,11 +40,14 @@ export default function ModeSelectionHub({ user }: ModeSelectionHubProps) {
       </div>
 
       {/* Haupt-Bereich: Ranking-System & Trainingsmodus nebeneinander auf voller Bildschirmbreite */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 flex-1 min-h-[380px] sm:min-h-[460px] lg:min-h-[500px]">
-        
+      <div
+        data-ui-id="HOME.TILES.GRID"
+        className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 flex-1 min-h-[380px] sm:min-h-[460px] lg:min-h-[500px]"
+      >
         {/* Kachel 1: Ranking-System */}
         <Link
           href="/?mode=ranking"
+          data-ui-id="HOME.TILES.RANKING_CARD"
           className="group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 border-amber-500/30 hover:border-amber-400 shadow-2xl hover:shadow-[0_0_35px_rgba(245,158,11,0.35)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
         >
           {/* Hintergrundbild */}
@@ -82,6 +86,7 @@ export default function ModeSelectionHub({ user }: ModeSelectionHubProps) {
         {/* Kachel 2: Trainingsmodus */}
         <Link
           href="/training"
+          data-ui-id="HOME.TILES.TRAINING_CARD"
           className="group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 border-cyan-500/30 hover:border-cyan-400 shadow-2xl hover:shadow-[0_0_35px_rgba(0,212,255,0.35)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
         >
           {/* Hintergrundbild */}
@@ -117,6 +122,7 @@ export default function ModeSelectionHub({ user }: ModeSelectionHubProps) {
       {/* Untere Kachel: Einstellungen (Über die gesamte Bildschirmbreite) */}
       <Link
         href="/einstellungen"
+        data-ui-id="HOME.TILES.SETTINGS_CARD"
         className="group relative w-full rounded-2xl sm:rounded-3xl border-2 border-purple-500/30 hover:border-purple-400 bg-gradient-to-r from-slate-950 via-[#10162a] to-slate-950 shadow-xl hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] cursor-pointer p-4 sm:p-5 flex items-center justify-between gap-4"
       >
         <div className="flex items-center gap-3.5 sm:gap-4">

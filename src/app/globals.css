@@ -215,3 +215,33 @@ html.theme-light .dq-container select option {
   color: #000000 !important;
 }
 
+/* =========================================================
+   ADMIN UI INSPEKTOR / DATA-UI-ID BADGES
+   ========================================================= */
+html.show-ui-labels [data-ui-id] {
+  position: relative !important;
+  outline: 1.5px dashed rgba(245, 158, 11, 0.7) !important;
+  outline-offset: 1px !important;
+}
+
+html.show-ui-labels [data-ui-id]::after {
+  content: attr(data-ui-id);
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: #b45309;
+  color: #ffffff;
+  font-size: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+  z-index: 9999;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  opacity: 0.95;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+

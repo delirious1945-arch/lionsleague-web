@@ -24,9 +24,13 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
   return (
     <div className="min-h-[85vh] py-4 sm:py-8 space-y-6 max-w-6xl mx-auto px-2 sm:px-4 animate-fadeIn">
       {/* Navigation Top Bar */}
-      <div className="flex items-center justify-between gap-3 bg-slate-900/80 border border-white/10 rounded-2xl p-3 sm:p-4 shadow-xl">
+      <div
+        data-ui-id="TRAINING.NAV.BAR"
+        className="flex items-center justify-between gap-3 bg-slate-900/80 border border-white/10 rounded-2xl p-3 sm:p-4 shadow-xl"
+      >
         <Link
           href="/"
+          data-ui-id="TRAINING.NAV.BACK_BTN"
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
@@ -35,7 +39,7 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
       </div>
 
       {/* Intro Banner */}
-      <div className="text-center sm:text-left space-y-1 px-1">
+      <div className="text-center sm:text-left space-y-1 px-1" data-ui-id="TRAINING.HEADER.TITLE">
         <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
           Wähle deine Trainings-Disziplin
         </h2>
@@ -45,9 +49,12 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
       </div>
 
       {/* Grid of Active Training Games */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-ui-id="TRAINING.GAMES.GRID">
         {/* Spiel 1: Checkout Battle (Doppelquote) */}
-        <div className="relative bg-zinc-900 border-2 border-zinc-700/80 hover:border-amber-400/80 rounded-3xl p-6 sm:p-7 shadow-2xl transition-all flex flex-col justify-between">
+        <div
+          data-ui-id="TRAINING.GAME_CHECKOUT.CARD"
+          className="relative bg-zinc-900 border-2 border-zinc-700/80 hover:border-amber-400/80 rounded-3xl p-6 sm:p-7 shadow-2xl transition-all flex flex-col justify-between"
+        >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5">
@@ -126,6 +133,7 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
               <Link
                 href="/doppelquote/live"
                 target="_blank"
+                data-ui-id="TRAINING.GAME_CHECKOUT.TV_BTN"
                 className="flex-1 sm:flex-initial px-3.5 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
                 title="Live-Ranking für TV im Vereinsheim"
               >
@@ -134,6 +142,7 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
               </Link>
               <Link
                 href="/doppelquote"
+                data-ui-id="TRAINING.GAME_CHECKOUT.START_BTN"
                 className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <span>🎯 Spiel starten</span>
@@ -144,7 +153,10 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
         </div>
 
         {/* Spiel 2: PDC Challenge (57 Darts Leistungsabzeichen) */}
-        <div className="relative bg-gradient-to-b from-[#191508] via-[#120f06] to-[#090703] border-2 border-amber-500/60 hover:border-amber-400 rounded-3xl p-6 sm:p-7 shadow-2xl transition-all flex flex-col justify-between">
+        <div
+          data-ui-id="TRAINING.GAME_PDC.CARD"
+          className="relative bg-gradient-to-b from-[#191508] via-[#120f06] to-[#090703] border-2 border-amber-500/60 hover:border-amber-400 rounded-3xl p-6 sm:p-7 shadow-2xl transition-all flex flex-col justify-between"
+        >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5">
@@ -216,6 +228,7 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
               <Link
                 href="/training/pdc-challenge/live"
                 target="_blank"
+                data-ui-id="TRAINING.GAME_PDC.TV_BTN"
                 className="flex-1 sm:flex-initial px-3.5 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
                 title="Live-Ranking für TV im Vereinsheim"
               >
@@ -224,6 +237,7 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
               </Link>
               <Link
                 href="/training/pdc-challenge"
+                data-ui-id="TRAINING.GAME_PDC.START_BTN"
                 className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <span>🏆 Challenge starten</span>

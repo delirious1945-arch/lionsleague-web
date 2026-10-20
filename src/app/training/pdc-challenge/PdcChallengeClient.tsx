@@ -879,10 +879,14 @@ export default function PdcChallengeClient({
 
       {/* TOP HEADER: SLIM & MINIMAL WÄHREND DES MATCHES, KOMPLETT IM VORGELAGERTEN SETUP */}
       {isPlaying ? (
-        <div className="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl px-4 py-3 shadow-lg">
+        <div
+          data-ui-id="PDC.NAV.PLAYING_BAR"
+          className="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl px-4 py-3 shadow-lg"
+        >
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => handleSafeNavigation('/training')}
+              data-ui-id="PDC.NAV.BACK_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
@@ -901,6 +905,7 @@ export default function PdcChallengeClient({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSetupSettings((prev) => !prev)}
+              data-ui-id="PDC.NAV.SETUP_BTN"
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 showSetupSettings
                   ? 'bg-amber-500 text-zinc-950 border-amber-400'
@@ -914,6 +919,7 @@ export default function PdcChallengeClient({
 
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
+              data-ui-id="PDC.NAV.SOUND_BTN"
               className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 soundEnabled
                   ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
@@ -927,6 +933,7 @@ export default function PdcChallengeClient({
             <Link
               href="/training/pdc-challenge/live"
               target="_blank"
+              data-ui-id="PDC.NAV.TV_BTN"
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
               title="TV Live-Board öffnen"
             >
@@ -936,6 +943,7 @@ export default function PdcChallengeClient({
 
             <button
               onClick={resetGame}
+              data-ui-id="PDC.NAV.RESET_BTN"
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-red-950/60 text-zinc-300 hover:text-red-300 border border-zinc-700 hover:border-red-800/60 text-xs font-bold transition-all cursor-pointer"
               title="Spiel abbrechen / neu starten"
             >
@@ -945,10 +953,14 @@ export default function PdcChallengeClient({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-4 shadow-xl">
+        <div
+          data-ui-id="PDC.NAV.SETUP_BAR"
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-4 shadow-xl"
+        >
           <div className="flex items-center gap-3">
             <button
               onClick={() => handleSafeNavigation('/training')}
+              data-ui-id="PDC.NAV.BACK_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
@@ -968,6 +980,7 @@ export default function PdcChallengeClient({
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
+              data-ui-id="PDC.NAV.SOUND_BTN"
               className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 soundEnabled
                   ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
@@ -981,6 +994,7 @@ export default function PdcChallengeClient({
             <Link
               href="/training/pdc-challenge/live"
               target="_blank"
+              data-ui-id="PDC.NAV.TV_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
               title="TV Live-Board öffnen"
             >
@@ -990,6 +1004,7 @@ export default function PdcChallengeClient({
 
             <button
               onClick={resetGame}
+              data-ui-id="PDC.NAV.RESET_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -1001,9 +1016,13 @@ export default function PdcChallengeClient({
 
       {/* TABS: NUR SICHTBAR WENN KEIN SPIEL AKTIV LÄUFT */}
       {!isPlaying && (
-        <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto text-xs font-bold">
+        <div
+          data-ui-id="PDC.NAV.TABS_BAR"
+          className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto text-xs font-bold"
+        >
           <button
             onClick={() => setActiveTab('game')}
+            data-ui-id="PDC.NAV.TAB_BOARD"
             className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'game'
                 ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
@@ -1016,6 +1035,7 @@ export default function PdcChallengeClient({
 
           <button
             onClick={() => setActiveTab('summary')}
+            data-ui-id="PDC.NAV.TAB_SUMMARY"
             className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'summary'
                 ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
@@ -1028,6 +1048,7 @@ export default function PdcChallengeClient({
 
           <button
             onClick={() => setActiveTab('leaderboard')}
+            data-ui-id="PDC.NAV.TAB_LEADERBOARD"
             className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'leaderboard'
                 ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
@@ -1040,6 +1061,7 @@ export default function PdcChallengeClient({
 
           <button
             onClick={() => setActiveTab('history')}
+            data-ui-id="PDC.NAV.TAB_HISTORY"
             className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'history'
                 ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
@@ -1068,7 +1090,7 @@ export default function PdcChallengeClient({
 
       {/* VORGELAGERTE SETUP-ANSICHT (WENN NOCH KEIN MATCH GESTARTET WURDE) */}
       {!isPlaying && activeTab === 'game' && (
-        <div className="space-y-5">
+        <div className="space-y-5" data-ui-id="PDC.SETUP.CARD">
           <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
               <div>
@@ -1085,13 +1107,14 @@ export default function PdcChallengeClient({
             </div>
 
             {/* Modus Auswahl */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-ui-id="PDC.SETUP.MODE_TOGGLE">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
                 Spielmodus wählen:
               </label>
               <div className="grid grid-cols-2 gap-3 max-w-md">
                 <button
                   type="button"
+                  data-ui-id="PDC.SETUP.MODE_SOLO_BTN"
                   onClick={() => setGameMode('solo')}
                   className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     gameMode === 'solo'
@@ -1105,6 +1128,7 @@ export default function PdcChallengeClient({
 
                 <button
                   type="button"
+                  data-ui-id="PDC.SETUP.MODE_1VS1_BTN"
                   onClick={() => setGameMode('1vs1')}
                   className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     gameMode === '1vs1'
@@ -1121,7 +1145,7 @@ export default function PdcChallengeClient({
             {/* Spieler Auswahl */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
               {/* Spieler 1 */}
-              <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-2">
+              <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-2" data-ui-id="PDC.SETUP.P1_WRAPPER">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-white flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
@@ -1153,7 +1177,7 @@ export default function PdcChallengeClient({
 
               {/* Spieler 2 (nur bei 1vs1) */}
               {gameMode === '1vs1' ? (
-                <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-2">
+                <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-2" data-ui-id="PDC.SETUP.P2_WRAPPER">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-white flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-zinc-400" />
@@ -1188,6 +1212,7 @@ export default function PdcChallengeClient({
             <div className="pt-3">
               <button
                 type="button"
+                data-ui-id="PDC.SETUP.START_BTN"
                 onClick={() => {
                   setIsMatchStarted(true);
                 }}
@@ -1199,7 +1224,7 @@ export default function PdcChallengeClient({
             </div>
 
             {/* Info zur Routine */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs text-zinc-400">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs text-zinc-400" data-ui-id="PDC.SETUP.ROUTINE_INFO">
               <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800">
                 <span className="font-bold text-white block">Teil 1 (18 Darts):</span>
                 <span>Shanghai auf 10 bis 15</span>
@@ -1250,7 +1275,7 @@ export default function PdcChallengeClient({
           )}
 
           {/* PROMINENTER HERO-BANNER: AKTIVER SPIELER AM WURF */}
-          <div className="space-y-3">
+          <div className="space-y-3" data-ui-id="PDC.MATCH.HERO_PLAYER">
             {gameMode === 'solo' ? (
               <div className="bg-zinc-900 border-2 border-amber-400/80 rounded-2xl p-4 sm:p-5 shadow-xl shadow-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -1350,8 +1375,9 @@ export default function PdcChallengeClient({
           </div>
 
           {/* Section Progress Stepper */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2" data-ui-id="PDC.MATCH.STEPPER_BAR">
             <div
+              data-ui-id="PDC.MATCH.STEPPER_PART1"
               className={`p-3 rounded-xl border transition-all ${
                 stage === 'part1'
                   ? 'bg-zinc-900 border-2 border-amber-400 text-amber-300 shadow-md shadow-amber-500/10'
@@ -1368,6 +1394,7 @@ export default function PdcChallengeClient({
             </div>
 
             <div
+              data-ui-id="PDC.MATCH.STEPPER_PART2"
               className={`p-3 rounded-xl border transition-all ${
                 stage === 'part2'
                   ? 'bg-zinc-900 border-2 border-amber-400 text-amber-300 shadow-md shadow-amber-500/10'
@@ -1384,6 +1411,7 @@ export default function PdcChallengeClient({
             </div>
 
             <div
+              data-ui-id="PDC.MATCH.STEPPER_PART3"
               className={`p-3 rounded-xl border transition-all ${
                 stage === 'part3'
                   ? 'bg-zinc-900 border-2 border-amber-400 text-amber-300 shadow-md shadow-amber-500/10'
@@ -1402,10 +1430,13 @@ export default function PdcChallengeClient({
 
           {/* AKTIVER WURFBEREICH */}
           {stage !== 'completed' ? (
-            <div className="bg-zinc-900 border-2 border-zinc-700/80 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-6">
+            <div
+              data-ui-id="PDC.MATCH.BOARD_CARD"
+              className="bg-zinc-900 border-2 border-zinc-700/80 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-6"
+            >
               {/* Header Target Display */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-                <div>
+                <div data-ui-id="PDC.MATCH.TARGET_HERO">
                   <div className="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                     <span>Aktives Wurfziel ({stage === 'part2' ? '1 Dart auf Doppel' : '3 Darts auf Shanghai'})</span>
@@ -1416,7 +1447,10 @@ export default function PdcChallengeClient({
                 </div>
 
                 {/* Live Badge Preview Card */}
-                <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-center sm:text-right min-w-[180px]">
+                <div
+                  data-ui-id="PDC.MATCH.SCORE_PREVIEW"
+                  className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-center sm:text-right min-w-[180px]"
+                >
                   <div className="text-[10px] text-zinc-400 uppercase font-black">Aktueller Score</div>
                   <div className="text-2xl font-black text-amber-400 font-mono">
                     {activeStats.totalScore} Pkt
@@ -1436,7 +1470,7 @@ export default function PdcChallengeClient({
 
               {/* STAGE 1 & 3: SHANGHAI WURFBEREICH (EINGABE DER ANZAHL 0 BIS 9) */}
               {(stage === 'part1' || stage === 'part3') && (
-                <div className="space-y-4">
+                <div className="space-y-4" data-ui-id="PDC.MATCH.SHANGHAI_INPUTS">
                   <div className="text-center space-y-1">
                     <span className="text-xs uppercase font-bold text-zinc-400">
                       Aufnahme mit 3 Darts auf die {currentTargetLabel}
@@ -1504,7 +1538,7 @@ export default function PdcChallengeClient({
               {stage === 'part2' && (
                 <div className="space-y-6">
                   {/* Timeline der 21 Doppel */}
-                  <div className="overflow-x-auto pb-2">
+                  <div className="overflow-x-auto pb-2" data-ui-id="PDC.MATCH.DOUBLES_TIMELINE">
                     <div className="flex items-center gap-1.5 min-w-max justify-center">
                       {PART2_TARGETS.map((t, idx) => {
                         const currentState = activePlayer === 1 ? stateP1 : stateP2;
@@ -1533,7 +1567,10 @@ export default function PdcChallengeClient({
                   </div>
 
                   {/* Aufnahme & 3 Darts Statusanzeige in Teil 2 */}
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 sm:p-4 text-center space-y-2.5">
+                  <div
+                    data-ui-id="PDC.MATCH.DOUBLES_STATUS"
+                    className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 sm:p-4 text-center space-y-2.5"
+                  >
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       <span className="text-xs uppercase font-black tracking-wider text-amber-400 bg-zinc-900 px-3 py-1 rounded-full border border-amber-500/40">
                         Aufnahme {Math.floor(currentTargetIndex / 3) + 1} von 7
@@ -1595,6 +1632,7 @@ export default function PdcChallengeClient({
                   <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto pt-2">
                     <button
                       onClick={() => handleDoubleDart(false)}
+                      data-ui-id="PDC.MATCH.DOUBLE_MISS_BTN"
                       className="py-6 px-4 rounded-3xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 border-2 border-zinc-700 text-white font-black text-lg transition-all shadow-xl cursor-pointer flex flex-col items-center justify-center gap-1"
                     >
                       <span className="text-2xl">❌</span>
@@ -1604,6 +1642,7 @@ export default function PdcChallengeClient({
 
                     <button
                       onClick={() => handleDoubleDart(true)}
+                      data-ui-id="PDC.MATCH.DOUBLE_HIT_BTN"
                       className="py-6 px-4 rounded-3xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 active:scale-95 border-2 border-amber-300 text-zinc-950 font-black text-lg transition-all shadow-xl shadow-amber-500/30 cursor-pointer flex flex-col items-center justify-center gap-1"
                     >
                       <span className="text-2xl">🎯</span>
@@ -1620,6 +1659,7 @@ export default function PdcChallengeClient({
               <div className="flex items-center justify-between pt-3 border-t border-zinc-800 text-xs">
                 <button
                   onClick={handleUndo}
+                  data-ui-id="PDC.MATCH.UNDO_BTN"
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 font-bold transition-all cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -1633,7 +1673,7 @@ export default function PdcChallengeClient({
             </div>
           ) : (
             /* GAME COMPLETED CELEBRATION CARD */
-            <div className="bg-gradient-to-b from-[#0e1e3e] via-[#09142b] to-[#060e1f] border-2 border-amber-400 rounded-3xl p-6 sm:p-10 shadow-2xl text-center space-y-6">
+            <div data-ui-id="PDC.COMPLETION.CARD" className="bg-gradient-to-b from-[#0e1e3e] via-[#09142b] to-[#060e1f] border-2 border-amber-400 rounded-3xl p-6 sm:p-10 shadow-2xl text-center space-y-6">
               <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/30">
                 🏆
               </div>
@@ -1736,6 +1776,7 @@ export default function PdcChallengeClient({
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
                 <button
+                  data-ui-id="PDC.COMPLETION.SAVE_BTN"
                   onClick={() => saveSession()}
                   disabled={isSavedInCloud}
                   className={`w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -1758,6 +1799,7 @@ export default function PdcChallengeClient({
                 </button>
 
                 <button
+                  data-ui-id="PDC.COMPLETION.NEW_GAME_BTN"
                   onClick={resetGame}
                   className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-sm flex items-center justify-center gap-2 border border-zinc-700 cursor-pointer"
                 >

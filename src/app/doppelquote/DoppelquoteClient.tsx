@@ -939,10 +939,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       {/* TOP NAVIGATION: SLIM LEISTE WENN SPIEL AKTIV, ANSONSTEN HEADER MIT TABS */}
       {isPlaying ? (
-        <div className="flex items-center justify-between gap-2 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-3 px-4 shadow-xl text-xs">
+        <div
+          data-ui-id="CHECKOUT.NAV.PLAYING_BAR"
+          className="flex items-center justify-between gap-2 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-3 px-4 shadow-xl text-xs"
+        >
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleSafeNavigation('/training')}
+              data-ui-id="CHECKOUT.NAV.BACK_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
               title="Zurück zur Trainingsauswahl"
             >
@@ -952,6 +956,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
             <button
               onClick={() => setShowSetupSettings(!showSetupSettings)}
+              data-ui-id="CHECKOUT.NAV.SETUP_BTN"
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
               title="Setup anpassen"
             >
@@ -963,6 +968,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
+              data-ui-id="CHECKOUT.NAV.SOUND_BTN"
               className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 soundEnabled
                   ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
@@ -976,6 +982,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             <Link
               href="/doppelquote/live"
               target="_blank"
+              data-ui-id="CHECKOUT.NAV.TV_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
               title="TV Live-Board öffnen"
             >
@@ -985,6 +992,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
             <button
               onClick={resetGame}
+              data-ui-id="CHECKOUT.NAV.RESET_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
               title="Spiel abbrechen / neu starten"
             >
@@ -994,10 +1002,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           </div>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-4 shadow-xl">
+        <div
+          data-ui-id="CHECKOUT.NAV.SETUP_BAR"
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-4 shadow-xl"
+        >
           <div className="flex items-center gap-3">
             <button
               onClick={() => handleSafeNavigation('/training')}
+              data-ui-id="CHECKOUT.NAV.BACK_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
@@ -1017,6 +1029,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
+              data-ui-id="CHECKOUT.NAV.SOUND_BTN"
               className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 soundEnabled
                   ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
@@ -1030,6 +1043,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             <Link
               href="/doppelquote/live"
               target="_blank"
+              data-ui-id="CHECKOUT.NAV.TV_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
               title="TV Live-Board öffnen"
             >
@@ -1039,6 +1053,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
             <button
               onClick={resetGame}
+              data-ui-id="CHECKOUT.NAV.RESET_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -1050,9 +1065,13 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       {/* TABS: NUR SICHTBAR WENN KEIN SPIEL AKTIV LÄUFT */}
       {!isPlaying && (
-        <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto text-xs font-bold">
+        <div
+          data-ui-id="CHECKOUT.NAV.TABS_BAR"
+          className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto text-xs font-bold"
+        >
           <button
             onClick={() => setActiveTab('board')}
+            data-ui-id="CHECKOUT.NAV.TAB_BOARD"
             className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'board'
                 ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
@@ -1065,6 +1084,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
           <button
             onClick={() => setActiveTab('table')}
+            data-ui-id="CHECKOUT.NAV.TAB_TABLE"
             className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'table'
                 ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
@@ -1077,6 +1097,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
           <button
             onClick={() => setActiveTab('history')}
+            data-ui-id="CHECKOUT.NAV.TAB_HISTORY"
             className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'history'
                 ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
@@ -1102,7 +1123,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       {/* VORGELAGERTES MATCH-SETUP (VOR SPIELSTART) */}
       {!isPlaying && !isCompleted && activeTab === 'board' && (
-        <div className="space-y-5 animate-fadeIn">
+        <div className="space-y-5 animate-fadeIn" data-ui-id="CHECKOUT.SETUP.CARD">
           <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
               <div>
@@ -1119,13 +1140,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* Modus Auswahl */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-ui-id="CHECKOUT.SETUP.MODE_TOGGLE">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
                 Spielmodus wählen:
               </label>
               <div className="grid grid-cols-2 gap-3 max-w-md">
                 <button
                   type="button"
+                  data-ui-id="CHECKOUT.SETUP.MODE_SOLO_BTN"
                   onClick={() => {
                     setGameMode('solo');
                     setActivePlayer(1);
@@ -1145,6 +1167,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
                 <button
                   type="button"
+                  data-ui-id="CHECKOUT.SETUP.MODE_1VS1_BTN"
                   onClick={() => setGameMode('1vs1')}
                   className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     gameMode === '1vs1'
@@ -1162,7 +1185,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Spieler 1 */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-ui-id="CHECKOUT.SETUP.P1_WRAPPER">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold uppercase tracking-wider text-white">
                       Spieler 1 am Oche:
@@ -1200,7 +1223,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
                 {/* Spieler 2 (nur Duell) */}
                 {gameMode === '1vs1' ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5" data-ui-id="CHECKOUT.SETUP.P2_WRAPPER">
                     <label className="text-xs font-bold uppercase tracking-wider text-white">
                       Spieler 2 (Gegner):
                     </label>
@@ -1225,7 +1248,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* Selbsteinschätzung Doppelquotenniveau */}
-            <div className="space-y-2 pt-2 border-t border-zinc-800">
+            <div className="space-y-2 pt-2 border-t border-zinc-800" data-ui-id="CHECKOUT.SETUP.ESTIMATE_BOX">
               <div className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                 Zielvorgabe (Selbsteinschätzung Doppelquote):
               </div>
@@ -1242,6 +1265,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   </div>
                   <button
                     type="button"
+                    data-ui-id="CHECKOUT.SETUP.ESTIMATE_P1_BTN"
                     onClick={() => {
                       setModalTargetPlayer(p1Name);
                       setModalInputValue(playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '');
@@ -1267,6 +1291,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                     </div>
                     <button
                       type="button"
+                      data-ui-id="CHECKOUT.SETUP.ESTIMATE_P2_BTN"
                       onClick={() => {
                         setModalTargetPlayer(p2Name);
                         setModalInputValue(playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '');
@@ -1286,6 +1311,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             <div className="pt-2">
               <button
                 type="button"
+                data-ui-id="CHECKOUT.SETUP.START_BTN"
                 onClick={handleStartMatch}
                 className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-zinc-950 font-black text-lg sm:text-xl shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer select-none"
               >
@@ -1296,7 +1322,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* Disziplin Übersicht Kacheln */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-zinc-800">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-zinc-800" data-ui-id="CHECKOUT.SETUP.TARGETS_OVERVIEW">
               {TARGETS.map(t => (
                 <div key={t} className="p-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
                   <div className="text-base font-black text-amber-400">{t}</div>
@@ -1349,7 +1375,10 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       {/* GROSSE HERO-ANZEIGE: WER IST AM ZUG */}
       {isPlaying && (
-        <div className="p-4 sm:p-5 rounded-3xl border-2 border-zinc-700/80 bg-zinc-900 shadow-2xl transition-all duration-300 relative overflow-hidden">
+        <div
+          data-ui-id="CHECKOUT.MATCH.HERO_PLAYER"
+          className="p-4 sm:p-5 rounded-3xl border-2 border-zinc-700/80 bg-zinc-900 shadow-2xl transition-all duration-300 relative overflow-hidden"
+        >
           {/* Ambient Glow */}
           <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20 bg-amber-400" />
 
@@ -1393,7 +1422,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* Aufnahme Zähler */}
-            <div className="shrink-0 text-right">
+            <div className="shrink-0 text-right" data-ui-id="CHECKOUT.MATCH.HERO_SHOT_COUNTER">
               <div className="text-[10px] sm:text-xs uppercase font-bold text-zinc-400 tracking-wider">
                 Aufnahme
               </div>
@@ -1406,7 +1435,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
           {/* 1 vs 1 Duell Score-Vergleich */}
           {gameMode === '1vs1' && (
-            <div className="mt-3.5 pt-3 border-t border-zinc-800 grid grid-cols-2 gap-2 text-xs">
+            <div className="mt-3.5 pt-3 border-t border-zinc-800 grid grid-cols-2 gap-2 text-xs" data-ui-id="CHECKOUT.MATCH.DUEL_BAR">
               <div className={`p-2 sm:p-2.5 rounded-xl transition-all flex items-center justify-between ${
                 activePlayer === 1 
                   ? 'bg-zinc-800 border-2 border-amber-400 text-white font-black shadow-md' 
@@ -1445,7 +1474,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       {/* TARGET NAV PILLS */}
       {isPlaying && (
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+        <div className="flex gap-1.5 overflow-x-auto pb-1" data-ui-id="CHECKOUT.MATCH.TARGET_NAV">
           {TARGETS.map((t, idx) => {
             const shots = scoresP1[t];
             const isDone = shots.filter(s => s !== null).length === 10;
@@ -1478,9 +1507,15 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       {/* VIEW 1: LIVE BOARD */}
       {isPlaying && activeTab === 'board' && (
-        <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 shadow-2xl flex flex-col gap-4 text-center">
+        <div
+          data-ui-id="CHECKOUT.MATCH.BOARD_CARD"
+          className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 shadow-2xl flex flex-col gap-4 text-center"
+        >
           {/* Target Hero Display */}
-          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-center relative overflow-hidden">
+          <div
+            data-ui-id="CHECKOUT.MATCH.CURRENT_TARGET"
+            className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-center relative overflow-hidden"
+          >
             <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 mb-1">
               <span className="uppercase tracking-widest">Aktuelles Doppelfeld</span>
               {playerEstimates[(gameMode === 'solo' || activePlayer === 1) ? p1Name : p2Name] && (
@@ -1499,7 +1534,10 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mt-2 border border-zinc-700">
+            <div
+              data-ui-id="CHECKOUT.MATCH.PROGRESS_BAR"
+              className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mt-2 border border-zinc-700"
+            >
               <div 
                 className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300"
                 style={{ width: `${((curShots.filter(s => s !== null).length) / 10) * 100}%` }}
@@ -1507,7 +1545,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* 10 Shot Boxes */}
-            <div className="grid grid-cols-10 gap-1.5 mt-3">
+            <div className="grid grid-cols-10 gap-1.5 mt-3" data-ui-id="CHECKOUT.MATCH.SHOT_BOXES">
               {curShots.map((val, idx) => {
                 const isCurrent = idx === currentShotIndex;
                 let bgCls = 'bg-zinc-950 text-zinc-600 border-zinc-800';
@@ -1532,9 +1570,10 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           </div>
 
           {/* TOUCH BUTTONS (0, 1, 2, 3 TREFFER) */}
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5" data-ui-id="CHECKOUT.MATCH.INPUT_GRID">
             <button
               onClick={() => handleScore(0)}
+              data-ui-id="CHECKOUT.MATCH.INPUT_0"
               className="py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-750 active:bg-zinc-900 border border-zinc-700 text-zinc-300 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
             >
               0
@@ -1542,6 +1581,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </button>
             <button
               onClick={() => handleScore(1)}
+              data-ui-id="CHECKOUT.MATCH.INPUT_1"
               className="py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-650 active:bg-zinc-800 border border-zinc-600 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
             >
               1
@@ -1549,6 +1589,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </button>
             <button
               onClick={() => handleScore(2)}
+              data-ui-id="CHECKOUT.MATCH.INPUT_2"
               className="py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-650 active:bg-zinc-800 border border-amber-500/40 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
             >
               2
@@ -1556,6 +1597,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </button>
             <button
               onClick={() => handleScore(3)}
+              data-ui-id="CHECKOUT.MATCH.INPUT_3"
               className="py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 border border-amber-400 text-zinc-950 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg shadow-amber-500/25 cursor-pointer"
             >
               3 ⭐
@@ -1564,9 +1606,10 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           </div>
 
           {/* CONTROLS */}
-          <div className="flex gap-2">
+          <div className="flex gap-2" data-ui-id="CHECKOUT.MATCH.CONTROLS_BAR">
             <button
               onClick={handleUndo}
+              data-ui-id="CHECKOUT.MATCH.UNDO_BTN"
               className="flex-1 py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-zinc-700 transition-colors cursor-pointer"
             >
               <RotateCcw size={14} /> Wurf korrigieren
@@ -1577,6 +1620,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 setCurrentTargetIndex(nextIdx);
                 setCurrentShotIndex(0);
               }}
+              data-ui-id="CHECKOUT.MATCH.NEXT_TARGET_BTN"
               className="flex-1 py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-zinc-700 transition-colors cursor-pointer"
             >
               Nächstes Doppel <ArrowRight size={14} />
@@ -1587,7 +1631,10 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
       {/* ABSCHLUSS-KARTE (WENN SPIEL BEENDET IST) */}
       {isCompleted && activeTab === 'board' && (
-        <div className="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl animate-fadeIn">
+        <div
+          data-ui-id="CHECKOUT.COMPLETION.CARD"
+          className="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl animate-fadeIn"
+        >
           <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-xl shadow-amber-500/20">
             🏆
           </div>
@@ -1650,6 +1697,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             <button
               onClick={() => saveSession()}
               disabled={isSavedInCloud}
+              data-ui-id="CHECKOUT.COMPLETION.SAVE_BTN"
               className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 isSavedInCloud
                   ? 'bg-zinc-800 text-amber-400 border border-zinc-700 cursor-not-allowed'
@@ -1668,6 +1716,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </button>
             <button
               onClick={resetGame}
+              data-ui-id="CHECKOUT.COMPLETION.NEW_GAME_BTN"
               className="py-3 px-5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-bold text-sm transition-all cursor-pointer"
             >
               Neues Spiel starten
