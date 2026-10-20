@@ -13,7 +13,7 @@ import { UserSession } from '@/app/actions';
 import { 
   Trophy, Users, User, ArrowRight, RotateCcw, Volume2, VolumeX, 
   Save, Download, FileSpreadsheet, FileText, CheckCircle2, AlertCircle,
-  ArrowLeft, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Target, Play, Settings
+  ArrowLeft, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Target, Play, Settings, Tv, Award
 } from 'lucide-react';
 import { getPlayerPhotoUrl, getPlayerInitials } from '@/lib/avatar';
 
@@ -148,8 +148,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     : (TARGETS.every(t => scoresP1[t].every(s => s !== null)) && TARGETS.every(t => scoresP2[t].every(s => s !== null)))
   );
   const hasStarted = (p1Stats.thrown > 0 || p2Stats.thrown > 0);
-  const isPlaying = isMatchStarted || hasStarted;
-  const isGameActive = isPlaying && !isCompleted;
+  const isPlaying = (isMatchStarted || hasStarted) && !isCompleted;
+  const isGameActive = hasStarted && !isCompleted;
 
   // 1. Lokalen Geräte-Cache beim Start wiederherstellen
   useEffect(() => {
@@ -162,7 +162,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             (cached.scoresP1[t] && cached.scoresP1[t].some((s: any) => s !== null)) ||
             (cached.scoresP2 && cached.scoresP2[t] && cached.scoresP2[t].some((s: any) => s !== null))
           );
-          if (hasScores) {
+          if (hasScores || cached.isMatchStarted) {
             const restoredMode = cached.gameMode || 'solo';
             setGameMode(restoredMode);
             if (!isBoardUser && userPlayerMatch && restoredMode === 'solo') {
@@ -202,10 +202,11 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   useEffect(() => {
     if (!isGameInitialized) return;
 
-    if (hasStarted && !isCompleted) {
+    if ((hasStarted || isMatchStarted) && !isCompleted) {
       const sessionData = {
         gameSessionId,
         isSavedInCloud,
+        isMatchStarted,
         gameMode,
         p1Name,
         p2Name,
@@ -218,13 +219,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         updatedAt: Date.now(),
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(sessionData));
-    } else if (!hasStarted) {
+    } else if (!hasStarted && !isMatchStarted) {
       localStorage.removeItem(CACHE_KEY);
     }
   }, [
     isGameInitialized,
     hasStarted,
     isCompleted,
+    isMatchStarted,
     gameSessionId,
     isSavedInCloud,
     gameMode,
@@ -680,6 +682,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     setRestoredFromCache(false);
     setIsMatchStarted(false);
     setShowSetupSettings(false);
+    setActiveTab('board');
     const empty = () => ({
       D20: Array(10).fill(null), D10: Array(10).fill(null),
       D16: Array(10).fill(null), D8:  Array(10).fill(null),
@@ -702,40 +705,153 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const curPlayerInitials = getPlayerInitials(curPlayerName);
   const curPlayerEstimate = playerEstimates[curPlayerName];
 
+  // Wiederverwendbare Quoten-Tabellen für Tabelle-Tab & Spielende
+  const renderQuotenTables = () => (
+    <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4 text-left">
+      <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+        <span>📊</span> Quoten-Tabelle: {p1Name}
+      </h2>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs text-center border-collapse">
+          <thead>
+            <tr className="border-b border-zinc-700 text-zinc-400 font-bold">
+              <th className="py-2.5 text-left pl-2">Doppel</th>
+              <th>Aufn. 1-5</th>
+              <th>Aufn. 6-10</th>
+              <th>Treffer</th>
+              <th>Quote</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TARGETS.map(t => {
+              const s = scoresP1[t];
+              const first5 = s.slice(0, 5).map(v => v !== null ? v : '-').join(' ');
+              const last5 = s.slice(5, 10).map(v => v !== null ? v : '-').join(' ');
+              const hits = s.reduce<number>((a, b) => a + (b ?? 0), 0);
+              const thr = s.filter(v => v !== null).length * 3;
+              const pct = thr > 0 ? ((hits / thr) * 100).toFixed(1) + '%' : '0.0%';
+
+              return (
+                <tr key={t} className="border-b border-zinc-800 hover:bg-zinc-800/40">
+                  <td className="py-2.5 text-left pl-2 font-black text-amber-400 text-sm">{t}</td>
+                  <td className="font-mono text-zinc-400">{first5}</td>
+                  <td className="font-mono text-zinc-400">{last5}</td>
+                  <td className="font-bold text-white">{hits}</td>
+                  <td className="font-bold text-amber-400">{pct}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="bg-zinc-800 font-black text-white border-t-2 border-zinc-700">
+              <td className="py-2.5 text-left pl-2">GESAMT</td>
+              <td colSpan={2} className="text-zinc-400">{p1Stats.thrown} / 150 Darts</td>
+              <td>{p1Stats.hits}</td>
+              <td className="text-amber-400 text-sm">{p1Stats.quote.toFixed(1)}%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {gameMode === '1vs1' && (
+        <div className="mt-4 pt-4 border-t border-zinc-800">
+          <h2 className="text-sm sm:text-base font-black text-white mb-2 flex items-center gap-2">
+            <span>📊</span> Quoten-Tabelle: {p2Name} (Gegner)
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-center border-collapse">
+              <thead>
+                <tr className="border-b border-zinc-700 text-zinc-400 font-bold">
+                  <th className="py-2.5 text-left pl-2">Doppel</th>
+                  <th>Aufn. 1-5</th>
+                  <th>Aufn. 6-10</th>
+                  <th>Treffer</th>
+                  <th>Quote</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TARGETS.map(t => {
+                  const s = scoresP2[t];
+                  const first5 = s.slice(0, 5).map(v => v !== null ? v : '-').join(' ');
+                  const last5 = s.slice(5, 10).map(v => v !== null ? v : '-').join(' ');
+                  const hits = s.reduce<number>((a, b) => a + (b ?? 0), 0);
+                  const thr = s.filter(v => v !== null).length * 3;
+                  const pct = thr > 0 ? ((hits / thr) * 100).toFixed(1) + '%' : '0.0%';
+
+                  return (
+                    <tr key={t} className="border-b border-zinc-800 hover:bg-zinc-800/40">
+                      <td className="py-2.5 text-left pl-2 font-black text-amber-400 text-sm">{t}</td>
+                      <td className="font-mono text-zinc-400">{first5}</td>
+                      <td className="font-mono text-zinc-400">{last5}</td>
+                      <td className="font-bold text-white">{hits}</td>
+                      <td className="font-bold text-amber-400">{pct}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-zinc-800 font-black text-white border-t-2 border-zinc-700">
+                  <td className="py-2.5 text-left pl-2">GESAMT</td>
+                  <td colSpan={2} className="text-zinc-400">{p2Stats.thrown} / 150 Darts</td>
+                  <td>{p2Stats.hits}</td>
+                  <td className="text-amber-400 text-sm">{p2Stats.quote.toFixed(1)}%</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
+          Trainings-Notizen:
+        </label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="z. B. Stand, Rhythmus, bestes Doppel..."
+          className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-400"
+          rows={2}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div 
-      className="max-w-[700px] mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4"
+      className="dq-container max-w-[760px] mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4 text-white"
       style={{ overscrollBehaviorY: 'contain' }}
     >
       {/* EINGABEMASKE: SELBSTEINSCHÄTZUNG DOPPELQUOTE (0 BIS 9 NUMPAD OHNE VORLAGE) */}
       {showEstimateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-          <div className="bg-gradient-to-b from-slate-900 via-[#0d1829] to-slate-950 border-2 border-sky-400 rounded-3xl p-5 sm:p-7 max-w-sm w-full shadow-2xl shadow-sky-500/25 text-center space-y-4">
+          <div className="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-5 sm:p-7 max-w-sm w-full shadow-2xl shadow-amber-500/20 text-center space-y-4">
             {/* Icon */}
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center text-3xl shadow-lg shadow-sky-500/30">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20">
               🎯
             </div>
 
             {/* Header & Frage */}
             <div>
-              <span className="text-[11px] uppercase font-black tracking-widest text-sky-400">
+              <span className="text-[11px] uppercase font-black tracking-widest text-amber-400">
                 Selbsteinschätzung · {modalTargetPlayer} {gameMode === '1vs1' ? (modalTargetPlayer === p1Name ? '(Spieler 1)' : '(Spieler 2)') : ''}
               </span>
               <h2 className="text-lg sm:text-xl font-black text-white mt-1 leading-snug">
                 Wie schätzt du dein Doppelquotenniveau ein?
               </h2>
-              <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+              <p className="text-xs text-zinc-300 mt-1.5 leading-relaxed">
                 Tippe deinen geschätzten Prozentwert (1–100%) über das Zahlenfeld ein. Diese Abfrage erfolgt nur <strong>einmalig</strong> und wird fest in der Datenbank gespeichert!
               </p>
             </div>
 
             {/* Display der eingegebenen Prozentzahl */}
             <div className="space-y-1.5">
-              <div className="w-full max-w-[240px] mx-auto bg-slate-950 border-2 border-sky-500/50 rounded-2xl py-3 px-4 flex items-center justify-center gap-1 shadow-inner">
+              <div className="w-full max-w-[240px] mx-auto bg-zinc-950 border-2 border-amber-500/50 rounded-2xl py-3 px-4 flex items-center justify-center gap-1 shadow-inner">
                 <span className="text-4xl sm:text-5xl font-black font-mono tracking-wider text-white">
-                  {modalInputValue || <span className="text-slate-600 font-normal">--</span>}
+                  {modalInputValue || <span className="text-zinc-600 font-normal">--</span>}
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-sky-400 font-mono">
+                <span className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
                   %
                 </span>
               </div>
@@ -754,7 +870,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   key={digit}
                   type="button"
                   onClick={() => handleNumpadPress(String(digit))}
-                  className="h-13 sm:h-14 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:bg-sky-600 active:scale-95 text-white text-2xl font-black border border-white/10 shadow-md hover:border-sky-400/40 transition-all flex items-center justify-center cursor-pointer"
+                  className="h-13 sm:h-14 rounded-2xl bg-zinc-800/90 hover:bg-zinc-700 active:bg-amber-500 active:text-zinc-950 active:scale-95 text-white text-2xl font-black border border-zinc-700 shadow-md transition-all flex items-center justify-center cursor-pointer"
                 >
                   {digit}
                 </button>
@@ -774,7 +890,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               <button
                 type="button"
                 onClick={() => handleNumpadPress('0')}
-                className="h-13 sm:h-14 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:bg-sky-600 active:scale-95 text-white text-2xl font-black border border-white/10 shadow-md hover:border-sky-400/40 transition-all flex items-center justify-center cursor-pointer"
+                className="h-13 sm:h-14 rounded-2xl bg-zinc-800/90 hover:bg-zinc-700 active:bg-amber-500 active:text-zinc-950 active:scale-95 text-white text-2xl font-black border border-zinc-700 shadow-md transition-all flex items-center justify-center cursor-pointer"
               >
                 0
               </button>
@@ -784,7 +900,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 type="button"
                 onClick={handleNumpadBackspace}
                 title="Letzte Ziffer löschen"
-                className="h-13 sm:h-14 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-600 active:text-white active:scale-95 text-amber-400 text-xl font-black border border-amber-500/30 shadow-md transition-all flex items-center justify-center cursor-pointer"
+                className="h-13 sm:h-14 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500 active:text-zinc-950 text-amber-400 text-xl font-black border border-amber-500/30 shadow-md transition-all flex items-center justify-center cursor-pointer"
               >
                 ⌫
               </button>
@@ -796,7 +912,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 <button
                   type="button"
                   onClick={() => setShowEstimateModal(false)}
-                  className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                  className="px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition-colors cursor-pointer"
                 >
                   Abbrechen
                 </button>
@@ -805,7 +921,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 type="button"
                 disabled={isSavingEstimate || !modalInputValue}
                 onClick={handleConfirmEstimate}
-                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-95 text-white font-black text-sm shadow-xl shadow-sky-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-zinc-950 font-black text-sm shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingEstimate ? (
                   <span>Speichere...</span>
@@ -821,269 +937,421 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         </div>
       )}
 
-      {/* SCHLANKE TOP-NAVIGATION (OBERE ANSICHT ENTSCHLACKT) */}
-      <div className="flex items-center justify-between text-xs pb-1">
-        <button
-          onClick={() => handleSafeNavigation('/training')}
-          className="inline-flex items-center gap-1.5 text-slate-300 hover:text-cyan-400 bg-slate-900/90 hover:bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl transition-all font-bold text-xs shadow-sm cursor-pointer"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
-          <span>← Trainingsauswahl</span>
-        </button>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/doppelquote/live"
-            target="_blank"
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-400/30 transition-colors flex items-center gap-1 shadow-sm"
-            title="Live-Board für Beamer/TV"
-          >
-            <span>📺</span>
-            <span className="hidden sm:inline">TV Live-Board</span>
-          </Link>
-          <button
-            onClick={() => handleSafeNavigation('/?mode=ranking')}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
-          >
-            <span>🏆</span>
-            <span className="hidden sm:inline">Ranking</span>
-          </button>
-          <button 
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="w-8 h-8 rounded-xl bg-slate-800/90 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Ton an/aus"
-          >
-            {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
-          </button>
-        </div>
-      </div>
-
-      {/* LOKALER GERÄTE-CACHE HINWEIS BANNER */}
-      {restoredFromCache && isGameActive && (
-        <div className="bg-cyan-950/70 border border-cyan-500/40 rounded-xl p-2.5 px-3.5 flex items-center justify-between text-xs text-cyan-200 shadow-lg">
+      {/* TOP NAVIGATION: SLIM LEISTE WENN SPIEL AKTIV, ANSONSTEN HEADER MIT TABS */}
+      {isPlaying ? (
+        <div className="flex items-center justify-between gap-2 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-3 px-4 shadow-xl text-xs">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span><strong>Geräte-Cache aktiv:</strong> Laufendes Spiel wurde nahtlos aus deinem lokalen Speicher wiederhergestellt.</span>
+            <button
+              onClick={() => handleSafeNavigation('/training')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+              title="Zurück zur Trainingsauswahl"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Trainingsauswahl</span>
+            </button>
+
+            <button
+              onClick={() => setShowSetupSettings(!showSetupSettings)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+              title="Setup anpassen"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Setup ({gameMode === 'solo' ? 'Solo' : '1 vs 1'})</span>
+            </button>
           </div>
-          <span className="text-[10px] font-mono font-bold bg-cyan-900/60 px-2 py-0.5 rounded border border-cyan-700/50">Lokal gesichert</span>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                soundEnabled
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-zinc-800 text-zinc-500 border-zinc-700'
+              }`}
+              title={soundEnabled ? 'Ton an' : 'Ton aus'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+
+            <Link
+              href="/doppelquote/live"
+              target="_blank"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
+              title="TV Live-Board öffnen"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">TV Board</span>
+            </Link>
+
+            <button
+              onClick={resetGame}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+              title="Spiel abbrechen / neu starten"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Neu</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-900 border border-zinc-700/80 rounded-2xl p-4 shadow-xl">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleSafeNavigation('/training')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Zurück zur Trainingsauswahl</span>
+            </button>
+
+            <div>
+              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1">
+                <Target className="w-3 h-3 text-amber-400" /> Checkout Battle Routine
+              </span>
+              <h1 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                <span>🎯</span> Checkout Battle (Doppelquote)
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                soundEnabled
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-zinc-800 text-zinc-500 border-zinc-700'
+              }`}
+              title={soundEnabled ? 'Ton an' : 'Ton aus'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+
+            <Link
+              href="/doppelquote/live"
+              target="_blank"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
+              title="TV Live-Board öffnen"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>TV Live-Board</span>
+            </Link>
+
+            <button
+              onClick={resetGame}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Neu</span>
+            </button>
+          </div>
         </div>
       )}
 
-      {/* SETUP CARD (MODUS & SPIELER) */}
-      {(!isPlaying || showSetupSettings) ? (
-        <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-3.5 animate-fadeIn">
-          <div className="flex items-center justify-between pb-1 border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <span className="text-base">⚙️</span>
-              <span className="text-xs font-black uppercase tracking-wider text-slate-200">
-                Spiel-Setup & Spieler
-              </span>
-            </div>
-            {isPlaying && (
-              <button
-                onClick={() => setShowSetupSettings(false)}
-                className="text-xs font-bold text-slate-400 hover:text-white px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
-              >
-                ✕ Schließen
-              </button>
-            )}
+      {/* TABS: NUR SICHTBAR WENN KEIN SPIEL AKTIV LÄUFT */}
+      {!isPlaying && (
+        <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto text-xs font-bold">
+          <button
+            onClick={() => setActiveTab('board')}
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'board'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+            }`}
+          >
+            <Target className="w-4 h-4" />
+            <span>Wurf-Board & Setup</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('table')}
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'table'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>Quoten & Tabellen</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'history'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+            }`}
+          >
+            <span>📜</span>
+            <span>Verlauf</span>
+          </button>
+        </div>
+      )}
+
+      {/* LOKALER GERÄTE-CACHE HINWEIS BANNER */}
+      {restoredFromCache && isGameActive && (
+        <div className="bg-zinc-900 border border-amber-500/40 rounded-xl p-2.5 px-3.5 flex items-center justify-between text-xs text-amber-200 shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span><strong>Geräte-Cache aktiv:</strong> Laufendes Spiel wurde nahtlos aus deinem lokalen Speicher wiederhergestellt.</span>
           </div>
+          <span className="text-[10px] font-mono font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 text-amber-400">Lokal gesichert</span>
+        </div>
+      )}
 
-          {/* Modus Switcher */}
-          <div className="grid grid-cols-2 p-1 bg-slate-950/60 rounded-xl border border-white/5">
-            <button
-              onClick={() => {
-                setGameMode('solo');
-                setActivePlayer(1);
-                if (!isBoardUser && userPlayerMatch) {
-                  setP1Name(userPlayerMatch.name);
-                }
-              }}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
-                gameMode === 'solo' 
-                  ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]' 
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <User size={15} /> Solo-Training
-            </button>
-            <button
-              onClick={() => setGameMode('1vs1')}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
-                gameMode === '1vs1' 
-                  ? 'bg-amber-600 text-white shadow-[0_0_12px_rgba(217,119,6,0.5)]' 
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Users size={15} /> 1 vs 1 Duell
-            </button>
-          </div>
-
-          {/* Spieler Auswahl */}
-          <div className={`grid gap-2.5 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
-                  Spieler 1
-                </label>
-                {gameMode === 'solo' && !isBoardUser && userPlayerMatch && (
-                  <span className="text-[10px] text-slate-400 font-semibold">
-                    (Fest mit Account verknüpft)
-                  </span>
-                )}
-              </div>
-
-              {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
-                <div className="w-full bg-slate-950/90 border border-blue-500/40 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-white flex items-center justify-between shadow-inner">
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                    <span className="truncate">{p1Name}</span>
-                  </span>
-                  <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-950 border border-sky-800/60 px-2 py-0.5 rounded shrink-0 ml-2">
-                    Angemeldet
-                  </span>
-                </div>
-              ) : (
-                <select
-                  value={p1Name}
-                  onChange={(e) => setP1Name(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-blue-500"
-                >
-                  {players.map(p => (
-                    <option key={p.id} value={p.name}>
-                      {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {gameMode === '1vs1' && (
+      {/* VORGELAGERTES MATCH-SETUP (VOR SPIELSTART) */}
+      {!isPlaying && !isCompleted && activeTab === 'board' && (
+        <div className="space-y-5 animate-fadeIn">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
               <div>
-                <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
-                  Spieler 2 (Gegner)
-                </label>
-                <select
-                  value={p2Name}
-                  onChange={(e) => setP2Name(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-white outline-none focus:border-amber-500"
-                >
-                  {players.map(p => (
-                    <option key={p.id} value={p.name}>
-                      {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <span className="text-xs font-black uppercase tracking-widest text-amber-400">
+                  Vorgelagertes Match-Setup
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white mt-0.5">
+                  Spieler & Modus festlegen
+                </h2>
               </div>
-            )}
-          </div>
-
-          {/* Selbsteinschätzung Doppelquotenniveau */}
-          <div className="space-y-2 pt-2 border-t border-white/5">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Zielvorgabe (Selbsteinschätzung)
+              <div className="text-xs text-zinc-400 font-mono">
+                Offizielles Checkout Battle (150 Darts)
+              </div>
             </div>
-            <div className={`grid gap-2 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-sky-500/25">
-                <div className="min-w-0 pr-2">
-                  <div className="text-xs font-bold text-white truncate">{p1Name}</div>
-                  <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5">
-                    <span>Niveau:</span>
-                    <span className={playerEstimates[p1Name] ? "text-sky-300 font-mono font-black text-xs" : "text-amber-400 font-bold"}>
-                      {playerEstimates[p1Name] ? `${playerEstimates[p1Name]}%` : 'Nicht festgelegt'}
-                    </span>
-                  </div>
-                </div>
+
+            {/* Modus Auswahl */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                Spielmodus wählen:
+              </label>
+              <div className="grid grid-cols-2 gap-3 max-w-md">
                 <button
+                  type="button"
                   onClick={() => {
-                    setModalTargetPlayer(p1Name);
-                    setModalInputValue(playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '');
-                    setModalError(null);
-                    setShowEstimateModal(true);
+                    setGameMode('solo');
+                    setActivePlayer(1);
+                    if (!isBoardUser && userPlayerMatch) {
+                      setP1Name(userPlayerMatch.name);
+                    }
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/35 text-sky-300 border border-sky-400/40 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                    gameMode === 'solo'
+                      ? 'bg-amber-500 text-zinc-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+                      : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
+                  }`}
                 >
-                  {playerEstimates[p1Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                  <User className="w-4 h-4" />
+                  <span>Solo-Training</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGameMode('1vs1')}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                    gameMode === '1vs1'
+                      ? 'bg-amber-500 text-zinc-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+                      : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>1 vs 1 Duell</span>
                 </button>
               </div>
+            </div>
 
-              {gameMode === '1vs1' && (
-                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-amber-500/25">
+            {/* Spieler Dropdowns */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Spieler 1 */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-white">
+                      Spieler 1 am Oche:
+                    </label>
+                    {gameMode === 'solo' && !isBoardUser && userPlayerMatch && (
+                      <span className="text-[10px] text-zinc-400 font-semibold">
+                        (Fest mit Account verknüpft)
+                      </span>
+                    )}
+                  </div>
+                  {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
+                    <div className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white flex items-center justify-between shadow-inner">
+                      <span className="flex items-center gap-2 truncate">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                        <span className="truncate">{p1Name}</span>
+                      </span>
+                      <span className="text-[10px] uppercase font-bold text-amber-400 bg-zinc-900 border border-amber-500/30 px-2 py-0.5 rounded shrink-0 ml-2">
+                        Angemeldet
+                      </span>
+                    </div>
+                  ) : (
+                    <select
+                      value={p1Name}
+                      onChange={(e) => setP1Name(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                    >
+                      {players.map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Spieler 2 (nur Duell) */}
+                {gameMode === '1vs1' ? (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-white">
+                      Spieler 2 (Gegner):
+                    </label>
+                    <select
+                      value={p2Name}
+                      onChange={(e) => setP2Name(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                    >
+                      {players.map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name} {p.team && p.team !== 'Kein Team' ? `(${p.team})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 text-xs text-zinc-400 flex items-center justify-center">
+                    🎯 Einzeltraining: 50 Aufnahmen auf Doppel D20, D10, D16, D8, D4.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Selbsteinschätzung Doppelquotenniveau */}
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <div className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                Zielvorgabe (Selbsteinschätzung Doppelquote):
+              </div>
+              <div className={`grid gap-2.5 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800">
                   <div className="min-w-0 pr-2">
-                    <div className="text-xs font-bold text-white truncate">{p2Name}</div>
-                    <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5">
+                    <div className="text-sm font-bold text-white truncate">{p1Name}</div>
+                    <div className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
                       <span>Niveau:</span>
-                      <span className={playerEstimates[p2Name] ? "text-amber-300 font-mono font-black text-xs" : "text-amber-400 font-bold"}>
-                        {playerEstimates[p2Name] ? `${playerEstimates[p2Name]}%` : 'Nicht festgelegt'}
+                      <span className={playerEstimates[p1Name] ? "text-amber-400 font-mono font-black text-sm" : "text-amber-400/80 font-bold"}>
+                        {playerEstimates[p1Name] ? `${playerEstimates[p1Name]}%` : 'Nicht festgelegt'}
                       </span>
                     </div>
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
-                      setModalTargetPlayer(p2Name);
-                      setModalInputValue(playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '');
+                      setModalTargetPlayer(p1Name);
+                      setModalInputValue(playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '');
                       setModalError(null);
                       setShowEstimateModal(true);
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-400/40 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shrink-0 cursor-pointer"
                   >
-                    {playerEstimates[p2Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                    {playerEstimates[p1Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
                   </button>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* START-BUTTON */}
-          <div className="pt-2">
-            {!isPlaying ? (
+                {gameMode === '1vs1' && (
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800">
+                    <div className="min-w-0 pr-2">
+                      <div className="text-sm font-bold text-white truncate">{p2Name}</div>
+                      <div className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                        <span>Niveau:</span>
+                        <span className={playerEstimates[p2Name] ? "text-amber-400 font-mono font-black text-sm" : "text-amber-400/80 font-bold"}>
+                          {playerEstimates[p2Name] ? `${playerEstimates[p2Name]}%` : 'Nicht festgelegt'}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalTargetPlayer(p2Name);
+                        setModalInputValue(playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '');
+                        setModalError(null);
+                        setShowEstimateModal(true);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                    >
+                      {playerEstimates[p2Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Großer prominenter Startbutton */}
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={handleStartMatch}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 active:scale-95 text-slate-950 font-black text-lg sm:text-xl shadow-[0_0_25px_rgba(16,185,129,0.35)] transition-all flex items-center justify-center gap-3 cursor-pointer select-none"
+                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-zinc-950 font-black text-lg sm:text-xl shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer select-none"
               >
                 <Play className="w-6 h-6 fill-current" />
-                <span>Spiel starten</span>
+                <span>SPIEL STARTEN</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowSetupSettings(false)}
-                className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>✓ Einstellungen schließen & weiterspielen</span>
-              </button>
-            )}
+            </div>
+
+            {/* Disziplin Übersicht Kacheln */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-zinc-800">
+              {TARGETS.map(t => (
+                <div key={t} className="p-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
+                  <div className="text-base font-black text-amber-400">{t}</div>
+                  <div className="text-[10px] text-zinc-400 mt-0.5">10 Runden (30 D.)</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      ) : (
-        /* WÄHREND DES SPIELS: SCHLANKER SETUP-EXPAND BUTTON */
-        <div className="flex items-center justify-between px-1">
-          <button
-            onClick={() => setShowSetupSettings(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
-          >
-            <Settings size={14} className="text-cyan-400" />
-            <span>Setup anpassen ({gameMode === 'solo' ? 'Solo' : '1 vs 1'})</span>
-          </button>
-          <div className="text-[11px] font-semibold text-slate-400">
-            Doppelquote-Training
+      )}
+
+      {/* SETUP ANPASSEN WÄHREND DES SPIELS */}
+      {isPlaying && showSetupSettings && (
+        <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl animate-fadeIn">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-black uppercase text-white">Setup anpassen</span>
+            </div>
+            <button
+              onClick={() => setShowSetupSettings(false)}
+              className="text-xs font-bold text-zinc-400 hover:text-white px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors"
+            >
+              ✕ Schließen
+            </button>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+              <span className="text-zinc-400 block">Spieler 1:</span>
+              <span className="text-white font-bold text-sm">{p1Name}</span>
+            </div>
+            {gameMode === '1vs1' && (
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                <span className="text-zinc-400 block">Spieler 2 (Gegner):</span>
+                <span className="text-white font-bold text-sm">{p2Name}</span>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowSetupSettings(false)}
+            className="w-full py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>✓ Einstellungen schließen & weiterspielen</span>
+          </button>
         </div>
       )}
 
       {/* GROSSE HERO-ANZEIGE: WER IST AM ZUG */}
       {isPlaying && (
-        <div className={`p-4 sm:p-5 rounded-3xl border-2 shadow-2xl transition-all duration-300 relative overflow-hidden ${
-          (gameMode === 'solo' || activePlayer === 1)
-            ? 'bg-gradient-to-r from-blue-950 via-[#0a1832] to-slate-950 border-sky-400/80 shadow-[0_0_30px_rgba(56,189,248,0.2)]'
-            : 'bg-gradient-to-r from-amber-950 via-[#261706] to-slate-950 border-amber-400/80 shadow-[0_0_30px_rgba(245,158,11,0.2)]'
-        }`}>
+        <div className="p-4 sm:p-5 rounded-3xl border-2 border-zinc-700/80 bg-zinc-900 shadow-2xl transition-all duration-300 relative overflow-hidden">
           {/* Ambient Glow */}
-          <div className={`absolute -right-10 -bottom-10 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20 ${
-            (gameMode === 'solo' || activePlayer === 1) ? 'bg-sky-400' : 'bg-amber-400'
-          }`} />
+          <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20 bg-amber-400" />
 
           <div className="flex items-center justify-between gap-3 relative z-10">
             <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
@@ -1093,41 +1361,27 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   <img
                     src={curPlayerPhoto}
                     alt={curPlayerName}
-                    className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 shadow-xl ${
-                      (gameMode === 'solo' || activePlayer === 1) ? 'border-sky-400 ring-4 ring-sky-500/20' : 'border-amber-400 ring-4 ring-amber-500/20'
-                    }`}
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-amber-400 ring-4 ring-amber-500/20 shadow-xl"
                   />
                 ) : (
-                  <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center text-2xl sm:text-3xl font-black shadow-xl ${
-                    (gameMode === 'solo' || activePlayer === 1)
-                      ? 'bg-sky-500/20 border-sky-400 text-sky-300 ring-4 ring-sky-500/20'
-                      : 'bg-amber-500/20 border-amber-400 text-amber-300 ring-4 ring-amber-500/20'
-                  }`}>
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-amber-400 ring-4 ring-amber-500/20 bg-zinc-950 flex items-center justify-center text-2xl sm:text-3xl font-black text-amber-400 shadow-xl">
                     {curPlayerInitials}
                   </div>
                 )}
                 <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    (gameMode === 'solo' || activePlayer === 1) ? 'bg-sky-400' : 'bg-amber-400'
-                  }`} />
-                  <span className={`relative inline-flex rounded-full h-4 w-4 border-2 border-slate-950 ${
-                    (gameMode === 'solo' || activePlayer === 1) ? 'bg-sky-400' : 'bg-amber-400'
-                  }`} />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-amber-400" />
+                  <span className="relative inline-flex rounded-full h-4 w-4 border-2 border-zinc-950 bg-amber-400" />
                 </span>
               </div>
 
               {/* Spieler Name & Badge */}
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                    (gameMode === 'solo' || activePlayer === 1)
-                      ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50 shadow-sm'
-                      : 'bg-amber-500/25 text-amber-300 border border-amber-400/50 shadow-sm'
-                  }`}>
+                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm">
                     🎯 JETZT AM WURF {gameMode === '1vs1' ? `· SPIELER ${activePlayer}` : ''}
                   </span>
                   {curPlayerEstimate && (
-                    <span className="text-[10px] font-bold text-slate-300 bg-black/40 px-2 py-0.5 rounded-md border border-white/10">
+                    <span className="text-[10px] font-bold text-zinc-300 bg-zinc-950 px-2 py-0.5 rounded-md border border-zinc-800">
                       Ziel: {curPlayerEstimate}%
                     </span>
                   )}
@@ -1140,47 +1394,47 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
             {/* Aufnahme Zähler */}
             <div className="shrink-0 text-right">
-              <div className="text-[10px] sm:text-xs uppercase font-bold text-slate-400 tracking-wider">
+              <div className="text-[10px] sm:text-xs uppercase font-bold text-zinc-400 tracking-wider">
                 Aufnahme
               </div>
-              <div className="text-2xl sm:text-4xl font-black font-mono text-cyan-300">
+              <div className="text-2xl sm:text-4xl font-black font-mono text-amber-400">
                 {currentShotIndex + 1}
-                <span className="text-xs sm:text-sm text-slate-400 font-sans font-bold"> / 10</span>
+                <span className="text-xs sm:text-sm text-zinc-400 font-sans font-bold"> / 10</span>
               </div>
             </div>
           </div>
 
           {/* 1 vs 1 Duell Score-Vergleich */}
           {gameMode === '1vs1' && (
-            <div className="mt-3.5 pt-3 border-t border-white/10 grid grid-cols-2 gap-2 text-xs">
+            <div className="mt-3.5 pt-3 border-t border-zinc-800 grid grid-cols-2 gap-2 text-xs">
               <div className={`p-2 sm:p-2.5 rounded-xl transition-all flex items-center justify-between ${
                 activePlayer === 1 
-                  ? 'bg-sky-500/20 border-2 border-sky-400/80 text-white font-black shadow-md' 
-                  : 'bg-slate-900/60 border border-white/5 text-slate-400 font-semibold'
+                  ? 'bg-zinc-800 border-2 border-amber-400 text-white font-black shadow-md' 
+                  : 'bg-zinc-950 border border-zinc-800 text-zinc-400 font-semibold'
               }`}>
                 <div className="truncate flex items-center gap-1.5">
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                    activePlayer === 1 ? 'bg-sky-400 text-slate-950' : 'bg-black/40 text-sky-300'
+                    activePlayer === 1 ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-800 text-amber-400'
                   }`}>P1</span>
                   <span className="truncate">{p1Name}</span>
                 </div>
-                <div className="font-mono text-sky-300 text-xs shrink-0 ml-1">
+                <div className="font-mono text-amber-400 text-xs shrink-0 ml-1">
                   {p1Stats.hits} Tr. ({p1Stats.quote.toFixed(0)}%)
                 </div>
               </div>
 
               <div className={`p-2 sm:p-2.5 rounded-xl transition-all flex items-center justify-between ${
                 activePlayer === 2 
-                  ? 'bg-amber-500/20 border-2 border-amber-400/80 text-white font-black shadow-md' 
-                  : 'bg-slate-900/60 border border-white/5 text-slate-400 font-semibold'
+                  ? 'bg-zinc-800 border-2 border-amber-400 text-white font-black shadow-md' 
+                  : 'bg-zinc-950 border border-zinc-800 text-zinc-400 font-semibold'
               }`}>
                 <div className="truncate flex items-center gap-1.5">
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                    activePlayer === 2 ? 'bg-amber-400 text-slate-950' : 'bg-black/40 text-amber-300'
+                    activePlayer === 2 ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-800 text-amber-400'
                   }`}>P2</span>
                   <span className="truncate">{p2Name}</span>
                 </div>
-                <div className="font-mono text-amber-300 text-xs shrink-0 ml-1">
+                <div className="font-mono text-amber-400 text-xs shrink-0 ml-1">
                   {p2Stats.hits} Tr. ({p2Stats.quote.toFixed(0)}%)
                 </div>
               </div>
@@ -1189,88 +1443,65 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         </div>
       )}
 
-      {/* TABS */}
-      <div className="grid grid-cols-3 p-1 bg-slate-900/60 border border-white/10 rounded-xl text-xs font-bold">
-        <button
-          onClick={() => setActiveTab('board')}
-          className={`py-2 rounded-lg transition-all ${activeTab === 'board' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
-        >
-          🎯 Live Board
-        </button>
-        <button
-          onClick={() => setActiveTab('table')}
-          className={`py-2 rounded-lg transition-all ${activeTab === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
-        >
-          📊 Quoten
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`py-2 rounded-lg transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
-        >
-          📜 Verlauf
-        </button>
-      </div>
-
       {/* TARGET NAV PILLS */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {TARGETS.map((t, idx) => {
-          const shots = scoresP1[t];
-          const isDone = shots.filter(s => s !== null).length === 10;
-          const isActive = idx === currentTargetIndex;
-          const hits = shots.reduce<number>((a, b) => a + (b !== null ? b : 0), 0);
-          const thr = shots.filter(s => s !== null).length * 3;
-          const pct = thr > 0 ? ((hits / thr) * 100).toFixed(0) + '%' : '-';
+      {isPlaying && (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {TARGETS.map((t, idx) => {
+            const shots = scoresP1[t];
+            const isDone = shots.filter(s => s !== null).length === 10;
+            const isActive = idx === currentTargetIndex;
 
-          return (
-            <button
-              key={t}
-              onClick={() => {
-                setCurrentTargetIndex(idx);
-                const s = curScores[t];
-                const firstEmpty = s.findIndex(v => v === null);
-                setCurrentShotIndex(firstEmpty !== -1 ? firstEmpty : 9);
-              }}
-              className={`flex-1 min-w-[58px] py-1.5 px-1 rounded-xl border text-center font-bold text-xs transition-all ${
-                isActive 
-                  ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)] scale-105' 
-                  : isDone 
-                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300' 
-                  : 'bg-slate-900/80 border-white/5 text-slate-300'
-              }`}
-            >
-              <div className="text-sm font-black">{t}</div>
-              <div className="text-[10px] opacity-75">{isDone ? '✓ Fertig' : `${shots.filter(s => s !== null).length}/10`}</div>
-            </button>
-          );
-        })}
-      </div>
+            return (
+              <button
+                key={t}
+                onClick={() => {
+                  setCurrentTargetIndex(idx);
+                  const s = curScores[t];
+                  const firstEmpty = s.findIndex(v => v === null);
+                  setCurrentShotIndex(firstEmpty !== -1 ? firstEmpty : 9);
+                }}
+                className={`flex-1 min-w-[58px] py-2 px-1 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer ${
+                  isActive 
+                    ? 'bg-amber-500 border-amber-400 text-zinc-950 font-black shadow-lg shadow-amber-500/20 scale-105' 
+                    : isDone 
+                    ? 'bg-zinc-800 border-zinc-700 text-white font-bold' 
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                }`}
+              >
+                <div className="text-sm font-black">{t}</div>
+                <div className="text-[10px] opacity-75">{isDone ? '✓ Fertig' : `${shots.filter(s => s !== null).length}/10`}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* VIEW 1: LIVE BOARD */}
-      {activeTab === 'board' && (
-        <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
+      {isPlaying && activeTab === 'board' && (
+        <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 shadow-2xl flex flex-col gap-4 text-center">
           {/* Target Hero Display */}
-          <div className="bg-gradient-to-b from-slate-950 to-slate-900 border border-white/10 rounded-2xl p-4 text-center relative overflow-hidden">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-center relative overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 mb-1">
               <span className="uppercase tracking-widest">Aktuelles Doppelfeld</span>
               {playerEstimates[(gameMode === 'solo' || activePlayer === 1) ? p1Name : p2Name] && (
-                <span className="text-sky-300 bg-sky-950/80 border border-sky-500/30 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm">
+                <span className="text-amber-400 bg-zinc-900 border border-amber-500/30 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm">
                   🎯 Ziel: {playerEstimates[(gameMode === 'solo' || activePlayer === 1) ? p1Name : p2Name]}%
                 </span>
               )}
             </div>
-            <div className="text-5xl font-black text-sky-400 tracking-wider my-1 drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]">
+            <div className="text-5xl sm:text-6xl font-black text-amber-400 tracking-wider my-1 drop-shadow-[0_0_20px_rgba(245,158,11,0.3)]">
               {curTarget}
             </div>
 
-            <div className="flex justify-between items-center text-xs font-semibold text-slate-400 mt-2">
+            <div className="flex justify-between items-center text-xs font-semibold text-zinc-400 mt-2">
               <span>Aufnahme <strong className="text-white">{currentShotIndex + 1}</strong> von 10</span>
-              <span>Treffer: <strong className="text-emerald-400">{curTargetHits} / 30</strong> ({curTargetPct}%)</span>
+              <span>Treffer: <strong className="text-amber-400">{curTargetHits} / 30</strong> ({curTargetPct}%)</span>
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-2 border border-white/5">
+            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mt-2 border border-zinc-700">
               <div 
-                className="h-full bg-gradient-to-r from-blue-600 to-sky-400 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300"
                 style={{ width: `${((curShots.filter(s => s !== null).length) / 10) * 100}%` }}
               />
             </div>
@@ -1279,18 +1510,18 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             <div className="grid grid-cols-10 gap-1.5 mt-3">
               {curShots.map((val, idx) => {
                 const isCurrent = idx === currentShotIndex;
-                let bgCls = 'bg-slate-800 text-slate-500 border-white/5';
-                if (isCurrent) bgCls = 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-400/50 scale-105';
-                else if (val === 0) bgCls = 'bg-slate-700 text-slate-300';
-                else if (val === 1) bgCls = 'bg-sky-600 text-white font-bold';
-                else if (val === 2) bgCls = 'bg-emerald-600 text-white font-bold';
-                else if (val === 3) bgCls = 'bg-amber-500 text-slate-950 font-black';
+                let bgCls = 'bg-zinc-950 text-zinc-600 border-zinc-800';
+                if (isCurrent) bgCls = 'bg-amber-500 text-zinc-950 font-black border-amber-400 ring-2 ring-amber-400/50 scale-105';
+                else if (val === 0) bgCls = 'bg-zinc-800 text-zinc-400 border-zinc-700';
+                else if (val === 1) bgCls = 'bg-zinc-700 text-white font-bold border-zinc-600';
+                else if (val === 2) bgCls = 'bg-zinc-700 text-white font-bold border-amber-500/40';
+                else if (val === 3) bgCls = 'bg-amber-400 text-zinc-950 font-black border-amber-300';
 
                 return (
                   <button
                     key={idx}
                     onClick={() => setCurrentShotIndex(idx)}
-                    className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-all border ${bgCls}`}
+                    className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-all border ${bgCls} cursor-pointer`}
                   >
                     <span className="text-[8px] opacity-75">{idx + 1}</span>
                     <span>{val !== null ? val : '·'}</span>
@@ -1304,31 +1535,31 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           <div className="grid grid-cols-2 gap-2.5">
             <button
               onClick={() => handleScore(0)}
-              className="py-4 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg"
+              className="py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-750 active:bg-zinc-900 border border-zinc-700 text-zinc-300 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
             >
               0
-              <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider mt-0.5">0 Treffer</span>
+              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mt-0.5">0 Treffer</span>
             </button>
             <button
               onClick={() => handleScore(1)}
-              className="py-4 rounded-xl bg-gradient-to-br from-sky-600 to-blue-700 border border-sky-400 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg shadow-sky-900/30"
+              className="py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-650 active:bg-zinc-800 border border-zinc-600 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
             >
               1
-              <span className="text-[10px] font-semibold text-sky-200 uppercase tracking-wider mt-0.5">1 Treffer</span>
+              <span className="text-[10px] font-semibold text-zinc-300 uppercase tracking-wider mt-0.5">1 Treffer</span>
             </button>
             <button
               onClick={() => handleScore(2)}
-              className="py-4 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 border border-emerald-400 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg shadow-emerald-900/30"
+              className="py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-650 active:bg-zinc-800 border border-amber-500/40 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
             >
               2
-              <span className="text-[10px] font-semibold text-emerald-200 uppercase tracking-wider mt-0.5">2 Treffer</span>
+              <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider mt-0.5">2 Treffer</span>
             </button>
             <button
               onClick={() => handleScore(3)}
-              className="py-4 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 border border-amber-300 text-slate-950 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg shadow-amber-900/40"
+              className="py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 border border-amber-400 text-zinc-950 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg shadow-amber-500/25 cursor-pointer"
             >
               3 ⭐
-              <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider mt-0.5">Maximum!</span>
+              <span className="text-[10px] font-black text-zinc-950 uppercase tracking-wider mt-0.5">Maximum!</span>
             </button>
           </div>
 
@@ -1336,7 +1567,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
           <div className="flex gap-2">
             <button
               onClick={handleUndo}
-              className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-slate-700"
+              className="flex-1 py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-zinc-700 transition-colors cursor-pointer"
             >
               <RotateCcw size={14} /> Wurf korrigieren
             </button>
@@ -1346,7 +1577,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 setCurrentTargetIndex(nextIdx);
                 setCurrentShotIndex(0);
               }}
-              className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 active:bg-slate-700"
+              className="flex-1 py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:bg-zinc-700 transition-colors cursor-pointer"
             >
               Nächstes Doppel <ArrowRight size={14} />
             </button>
@@ -1354,118 +1585,104 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         </div>
       )}
 
-      {/* VIEW 2: QUOTEN & TABELLEN */}
-      {activeTab === 'table' && (
-        <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2">
-            📊 Quoten-Tabelle: {p1Name}
-          </h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-center border-collapse">
-              <thead>
-                <tr className="border-b border-white/10 text-slate-400 font-bold">
-                  <th className="py-2 text-left pl-2">Doppel</th>
-                  <th>Aufn. 1-5</th>
-                  <th>Aufn. 6-10</th>
-                  <th>Treffer</th>
-                  <th>Quote</th>
-                </tr>
-              </thead>
-              <tbody>
-                {TARGETS.map(t => {
-                  const s = scoresP1[t];
-                  const first5 = s.slice(0, 5).map(v => v !== null ? v : '-').join(' ');
-                  const last5 = s.slice(5, 10).map(v => v !== null ? v : '-').join(' ');
-                  const hits = s.reduce<number>((a, b) => a + (b ?? 0), 0);
-                  const thr = s.filter(v => v !== null).length * 3;
-                  const pct = thr > 0 ? ((hits / thr) * 100).toFixed(1) + '%' : '0.0%';
-
-                  return (
-                    <tr key={t} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="py-2.5 text-left pl-2 font-black text-sky-400">{t}</td>
-                      <td className="font-mono text-slate-400">{first5}</td>
-                      <td className="font-mono text-slate-400">{last5}</td>
-                      <td className="font-bold text-white">{hits}</td>
-                      <td className="font-bold text-emerald-400">{pct}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-slate-800/80 font-black text-white border-t-2 border-slate-600">
-                  <td className="py-2.5 text-left pl-2">GESAMT</td>
-                  <td colSpan={2} className="text-slate-400">{p1Stats.thrown} / 150 Darts</td>
-                  <td>{p1Stats.hits}</td>
-                  <td className="text-emerald-400 text-sm">{p1Stats.quote.toFixed(1)}%</td>
-                </tr>
-              </tfoot>
-            </table>
+      {/* ABSCHLUSS-KARTE (WENN SPIEL BEENDET IST) */}
+      {isCompleted && activeTab === 'board' && (
+        <div className="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl animate-fadeIn">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-xl shadow-amber-500/20">
+            🏆
           </div>
 
-          {gameMode === '1vs1' && (
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <h2 className="text-sm font-bold text-amber-400 mb-2">
-                📊 Quoten-Tabelle: {p2Name} (Gegner)
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-center border-collapse">
-                  <thead>
-                    <tr className="border-b border-white/10 text-slate-400 font-bold">
-                      <th className="py-2 text-left pl-2">Doppel</th>
-                      <th>Aufn. 1-5</th>
-                      <th>Aufn. 6-10</th>
-                      <th>Treffer</th>
-                      <th>Quote</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {TARGETS.map(t => {
-                      const s = scoresP2[t];
-                      const first5 = s.slice(0, 5).map(v => v !== null ? v : '-').join(' ');
-                      const last5 = s.slice(5, 10).map(v => v !== null ? v : '-').join(' ');
-                      const hits = s.reduce<number>((a, b) => a + (b ?? 0), 0);
-                      const thr = s.filter(v => v !== null).length * 3;
-                      const pct = thr > 0 ? ((hits / thr) * 100).toFixed(1) + '%' : '0.0%';
-
-                      return (
-                        <tr key={t} className="border-b border-white/5 hover:bg-white/5">
-                          <td className="py-2.5 text-left pl-2 font-black text-amber-400">{t}</td>
-                          <td className="font-mono text-slate-400">{first5}</td>
-                          <td className="font-mono text-slate-400">{last5}</td>
-                          <td className="font-bold text-white">{hits}</td>
-                          <td className="font-bold text-amber-400">{pct}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-slate-800/80 font-black text-white border-t-2 border-slate-600">
-                      <td className="py-2.5 text-left pl-2">GESAMT</td>
-                      <td colSpan={2} className="text-slate-400">{p2Stats.thrown} / 150 Darts</td>
-                      <td>{p2Stats.hits}</td>
-                      <td className="text-amber-400 text-sm">{p2Stats.quote.toFixed(1)}%</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          )}
-
           <div>
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Trainings-Notizen:
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="z. B. Stand, Rhythmus, bestes Doppel..."
-              className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-xs text-white outline-none focus:border-blue-500"
-              rows={2}
-            />
+            <span className="text-xs font-black uppercase tracking-widest text-amber-400">
+              Trainingseinheit abgeschlossen
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black text-white mt-1">
+              🎉 Checkout Battle beendet!
+            </h2>
+            <p className="text-xs text-zinc-400 mt-1">
+              Alle 5 Doppelfelder (150 Darts) wurden geworfen.
+            </p>
+          </div>
+
+          {/* Resultate */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+            <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
+              <span className="text-xs font-bold text-zinc-400 block">{p1Name}</span>
+              <div className="text-3xl font-black text-amber-400 font-mono mt-1">
+                {p1Stats.quote.toFixed(1)}%
+              </div>
+              <span className="text-xs text-zinc-400 mt-1 block">
+                {p1Stats.hits} Treffer / 150 Darts
+              </span>
+              {playerEstimates[p1Name] && (
+                <div className="mt-2 pt-2 border-t border-zinc-800 text-[11px] text-zinc-400">
+                  Ziel: <strong className="text-white">{playerEstimates[p1Name]}%</strong> (
+                  <span className={p1Stats.quote >= playerEstimates[p1Name]! ? 'text-amber-400 font-bold' : 'text-zinc-400'}>
+                    {(p1Stats.quote - playerEstimates[p1Name]!).toFixed(1)}%
+                  </span>)
+                </div>
+              )}
+            </div>
+
+            {gameMode === '1vs1' && (
+              <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-center">
+                <span className="text-xs font-bold text-zinc-400 block">{p2Name}</span>
+                <div className="text-3xl font-black text-amber-400 font-mono mt-1">
+                  {p2Stats.quote.toFixed(1)}%
+                </div>
+                <span className="text-xs text-zinc-400 mt-1 block">
+                  {p2Stats.hits} Treffer / 150 Darts
+                </span>
+                {playerEstimates[p2Name] && (
+                  <div className="mt-2 pt-2 border-t border-zinc-800 text-[11px] text-zinc-400">
+                    Ziel: <strong className="text-white">{playerEstimates[p2Name]}%</strong> (
+                    <span className={p2Stats.quote >= playerEstimates[p2Name]! ? 'text-amber-400 font-bold' : 'text-zinc-400'}>
+                      {(p2Stats.quote - playerEstimates[p2Name]!).toFixed(1)}%
+                    </span>)
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto pt-2">
+            <button
+              onClick={() => saveSession()}
+              disabled={isSavedInCloud}
+              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                isSavedInCloud
+                  ? 'bg-zinc-800 text-amber-400 border border-zinc-700 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-zinc-950 font-black shadow-lg shadow-amber-500/20 active:scale-[0.98]'
+              }`}
+            >
+              {isSavedInCloud ? (
+                <>
+                  <CheckCircle2 size={16} className="text-amber-400" /> Bereits in Cloud gespeichert
+                </>
+              ) : (
+                <>
+                  <Save size={16} /> In Supabase Cloud speichern
+                </>
+              )}
+            </button>
+            <button
+              onClick={resetGame}
+              className="py-3 px-5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-bold text-sm transition-all cursor-pointer"
+            >
+              Neues Spiel starten
+            </button>
+          </div>
+
+          {/* Quoten-Tabelle direkt darunter */}
+          <div className="pt-4 text-left">
+            {renderQuotenTables()}
           </div>
         </div>
       )}
+
+      {/* VIEW 2: QUOTEN & TABELLEN */}
+      {activeTab === 'table' && renderQuotenTables()}
 
       {/* VIEW 3: VERLAUF */}
       {activeTab === 'history' && (() => {
@@ -1503,45 +1720,45 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         });
 
         return (
-          <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4">
             {/* Header & Role Info */}
             {isAdmin ? (
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
                         <span>📜</span> Trainingsverlauf
                       </h2>
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center gap-1">
                         👑 Admin: Alle Verläufe
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
                       Als Admin kannst du alle Verläufe aller Spieler einsehen und analysieren.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Link
                       href="/verwaltung"
-                      className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                      className="text-[11px] text-amber-400 hover:text-amber-300 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 font-bold"
                     >
                       ⚙️ Admin-Bereich
                     </Link>
-                    <span className="text-xs text-slate-400">{visibleHistory.length} Einheiten</span>
+                    <span className="text-xs text-zinc-400 font-mono">{visibleHistory.length} Einheiten</span>
                   </div>
                 </div>
 
                 {/* Admin Filter Bar */}
-                <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-white/10 text-xs">
-                  <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-2xl bg-zinc-950 border border-zinc-800 text-xs">
+                  <span className="text-zinc-300 font-semibold flex items-center gap-1.5">
                     <Users size={13} className="text-amber-400" />
                     Spieler filtern:
                   </span>
                   <select
                     value={adminPlayerFilter}
                     onChange={(e) => setAdminPlayerFilter(e.target.value)}
-                    className="bg-slate-900 border border-white/15 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400 cursor-pointer"
                   >
                     <option value="all">🌐 Alle Spieler ({history.length})</option>
                     {uniquePlayers.map((p) => {
@@ -1555,10 +1772,10 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   </select>
                   <button
                     onClick={() => setAdminPlayerFilter('all')}
-                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                       adminPlayerFilter === 'all'
                         ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
-                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                        : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'
                     }`}
                   >
                     Alle ({history.length})
@@ -1566,10 +1783,10 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   {user?.name && (
                     <button
                       onClick={() => setAdminPlayerFilter(user.name)}
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                         adminPlayerFilter.toLowerCase() === user.name.toLowerCase()
                           ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
-                          : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                          : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'
                       }`}
                     >
                       Nur meine ({history.filter(h => h.player_name?.toLowerCase() === user.name.toLowerCase() || h.opponent_name?.toLowerCase() === user.name.toLowerCase()).length})
@@ -1580,20 +1797,20 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             ) : user ? (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <div>
-                  <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                  <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
                     <span>📜</span> Mein Trainingsverlauf
                   </h2>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Persönliche Trainingseinheiten von <strong className="text-cyan-300">{user.name}</strong>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Persönliche Trainingseinheiten von <strong className="text-white">{user.name}</strong>
                   </p>
                 </div>
-                <span className="text-xs text-slate-400">{visibleHistory.length} Einheiten</span>
+                <span className="text-xs text-zinc-400 font-mono">{visibleHistory.length} Einheiten</span>
               </div>
             ) : (
-              <div className="text-center py-6 px-4 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
+              <div className="text-center py-6 px-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-2">
                 <div className="text-2xl">🔒</div>
                 <div className="text-sm font-bold text-white">Privater Trainingsverlauf</div>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                   Trainingsverläufe sind geschützt: Jeder Spieler sieht nur seine eigenen Trainingseinheiten.
                   Bitte melde dich an, um deinen persönlichen Verlauf einzusehen.
                 </p>
@@ -1602,7 +1819,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
             <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
               {visibleHistory.length === 0 ? (
-                <div className="text-center py-6 text-xs text-slate-500">
+                <div className="text-center py-6 text-xs text-zinc-500">
                   Noch keine Trainingseinheiten vorhanden.
                 </div>
               ) : (
@@ -1620,21 +1837,21 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                       key={sessionKey}
                       onClick={() => !isAborted && setExpandedSessionKey(isExpanded ? null : sessionKey)}
                       className={`border rounded-2xl p-3.5 flex flex-col gap-2 text-xs transition-all ${
-                        !isAborted ? 'cursor-pointer hover:border-white/20 hover:bg-slate-900/90' : ''
+                        !isAborted ? 'cursor-pointer hover:border-zinc-700 hover:bg-zinc-850' : ''
                       } ${
                         isAborted 
                           ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' 
                           : isExpanded
-                          ? 'bg-slate-900/95 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-                          : 'bg-slate-950/80 border-white/5'
+                          ? 'bg-zinc-900 border-amber-500/50 shadow-lg shadow-amber-500/10'
+                          : 'bg-zinc-950 border-zinc-800'
                       }`}
                     >
                       <div className="flex justify-between items-center">
                         <div>
-                          <div className="flex items-center gap-1.5 text-slate-400 text-[10px]">
+                          <div className="flex items-center gap-1.5 text-zinc-400 text-[10px]">
                             <span>{dStr}</span>
                             <span>•</span>
-                            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                            <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">
                               {h.game_mode === '1vs1' ? `⚔️ vs ${h.opponent_name || 'Gegner'}` : '👤 Solo'}
                             </span>
                             {isWin && <span className="text-amber-400 font-bold">🏆 Sieg</span>}
@@ -1650,14 +1867,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                               <span className="text-[10px] font-normal text-rose-300/80 italic">({h.notes})</span>
                             )}
                           </div>
-                          <div className="text-slate-400 text-[11px] flex items-center gap-1 mt-0.5">
+                          <div className="text-zinc-400 text-[11px] flex items-center gap-1 mt-0.5">
                             {isAborted ? (
                               <span>Vorzeitig abgebrochen</span>
                             ) : (
                               <>
-                                <span className="text-amber-300 font-semibold">Best: {h.best_double || '-'}</span>
-                                <span className="text-slate-500">•</span>
-                                <span className="text-cyan-400/90 text-[10px]">
+                                <span className="text-amber-400 font-semibold">Best: {h.best_double || '-'}</span>
+                                <span className="text-zinc-600">•</span>
+                                <span className="text-amber-400/80 text-[10px]">
                                   {isExpanded ? 'Klicken zum Einklappen' : 'Klicken für Details'}
                                 </span>
                               </>
@@ -1667,14 +1884,14 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
                         <div className="flex items-center gap-3">
                           <div className="text-right">
-                            <div className={`text-base font-black ${isAborted ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            <div className={`text-base font-black font-mono ${isAborted ? 'text-rose-400' : 'text-amber-400'}`}>
                               {qPct}
                             </div>
-                            <div className="text-[10px] text-slate-400">{h.total_hits} / {h.total_darts} Darts</div>
+                            <div className="text-[10px] text-zinc-400 font-mono">{h.total_hits} / {h.total_darts} Darts</div>
                           </div>
                           {!isAborted && (
-                            <div className="text-slate-400 pl-1">
-                              {isExpanded ? <ChevronUp size={16} className="text-emerald-400" /> : <ChevronDown size={16} />}
+                            <div className="text-zinc-400 pl-1">
+                              {isExpanded ? <ChevronUp size={16} className="text-amber-400" /> : <ChevronDown size={16} />}
                             </div>
                           )}
                         </div>
@@ -1682,20 +1899,20 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
                       {/* AUFGEKLAPPTE DETAIL-STATISTIK DER DOPPEL */}
                       {isExpanded && !isAborted && (
-                        <div className="pt-3 border-t border-white/10 space-y-2.5 animate-fadeIn">
+                        <div className="pt-3 border-t border-zinc-800 space-y-2.5 animate-fadeIn">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] font-bold gap-1">
-                            <span className="text-cyan-300 flex items-center gap-1.5">
-                              <Target size={13} className="text-cyan-400" />
+                            <span className="text-amber-400 flex items-center gap-1.5">
+                              <Target size={13} className="text-amber-400" />
                               Trefferquote je Doppelfeld (10 Runden à 3 Darts):
                             </span>
                             <div className="flex items-center gap-2 text-[10px]">
                               {h.estimated_quote !== null && h.estimated_quote !== undefined && (
-                                <span className="bg-sky-950 border border-sky-500/40 text-sky-300 px-2 py-0.5 rounded-full font-bold">
+                                <span className="bg-zinc-950 border border-amber-500/40 text-amber-300 px-2 py-0.5 rounded-full font-bold">
                                   🎯 Einschätzung: {h.estimated_quote}%
                                 </span>
                               )}
-                              <span className="text-slate-400">
-                                Bester Wert: <strong className="text-amber-300">{h.best_double || '-'}</strong>
+                              <span className="text-zinc-400">
+                                Bester Wert: <strong className="text-amber-400">{h.best_double || '-'}</strong>
                               </span>
                             </div>
                           </div>
@@ -1715,37 +1932,33 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                                   className={`p-2.5 rounded-xl border flex flex-col justify-between transition-all ${
                                     isBest
                                       ? 'bg-amber-500/10 border-amber-400/50 shadow-md shadow-amber-500/10 ring-1 ring-amber-400/30'
-                                      : 'bg-slate-900/90 border-white/10'
+                                      : 'bg-zinc-900 border-zinc-800'
                                   }`}
                                 >
                                   <div className="flex items-center justify-between text-xs">
                                     <span className="font-black text-white">{t}</span>
                                     {isBest ? (
-                                      <span className="text-[10px] font-black text-amber-300 bg-amber-400/20 px-1 py-0.2 rounded" title="Bestes Feld">
+                                      <span className="text-[10px] font-black text-zinc-950 bg-amber-400 px-1 py-0.2 rounded" title="Bestes Feld">
                                         TOP 🌟
                                       </span>
                                     ) : (
-                                      <span className="text-[10px] text-slate-500">30 Darts</span>
+                                      <span className="text-[10px] text-zinc-500">30 Darts</span>
                                     )}
                                   </div>
 
                                   <div className="my-1.5">
-                                    <div className="text-base font-black text-emerald-300 font-mono">
+                                    <div className="text-base font-black text-amber-400 font-mono">
                                       {pct}%
                                     </div>
-                                    <div className="text-[10px] font-mono text-slate-400">
+                                    <div className="text-[10px] font-mono text-zinc-400">
                                       {hits} / {darts} Hits
                                     </div>
                                   </div>
 
                                   {/* Progress bar */}
-                                  <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
+                                  <div className="w-full bg-zinc-950 h-1.5 rounded-full overflow-hidden border border-zinc-800">
                                     <div
-                                      className={`h-full rounded-full transition-all ${
-                                        isBest 
-                                          ? 'bg-gradient-to-r from-amber-400 to-yellow-300' 
-                                          : 'bg-gradient-to-r from-emerald-500 to-teal-400'
-                                      }`}
+                                      className="h-full rounded-full transition-all bg-gradient-to-r from-amber-500 to-yellow-400"
                                       style={{ width: `${Math.min(100, Math.max(0, quote * 100))}%` }}
                                     />
                                   </div>
@@ -1755,7 +1968,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                           </div>
 
                           {h.notes && (
-                            <div className="text-[11px] text-slate-300 italic bg-slate-900/70 p-2.5 rounded-xl border border-white/5">
+                            <div className="text-[11px] text-zinc-300 italic bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
                               💬 Notiz: {h.notes}
                             </div>
                           )}
@@ -1768,24 +1981,24 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* DOWNLOADS */}
-            <div className="pt-3 border-t border-white/10">
-              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <div className="pt-3 border-t border-zinc-800">
+              <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
                 Druckvorlagen für das Dartboard
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 <a
                   href="/Darts_Doppelquote_Trainingsblatt_A4.xlsx"
                   download
-                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-xs font-bold text-white hover:bg-slate-700 transition-colors"
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-zinc-800 border border-zinc-700 text-xs font-bold text-white hover:bg-zinc-700 transition-colors"
                 >
-                  <FileSpreadsheet size={15} className="text-emerald-400" /> Excel (.xlsx)
+                  <FileSpreadsheet size={15} className="text-amber-400" /> Excel (.xlsx)
                 </a>
                 <a
                   href="/Darts_Doppelquote_Trainingsblatt_A4.pdf"
                   target="_blank"
-                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/10 text-xs font-bold text-white hover:bg-slate-700 transition-colors"
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-zinc-800 border border-zinc-700 text-xs font-bold text-white hover:bg-zinc-700 transition-colors"
                 >
-                  <FileText size={15} className="text-rose-400" /> PDF Druckblatt
+                  <FileText size={15} className="text-zinc-300" /> PDF Druckblatt
                 </a>
               </div>
             </div>
@@ -1793,64 +2006,68 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         );
       })()}
 
-      {/* KPI STATUS BAR */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-slate-900/90 border border-white/10 rounded-xl p-2.5 text-center">
-          <div className="text-[10px] font-bold text-slate-400 uppercase">Darts</div>
-          <div className="text-lg font-black text-white mt-0.5">
-            {gameMode === 'solo' ? p1Stats.thrown : (activePlayer === 1 ? p1Stats.thrown : p2Stats.thrown)} / 150
+      {/* KPI STATUS BAR (NUR SICHTBAR WENN EIN SPIEL LÄUFT) */}
+      {isPlaying && (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl p-2.5 text-center">
+            <div className="text-[10px] font-bold text-zinc-400 uppercase">Darts</div>
+            <div className="text-lg font-black text-white mt-0.5 font-mono">
+              {gameMode === 'solo' ? p1Stats.thrown : (activePlayer === 1 ? p1Stats.thrown : p2Stats.thrown)} / 150
+            </div>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl p-2.5 text-center">
+            <div className="text-[10px] font-bold text-zinc-400 uppercase">Treffer</div>
+            <div className="text-lg font-black text-white mt-0.5 font-mono">
+              {gameMode === 'solo' ? p1Stats.hits : (activePlayer === 1 ? p1Stats.hits : p2Stats.hits)}
+            </div>
+          </div>
+          <div className="bg-zinc-900 border border-amber-500/40 rounded-2xl p-2.5 text-center shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+            <div className="text-[10px] font-bold text-amber-400 uppercase">Doppelquote</div>
+            <div className="text-lg font-black text-amber-400 mt-0.5 font-mono">
+              {(gameMode === 'solo' ? p1Stats.quote : (activePlayer === 1 ? p1Stats.quote : p2Stats.quote)).toFixed(1)}%
+            </div>
           </div>
         </div>
-        <div className="bg-slate-900/90 border border-white/10 rounded-xl p-2.5 text-center">
-          <div className="text-[10px] font-bold text-slate-400 uppercase">Treffer</div>
-          <div className="text-lg font-black text-white mt-0.5">
-            {gameMode === 'solo' ? p1Stats.hits : (activePlayer === 1 ? p1Stats.hits : p2Stats.hits)}
-          </div>
-        </div>
-        <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-2.5 text-center shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-          <div className="text-[10px] font-bold text-emerald-400 uppercase">Doppelquote</div>
-          <div className="text-lg font-black text-emerald-300 mt-0.5">
-            {(gameMode === 'solo' ? p1Stats.quote : (activePlayer === 1 ? p1Stats.quote : p2Stats.quote)).toFixed(1)}%
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* STATUS NOTIFICATION */}
       {saveStatus && (
-        <div className="bg-slate-950 border border-emerald-500/50 rounded-xl p-3 text-center text-xs font-bold text-emerald-300 shadow-xl flex items-center justify-center gap-2">
+        <div className="bg-zinc-900 border border-amber-500/50 rounded-2xl p-3 text-center text-xs font-bold text-amber-400 shadow-xl flex items-center justify-center gap-2 animate-bounce">
           <CheckCircle2 size={16} />
           {saveStatus}
         </div>
       )}
 
-      {/* ACTION BUTTONS */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => saveSession()}
-          disabled={isSavedInCloud}
-          className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-            isSavedInCloud
-              ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed opacity-90'
-              : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-[0.98]'
-          }`}
-        >
-          {isSavedInCloud ? (
-            <>
-              <CheckCircle2 size={16} className="text-emerald-400" /> Bereits in Cloud gespeichert
-            </>
-          ) : (
-            <>
-              <Save size={16} /> In Supabase Cloud speichern
-            </>
-          )}
-        </button>
-        <button
-          onClick={resetGame}
-          className="py-3 px-4 rounded-xl bg-slate-800 border border-white/10 text-slate-300 hover:text-white font-bold text-sm active:scale-95 transition-all"
-        >
-          Neu
-        </button>
-      </div>
+      {/* ACTION BUTTONS (WÄHREND DES SPIELS) */}
+      {isPlaying && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => saveSession()}
+            disabled={isSavedInCloud}
+            className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              isSavedInCloud
+                ? 'bg-zinc-800 text-amber-400 border border-zinc-700 cursor-not-allowed opacity-90'
+                : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20 active:scale-[0.98]'
+            }`}
+          >
+            {isSavedInCloud ? (
+              <>
+                <CheckCircle2 size={16} className="text-amber-400" /> Bereits in Cloud gespeichert
+              </>
+            ) : (
+              <>
+                <Save size={16} /> In Supabase Cloud speichern
+              </>
+            )}
+          </button>
+          <button
+            onClick={resetGame}
+            className="py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white font-bold text-sm active:scale-95 transition-all cursor-pointer"
+          >
+            Neu
+          </button>
+        </div>
+      )}
 
     </div>
   );
