@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Sun, Moon, ShieldCheck, Tag } from 'lucide-react';
+import { ArrowLeft, Sun, Moon, ShieldCheck, Tag, Trophy, RefreshCw } from 'lucide-react';
+import { triggerManualLotteryDrawAction } from '@/app/actions/lotteryActions';
 
 interface EinstellungenClientProps {
   isAdmin?: boolean;
@@ -11,7 +12,26 @@ interface EinstellungenClientProps {
 export default function EinstellungenClient({ isAdmin = false }: EinstellungenClientProps) {
   const [isLightMode, setIsLightMode] = useState<boolean>(false);
   const [showUiLabels, setShowUiLabels] = useState<boolean>(false);
+  const [lotteryRunning, setLotteryRunning] = useState<boolean>(false);
+  const [lotteryStatus, setLotteryStatus] = useState<string | null>(null);
   const [mounted, setMounted] = useState<boolean>(false);
+
+  const handleTriggerLottery = async () => {
+    setLotteryRunning(true);
+    setLotteryStatus('Prüfe & führe Auslosung durch...');
+    try {
+      const res = await triggerManualLotteryDrawAction();
+      if (res.success) {
+        setLotteryStatus(res.message || 'Auslosung erfolgreich durchgeführt!');
+      } else {
+        setLotteryStatus(res.message || res.error || 'Keine Auslosung möglich.');
+      }
+    } catch (e) {
+      setLotteryStatus('Fehler beim Ausführen der Ziehung.');
+    } finally {
+      setLotteryRunning(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -157,8 +177,9 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
 
       {/* Admin-Bereich: UI-Inspektor Schalter (NUR FUER ADMIN) */}
       {isAdmin && (
-        <div
-          data-ui-id="SETTINGS.INSPECTOR.CARD"
+        <>
+          <div
+            data-ui-id="SETTINGS.INSPECTOR.CARD"
           className="bg-amber-950/20 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-6"
         >
           <div className="flex items-center justify-between gap-4">
@@ -218,6 +239,49 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
             </span>
           </div>
         </div>
+
+        {/* 3. Admin-Bereich: Trainings-Monatsverlosung manuell anstoßen */}
+        <div
+          data-ui-id="SETTINGS.LOTTERY.CARD"
+          className="bg-emerald-950/20 border-2 border-emerald-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-4"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-400" />
+                <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                  <span>Trainings-Monatsverlosung (5 Freigetränke)</span>
+                  <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                    Admin
+                  </span>
+                </h2>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Läuft am 1. eines jeden Monats automatisch für alle Spieler mit mind. 20 abgeschlossenen Trainingsspielen (inkl. 4 Monate Sperre für vorherige Gewinner).
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <button
+              type="button"
+              data-ui-id="SETTINGS.LOTTERY.TRIGGER_BTN"
+              disabled={lotteryRunning}
+              onClick={handleTriggerLottery}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${lotteryRunning ? 'animate-spin' : ''}`} />
+              <span>{lotteryRunning ? 'Ziehung läuft...' : 'Auslosung jetzt manuell ausführen'}</span>
+            </button>
+
+            {lotteryStatus && (
+              <span className="text-xs font-semibold text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/30">
+                {lotteryStatus}
+              </span>
+            )}
+          </div>
+        </div>
+        </>
       )}
     </div>
   );

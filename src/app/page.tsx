@@ -8,6 +8,7 @@ import DetailedMatrixTable from '@/components/DetailedMatrixTable';
 import ModeSelectionHub from '@/components/ModeSelectionHub';
 import { getDashboardData } from '@/lib/data';
 import { getSessionAction } from './actions';
+import { getLotteryDataAction } from './actions/lotteryActions';
 
 interface PageProps {
   searchParams: Promise<{ season?: string; mode?: string }>;
@@ -26,7 +27,14 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   // Wenn noch kein Modus (Ranking) gewählt wurde, zeigen wir den Einstiegs-Hub!
   if (mode !== 'ranking') {
-    return <ModeSelectionHub user={session} />;
+    const lotteryData = await getLotteryDataAction();
+    return (
+      <ModeSelectionHub
+        user={session}
+        bannerWinner={lotteryData.bannerWinner}
+        unacknowledgedWin={lotteryData.unacknowledgedWin}
+      />
+    );
   }
 
   const currentSeason = resolvedParams.season || '2026/2027';

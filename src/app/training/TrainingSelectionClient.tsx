@@ -13,14 +13,29 @@ import {
   Award,
   Sparkles,
   Tv,
+  Trophy,
+  Beer,
+  Gift,
+  Clock,
 } from 'lucide-react';
 import { PDC_BADGES_LIST } from './pdc-challenge/types';
+import { PlayerMonthProgress, LotteryWinner } from '@/lib/trainingLottery';
 
 interface TrainingSelectionClientProps {
   user: UserSession;
+  monthProgress?: PlayerMonthProgress | null;
+  bannerWinner?: LotteryWinner | null;
 }
 
-export default function TrainingSelectionClient({ user }: TrainingSelectionClientProps) {
+export default function TrainingSelectionClient({
+  user,
+  monthProgress,
+  bannerWinner,
+}: TrainingSelectionClientProps) {
+  const completed = monthProgress?.completedGames ?? 0;
+  const target = monthProgress?.targetGames ?? 20;
+  const pct = Math.min(100, Math.round((completed / target) * 100));
+
   return (
     <div className="min-h-[85vh] py-4 sm:py-8 space-y-6 max-w-6xl mx-auto px-2 sm:px-4 animate-fadeIn">
       {/* Navigation Top Bar */}
@@ -37,6 +52,85 @@ export default function TrainingSelectionClient({ user }: TrainingSelectionClien
           <span>Zurück zur Startseite</span>
         </Link>
       </div>
+
+      {/* Monatsverlosung-Fortschrittskarte (20 Spiele für 5 Freigetränke) */}
+      {monthProgress && (
+        <div
+          data-ui-id="TRAINING.LOTTERY.PROGRESS_CARD"
+          className="relative overflow-hidden bg-gradient-to-r from-zinc-900 via-slate-900 to-zinc-900 border-2 border-amber-500/40 hover:border-amber-400 rounded-3xl p-5 sm:p-6 shadow-2xl transition-all space-y-4"
+        >
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-md text-xl">
+                🍻
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                    Monatsverlosung: 5 Freigetränke
+                  </span>
+                  <span className="text-xs text-zinc-400 font-semibold">
+                    {monthProgress.monthLabel}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-white mt-0.5">
+                  Trainingsfleiß zahlt sich aus: 20 Spiele = 1 Los im Topf!
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-zinc-400 shrink-0">
+              <Clock className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Noch {monthProgress.daysRemainingInMonth} Tage im {monthProgress.monthLabel}</span>
+            </div>
+          </div>
+
+          {/* Fortschrittsbalken */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
+              <span className="font-bold text-zinc-300">
+                Dein persönlicher Fortschritt ({user.name}):
+              </span>
+              <span className="font-black font-mono text-amber-400 text-sm sm:text-base">
+                {completed} / {target} Spiele ({pct}%)
+              </span>
+            </div>
+
+            <div className="w-full h-3.5 sm:h-4 bg-zinc-950 rounded-full border border-zinc-800 overflow-hidden p-0.5 shadow-inner">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ease-out ${
+                  monthProgress.isQualified
+                    ? 'bg-gradient-to-r from-emerald-500 to-green-400 shadow-[0_0_15px_rgba(34,197,94,0.5)]'
+                    : 'bg-gradient-to-r from-amber-500 to-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                }`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Status-Hinweise */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs pt-1">
+            {monthProgress.isBlockedByPastWin ? (
+              <span className="px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold">
+                ℹ️ Gewinnersperre aktiv (du hast in den letzten 4 Monaten gewonnen und setzt diesen Monat aus)
+              </span>
+            ) : monthProgress.isQualified ? (
+              <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Lostopf freigeschaltet! Du bist bei der Auslosung am 1. dabei! 🎯</span>
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
+                Noch <strong className="text-white">{monthProgress.remainingGames} abgeschlossene Spiele</strong> bis zur Teilnahme
+              </span>
+            )}
+
+            <span className="text-[11px] text-zinc-400">
+              Aktuell <strong className="text-white">{monthProgress.eligiblePlayersCount} Spieler</strong> im Lostopf • Auslosung am 1. nach Zufallsprinzip
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Intro Banner */}
       <div className="text-center sm:text-left space-y-1 px-1" data-ui-id="TRAINING.HEADER.TITLE">

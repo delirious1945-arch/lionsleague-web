@@ -7,12 +7,16 @@ import { UserSession, logoutAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { LogOut, Settings, SunMoon } from 'lucide-react';
 import DynamicRankingTileContent from './DynamicRankingTileContent';
+import TrainingLotteryWidget from './TrainingLotteryWidget';
+import { LotteryWinner } from '@/lib/trainingLottery';
 
 interface ModeSelectionHubProps {
   user: UserSession;
+  bannerWinner?: LotteryWinner | null;
+  unacknowledgedWin?: LotteryWinner | null;
 }
 
-export default function ModeSelectionHub({ user }: ModeSelectionHubProps) {
+export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin }: ModeSelectionHubProps) {
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -38,6 +42,13 @@ export default function ModeSelectionHub({ user }: ModeSelectionHubProps) {
           <span>Abmelden</span>
         </button>
       </div>
+
+      {/* Monatsverlosungs-Banner & persönliches Gewinner-Modal */}
+      <TrainingLotteryWidget
+        bannerWinner={bannerWinner ?? null}
+        unacknowledgedWin={unacknowledgedWin ?? null}
+        currentUser={user.name}
+      />
 
       {/* Haupt-Bereich: Ranking-System & Trainingsmodus nebeneinander auf voller Bildschirmbreite */}
       <div
