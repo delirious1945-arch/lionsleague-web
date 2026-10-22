@@ -3,6 +3,7 @@
 import { sql } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { getSessionAction } from '@/app/actions';
+import { sanitizeTrainingDate } from '@/lib/dateUtils';
 
 export interface PdcChallengeSessionData {
   session_id: string;
@@ -27,6 +28,7 @@ export interface PdcChallengeSessionData {
 export async function savePdcChallengeAction(sessions: PdcChallengeSessionData[]) {
   try {
     for (const s of sessions) {
+      const validTrainingDate = sanitizeTrainingDate(s.training_date);
       const existing = await sql`
         SELECT id FROM training_pdc_challenge 
         WHERE session_id = ${s.session_id} AND player_name = ${s.player_name}
@@ -40,7 +42,7 @@ export async function savePdcChallengeAction(sessions: PdcChallengeSessionData[]
             player_id = ${s.player_id ?? null},
             opponent_name = ${s.opponent_name ?? null},
             game_mode = ${s.game_mode},
-            training_date = ${s.training_date},
+            training_date = ${validTrainingDate},
             score_part1 = ${s.score_part1},
             score_part2 = ${s.score_part2},
             score_part3 = ${s.score_part3},
@@ -62,7 +64,7 @@ export async function savePdcChallengeAction(sessions: PdcChallengeSessionData[]
             shanghai_count, doubles_hit, badge_color, details, notes,
             is_winner, is_aborted
           ) VALUES (
-            ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
+            ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${validTrainingDate},
             ${s.score_part1}, ${s.score_part2}, ${s.score_part3}, ${s.total_score},
             ${s.shanghai_count}, ${s.doubles_hit}, ${s.badge_color}, ${s.details ?? null}, ${s.notes ?? ''},
             ${s.is_winner ?? 0}, ${s.is_aborted ?? 0}

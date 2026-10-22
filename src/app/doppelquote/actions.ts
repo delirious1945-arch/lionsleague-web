@@ -3,6 +3,7 @@
 import { sql } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { getSessionAction } from '@/app/actions';
+import { sanitizeTrainingDate } from '@/lib/dateUtils';
 
 export interface TrainingSessionData {
   session_id: string;
@@ -39,6 +40,7 @@ export interface TrainingSessionData {
 export async function saveTrainingSessionAction(sessions: TrainingSessionData[]) {
   try {
     for (const s of sessions) {
+      const validTrainingDate = sanitizeTrainingDate(s.training_date);
       const existing = await sql`
         SELECT id FROM training_doubles 
         WHERE session_id = ${s.session_id} AND player_name = ${s.player_name}
@@ -52,7 +54,7 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
             player_id = ${s.player_id ?? null},
             opponent_name = ${s.opponent_name ?? null},
             game_mode = ${s.game_mode},
-            training_date = ${s.training_date},
+            training_date = ${validTrainingDate},
             d20_hits = ${s.d20_hits}, d20_darts = ${s.d20_darts}, d20_quote = ${s.d20_quote},
             d10_hits = ${s.d10_hits}, d10_darts = ${s.d10_darts}, d10_quote = ${s.d10_quote},
             d16_hits = ${s.d16_hits}, d16_darts = ${s.d16_darts}, d16_quote = ${s.d16_quote},
@@ -76,7 +78,7 @@ export async function saveTrainingSessionAction(sessions: TrainingSessionData[])
             best_double, notes, is_winner, is_aborted,
             estimated_quote
           ) VALUES (
-            ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${s.training_date},
+            ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name ?? null}, ${s.game_mode}, ${validTrainingDate},
             ${s.d20_hits}, ${s.d20_darts}, ${s.d20_quote},
             ${s.d10_hits}, ${s.d10_darts}, ${s.d10_quote},
             ${s.d16_hits}, ${s.d16_darts}, ${s.d16_quote},

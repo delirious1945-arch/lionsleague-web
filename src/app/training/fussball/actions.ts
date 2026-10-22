@@ -3,10 +3,12 @@
 import { sql } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { FussballSessionSavePayload } from './types';
+import { sanitizeTrainingDate } from '@/lib/dateUtils';
 
 export async function saveFussballSessionAction(sessions: FussballSessionSavePayload[]) {
   try {
     for (const s of sessions) {
+      const validTrainingDate = sanitizeTrainingDate(s.training_date);
       await sql`
         INSERT INTO training_fussball (
           session_id, player_id, player_name, opponent_name, is_computer, computer_level,
@@ -17,7 +19,7 @@ export async function saveFussballSessionAction(sessions: FussballSessionSavePay
           ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name}, ${s.is_computer}, ${s.computer_level ?? null},
           ${s.game_mode}, ${s.target_goals}, ${s.goals_scored}, ${s.goals_conceded}, ${s.darts_thrown},
           ${s.bull_hits}, ${s.bull_attempts}, ${s.double_hits}, ${s.double_attempts},
-          ${s.is_winner}, ${s.training_date}
+          ${s.is_winner}, ${validTrainingDate}
         )
       `;
     }
