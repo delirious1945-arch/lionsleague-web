@@ -215,6 +215,9 @@ export async function updateEstimatedDoubleQuoteAction(playerName: string, estim
 
 export interface ReEstimateCheckResult {
   needsReEstimate: boolean;
+  canEdit: boolean;
+  isLocked: boolean;
+  type: 'none' | 'unlocked_increase' | 'unlocked_decrease' | 'locked';
   playerName: string;
   currentEstimate: number;
   recentGamesCount: number;
@@ -222,17 +225,23 @@ export interface ReEstimateCheckResult {
   averageRecentQuote: number;
   suggestedEstimate: number;
   reason?: string;
+  lockReason?: string;
 }
 
 /**
- * Prüft, ob ein Spieler in seinen letzten Spielen dauerhaft auf oder über seiner geschätzten
- * Doppelquote geworfen hat. Falls ja, soll er erneut zur Selbsteinschätzung aufgefordert werden.
+ * Prüft, ob der Ändern-Button für einen Spieler gesperrt oder freigeschaltet ist.
+ * Freigeschaltet nur wenn:
+ * 1. Dauerhaft drüber oder +-1% zum Wert der Einschätzung (nach mind. 2 Spielen)
+ * 2. Quote zu oft verfehlt: dauerhaft 5-7 Spiele schlechter als 8% vom Wert der Einschätzung
  */
 export async function checkPlayerNeedsReEstimateAction(playerName: string): Promise<ReEstimateCheckResult> {
   const cleanName = playerName ? playerName.trim() : '';
   if (!cleanName) {
     return {
       needsReEstimate: false,
+      canEdit: true,
+      isLocked: false,
+      type: 'none',
       playerName: '',
       currentEstimate: 0,
       recentGamesCount: 0,
@@ -254,18 +263,22 @@ export async function checkPlayerNeedsReEstimateAction(playerName: string): Prom
     if (pRows.length === 0 || pRows[0].estimated_double_quote === null || pRows[0].estimated_double_quote === undefined) {
       return {
         needsReEstimate: false,
+        canEdit: true,
+        isLocked: false,
+        type: 'none',
         playerName: cleanName,
         currentEstimate: 0,
         recentGamesCount: 0,
         recentQuotes: [],
         averageRecentQuote: 0,
         suggestedEstimate: 0,
+        reason: 'Noch keine Selbsteinschätzung hinterlegt.',
       };
     }
 
     const currentEstimate = Number(pRows[0].estimated_double_quote);
 
-    // 2. Letzte abgeschlossene Doppelquoten-Spiele holen (mind. 30 Darts, is_aborted = 0)
+    // 2. Letzte abgeschlossene Doppelquoten-Spiele holen (mind. 30 Darts, is_aborted = 0, bis zu 7 Spiele)
     const recentGames = await sql`
       SELECT total_hits, total_darts, total_quote, created_at, training_date
       FROM training_doubles
@@ -273,60 +286,96 @@ export async function checkPlayerNeedsReEstimateAction(playerName: string): Prom
         AND (is_aborted IS NULL OR is_aborted = 0)
         AND total_darts >= 30
       ORDER BY COALESCE(training_date, created_at::text) DESC
-      LIMIT 3;
+      LIMIT 7;
     `;
 
-    if (recentGames.length < 2) {
+    const recentQuotes = recentGames.map((g: any) => Number((Number(g.total_quote) * 100).toFixed(1)));
+    const recentGamesCount = recentQuotes.length;
+
+    // 1. Kriterium: "dauerhaft drüber oder +-1% zum wert der einschätzung" (letzte bis zu 3 Spiele)
+    const last3 = recentQuotes.slice(0, 3);
+    const avg3 = last3.length > 0 ? Number((last3.reduce((a, b) => a + b, 0) / last3.length).toFixed(1)) : 0;
+    const isAtOrAbove = last3.length >= 2 && avg3 >= (currentEstimate - 1.0);
+
+    // 2. Kriterium: "zu oft verfehlt wird (dauerhaft 5-7 spiele schlechter als 8% vom wert der einschätzung)"
+    const avg5to7 = recentGamesCount > 0 ? Number((recentQuotes.reduce((a, b) => a + b, 0) / recentGamesCount).toFixed(1)) : 0;
+    const diff = currentEstimate - avg5to7;
+    const isUnderperforming = recentGamesCount >= 5 && (diff >= 8 || (currentEstimate <= 10 && avg5to7 <= currentEstimate * 0.6));
+
+    if (isAtOrAbove) {
+      const suggested = Math.max(currentEstimate + 1, Math.round(avg3));
+      const isActualIncrease = avg3 >= currentEstimate;
       return {
-        needsReEstimate: false,
+        needsReEstimate: isActualIncrease,
+        canEdit: true,
+        isLocked: false,
+        type: 'unlocked_increase',
         playerName: cleanName,
         currentEstimate,
-        recentGamesCount: recentGames.length,
-        recentQuotes: [],
-        averageRecentQuote: 0,
-        suggestedEstimate: currentEstimate,
+        recentGamesCount: last3.length,
+        recentQuotes: last3,
+        averageRecentQuote: avg3,
+        suggestedEstimate: suggested,
+        reason: isActualIncrease
+          ? `Ziel übertroffen: Dein Schnitt der letzten ${last3.length} Spiele liegt bei ${avg3}% (bisherige Schätzung: ${currentEstimate}%).`
+          : `Ziel bestätigt (±1%): Dein Schnitt der letzten ${last3.length} Spiele liegt bei ${avg3}% (Schätzung: ${currentEstimate}%).`,
       };
     }
 
-    const recentQuotes = recentGames.map((g: any) => Number((Number(g.total_quote) * 100).toFixed(1)));
-    const sum = recentQuotes.reduce((acc: number, val: number) => acc + val, 0);
-    const averageRecentQuote = Number((sum / recentQuotes.length).toFixed(1));
-
-    // Kriterium für "dauerhaft auf oder über":
-    // Bei 2 Spielen: beide Spiele >= currentEstimate und Schnitt >= currentEstimate
-    // Bei 3 Spielen: mind. 2 von 3 >= currentEstimate und Schnitt >= currentEstimate, ODER alle 3 >= currentEstimate
-    const onOrAboveCount = recentQuotes.filter((q: number) => q >= currentEstimate).length;
-    let isSustainedAbove = false;
-    if (recentGames.length === 2) {
-      isSustainedAbove = onOrAboveCount === 2 && averageRecentQuote >= currentEstimate;
-    } else {
-      isSustainedAbove = (averageRecentQuote >= currentEstimate && onOrAboveCount >= 2) || onOrAboveCount === 3;
+    if (isUnderperforming) {
+      const suggested = Math.max(1, Math.round(avg5to7));
+      return {
+        needsReEstimate: false,
+        canEdit: true,
+        isLocked: false,
+        type: 'unlocked_decrease',
+        playerName: cleanName,
+        currentEstimate,
+        recentGamesCount,
+        recentQuotes,
+        averageRecentQuote: avg5to7,
+        suggestedEstimate: suggested,
+        reason: `Ziel verfehlt: In deinen letzten ${recentGamesCount} Spielen lag dein Schnitt bei ${avg5to7}% (mehr als 8% unter deiner Schätzung von ${currentEstimate}%).`,
+      };
     }
 
-    const suggestedEstimate = Math.max(currentEstimate + 1, Math.round(averageRecentQuote));
+    // Gesperrt (Locked)
+    let lockReason = '';
+    if (recentGamesCount < 2) {
+      lockReason = `🔒 Gesperrt: Spiele mindestens 2 bis 3 Spiele, um deine Einschätzung anzupassen.`;
+    } else if (recentGamesCount < 5) {
+      lockReason = `🔒 Gesperrt: Deine Schätzung (${currentEstimate}%) ist fixiert. Anpassung erst möglich bei Zielerreichung (drüber / ±1%) oder nach 5–7 Spielen bei deutlicher Verfehlung.`;
+    } else {
+      lockReason = `🔒 Gesperrt: Dein Schnitt der letzten ${recentGamesCount} Spiele liegt bei ${avg5to7}%. Anpassung erst möglich ab ${currentEstimate - 1}% oder unter ${Math.max(1, currentEstimate - 8)}%.`;
+    }
 
     return {
-      needsReEstimate: isSustainedAbove,
+      needsReEstimate: false,
+      canEdit: false,
+      isLocked: true,
+      type: 'locked',
       playerName: cleanName,
       currentEstimate,
-      recentGamesCount: recentGames.length,
+      recentGamesCount,
       recentQuotes,
-      averageRecentQuote,
-      suggestedEstimate,
-      reason: isSustainedAbove
-        ? `Starke Steigerung: Du hast in deinen letzten ${recentGames.length} Spielen einen Schnitt von ${averageRecentQuote}% erzielt (bisherige Schätzung: ${currentEstimate}%).`
-        : undefined,
+      averageRecentQuote: avg3 || avg5to7,
+      suggestedEstimate: currentEstimate,
+      lockReason,
     };
   } catch (err) {
     console.error('Fehler bei checkPlayerNeedsReEstimateAction:', err);
     return {
       needsReEstimate: false,
+      canEdit: false,
+      isLocked: true,
+      type: 'locked',
       playerName: cleanName,
       currentEstimate: 0,
       recentGamesCount: 0,
       recentQuotes: [],
       averageRecentQuote: 0,
       suggestedEstimate: 0,
+      lockReason: 'Prüfung fehlgeschlagen',
     };
   }
 }
