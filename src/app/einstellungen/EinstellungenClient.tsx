@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Sun, Moon, ShieldCheck, Tag, Trophy, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sun, Moon, ShieldCheck, Tag, Trophy, RefreshCw } from 'lucide-react';
 import { triggerManualLotteryDrawAction } from '@/app/actions/lotteryActions';
 
 interface EinstellungenClientProps {
@@ -262,17 +262,28 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
             </div>
           </div>
 
-          <div className="pt-3 border-t border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <button
-              type="button"
-              data-ui-id="SETTINGS.LOTTERY.TRIGGER_BTN"
-              disabled={lotteryRunning}
-              onClick={handleTriggerLottery}
-              className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${lotteryRunning ? 'animate-spin' : ''}`} />
-              <span>{lotteryRunning ? 'Ziehung läuft...' : 'Auslosung jetzt manuell ausführen'}</span>
-            </button>
+          <div className="pt-3 border-t border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                data-ui-id="SETTINGS.LOTTERY.TRIGGER_BTN"
+                disabled={lotteryRunning}
+                onClick={handleTriggerLottery}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${lotteryRunning ? 'animate-spin' : ''}`} />
+                <span>{lotteryRunning ? 'Ziehung läuft...' : 'Auslosung jetzt manuell ausführen'}</span>
+              </button>
+
+              <Link
+                href="/verwaltung?tab=training"
+                data-ui-id="SETTINGS.LOTTERY.OVERVIEW_LINK"
+                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>📊 Spieler-Trainingsübersicht ansehen</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
 
             {lotteryStatus && (
               <span className="text-xs font-semibold text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/30">

@@ -102,3 +102,21 @@ export async function triggerManualLotteryDrawAction(customMonthKey?: string): P
     return { success: false, error: String(err) };
   }
 }
+
+/**
+ * Ruft die Admin-Trainingsübersicht für einen bestimmten Monat ab.
+ */
+export async function getAdminTrainingOverviewAction(monthKey?: string) {
+  try {
+    const session = await getSessionAction();
+    if (session?.role !== 'admin') {
+      return { success: false, error: 'Zugriff verweigert (nur für Administratoren).' };
+    }
+    const { getAdminTrainingOverviewData } = await import('@/lib/trainingLottery');
+    const data = await getAdminTrainingOverviewData(monthKey);
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+}
+

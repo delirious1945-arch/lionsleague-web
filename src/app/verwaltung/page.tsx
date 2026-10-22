@@ -4,6 +4,7 @@ import { getAllMatches, getPlayers } from '@/lib/data';
 import { getSessionAction } from '@/app/actions';
 import { getTrainingHistoryAction } from '@/app/doppelquote/actions';
 import { getPdcChallengeHistoryAction } from '@/app/training/pdc-challenge/actions';
+import { getAdminTrainingOverviewData } from '@/lib/trainingLottery';
 import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -17,11 +18,12 @@ export default async function VerwaltungPage() {
     redirect('/?mode=ranking');
   }
 
-  const [matches, players, trainingDoubles, trainingPdc] = await Promise.all([
+  const [matches, players, trainingDoubles, trainingPdc, adminTrainingOverview] = await Promise.all([
     getAllMatches(),
     getPlayers(),
     getTrainingHistoryAction(100),
     getPdcChallengeHistoryAction(100),
+    getAdminTrainingOverviewData(),
   ]);
 
   return (
@@ -31,6 +33,7 @@ export default async function VerwaltungPage() {
         players={players}
         trainingDoubles={trainingDoubles}
         trainingPdc={trainingPdc}
+        adminTrainingOverview={adminTrainingOverview}
       />
     </div>
   );

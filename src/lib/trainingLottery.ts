@@ -106,10 +106,7 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
       FROM training_doubles
       WHERE (is_aborted IS NULL OR is_aborted = 0)
         AND total_darts >= 30
-        AND (
-          (training_date >= ${startIso} AND training_date <= ${endIso})
-          OR (training_date IS NULL AND created_at >= ${startDate} AND created_at <= ${endDate})
-        )
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
       GROUP BY player_name, player_id
     `;
 
@@ -132,10 +129,7 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
       FROM training_pdc_challenge
       WHERE (is_aborted IS NULL OR is_aborted = 0)
         AND total_score IS NOT NULL
-        AND (
-          (training_date >= ${startIso} AND training_date <= ${endIso})
-          OR (training_date IS NULL AND created_at >= ${startDate} AND created_at <= ${endDate})
-        )
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
       GROUP BY player_name, player_id
     `;
 
@@ -148,6 +142,28 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
     }
   } catch (err) {
     console.error('Fehler beim Abfragen von training_pdc_challenge für Verlosung:', err);
+  }
+
+  // 3. Fußball Darts Battle
+  try {
+    const fussballRows = await sql`
+      SELECT player_name, player_id, count(*)::int as cnt
+      FROM training_fussball
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND darts_thrown >= 6
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
+      GROUP BY player_name, player_id
+    `;
+
+    for (const r of fussballRows) {
+      const name = String(r.player_name).trim();
+      const current = playerStats.get(name) || { playerId: r.player_id ?? null, count: 0 };
+      current.count += Number(r.cnt);
+      if (r.player_id && !current.playerId) current.playerId = r.player_id;
+      playerStats.set(name, current);
+    }
+  } catch (err) {
+    console.error('Fehler beim Abfragen von training_fussball für Verlosung:', err);
   }
 
   return playerStats;
@@ -438,5 +454,270 @@ export async function getCurrentMonthProgressForPlayer(playerName?: string): Pro
     isBlockedByPastWin,
     daysRemainingInMonth,
     eligiblePlayersCount: eligibleCount,
+  };
+}
+
+export interface PlayerMonthlyTrainingStat {
+  playerName: string;
+  playerId: number | null;
+  team: string;
+  doublesSolo: number;
+  doubles1vs1: number;
+  totalDoubles: number;
+  pdcSolo: number;
+  pdc1vs1: number;
+  totalPdc: number;
+  totalCompletedGames: number;
+  isQualified: boolean;
+  isBlockedByPastWin: boolean;
+  isMonthWinner: boolean;
+  gamesList: {
+    id: number;
+    gameType: 'doubles' | 'pdc';
+    gameMode: string;
+    opponentName: string | null;
+    date: string;
+    summary: string;
+    isWinner: number;
+  }[];
+}
+
+export interface AdminTrainingOverviewData {
+  selectedMonthKey: string;
+  selectedMonthLabel: string;
+  availableMonths: { monthKey: string; monthLabel: string }[];
+  totalGamesInMonth: number;
+  totalActivePlayers: number;
+  qualifiedPlayersCount: number;
+  monthWinner: LotteryWinner | null;
+  players: PlayerMonthlyTrainingStat[];
+}
+
+/**
+ * Liefert für Administratoren die vollständige Monatsübersicht aller Spieler
+ * mit Aufschlüsselung nach Solo vs. 1-gegen-1, Checkout Battle, PDC Challenge und Verlosungsstatus.
+ */
+export async function getAdminTrainingOverviewData(customMonthKey?: string): Promise<AdminTrainingOverviewData> {
+  const current = formatMonthKey();
+  const selectedMonthKey = customMonthKey || current.monthKey;
+
+  // 1. Verfügbare Monate sammeln
+  const monthRows = await sql`
+    SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
+    FROM training_doubles
+    WHERE is_aborted IS NULL OR is_aborted = 0
+    UNION
+    SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
+    FROM training_pdc_challenge
+    WHERE is_aborted IS NULL OR is_aborted = 0
+    ORDER BY m DESC;
+  `;
+
+  const monthSet = new Set<string>();
+  monthSet.add(current.monthKey);
+  for (const r of monthRows) {
+    if (r.m && typeof r.m === 'string' && r.m.length === 7) {
+      monthSet.add(r.m);
+    }
+  }
+
+  const availableMonths = Array.from(monthSet)
+    .sort((a, b) => b.localeCompare(a))
+    .map((mKey) => {
+      const [yStr, mStr] = mKey.split('-');
+      const mIdx = parseInt(mStr, 10) - 1;
+      return {
+        monthKey: mKey,
+        monthLabel: `${GERMAN_MONTHS[mIdx] || mKey} ${yStr}`,
+      };
+    });
+
+  const selectedMonthLabel =
+    availableMonths.find((m) => m.monthKey === selectedMonthKey)?.monthLabel || selectedMonthKey;
+
+  // 2. Alle Liga-Spieler abrufen
+  const dbPlayers = await sql`
+    SELECT id, name, team 
+    FROM players 
+    WHERE name NOT LIKE 'Board %'
+    ORDER BY name ASC;
+  `;
+
+  // 3. Doubles & PDC Sessions für den Monat abrufen
+  const doublesSessions = await sql`
+    SELECT 
+      id, session_id, player_name, opponent_name, game_mode, 
+      training_date, created_at, total_hits, total_darts, total_quote, best_double, is_winner
+    FROM training_doubles
+    WHERE (is_aborted IS NULL OR is_aborted = 0)
+      AND total_darts >= 30
+      AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+    ORDER BY COALESCE(training_date, created_at::text) DESC;
+  `;
+
+  const pdcSessions = await sql`
+    SELECT 
+      id, session_id, player_name, opponent_name, game_mode, 
+      training_date, created_at, total_score, badge_color, is_winner
+    FROM training_pdc_challenge
+    WHERE (is_aborted IS NULL OR is_aborted = 0)
+      AND total_score IS NOT NULL
+      AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+    ORDER BY COALESCE(training_date, created_at::text) DESC;
+  `;
+
+  // 4. Sperrfrist & Gewinner des Monats ermitteln
+  const blockedPlayers = await getBlockedPlayersForMonth(selectedMonthKey);
+  const winnerRows = await sql`
+    SELECT * FROM training_lottery_winners
+    WHERE month_key = ${selectedMonthKey}
+    LIMIT 1;
+  `;
+  const monthWinner = winnerRows.length > 0 ? (winnerRows[0] as LotteryWinner) : null;
+  const winnerName = monthWinner ? monthWinner.player_name.trim() : null;
+
+  // 5. Aggregation pro Spieler
+  const statsMap = new Map<string, PlayerMonthlyTrainingStat>();
+
+  // Grundbestand aller Spieler anlegen
+  for (const p of dbPlayers) {
+    const name = String(p.name).trim();
+    statsMap.set(name, {
+      playerName: name,
+      playerId: p.id,
+      team: p.team || 'Verein',
+      doublesSolo: 0,
+      doubles1vs1: 0,
+      totalDoubles: 0,
+      pdcSolo: 0,
+      pdc1vs1: 0,
+      totalPdc: 0,
+      totalCompletedGames: 0,
+      isQualified: false,
+      isBlockedByPastWin: blockedPlayers.has(name),
+      isMonthWinner: winnerName === name,
+      gamesList: [],
+    });
+  }
+
+  // Doubles zuweisen
+  for (const s of doublesSessions) {
+    const name = String(s.player_name).trim();
+    let stat = statsMap.get(name);
+    if (!stat) {
+      stat = {
+        playerName: name,
+        playerId: null,
+        team: 'Gast',
+        doublesSolo: 0,
+        doubles1vs1: 0,
+        totalDoubles: 0,
+        pdcSolo: 0,
+        pdc1vs1: 0,
+        totalPdc: 0,
+        totalCompletedGames: 0,
+        isQualified: false,
+        isBlockedByPastWin: blockedPlayers.has(name),
+        isMonthWinner: winnerName === name,
+        gamesList: [],
+      };
+      statsMap.set(name, stat);
+    }
+
+    const isSolo = s.game_mode === 'solo';
+    if (isSolo) {
+      stat.doublesSolo += 1;
+    } else {
+      stat.doubles1vs1 += 1;
+    }
+    stat.totalDoubles += 1;
+    stat.totalCompletedGames += 1;
+
+    const qPct = s.total_quote ? (Number(s.total_quote) * 100).toFixed(1) + '%' : '-';
+    stat.gamesList.push({
+      id: s.id,
+      gameType: 'doubles',
+      gameMode: s.game_mode,
+      opponentName: s.opponent_name || null,
+      date: s.training_date || s.created_at,
+      summary: `Doppelquote: ${qPct} (${s.total_hits || 0}/${s.total_darts || 150})`,
+      isWinner: s.is_winner ?? 0,
+    });
+  }
+
+  // PDC zuweisen
+  for (const s of pdcSessions) {
+    const name = String(s.player_name).trim();
+    let stat = statsMap.get(name);
+    if (!stat) {
+      stat = {
+        playerName: name,
+        playerId: null,
+        team: 'Gast',
+        doublesSolo: 0,
+        doubles1vs1: 0,
+        totalDoubles: 0,
+        pdcSolo: 0,
+        pdc1vs1: 0,
+        totalPdc: 0,
+        totalCompletedGames: 0,
+        isQualified: false,
+        isBlockedByPastWin: blockedPlayers.has(name),
+        isMonthWinner: winnerName === name,
+        gamesList: [],
+      };
+      statsMap.set(name, stat);
+    }
+
+    const isSolo = s.game_mode === 'solo';
+    if (isSolo) {
+      stat.pdcSolo += 1;
+    } else {
+      stat.pdc1vs1 += 1;
+    }
+    stat.totalPdc += 1;
+    stat.totalCompletedGames += 1;
+
+    stat.gamesList.push({
+      id: s.id,
+      gameType: 'pdc',
+      gameMode: s.game_mode,
+      opponentName: s.opponent_name || null,
+      date: s.training_date || s.created_at,
+      summary: `PDC Score: ${s.total_score} Pkt (${s.badge_color || '-'}es Abzeichen)`,
+      isWinner: s.is_winner ?? 0,
+    });
+  }
+
+  // Qualifikation und Sortierung berechnen
+  let totalGamesInMonth = 0;
+  let totalActivePlayers = 0;
+  let qualifiedPlayersCount = 0;
+
+  const playerList = Array.from(statsMap.values()).map((p) => {
+    p.isQualified = p.totalCompletedGames >= 20 && !p.isBlockedByPastWin;
+    totalGamesInMonth += p.totalCompletedGames;
+    if (p.totalCompletedGames > 0) totalActivePlayers += 1;
+    if (p.isQualified) qualifiedPlayersCount += 1;
+    return p;
+  });
+
+  // Sortierung: Wer die meisten Spiele hat, steht oben. Bei 0 Spielen alphabetisch dahinter.
+  playerList.sort((a, b) => {
+    if (b.totalCompletedGames !== a.totalCompletedGames) {
+      return b.totalCompletedGames - a.totalCompletedGames;
+    }
+    return a.playerName.localeCompare(b.playerName);
+  });
+
+  return {
+    selectedMonthKey,
+    selectedMonthLabel,
+    availableMonths,
+    totalGamesInMonth,
+    totalActivePlayers,
+    qualifiedPlayersCount,
+    monthWinner,
+    players: playerList,
   };
 }

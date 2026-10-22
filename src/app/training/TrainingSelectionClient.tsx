@@ -125,9 +125,22 @@ export default function TrainingSelectionClient({
               </span>
             )}
 
-            <span className="text-[11px] text-zinc-400">
-              Aktuell <strong className="text-white">{monthProgress.eligiblePlayersCount} Spieler</strong> im Lostopf • Auslosung am 1. nach Zufallsprinzip
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-zinc-400">
+                Aktuell <strong className="text-white">{monthProgress.eligiblePlayersCount} Spieler</strong> im Lostopf • Auslosung am 1. nach Zufallsprinzip
+              </span>
+
+              {user.role === 'admin' && (
+                <Link
+                  href="/verwaltung?tab=training"
+                  data-ui-id="TRAINING.LOTTERY.ADMIN_LINK"
+                  className="px-3 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center gap-1.5 transition-all"
+                >
+                  <span>👑 Admin: Alle Spieler ansehen</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       )}

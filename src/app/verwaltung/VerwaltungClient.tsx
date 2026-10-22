@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   deleteMatchAction,
   updateMatchAction,
@@ -22,19 +23,31 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { getPdcBadge, PART2_TARGETS } from '@/app/training/pdc-challenge/types';
+import AdminTrainingOverview from '@/components/AdminTrainingOverview';
+import { AdminTrainingOverviewData } from '@/lib/trainingLottery';
 
 export default function VerwaltungClient({
   matches,
   players,
   trainingDoubles = [],
   trainingPdc = [],
+  adminTrainingOverview,
 }: {
   matches: MatchRow[];
   players: Player[];
   trainingDoubles?: any[];
   trainingPdc?: any[];
+  adminTrainingOverview?: AdminTrainingOverviewData;
 }) {
-  const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'training'>('matches');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get('tab');
+  const defaultTab = tabParam === 'training'
+    ? 'training'
+    : tabParam === 'players'
+    ? 'players'
+    : 'matches';
+
+  const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'training'>(defaultTab);
   const [trainingGameType, setTrainingGameType] = useState<'all' | 'doubles' | 'pdc'>('all');
   const [trainingPlayerFilter, setTrainingPlayerFilter] = useState<string>('all');
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
@@ -497,6 +510,21 @@ export default function VerwaltungClient({
                   <ExternalLink size={12} />
                 </Link>
               </div>
+            </div>
+
+            {/* 1. Monatliche Zuordnung & Spieler-Auswertung für Admin */}
+            {adminTrainingOverview && (
+              <AdminTrainingOverview initialData={adminTrainingOverview} />
+            )}
+
+            {/* Trenner zur Detail-Sitzungsliste */}
+            <div className="pt-2">
+              <h4 className="text-sm font-black text-white flex items-center gap-2">
+                <span>📋</span> Einzelprotokolle & Sitzungs-Historie
+              </h4>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Vollständige Liste aller absolvierten Einzelsitzungen mit Wurfdetails zum Aufklappen.
+              </p>
             </div>
 
             {/* KPI Cards */}
