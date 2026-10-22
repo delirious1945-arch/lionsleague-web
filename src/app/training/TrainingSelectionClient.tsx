@@ -146,14 +146,26 @@ export default function TrainingSelectionClient({
         </div>
       )}
 
-      {/* Intro Banner */}
-      <div className="text-center sm:text-left space-y-1 px-1" data-ui-id="TRAINING.HEADER.TITLE">
-        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-          Wähle deine Trainings-Disziplin
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-400">
-          Gezieltes Einzeltraining oder 1-gegen-1 Duelle für maximale Board-Präzision & offizielle Leistungsabzeichen.
-        </p>
+      {/* Intro Banner & TV-Board Link */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1" data-ui-id="TRAINING.HEADER.TITLE">
+        <div className="space-y-1 text-center sm:text-left">
+          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            Wähle deine Trainings-Disziplin
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400">
+            Gezieltes Einzeltraining oder 1-gegen-1 Duelle für maximale Board-Präzision & offizielle Leistungsabzeichen.
+          </p>
+        </div>
+
+        <Link
+          href="/training/live"
+          target="_blank"
+          data-ui-id="TRAINING.HEADER.TV_BOARD_BTN"
+          className="self-center sm:self-auto px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-amber-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 border-2 border-amber-500/50 font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+        >
+          <Tv className="w-4 h-4 text-amber-400" />
+          <span>📺 Vereinsheim TV-Board</span>
+        </Link>
       </div>
 
       {/* Grid of Active Training Games */}
@@ -239,7 +251,7 @@ export default function TrainingSelectionClient({
             </span>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Link
-                href="/doppelquote/live"
+                href="/training/live?view=doppelquote"
                 target="_blank"
                 data-ui-id="TRAINING.GAME_CHECKOUT.TV_BTN"
                 className="flex-1 sm:flex-initial px-3.5 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
@@ -334,7 +346,7 @@ export default function TrainingSelectionClient({
             </span>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Link
-                href="/training/pdc-challenge/live"
+                href="/training/live?view=pdc"
                 target="_blank"
                 data-ui-id="TRAINING.GAME_PDC.TV_BTN"
                 className="flex-1 sm:flex-initial px-3.5 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"

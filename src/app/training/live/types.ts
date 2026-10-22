@@ -1,0 +1,99 @@
+export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'archive';
+
+export type UnifiedTvTimeframe = 'today' | 'month' | 'all' | 'archive';
+
+export interface TvDoppelquoteRow {
+  session_id: string;
+  player_name: string;
+  attempt_nr: number;
+  attempt_label: string;
+  time_label: string;
+  total_hits: number;
+  total_darts: number;
+  quote_percent: number;
+  best_double: string;
+  rank: number;
+  isShared: boolean;
+  d20_quote: number;
+  d10_quote: number;
+  d16_quote: number;
+  d8_quote: number;
+  d4_quote: number;
+  opponent_name?: string | null;
+}
+
+export interface TvPdcRow {
+  session_id: string;
+  player_name: string;
+  attempt_nr: number;
+  attempt_label: string;
+  time_label: string;
+  best_score: number;
+  score_part1: number;
+  score_part2: number;
+  score_part3: number;
+  best_badge: string;
+  total_shanghais: number;
+  best_doubles_hit: number;
+  rank: number;
+  isShared: boolean;
+  opponent_name?: string | null;
+}
+
+export interface ArchiveTrainingDaySummary {
+  dateStr: string; // YYYY-MM-DD
+  dayLabel: string; // e.g. "Donnerstag, 22. Okt."
+  totalSessions: number;
+  uniquePlayersCount: number;
+  gamesList: ('doppelquote' | 'pdc' | 'fussball')[];
+}
+
+export interface ArchiveDayDetail {
+  dateStr: string;
+  fullDateLabel: string;
+  totalSessions: number;
+  activePlayers: string[];
+  doppelGames: {
+    id: string;
+    playerName: string;
+    opponentName?: string | null;
+    hits: number;
+    darts: number;
+    quotePercent: number;
+    bestDouble: string;
+    time: string;
+  }[];
+  pdcGames: {
+    id: string;
+    playerName: string;
+    opponentName?: string | null;
+    score: number;
+    badge: string;
+    shanghais: number;
+    doubles: number;
+    time: string;
+  }[];
+  fussballGames: {
+    id: string;
+    playerName: string;
+    opponentName: string;
+    isWinner: boolean;
+    goalsScored: number;
+    goalsConceded: number;
+    dartsThrown: number;
+    time: string;
+  }[];
+}
+
+export interface UnifiedTvBoardData {
+  timeframe: UnifiedTvTimeframe;
+  selectedDateStr: string; // YYYY-MM-DD
+  monthLabel: string;
+  todayDoppelLeaderboard: TvDoppelquoteRow[];
+  todayPdcLeaderboard: TvPdcRow[];
+  hasTodayData: boolean;
+  hasMonthData: boolean;
+  availableArchiveDays: ArchiveTrainingDaySummary[];
+  currentArchiveDayDetail?: ArchiveDayDetail | null;
+  lastUpdate: string;
+}
