@@ -211,6 +211,124 @@ export async function updateEstimatedDoubleQuoteAction(playerName: string, estim
   }
 }
 
+export interface ReEstimateCheckResult {
+  needsReEstimate: boolean;
+  playerName: string;
+  currentEstimate: number;
+  recentGamesCount: number;
+  recentQuotes: number[];
+  averageRecentQuote: number;
+  suggestedEstimate: number;
+  reason?: string;
+}
+
+/**
+ * Prüft, ob ein Spieler in seinen letzten Spielen dauerhaft auf oder über seiner geschätzten
+ * Doppelquote geworfen hat. Falls ja, soll er erneut zur Selbsteinschätzung aufgefordert werden.
+ */
+export async function checkPlayerNeedsReEstimateAction(playerName: string): Promise<ReEstimateCheckResult> {
+  const cleanName = playerName ? playerName.trim() : '';
+  if (!cleanName) {
+    return {
+      needsReEstimate: false,
+      playerName: '',
+      currentEstimate: 0,
+      recentGamesCount: 0,
+      recentQuotes: [],
+      averageRecentQuote: 0,
+      suggestedEstimate: 0,
+    };
+  }
+
+  try {
+    // 1. Aktuelle hinterlegte Schätzung aus der Datenbank holen
+    const pRows = await sql`
+      SELECT id, name, estimated_double_quote 
+      FROM players 
+      WHERE LOWER(TRIM(name)) = LOWER(${cleanName})
+      LIMIT 1;
+    `;
+
+    if (pRows.length === 0 || pRows[0].estimated_double_quote === null || pRows[0].estimated_double_quote === undefined) {
+      return {
+        needsReEstimate: false,
+        playerName: cleanName,
+        currentEstimate: 0,
+        recentGamesCount: 0,
+        recentQuotes: [],
+        averageRecentQuote: 0,
+        suggestedEstimate: 0,
+      };
+    }
+
+    const currentEstimate = Number(pRows[0].estimated_double_quote);
+
+    // 2. Letzte abgeschlossene Doppelquoten-Spiele holen (mind. 30 Darts, is_aborted = 0)
+    const recentGames = await sql`
+      SELECT total_hits, total_darts, total_quote, created_at, training_date
+      FROM training_doubles
+      WHERE LOWER(TRIM(player_name)) = LOWER(${cleanName})
+        AND (is_aborted IS NULL OR is_aborted = 0)
+        AND total_darts >= 30
+      ORDER BY COALESCE(training_date, created_at::text) DESC
+      LIMIT 3;
+    `;
+
+    if (recentGames.length < 2) {
+      return {
+        needsReEstimate: false,
+        playerName: cleanName,
+        currentEstimate,
+        recentGamesCount: recentGames.length,
+        recentQuotes: [],
+        averageRecentQuote: 0,
+        suggestedEstimate: currentEstimate,
+      };
+    }
+
+    const recentQuotes = recentGames.map((g: any) => Number((Number(g.total_quote) * 100).toFixed(1)));
+    const sum = recentQuotes.reduce((acc: number, val: number) => acc + val, 0);
+    const averageRecentQuote = Number((sum / recentQuotes.length).toFixed(1));
+
+    // Kriterium für "dauerhaft auf oder über":
+    // Bei 2 Spielen: beide Spiele >= currentEstimate und Schnitt >= currentEstimate
+    // Bei 3 Spielen: mind. 2 von 3 >= currentEstimate und Schnitt >= currentEstimate, ODER alle 3 >= currentEstimate
+    const onOrAboveCount = recentQuotes.filter((q: number) => q >= currentEstimate).length;
+    let isSustainedAbove = false;
+    if (recentGames.length === 2) {
+      isSustainedAbove = onOrAboveCount === 2 && averageRecentQuote >= currentEstimate;
+    } else {
+      isSustainedAbove = (averageRecentQuote >= currentEstimate && onOrAboveCount >= 2) || onOrAboveCount === 3;
+    }
+
+    const suggestedEstimate = Math.max(currentEstimate + 1, Math.round(averageRecentQuote));
+
+    return {
+      needsReEstimate: isSustainedAbove,
+      playerName: cleanName,
+      currentEstimate,
+      recentGamesCount: recentGames.length,
+      recentQuotes,
+      averageRecentQuote,
+      suggestedEstimate,
+      reason: isSustainedAbove
+        ? `Starke Steigerung: Du hast in deinen letzten ${recentGames.length} Spielen einen Schnitt von ${averageRecentQuote}% erzielt (bisherige Schätzung: ${currentEstimate}%).`
+        : undefined,
+    };
+  } catch (err) {
+    console.error('Fehler bei checkPlayerNeedsReEstimateAction:', err);
+    return {
+      needsReEstimate: false,
+      playerName: cleanName,
+      currentEstimate: 0,
+      recentGamesCount: 0,
+      recentQuotes: [],
+      averageRecentQuote: 0,
+      suggestedEstimate: 0,
+    };
+  }
+}
+
 export async function recordAbortedSessionAction(data: {
   session_id?: string;
   player_name: string;

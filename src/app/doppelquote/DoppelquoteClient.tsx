@@ -7,6 +7,8 @@ import {
   saveTrainingSessionAction, 
   recordAbortedSessionAction, 
   updateEstimatedDoubleQuoteAction, 
+  checkPlayerNeedsReEstimateAction,
+  ReEstimateCheckResult,
   TrainingSessionData 
 } from './actions';
 import { UserSession } from '@/app/actions';
@@ -69,6 +71,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSavingEstimate, setIsSavingEstimate] = useState<boolean>(false);
   const [hasPromptedPlayers, setHasPromptedPlayers] = useState<Record<string, boolean>>({});
+  const [reEstimateData, setReEstimateData] = useState<Record<string, ReEstimateCheckResult | null>>({});
+  const [hasCheckedReEstimate, setHasCheckedReEstimate] = useState<Record<string, boolean>>({});
 
   // Scores State
   const [scoresP1, setScoresP1] = useState<Record<string, (number | null)[]>>({
@@ -283,10 +287,11 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   }, [players]);
 
   // Automatische Abfrage vor dem ersten Start für Spieler ohne hinterlegte Selbsteinschätzung (Solo & 1vs1)
+  // Sowie erneute Aufforderung bei dauerhafter Zielübertreffung (Re-Estimate)
   useEffect(() => {
     if (hasStarted) return;
 
-    // 1. Spieler 1 prüfen
+    // 1. Spieler 1 prüfen: Falls noch gar keine Selbsteinschätzung hinterlegt ist
     if (p1Name && !playerEstimates[p1Name]) {
       if (!hasPromptedPlayers[p1Name]) {
         setModalTargetPlayer(p1Name);
@@ -298,17 +303,53 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       return;
     }
 
+    // 1b. Spieler 1 prüfen: Liegt eine dauerhafte Steigerung auf/über Selbsteinschätzung vor?
+    if (p1Name && playerEstimates[p1Name] && !hasCheckedReEstimate[p1Name]) {
+      setHasCheckedReEstimate(prev => ({ ...prev, [p1Name]: true }));
+      checkPlayerNeedsReEstimateAction(p1Name).then((res) => {
+        if (res.needsReEstimate) {
+          setReEstimateData(prev => ({ ...prev, [p1Name]: res }));
+          if (!hasPromptedPlayers[p1Name]) {
+            setModalTargetPlayer(p1Name);
+            setModalInputValue(String(res.suggestedEstimate));
+            setModalError(null);
+            setShowEstimateModal(true);
+            setHasPromptedPlayers(prev => ({ ...prev, [p1Name]: true }));
+          }
+        }
+      });
+      return;
+    }
+
     // 2. Bei 1vs1: Spieler 2 prüfen (sobald Spieler 1 erledigt ist und Modal nicht offen ist)
-    if (gameMode === '1vs1' && p2Name && !playerEstimates[p2Name]) {
-      if (!hasPromptedPlayers[p2Name] && !showEstimateModal) {
-        setModalTargetPlayer(p2Name);
-        setModalInputValue('');
-        setModalError(null);
-        setShowEstimateModal(true);
-        setHasPromptedPlayers(prev => ({ ...prev, [p2Name]: true }));
+    if (gameMode === '1vs1' && p2Name && !showEstimateModal) {
+      if (!playerEstimates[p2Name]) {
+        if (!hasPromptedPlayers[p2Name]) {
+          setModalTargetPlayer(p2Name);
+          setModalInputValue('');
+          setModalError(null);
+          setShowEstimateModal(true);
+          setHasPromptedPlayers(prev => ({ ...prev, [p2Name]: true }));
+        }
+        return;
+      }
+      if (playerEstimates[p2Name] && !hasCheckedReEstimate[p2Name]) {
+        setHasCheckedReEstimate(prev => ({ ...prev, [p2Name]: true }));
+        checkPlayerNeedsReEstimateAction(p2Name).then((res) => {
+          if (res.needsReEstimate) {
+            setReEstimateData(prev => ({ ...prev, [p2Name]: res }));
+            if (!hasPromptedPlayers[p2Name]) {
+              setModalTargetPlayer(p2Name);
+              setModalInputValue(String(res.suggestedEstimate));
+              setModalError(null);
+              setShowEstimateModal(true);
+              setHasPromptedPlayers(prev => ({ ...prev, [p2Name]: true }));
+            }
+          }
+        });
       }
     }
-  }, [p1Name, p2Name, gameMode, hasStarted, playerEstimates, hasPromptedPlayers, showEstimateModal]);
+  }, [p1Name, p2Name, gameMode, hasStarted, playerEstimates, hasPromptedPlayers, hasCheckedReEstimate, showEstimateModal]);
 
   // Numpad-Handler für freie Zahleneingabe (0 bis 9)
   const handleNumpadPress = (digit: string) => {
@@ -347,15 +388,23 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     if (res.success) {
       // 1. Lokalen State und Server-Props sofort synchronisieren
       setPlayerEstimates(prev => ({ ...prev, [targetPlayer]: num }));
+      setReEstimateData(prev => ({ ...prev, [targetPlayer]: null }));
       router.refresh();
 
-      // 2. Bei 1vs1 prüfen: Braucht der andere Spieler auch noch eine Selbsteinschätzung?
+      // 2. Bei 1vs1 prüfen: Braucht der andere Spieler auch noch eine Selbsteinschätzung oder Re-Estimate?
       if (gameMode === '1vs1') {
         const otherPlayer = targetPlayer === p1Name ? p2Name : p1Name;
         if (otherPlayer && !playerEstimates[otherPlayer]) {
           // Nahtlos direkt für Spieler 2 öffnen
           setModalTargetPlayer(otherPlayer);
           setModalInputValue('');
+          setModalError(null);
+          setHasPromptedPlayers(prev => ({ ...prev, [otherPlayer]: true }));
+          return;
+        }
+        if (otherPlayer && reEstimateData[otherPlayer]?.needsReEstimate && !hasPromptedPlayers[otherPlayer]) {
+          setModalTargetPlayer(otherPlayer);
+          setModalInputValue(String(reEstimateData[otherPlayer]!.suggestedEstimate));
           setModalError(null);
           setHasPromptedPlayers(prev => ({ ...prev, [otherPlayer]: true }));
           return;
@@ -383,14 +432,35 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       setShowEstimateModal(true);
       return;
     }
-    // 2. Bei 1vs1 prüfen, ob Spieler 2 eine Selbsteinschätzung benötigt
-    if (gameMode === '1vs1' && !playerEstimates[p2Name]) {
-      setModalTargetPlayer(p2Name);
-      setModalInputValue('');
+    // 1b. Prüfen, ob Spieler 1 eine Re-Estimate-Aufforderung offen hat
+    if (reEstimateData[p1Name]?.needsReEstimate && !hasPromptedPlayers[p1Name]) {
+      setModalTargetPlayer(p1Name);
+      setModalInputValue(String(reEstimateData[p1Name]!.suggestedEstimate));
       setModalError(null);
       setShowEstimateModal(true);
+      setHasPromptedPlayers(prev => ({ ...prev, [p1Name]: true }));
       return;
     }
+
+    // 2. Bei 1vs1 prüfen, ob Spieler 2 eine Selbsteinschätzung oder Re-Estimate benötigt
+    if (gameMode === '1vs1') {
+      if (!playerEstimates[p2Name]) {
+        setModalTargetPlayer(p2Name);
+        setModalInputValue('');
+        setModalError(null);
+        setShowEstimateModal(true);
+        return;
+      }
+      if (reEstimateData[p2Name]?.needsReEstimate && !hasPromptedPlayers[p2Name]) {
+        setModalTargetPlayer(p2Name);
+        setModalInputValue(String(reEstimateData[p2Name]!.suggestedEstimate));
+        setModalError(null);
+        setShowEstimateModal(true);
+        setHasPromptedPlayers(prev => ({ ...prev, [p2Name]: true }));
+        return;
+      }
+    }
+
     // Beide Spieler sind startbereit: Spiel aktivieren
     setIsMatchStarted(true);
     setShowSetupSettings(false);
@@ -615,6 +685,22 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         const filtered = prev.filter(h => h.session_id !== sessionId);
         return [...sessionsToSave.map(s => ({ ...s, is_aborted: 0, created_at: new Date().toISOString() })), ...filtered];
       });
+
+      // Nach Abschluss des Spiels direkt prüfen, ob die Quote nun dauerhaft übertroffen wurde
+      checkPlayerNeedsReEstimateAction(p1Name).then((p1Check) => {
+        if (p1Check.needsReEstimate) {
+          setReEstimateData(prev => ({ ...prev, [p1Name]: p1Check }));
+          setHasPromptedPlayers(prev => ({ ...prev, [p1Name]: false }));
+        }
+      });
+      if (gameMode === '1vs1' && p2Name) {
+        checkPlayerNeedsReEstimateAction(p2Name).then((p2Check) => {
+          if (p2Check.needsReEstimate) {
+            setReEstimateData(prev => ({ ...prev, [p2Name]: p2Check }));
+            setHasPromptedPlayers(prev => ({ ...prev, [p2Name]: false }));
+          }
+        });
+      }
     } else {
       setSaveStatus('⚠️ Fehler beim Speichern: ' + res.error);
     }
@@ -828,21 +914,58 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
           <div className="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-5 sm:p-7 max-w-sm w-full shadow-2xl shadow-amber-500/20 text-center space-y-4">
             {/* Icon */}
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20">
-              🎯
-            </div>
+            {reEstimateData[modalTargetPlayer]?.needsReEstimate ? (
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/30 animate-pulse">
+                🚀
+              </div>
+            ) : (
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20">
+                🎯
+              </div>
+            )}
 
             {/* Header & Frage */}
             <div>
-              <span className="text-[11px] uppercase font-black tracking-widest text-amber-400">
-                Selbsteinschätzung · {modalTargetPlayer} {gameMode === '1vs1' ? (modalTargetPlayer === p1Name ? '(Spieler 1)' : '(Spieler 2)') : ''}
-              </span>
-              <h2 className="text-lg sm:text-xl font-black text-white mt-1 leading-snug">
-                Wie schätzt du dein Doppelquotenniveau ein?
-              </h2>
-              <p className="text-xs text-zinc-300 mt-1.5 leading-relaxed">
-                Tippe deinen geschätzten Prozentwert (1–100%) über das Zahlenfeld ein. Diese Abfrage erfolgt nur <strong>einmalig</strong> und wird fest in der Datenbank gespeichert!
-              </p>
+              {reEstimateData[modalTargetPlayer]?.needsReEstimate ? (
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-[10px] font-black uppercase tracking-widest text-amber-400 shadow-sm">
+                    <span>🌟</span> Leistungssteigerung erkannt
+                  </div>
+                  <div className="text-xs font-bold text-zinc-400">
+                    {modalTargetPlayer} {gameMode === '1vs1' ? (modalTargetPlayer === p1Name ? '(Spieler 1)' : '(Spieler 2)') : ''}
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-black text-white leading-snug">
+                    Passe deine Selbsteinschätzung an!
+                  </h2>
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left space-y-1.5 mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400">Bisherige Schätzung:</span>
+                      <span className="font-mono font-bold text-zinc-300">{reEstimateData[modalTargetPlayer]?.currentEstimate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400">Schnitt letzte {reEstimateData[modalTargetPlayer]?.recentGamesCount} Spiele:</span>
+                      <span className="font-mono font-black text-amber-400 text-sm">
+                        {reEstimateData[modalTargetPlayer]?.averageRecentQuote}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-300 pt-1.5 border-t border-amber-500/20 leading-relaxed">
+                      Du triffst dauerhaft auf oder über deiner Schätzung! Bitte passe deinen Zielwert nach oben an.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className="text-[11px] uppercase font-black tracking-widest text-amber-400">
+                    Selbsteinschätzung · {modalTargetPlayer} {gameMode === '1vs1' ? (modalTargetPlayer === p1Name ? '(Spieler 1)' : '(Spieler 2)') : ''}
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-black text-white mt-1 leading-snug">
+                    Wie schätzt du dein Doppelquotenniveau ein?
+                  </h2>
+                  <p className="text-xs text-zinc-300 mt-1.5 leading-relaxed">
+                    Tippe deinen geschätzten Prozentwert (1–100%) über das Zahlenfeld ein. Diese Abfrage erfolgt nur <strong>einmalig</strong> und wird fest in der Datenbank gespeichert!
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Display der eingegebenen Prozentzahl */}
@@ -927,7 +1050,11 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   <span>Speichere...</span>
                 ) : (
                   <>
-                    <span>Einschätzung bestätigen & starten</span>
+                    <span>
+                      {reEstimateData[modalTargetPlayer]?.needsReEstimate
+                        ? 'Neue Einschätzung übernehmen & starten'
+                        : 'Einschätzung bestätigen & starten'}
+                    </span>
                     <ArrowRight size={16} />
                   </>
                 )}
@@ -1253,14 +1380,28 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                 Zielvorgabe (Selbsteinschätzung Doppelquote):
               </div>
               <div className={`grid gap-2.5 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800">
+                <div className={`flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950 border transition-all ${
+                  reEstimateData[p1Name]?.needsReEstimate ? 'border-amber-500/60 shadow-lg shadow-amber-500/10' : 'border-zinc-800'
+                }`}>
                   <div className="min-w-0 pr-2">
-                    <div className="text-sm font-bold text-white truncate">{p1Name}</div>
-                    <div className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                    <div className="text-sm font-bold text-white truncate flex items-center gap-2">
+                      <span>{p1Name}</span>
+                      {reEstimateData[p1Name]?.needsReEstimate && (
+                        <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-400/40 px-1.5 py-0.5 rounded font-black flex items-center gap-1">
+                          🚀 Steigerung!
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-zinc-400 mt-0.5 flex flex-wrap items-center gap-1.5">
                       <span>Niveau:</span>
                       <span className={playerEstimates[p1Name] ? "text-amber-400 font-mono font-black text-sm" : "text-amber-400/80 font-bold"}>
                         {playerEstimates[p1Name] ? `${playerEstimates[p1Name]}%` : 'Nicht festgelegt'}
                       </span>
+                      {reEstimateData[p1Name]?.needsReEstimate && (
+                        <span className="text-[11px] text-zinc-400">
+                          (Schnitt: <strong className="text-amber-400 font-mono">{reEstimateData[p1Name]?.averageRecentQuote}%</strong>)
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button
@@ -1268,25 +1409,46 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                     data-ui-id="CHECKOUT.SETUP.ESTIMATE_P1_BTN"
                     onClick={() => {
                       setModalTargetPlayer(p1Name);
-                      setModalInputValue(playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '');
+                      setModalInputValue(
+                        reEstimateData[p1Name]?.needsReEstimate
+                          ? String(reEstimateData[p1Name]!.suggestedEstimate)
+                          : (playerEstimates[p1Name] ? String(playerEstimates[p1Name]) : '')
+                      );
                       setModalError(null);
                       setShowEstimateModal(true);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                    className={reEstimateData[p1Name]?.needsReEstimate
+                      ? "px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 shrink-0 cursor-pointer animate-pulse"
+                      : "px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                    }
                   >
-                    {playerEstimates[p1Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                    {reEstimateData[p1Name]?.needsReEstimate ? '🚀 Anpassen' : (playerEstimates[p1Name] ? '✏️ Ändern' : '⚠️ Festlegen')}
                   </button>
                 </div>
 
                 {gameMode === '1vs1' && (
-                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800">
+                  <div className={`flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950 border transition-all ${
+                    reEstimateData[p2Name]?.needsReEstimate ? 'border-amber-500/60 shadow-lg shadow-amber-500/10' : 'border-zinc-800'
+                  }`}>
                     <div className="min-w-0 pr-2">
-                      <div className="text-sm font-bold text-white truncate">{p2Name}</div>
-                      <div className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                      <div className="text-sm font-bold text-white truncate flex items-center gap-2">
+                        <span>{p2Name}</span>
+                        {reEstimateData[p2Name]?.needsReEstimate && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-400/40 px-1.5 py-0.5 rounded font-black flex items-center gap-1">
+                            🚀 Steigerung!
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-zinc-400 mt-0.5 flex flex-wrap items-center gap-1.5">
                         <span>Niveau:</span>
                         <span className={playerEstimates[p2Name] ? "text-amber-400 font-mono font-black text-sm" : "text-amber-400/80 font-bold"}>
                           {playerEstimates[p2Name] ? `${playerEstimates[p2Name]}%` : 'Nicht festgelegt'}
                         </span>
+                        {reEstimateData[p2Name]?.needsReEstimate && (
+                          <span className="text-[11px] text-zinc-400">
+                            (Schnitt: <strong className="text-amber-400 font-mono">{reEstimateData[p2Name]?.averageRecentQuote}%</strong>)
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button
@@ -1294,13 +1456,20 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                       data-ui-id="CHECKOUT.SETUP.ESTIMATE_P2_BTN"
                       onClick={() => {
                         setModalTargetPlayer(p2Name);
-                        setModalInputValue(playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '');
+                        setModalInputValue(
+                          reEstimateData[p2Name]?.needsReEstimate
+                            ? String(reEstimateData[p2Name]!.suggestedEstimate)
+                            : (playerEstimates[p2Name] ? String(playerEstimates[p2Name]) : '')
+                        );
                         setModalError(null);
                         setShowEstimateModal(true);
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                      className={reEstimateData[p2Name]?.needsReEstimate
+                        ? "px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 shrink-0 cursor-pointer animate-pulse"
+                        : "px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                      }
                     >
-                      {playerEstimates[p2Name] ? '✏️ Ändern' : '⚠️ Festlegen'}
+                      {reEstimateData[p2Name]?.needsReEstimate ? '🚀 Anpassen' : (playerEstimates[p2Name] ? '✏️ Ändern' : '⚠️ Festlegen')}
                     </button>
                   </div>
                 )}

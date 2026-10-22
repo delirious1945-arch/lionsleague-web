@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lions Weyhausen • TV Board Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            darts: {
+              gold: '#F59E0B',
+              goldLight: '#FDE68A',
+              dark: '#080d1a',
+              card: '#0f172a',
+              cardBorder: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@700;800&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #060913;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glow-gold {
+      text-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
+    }
+    .glow-box-gold {
+      box-shadow: 0 0 35px rgba(245, 158, 11, 0.2);
+    }
+    .glow-box-cyan {
+      box-shadow: 0 0 35px rgba(6, 182, 212, 0.2);
+    }
+    /* Pulsierender Live-Indikator */
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.92); }
+    }
+    .animate-pulse-live {
+      animation: pulse-live 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-5 select-none bg-gradient-to-b from-[#080d1a] via-[#050811] to-[#020408]">
+
+  <!-- TOP BAR / MINIMALISTISCHE LEISTE -->
+  <header class="flex items-center justify-between gap-4 bg-slate-900/80 border border-white/10 rounded-2xl px-4 py-2.5 backdrop-blur-md shadow-2xl">
+    
+    <!-- Links: Vereinsname & Live-Pille -->
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shadow-md">
+        🎯
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs uppercase font-black tracking-widest text-amber-400">LIONS WEYHAUSEN</span>
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-[10px] font-black text-red-400">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse-live"></span>
+            LIVE TV
+          </span>
+        </div>
+        <h1 class="text-base sm:text-lg font-black text-white tracking-tight">Trainings-Board</h1>
+      </div>
+    </div>
+
+    <!-- Mitte: Spiel-Umschalter (PDC vs. Checkout vs. Split) -->
+    <div class="flex items-center bg-slate-950/90 border border-white/15 p-1 rounded-2xl gap-1 shadow-inner">
+      <button id="btnPdc" onclick="switchGame('pdc')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
+        <span>🏆 PDC Challenge</span>
+      </button>
+
+      <button id="btnCheckout" onclick="switchGame('checkout')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all flex items-center gap-2">
+        <span>🎯 Checkout Battle</span>
+      </button>
+
+      <button id="btnSplit" onclick="switchGame('split')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+        <span>📺 Split (Beide)</span>
+      </button>
+    </div>
+
+    <!-- Rechts: Digital-Uhr & Auto-Rotation & Vollbild -->
+    <div class="flex items-center gap-3">
+      <!-- Auto Rotation Schalter -->
+      <button id="btnAutoRotate" onclick="toggleAutoRotate()" class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-white/10 transition-all" title="Wechselt automatisch alle 15 Sekunden das Spiel">
+        <span id="rotateIcon">🔄</span>
+        <span id="rotateText">Auto-Wechsel: Aus</span>
+      </button>
+
+      <!-- Grosse Uhrzeit -->
+      <div class="text-right">
+        <div id="clock" class="text-lg sm:text-xl font-black font-mono tracking-tight text-white">19:45:00</div>
+        <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Clubheim TV</div>
+      </div>
+
+      <!-- Vollbild-Button -->
+      <button onclick="toggleFullscreen()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-white/10 transition-all text-sm font-bold" title="Vollbild umschalten (F)">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- HAUPTBEREICH / DYNAMISCHE ANSICHT -->
+  <main class="flex-1 my-3 sm:my-4 flex flex-col justify-center">
+
+    <!-- 1. PDC CHALLENGE ANSICHT -->
+    <section id="viewPdc" class="space-y-4 animate-fadeIn">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        
+        <!-- Linke Hauptkarte: Aktives Match / Live-Score (8 Cols) -->
+        <div class="lg:col-span-8 bg-slate-900/90 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden glow-box-gold">
+          <!-- Subtiler Hintergrund-Glanz -->
+          <div class="absolute -right-20 -top-20 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- Oben: Modus & Status -->
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div class="flex items-center gap-2">
+              <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs font-black uppercase tracking-wider">
+                PDC Challenge • 57 Darts
+              </span>
+              <span class="text-xs text-slate-400 font-semibold">• 1-gegen-1 Match</span>
+            </div>
+            <div class="text-xs font-mono font-bold text-amber-400 bg-slate-950 px-3 py-1 rounded-xl border border-white/10">
+              Runde: 2 von 3 (Doppel D1 - D20)
+            </div>
+          </div>
+
+          <!-- Mitte: Aktiver Spieler (RIESIG!) -->
+          <div class="my-6 text-center space-y-3">
+            <span class="text-xs sm:text-sm font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-4 py-1.5 rounded-full border border-amber-400/30">
+              ⚡ AKTUELL AM WURF
+            </span>
+            <h2 id="pdcActivePlayer" class="text-4xl sm:text-6xl md:text-7xl font-black text-white tracking-wide drop-shadow-md">
+              MICHAEL JOCHEN
+            </h2>
+            <div class="text-sm sm:text-base font-bold text-slate-400">
+              Ziel: <span class="text-amber-400 font-mono text-xl font-black">D16</span> (3 Darts auf die Doppel 16)
+            </div>
+          </div>
+
+          <!-- Unten: Duell-Vergleich mit RIESIGEN Punktzahlen -->
+          <div class="grid grid-cols-2 gap-4 bg-slate-950/80 p-5 rounded-2xl border border-white/10">
+            <!-- Spieler 1 (Aktiv) -->
+            <div class="text-center p-3 rounded-xl border-2 border-amber-400/80 bg-amber-500/10 shadow-lg">
+              <div class="text-xs sm:text-sm font-bold text-slate-300 truncate">Michael Jochen</div>
+              <div class="text-4xl sm:text-6xl font-black font-mono text-amber-400 my-1 glow-gold">
+                485
+              </div>
+              <div class="text-[11px] font-black text-amber-300 bg-amber-500/20 py-0.5 rounded uppercase">
+                🥈 Silbernes Abzeichen
+              </div>
+            </div>
+
+            <!-- Spieler 2 (Gegner) -->
+            <div class="text-center p-3 rounded-xl border border-white/10 bg-slate-900/40">
+              <div class="text-xs sm:text-sm font-bold text-slate-300 truncate">Martin Wolnik</div>
+              <div class="text-4xl sm:text-6xl font-black font-mono text-slate-300 my-1">
+                414
+              </div>
+              <div class="text-[11px] font-black text-slate-400 bg-slate-800 py-0.5 rounded uppercase">
+                🥉 Bronzenes Abzeichen
+              </div>
+            </div>
+          </div>
+
+          <!-- Letzte 3 Darts Aufnahmen-Indikator -->
+          <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+            <span>Aufnahme D16:</span>
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 flex items-center justify-center font-bold font-mono">50</span>
+              <span class="w-8 h-8 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 flex items-center justify-center font-bold font-mono">0</span>
+              <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 flex items-center justify-center font-bold font-mono">50</span>
+              <span class="font-bold text-white ml-2">= +100 Pkt</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rechte Karte: Monats-Bestenliste PDC (4 Cols) -->
+        <div class="lg:col-span-4 bg-slate-900/90 border border-white/10 rounded-3xl p-5 sm:p-6 flex flex-col justify-between shadow-2xl">
+          <div>
+            <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-amber-400 text-lg">👑</span>
+                <h3 class="text-sm sm:text-base font-black text-white">PDC Monats-Rekorde</h3>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono">Oktober 2026</span>
+            </div>
+
+            <!-- Rangliste -->
+            <div class="space-y-2">
+              <!-- Platz 1 -->
+              <div class="flex items-center justify-between p-3 rounded-2xl bg-amber-500/10 border border-amber-400/40">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-xs">1</span>
+                  <div>
+                    <div class="font-black text-white text-sm">Michael Kranz</div>
+                    <div class="text-[10px] text-amber-300">Goldenes Abzeichen</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-xl font-black font-mono text-amber-400">661</div>
+                  <div class="text-[10px] text-slate-400">Punkte</div>
+                </div>
+              </div>
+
+              <!-- Platz 2 -->
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs">2</span>
+                  <div>
+                    <div class="font-bold text-white text-xs">Jens Goltermann</div>
+                    <div class="text-[10px] text-slate-400">Goldenes Abzeichen</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-base font-black font-mono text-white">677</div>
+                </div>
+              </div>
+
+              <!-- Platz 3 -->
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs">3</span>
+                  <div>
+                    <div class="font-bold text-white text-xs">Michael Gehrt</div>
+                    <div class="text-[10px] text-slate-400">Silbernes Abzeichen</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-base font-black font-mono text-white">535</div>
+                </div>
+              </div>
+
+              <!-- Platz 4 -->
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs">4</span>
+                  <div>
+                    <div class="font-bold text-white text-xs">Michael Jochen</div>
+                    <div class="text-[10px] text-slate-400">Silbernes Abzeichen</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-base font-black font-mono text-white">485</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Infokasten Unten -->
+          <div class="mt-4 p-3 rounded-2xl bg-slate-950 border border-white/10 text-center text-xs text-slate-400">
+            🎯 57 Darts Challenge: Shanghai + D1-D20 + Bull + Shanghai
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 2. CHECKOUT BATTLE (DOPPELQUOTE) ANSICHT -->
+    <section id="viewCheckout" class="space-y-4 hidden animate-fadeIn">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        
+        <!-- Linke Hauptkarte: Checkout Battle Match (8 Cols) -->
+        <div class="lg:col-span-8 bg-slate-900/90 border-2 border-cyan-500/40 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden glow-box-cyan">
+          <div class="absolute -right-20 -top-20 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- Oben: Header -->
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div class="flex items-center gap-2">
+              <span class="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-xs font-black uppercase tracking-wider">
+                Checkout Battle • Doppelquote
+              </span>
+              <span class="text-xs text-slate-400 font-semibold">• 10 Runden à 3 Darts</span>
+            </div>
+            <div class="text-xs font-mono font-bold text-cyan-300 bg-slate-950 px-3 py-1 rounded-xl border border-white/10">
+              Ziel: 1 von 5 (D20)
+            </div>
+          </div>
+
+          <!-- Mitte: Aktiver Spieler & Grosses Ziel -->
+          <div class="my-6 text-center space-y-3">
+            <span class="text-xs sm:text-sm font-black uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-4 py-1.5 rounded-full border border-cyan-400/30">
+              ⚡ AKTUELL AM WURF
+            </span>
+            <h2 id="checkoutActivePlayer" class="text-4xl sm:text-6xl md:text-7xl font-black text-white tracking-wide drop-shadow-md">
+              ERIK SCHREMMER
+            </h2>
+
+            <!-- RIESIGES ZIELFELD -->
+            <div class="inline-flex items-center gap-4 bg-slate-950/90 border-2 border-cyan-400/80 px-8 py-3 rounded-3xl shadow-xl my-2">
+              <span class="text-xs text-slate-400 uppercase font-black tracking-widest">ZIEL:</span>
+              <span class="text-4xl sm:text-6xl font-black font-mono text-cyan-400 tracking-tight">D20</span>
+              <span class="text-xs font-bold text-slate-400">Doppel 20</span>
+            </div>
+          </div>
+
+          <!-- Unten: Duell-Trefferquoten -->
+          <div class="grid grid-cols-2 gap-4 bg-slate-950/80 p-5 rounded-2xl border border-white/10">
+            <!-- Spieler 1 -->
+            <div class="text-center p-3 rounded-xl border-2 border-cyan-400/80 bg-cyan-500/10 shadow-lg">
+              <div class="text-xs sm:text-sm font-bold text-slate-300 truncate">Erik Schremmer</div>
+              <div class="text-4xl sm:text-6xl font-black font-mono text-cyan-400 my-1">
+                46.7%
+              </div>
+              <div class="text-xs text-slate-300 font-mono">
+                14 Treffer / 30 Darts geworfen
+              </div>
+            </div>
+
+            <!-- Spieler 2 -->
+            <div class="text-center p-3 rounded-xl border border-white/10 bg-slate-900/40">
+              <div class="text-xs sm:text-sm font-bold text-slate-300 truncate">Sebastian Kirste</div>
+              <div class="text-4xl sm:text-6xl font-black font-mono text-slate-300 my-1">
+                36.7%
+              </div>
+              <div class="text-xs text-slate-400 font-mono">
+                11 Treffer / 30 Darts geworfen
+              </div>
+            </div>
+          </div>
+
+          <!-- Wurf-Indikatoren -->
+          <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+            <span>Aufnahme 4 auf D20:</span>
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 flex items-center justify-center font-bold">🎯</span>
+              <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 flex items-center justify-center font-bold">🎯</span>
+              <span class="w-8 h-8 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 flex items-center justify-center font-bold">✕</span>
+              <span class="font-bold text-white ml-2">= 2 Treffer</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rechte Karte: Top Doppel-Quoten (4 Cols) -->
+        <div class="lg:col-span-4 bg-slate-900/90 border border-white/10 rounded-3xl p-5 sm:p-6 flex flex-col justify-between shadow-2xl">
+          <div>
+            <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-cyan-400 text-lg">🎯</span>
+                <h3 class="text-sm sm:text-base font-black text-white">Top Doppelquoten</h3>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono">Oktober 2026</span>
+            </div>
+
+            <!-- Rangliste -->
+            <div class="space-y-2">
+              <!-- Platz 1 -->
+              <div class="flex items-center justify-between p-3 rounded-2xl bg-cyan-500/10 border border-cyan-400/40">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center font-black text-xs">1</span>
+                  <div>
+                    <div class="font-black text-white text-sm">Michael Jochen</div>
+                    <div class="text-[10px] text-cyan-300">Bestes Feld: D20 (60%)</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-xl font-black font-mono text-cyan-400">38.5%</div>
+                  <div class="text-[10px] text-slate-400">150 Darts</div>
+                </div>
+              </div>
+
+              <!-- Platz 2 -->
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs">2</span>
+                  <div>
+                    <div class="font-bold text-white text-xs">Erik Schremmer</div>
+                    <div class="text-[10px] text-slate-400">Bestes Feld: D16 (50%)</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-base font-black font-mono text-white">36.0%</div>
+                </div>
+              </div>
+
+              <!-- Platz 3 -->
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs">3</span>
+                  <div>
+                    <div class="font-bold text-white text-xs">Michael Kranz</div>
+                    <div class="text-[10px] text-slate-400">Bestes Feld: D10 (45%)</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-base font-black font-mono text-white">34.2%</div>
+                </div>
+              </div>
+
+              <!-- Platz 4 -->
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs">4</span>
+                  <div>
+                    <div class="font-bold text-white text-xs">Martin Thomas</div>
+                    <div class="text-[10px] text-slate-400">Bestes Feld: D8 (40%)</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-base font-black font-mono text-white">33.3%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 rounded-2xl bg-slate-950 border border-white/10 text-center text-xs text-slate-400">
+            🎯 5 Doppel-Segmente: D20 • D10 • D16 • D8 • D4 (je 10 Runden)
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 3. SPLIT-SCREEN ANSICHT (BEIDE SPIELE NEBENEINANDER 50/50) -->
+    <section id="viewSplit" class="hidden animate-fadeIn">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        
+        <!-- Linke Hälfte: PDC Challenge -->
+        <div class="bg-slate-900/90 border-2 border-amber-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-white/10 pb-3">
+            <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs font-black uppercase">
+              🏆 PDC Challenge
+            </span>
+            <span class="text-xs text-slate-400 font-mono">D16 • Runde 2/3</span>
+          </div>
+
+          <div class="text-center py-2 space-y-1">
+            <span class="text-[10px] uppercase font-black tracking-widest text-amber-400">Am Wurf</span>
+            <h3 class="text-3xl sm:text-4xl font-black text-white">Michael Jochen</h3>
+            <div class="text-5xl font-black font-mono text-amber-400 py-1 glow-gold">485 <span class="text-sm font-normal text-slate-400">Pkt</span></div>
+            <div class="text-xs text-amber-300 font-bold">🥈 Silbernes Abzeichen</div>
+          </div>
+
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-white/10 flex items-center justify-between text-xs">
+            <span class="text-slate-400">Gegner: Martin Wolnik</span>
+            <span class="font-mono font-bold text-white">414 Pkt</span>
+          </div>
+        </div>
+
+        <!-- Rechte Hälfte: Checkout Battle -->
+        <div class="bg-slate-900/90 border-2 border-cyan-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-white/10 pb-3">
+            <span class="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-xs font-black uppercase">
+              🎯 Checkout Battle
+            </span>
+            <span class="text-xs text-slate-400 font-mono">Ziel: D20</span>
+          </div>
+
+          <div class="text-center py-2 space-y-1">
+            <span class="text-[10px] uppercase font-black tracking-widest text-cyan-400">Am Wurf</span>
+            <h3 class="text-3xl sm:text-4xl font-black text-white">Erik Schremmer</h3>
+            <div class="text-5xl font-black font-mono text-cyan-400 py-1 glow-gold">46.7%</div>
+            <div class="text-xs text-cyan-300 font-bold">14 / 30 Darts getroffen</div>
+          </div>
+
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-white/10 flex items-center justify-between text-xs">
+            <span class="text-slate-400">Gegner: Sebastian Kirste</span>
+            <span class="font-mono font-bold text-white">36.7% (11/30)</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- BOTTOM BAR / MONATSVERLOSUNG TICKER & TEST-STEUERUNG -->
+  <footer class="bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3 backdrop-blur-md shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+    
+    <!-- Monatsverlosung Ticker -->
+    <div class="flex items-center gap-2.5">
+      <span class="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-400/40">🍻</span>
+      <div>
+        <span class="font-bold text-amber-400">Monatsverlosung (5 Freigetränke):</span>
+        <span class="text-slate-300 ml-1">Spiele 20 Trainingsspiele im Monat für ein Los im Topf!</span>
+      </div>
+    </div>
+
+    <!-- Interaktive Demo-Buttons zum Testen -->
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] text-slate-500 uppercase font-black mr-1">Demo-Steuerung:</span>
+      <button onclick="simulatePlayerSwitch()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all">
+        🔄 Spielerwechsel simulieren
+      </button>
+      <button onclick="simulateScore()" class="px-2.5 py-1 rounded-lg bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-slate-950 font-bold transition-all border border-amber-500/30">
+        ➕ Treffer / Punkte
+      </button>
+    </div>
+  </footer>
+
+  <!-- JAVASCRIPT LOGIK -->
+  <script>
+    let currentMode = 'pdc';
+    let autoRotateInterval = null;
+    let isAutoRotating = false;
+
+    // Digital Uhr
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('de-DE');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Spiel-Umschalter
+    function switchGame(mode) {
+      currentMode = mode;
+
+      const viewPdc = document.getElementById('viewPdc');
+      const viewCheckout = document.getElementById('viewCheckout');
+      const viewSplit = document.getElementById('viewSplit');
+
+      const btnPdc = document.getElementById('btnPdc');
+      const btnCheckout = document.getElementById('btnCheckout');
+      const btnSplit = document.getElementById('btnSplit');
+
+      // Alle ausblenden
+      viewPdc.classList.add('hidden');
+      viewCheckout.classList.add('hidden');
+      viewSplit.classList.add('hidden');
+
+      // Buttons zurücksetzen
+      [btnPdc, btnCheckout, btnSplit].forEach(btn => {
+        btn.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all flex items-center gap-2';
+      });
+
+      if (mode === 'pdc') {
+        viewPdc.classList.remove('hidden');
+        btnPdc.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20';
+      } else if (mode === 'checkout') {
+        viewCheckout.classList.remove('hidden');
+        btnCheckout.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-slate-950 shadow-lg shadow-cyan-500/20';
+      } else if (mode === 'split') {
+        viewSplit.classList.remove('hidden');
+        btnSplit.className = 'px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20';
+      }
+    }
+
+    // Auto-Rotation zwischen den Spielen
+    function toggleAutoRotate() {
+      isAutoRotating = !isAutoRotating;
+      const btn = document.getElementById('btnAutoRotate');
+      const icon = document.getElementById('rotateIcon');
+      const text = document.getElementById('rotateText');
+
+      if (isAutoRotating) {
+        text.textContent = 'Auto-Wechsel: 15s';
+        btn.className = 'hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-md';
+        autoRotateInterval = setInterval(() => {
+          if (currentMode === 'pdc') switchGame('checkout');
+          else if (currentMode === 'checkout') switchGame('split');
+          else switchGame('pdc');
+        }, 15000);
+      } else {
+        text.textContent = 'Auto-Wechsel: Aus';
+        btn.className = 'hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-white/10 transition-all';
+        clearInterval(autoRotateInterval);
+      }
+    }
+
+    // Vollbild umschalten
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // Taste F für Vollbild
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      } else if (e.key === '1') {
+        switchGame('pdc');
+      } else if (e.key === '2') {
+        switchGame('checkout');
+      } else if (e.key === '3') {
+        switchGame('split');
+      }
+    });
+
+    // Demo Simulation
+    const testPlayers = ['MICHAEL JOCHEN', 'MICHAEL KRANZ', 'ERIK SCHREMMER', 'MARTIN THOMAS', 'SEBASTIAN KIRSTE', 'UWE KOHNERT'];
+    let pIdx = 0;
+    function simulatePlayerSwitch() {
+      pIdx = (pIdx + 1) % testPlayers.length;
+      document.getElementById('pdcActivePlayer').textContent = testPlayers[pIdx];
+      document.getElementById('checkoutActivePlayer').textContent = testPlayers[(pIdx + 1) % testPlayers.length];
+    }
+
+    function simulateScore() {
+      alert("Demonstration: Wenn am Tablet ein Wurf eingetragen wird, aktualisiert das TV Board die Anzeige sekundengenau via Supabase Live-Sync!");
+    }
+  </script>
+</body>
+</html>
