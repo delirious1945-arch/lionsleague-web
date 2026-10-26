@@ -235,17 +235,24 @@ export default function UnifiedTvBoardClient({
   };
 
   return (
-    <div className="min-h-screen bg-[#040711] text-slate-100 flex flex-col font-sans select-none antialiased">
+    <div className="relative min-h-screen bg-[#05070e] text-slate-100 flex flex-col font-sans select-none antialiased">
+      {/* Dezente Hintergrund-Lichtquellen für edlen Glassmorphism-Effekt */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+        <div className="absolute top-[10%] left-[15%] w-[30rem] h-[30rem] rounded-full bg-amber-500/[0.05] blur-[140px]" />
+        <div className="absolute bottom-[12%] right-[15%] w-[32rem] h-[32rem] rounded-full bg-slate-400/[0.04] blur-[150px]" />
+        <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[40rem] h-72 rounded-full bg-amber-400/[0.03] blur-[160px]" />
+      </div>
+
       {/* ========================================================
-          TV HEADER / CONTROL BAR (AUFGERÄUMT & EINZEILIG)
+          TV HEADER / CONTROL BAR (AUFGERÄUMT, EINZEILIG & GLASSMORPHISM)
           ======================================================== */}
-      <header className="bg-gradient-to-r from-slate-950 via-[#070b19] to-slate-950 border-b border-amber-500/20 px-4 py-2.5 sticky top-0 z-40 backdrop-blur-md shadow-2xl">
+      <header className="bg-white/[0.025] border-b border-white/[0.08] px-4 py-2.5 sticky top-0 z-40 backdrop-blur-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.5)]">
         <div className="max-w-[1920px] mx-auto flex flex-wrap xl:flex-nowrap items-center justify-between gap-3">
           {/* 1. LINKS: Zurück-Button & Einzeiliger Titel */}
           <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/training"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-all text-xs font-bold whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-slate-300 hover:text-white transition-all text-xs font-bold whitespace-nowrap"
               title="Zurück zum Trainingsmenü"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
@@ -254,14 +261,14 @@ export default function UnifiedTvBoardClient({
 
             <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2 whitespace-nowrap">
               <span>LIONS TV-BOARD</span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/40 animate-pulse">
+              <span className="px-2 py-0.5 rounded-md bg-amber-400/[0.12] text-amber-300 text-[10px] font-black uppercase tracking-wider border border-amber-400/35">
                 LIVE
               </span>
             </h1>
           </div>
 
-          {/* 2. MITTE: Spiel-Auswahl (Tabs ohne Scrollbalken) */}
-          <div className="flex items-center justify-center gap-1 bg-slate-950/90 p-1 rounded-2xl border border-slate-800/90 flex-wrap sm:flex-nowrap order-3 xl:order-2 w-full xl:w-auto">
+          {/* 2. MITTE: Spiel-Auswahl (Einheitliches Dark-Gold Glassmorphism) */}
+          <div className="flex items-center justify-center gap-1 bg-black/40 backdrop-blur-xl p-1 rounded-2xl border border-white/[0.08] flex-wrap sm:flex-nowrap order-3 xl:order-2 w-full xl:w-auto">
             <button
               onClick={() => {
                 setViewMode('both');
@@ -269,8 +276,8 @@ export default function UnifiedTvBoardClient({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'both' && timeframe !== 'archive'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black shadow-lg shadow-amber-500/20'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -284,11 +291,11 @@ export default function UnifiedTvBoardClient({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'doppelquote' && timeframe !== 'archive'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-black'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
-              <span>🎯 Checkout Battle</span>
+              <span>Checkout Battle</span>
             </button>
 
             <button
@@ -298,11 +305,11 @@ export default function UnifiedTvBoardClient({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'pdc' && timeframe !== 'archive'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-black'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
-              <span>🏆 PDC Challenge</span>
+              <span>PDC Challenge</span>
             </button>
 
             <button
@@ -312,11 +319,11 @@ export default function UnifiedTvBoardClient({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'fussball' && timeframe !== 'archive'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 font-black'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
-              <span>⚽ Fußball (1vs1)</span>
+              <span>Fußball (1vs1)</span>
             </button>
 
             <button
@@ -326,11 +333,11 @@ export default function UnifiedTvBoardClient({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'stellen_checken' && timeframe !== 'archive'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-black shadow-[0_0_12px_rgba(6,182,212,0.2)]'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
-              <span>🎲 Stellen & Checken</span>
+              <span>Stellen & Checken</span>
             </button>
 
             <button
@@ -340,8 +347,8 @@ export default function UnifiedTvBoardClient({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'archive' || timeframe === 'archive'
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50 font-black'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />
@@ -352,12 +359,12 @@ export default function UnifiedTvBoardClient({
           {/* 3. RECHTS: Zeitraum-Wahl, Uhrzeit & TV-Tools */}
           <div className="flex items-center gap-2 shrink-0 order-2 xl:order-3">
             {viewMode !== 'archive' && (
-              <div className="flex items-center gap-0.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+              <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-xl p-1 rounded-xl border border-white/[0.08] text-xs">
                 <button
                   onClick={() => handleTimeframeChange('today')}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'today'
-                      ? 'bg-amber-500 text-slate-950 font-black'
+                      ? 'bg-amber-400 text-slate-950 font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                   title="Heutiges Training"
@@ -368,7 +375,7 @@ export default function UnifiedTvBoardClient({
                   onClick={() => handleTimeframeChange('month')}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'month'
-                      ? 'bg-amber-500 text-slate-950 font-black'
+                      ? 'bg-amber-400 text-slate-950 font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                   title="Monatsübersicht"
@@ -379,7 +386,7 @@ export default function UnifiedTvBoardClient({
                   onClick={() => handleTimeframeChange('all')}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'all'
-                      ? 'bg-amber-500 text-slate-950 font-black'
+                      ? 'bg-amber-400 text-slate-950 font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                   title="Gesamtübersicht"
@@ -390,8 +397,8 @@ export default function UnifiedTvBoardClient({
             )}
 
             {/* Uhrzeit */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-amber-400 font-mono text-xs sm:text-sm font-bold shadow-inner whitespace-nowrap">
-              <Clock className="w-3.5 h-3.5 text-amber-400/80" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.09] text-amber-300 font-mono text-xs sm:text-sm font-bold shadow-inner whitespace-nowrap">
+              <Clock className="w-3.5 h-3.5 text-amber-300/80" />
               <span>{currentTime || '--:--:--'}</span>
             </div>
 
@@ -401,8 +408,8 @@ export default function UnifiedTvBoardClient({
                 onClick={() => setSoundAlert(!soundAlert)}
                 className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${
                   soundAlert
-                    ? 'bg-slate-900 text-amber-400 border-amber-500/30'
-                    : 'bg-slate-900 text-slate-500 border-slate-800'
+                    ? 'bg-white/[0.05] text-amber-300 border-amber-400/35'
+                    : 'bg-white/[0.03] text-slate-500 border-white/[0.08]'
                 }`}
                 title={soundAlert ? 'Sound-Ping aktiv' : 'Sound stumm'}
               >
@@ -412,16 +419,16 @@ export default function UnifiedTvBoardClient({
               <button
                 onClick={() => refreshData(timeframe, selectedArchiveDate)}
                 disabled={isUpdating}
-                className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center gap-1 text-xs font-mono font-bold cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] transition-all flex items-center gap-1 text-xs font-mono font-bold cursor-pointer"
                 title="Jetzt aktualisieren"
               >
-                <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isUpdating ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline text-amber-400">{countdown}s</span>
+                <RefreshCw className={`w-3.5 h-3.5 text-amber-300 ${isUpdating ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline text-amber-300">{countdown}s</span>
               </button>
 
               <button
                 onClick={toggleFullscreen}
-                className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] transition-all cursor-pointer"
                 title={isFullscreen ? 'Vollbild beenden' : 'Vollbild (TV-Modus)'}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -432,39 +439,25 @@ export default function UnifiedTvBoardClient({
       </header>
 
       {/* ========================================================
-          SUB-HEADER / STATUS BANNER
+          SUB-HEADER / STATUS BANNER (EINHEITLICH & ELEGANT)
           ======================================================== */}
-      <div className="bg-[#060b1b] border-b border-slate-800/80 px-4 py-2">
+      <div className="bg-white/[0.015] border-b border-white/[0.07] px-4 py-2 backdrop-blur-md">
         <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-400">Aktiver Modus:</span>
-            {viewMode === 'both' ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40 font-black">
-                Gemeinschaftsansicht (PDC & Checkout Battle)
-              </span>
-            ) : viewMode === 'doppelquote' ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/40 font-black">
-                Checkout Battle Detail-Board
-              </span>
-            ) : viewMode === 'pdc' ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300 border border-yellow-500/40 font-black">
-                PDC Challenge Detail-Board
-              </span>
-            ) : viewMode === 'fussball' ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 font-black flex items-center gap-1">
-                <span>⚽</span>
-                <span>Fußball 1vs1 Matchboard</span>
-              </span>
-            ) : viewMode === 'stellen_checken' ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 font-black flex items-center gap-1">
-                <span>🎲</span>
-                <span>Stellen & Checken (3–101)</span>
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/40 font-black">
-                Archiv & Kalender
-              </span>
-            )}
+            <span className="px-2.5 py-0.5 rounded-lg bg-amber-400/[0.08] text-amber-200 border border-amber-400/30 font-bold">
+              {viewMode === 'both'
+                ? 'Kombi-Ansicht (Checkout Battle & PDC Challenge)'
+                : viewMode === 'doppelquote'
+                ? 'Checkout Battle (Doppelquote)'
+                : viewMode === 'pdc'
+                ? 'PDC Challenge Routine'
+                : viewMode === 'fussball'
+                ? 'Fußball (1vs1 Matchboard)'
+                : viewMode === 'stellen_checken'
+                ? 'Stellen & Checken (3–101)'
+                : 'Archiv & Kalender'}
+            </span>
 
             <span className="text-slate-600">•</span>
 
@@ -504,7 +497,7 @@ export default function UnifiedTvBoardClient({
       {/* ========================================================
           MAIN CONTENT AREA
           ======================================================== */}
-      <main className="flex-1 p-3 sm:p-5 max-w-[1920px] w-full mx-auto">
+      <main className="relative z-10 flex-1 p-3 sm:p-5 max-w-[1920px] w-full mx-auto">
         {/* ========================================================
             VIEW 1: GEMEINSCHAFTSANSICHT (BEIDE SPIELE NEBENEINANDER)
             ======================================================== */}
@@ -512,17 +505,17 @@ export default function UnifiedTvBoardClient({
           <div className="space-y-4">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 sm:gap-6">
               {/* TABELLE LINKS: CHECKOUT BATTLE (DOPPELQUOTE) */}
-              <div className="bg-gradient-to-b from-[#0e1322] to-[#080d19] rounded-3xl border-2 border-amber-500/40 shadow-2xl p-4 sm:p-5 flex flex-col">
+              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
                 {/* Header Spiel 1 */}
-                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-slate-800">
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(245,158,11,0.25)]">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
                       🎯
                     </div>
                     <div>
                       <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
                         <span>Checkout Battle</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
                           Doppelquote
                         </span>
                       </h2>
@@ -534,7 +527,7 @@ export default function UnifiedTvBoardClient({
 
                   <button
                     onClick={() => setViewMode('doppelquote')}
-                    className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 text-xs font-bold transition-all flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-amber-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1"
                     title="Zur detaillierten Doppel-Aufschlüsselung"
                   >
                     <span>Details</span>
@@ -544,7 +537,7 @@ export default function UnifiedTvBoardClient({
 
                 {/* Tabelle Doppelquote */}
                 {data.todayDoppelLeaderboard.length === 0 ? (
-                  <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center text-center p-6 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800">
+                  <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
                     <div className="text-4xl mb-3">🎯</div>
                     <h3 className="text-base font-bold text-slate-200">
                       Noch keine Checkout-Spiele heute
@@ -557,7 +550,7 @@ export default function UnifiedTvBoardClient({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs sm:text-sm">
                       <thead>
-                        <tr className="border-b border-slate-800/80 text-slate-400 uppercase text-[10px] tracking-wider">
+                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
                           <th className="py-2.5 px-2 text-center w-12">Platz</th>
                           <th className="py-2.5 px-3">Spieler</th>
                           <th className="py-2.5 px-2 text-center">Treffer</th>
@@ -566,20 +559,20 @@ export default function UnifiedTvBoardClient({
                           <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/40 font-medium">
+                      <tbody className="divide-y divide-white/[0.05] font-medium">
                         {data.todayDoppelLeaderboard.map((row) => {
                           const photo = getPlayerPhotoUrl(row.player_name);
                           const initials = getPlayerInitials(row.player_name);
                           return (
                             <tr
                               key={row.session_id + row.player_name + row.attempt_nr}
-                              className={`transition-colors hover:bg-slate-800/40 ${
+                              className={`transition-colors hover:bg-white/[0.04] ${
                                 row.rank === 1
-                                  ? 'bg-amber-500/10'
+                                  ? 'bg-amber-400/[0.08]'
                                   : row.rank === 2
-                                  ? 'bg-slate-800/20'
+                                  ? 'bg-white/[0.03]'
                                   : row.rank === 3
-                                  ? 'bg-amber-950/15'
+                                  ? 'bg-amber-900/[0.12]'
                                   : ''
                               }`}
                             >
@@ -591,7 +584,7 @@ export default function UnifiedTvBoardClient({
                               {/* Spieler */}
                               <td className="py-3 px-3">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
                                     {photo ? (
                                       <Image
                                         src={photo}
@@ -608,7 +601,7 @@ export default function UnifiedTvBoardClient({
                                     <div className="font-black text-white text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
                                       <span>{row.player_name}</span>
                                       {row.attempt_nr > 1 && (
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-800 text-amber-300 border border-slate-700">
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/[0.06] text-amber-300 border border-white/[0.1]">
                                           #{row.attempt_nr}
                                         </span>
                                       )}
@@ -632,14 +625,14 @@ export default function UnifiedTvBoardClient({
 
                               {/* Doppelquote */}
                               <td className="py-3 px-3 text-right">
-                                <span className="font-mono font-black text-sm sm:text-base text-amber-400">
+                                <span className="font-mono font-black text-sm sm:text-base text-amber-300">
                                   {row.quote_percent.toFixed(1)}%
                                 </span>
                               </td>
 
                               {/* Bestes Doppel */}
                               <td className="py-3 px-3 text-right hidden sm:table-cell">
-                                <span className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-bold text-emerald-400">
+                                <span className="px-2 py-0.5 rounded-lg bg-white/[0.04] border border-white/[0.09] text-xs font-bold text-amber-200">
                                   {row.best_double}
                                 </span>
                               </td>
@@ -658,17 +651,17 @@ export default function UnifiedTvBoardClient({
               </div>
 
               {/* TABELLE RECHTS: PDC CHALLENGE (57 DARTS) */}
-              <div className="bg-gradient-to-b from-[#14120a] to-[#0c0903] rounded-3xl border-2 border-amber-500/40 shadow-2xl p-4 sm:p-5 flex flex-col">
+              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
                 {/* Header Spiel 2 */}
-                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-amber-500/20">
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(245,158,11,0.25)]">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
                       🏆
                     </div>
                     <div>
                       <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
                         <span>PDC Challenge</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 font-bold border border-yellow-500/30">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
                           57 Darts
                         </span>
                       </h2>
@@ -680,7 +673,7 @@ export default function UnifiedTvBoardClient({
 
                   <button
                     onClick={() => setViewMode('pdc')}
-                    className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-yellow-400 border border-slate-800 text-xs font-bold transition-all flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-amber-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1"
                     title="Zur detaillierten Sektionen-Aufschlüsselung"
                   >
                     <span>Details</span>
@@ -690,7 +683,7 @@ export default function UnifiedTvBoardClient({
 
                 {/* Tabelle PDC */}
                 {data.todayPdcLeaderboard.length === 0 ? (
-                  <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center text-center p-6 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800">
+                  <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
                     <div className="text-4xl mb-3">🏆</div>
                     <h3 className="text-base font-bold text-slate-200">
                       Noch keine PDC-Challenges heute
@@ -703,7 +696,7 @@ export default function UnifiedTvBoardClient({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs sm:text-sm">
                       <thead>
-                        <tr className="border-b border-slate-800/80 text-slate-400 uppercase text-[10px] tracking-wider">
+                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
                           <th className="py-2.5 px-2 text-center w-12">Platz</th>
                           <th className="py-2.5 px-3">Spieler</th>
                           <th className="py-2.5 px-3 text-right">Punkte</th>
@@ -713,7 +706,7 @@ export default function UnifiedTvBoardClient({
                           <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/40 font-medium">
+                      <tbody className="divide-y divide-white/[0.05] font-medium">
                         {data.todayPdcLeaderboard.map((row) => {
                           const photo = getPlayerPhotoUrl(row.player_name);
                           const initials = getPlayerInitials(row.player_name);
@@ -721,13 +714,13 @@ export default function UnifiedTvBoardClient({
                           return (
                             <tr
                               key={row.session_id + row.player_name + row.attempt_nr}
-                              className={`transition-colors hover:bg-slate-800/40 ${
+                              className={`transition-colors hover:bg-white/[0.04] ${
                                 row.rank === 1
-                                  ? 'bg-amber-500/10'
+                                  ? 'bg-amber-400/[0.08]'
                                   : row.rank === 2
-                                  ? 'bg-slate-800/20'
+                                  ? 'bg-white/[0.03]'
                                   : row.rank === 3
-                                  ? 'bg-amber-950/15'
+                                  ? 'bg-amber-900/[0.12]'
                                   : ''
                               }`}
                             >
@@ -739,7 +732,7 @@ export default function UnifiedTvBoardClient({
                               {/* Spieler */}
                               <td className="py-3 px-3">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center font-bold text-[10px] text-yellow-300">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
                                     {photo ? (
                                       <Image
                                         src={photo}
@@ -756,7 +749,7 @@ export default function UnifiedTvBoardClient({
                                     <div className="font-black text-white text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
                                       <span>{row.player_name}</span>
                                       {row.attempt_nr > 1 && (
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-800 text-yellow-300 border border-slate-700">
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/[0.06] text-amber-300 border border-white/[0.1]">
                                           #{row.attempt_nr}
                                         </span>
                                       )}
@@ -772,7 +765,7 @@ export default function UnifiedTvBoardClient({
 
                               {/* Punkte */}
                               <td className="py-3 px-3 text-right">
-                                <span className="font-mono font-black text-sm sm:text-base text-yellow-400">
+                                <span className="font-mono font-black text-sm sm:text-base text-amber-300">
                                   {row.best_score}
                                 </span>
                               </td>
@@ -789,14 +782,14 @@ export default function UnifiedTvBoardClient({
 
                               {/* Shanghais */}
                               <td className="py-3 px-2 text-center hidden sm:table-cell">
-                                <span className="font-mono font-bold text-amber-300">
+                                <span className="font-mono font-bold text-amber-200">
                                   {row.total_shanghais}
                                 </span>
                               </td>
 
                               {/* Doppel */}
                               <td className="py-3 px-2 text-center hidden sm:table-cell">
-                                <span className="font-mono font-bold text-emerald-400">
+                                <span className="font-mono font-bold text-slate-200">
                                   {row.best_doubles_hit}
                                 </span>
                                 <span className="text-[10px] text-slate-500"> / 21</span>
@@ -823,10 +816,10 @@ export default function UnifiedTvBoardClient({
             ======================================================== */}
         {viewMode === 'doppelquote' && (
           <div className="space-y-5">
-            <div className="bg-gradient-to-b from-[#0e1322] to-[#080d19] rounded-3xl border-2 border-amber-500/40 p-5 shadow-2xl">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.07]">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
                     🎯
                   </div>
                   <div>
@@ -840,11 +833,17 @@ export default function UnifiedTvBoardClient({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Link
+                    href="/doppelquote"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(245,158,11,0.2)] transition-all"
+                  >
+                    Spiel starten
+                  </Link>
                   <button
                     onClick={() => setViewMode('both')}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all"
+                    className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] text-xs font-bold transition-all"
                   >
-                    ← Zurück zur Gemeinschaftsansicht
+                    ← Zurück
                   </button>
                 </div>
               </div>
@@ -853,23 +852,23 @@ export default function UnifiedTvBoardClient({
               <div className="overflow-x-auto mt-4">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                    <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
                       <th className="py-3 px-2 text-center w-12">Platz</th>
                       <th className="py-3 px-3">Spieler</th>
                       <th className="py-3 px-2 text-center">Treffer</th>
                       <th className="py-3 px-3 text-right">Gesamtquote</th>
-                      <th className="py-3 px-3 text-center text-rose-400">D20</th>
-                      <th className="py-3 px-3 text-center text-blue-400">D10</th>
-                      <th className="py-3 px-3 text-center text-emerald-400">D16</th>
-                      <th className="py-3 px-3 text-center text-amber-400">D8</th>
-                      <th className="py-3 px-3 text-center text-purple-400">D4</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">D20</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">D10</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">D16</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">D8</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">D4</th>
                       <th className="py-3 px-3 text-right">Bestes Doppel</th>
                       <th className="py-3 px-2 text-right text-slate-500">Zeit</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/40 font-medium">
+                  <tbody className="divide-y divide-white/[0.05] font-medium">
                     {data.todayDoppelLeaderboard.map((row) => (
-                      <tr key={row.session_id + row.player_name} className="hover:bg-slate-800/40 transition-colors">
+                      <tr key={row.session_id + row.player_name} className="hover:bg-white/[0.04] transition-colors">
                         <td className="py-3 px-2 text-center">
                           {renderRankBadge(row.rank, row.isShared)}
                         </td>
@@ -877,35 +876,35 @@ export default function UnifiedTvBoardClient({
                           <div className="font-black text-white text-sm">
                             {row.player_name}
                             {row.attempt_nr > 1 && (
-                              <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-amber-300">
+                              <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] bg-white/[0.06] text-amber-300 border border-white/[0.1]">
                                 #{row.attempt_nr}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-2 text-center font-mono">
+                        <td className="py-3 px-2 text-center font-mono text-slate-200">
                           {row.total_hits} / {row.total_darts}
                         </td>
-                        <td className="py-3 px-3 text-right font-mono font-black text-amber-400 text-base">
+                        <td className="py-3 px-3 text-right font-mono font-black text-amber-300 text-base">
                           {row.quote_percent.toFixed(1)}%
                         </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-rose-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                           {row.d20_quote.toFixed(1)}%
                         </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-blue-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                           {row.d10_quote.toFixed(1)}%
                         </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-emerald-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                           {row.d16_quote.toFixed(1)}%
                         </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-amber-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                           {row.d8_quote.toFixed(1)}%
                         </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-purple-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                           {row.d4_quote.toFixed(1)}%
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-xs font-bold text-emerald-400">
+                          <span className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.09] text-xs font-bold text-amber-200">
                             {row.best_double}
                           </span>
                         </td>
@@ -926,10 +925,10 @@ export default function UnifiedTvBoardClient({
             ======================================================== */}
         {viewMode === 'pdc' && (
           <div className="space-y-5">
-            <div className="bg-gradient-to-b from-[#14120a] to-[#0c0903] rounded-3xl border-2 border-amber-500/40 p-5 shadow-2xl">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-amber-500/20">
+            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.07]">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
                     🏆
                   </div>
                   <div>
@@ -943,11 +942,17 @@ export default function UnifiedTvBoardClient({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Link
+                    href="/training/pdc-challenge"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(245,158,11,0.2)] transition-all"
+                  >
+                    Spiel starten
+                  </Link>
                   <button
                     onClick={() => setViewMode('both')}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all"
+                    className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] text-xs font-bold transition-all"
                   >
-                    ← Zurück zur Gemeinschaftsansicht
+                    ← Zurück
                   </button>
                 </div>
               </div>
@@ -956,24 +961,24 @@ export default function UnifiedTvBoardClient({
               <div className="overflow-x-auto mt-4">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                    <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
                       <th className="py-3 px-2 text-center w-12">Platz</th>
                       <th className="py-3 px-3">Spieler</th>
                       <th className="py-3 px-3 text-right">Gesamtpunkte</th>
                       <th className="py-3 px-3 text-center">Abzeichen</th>
-                      <th className="py-3 px-3 text-center text-amber-300">Part 1 (10–15)</th>
-                      <th className="py-3 px-3 text-center text-emerald-300">Part 2 (Doppel)</th>
-                      <th className="py-3 px-3 text-center text-yellow-300">Part 3 (15–20)</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">Part 1 (10–15)</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">Part 2 (Doppel)</th>
+                      <th className="py-3 px-3 text-center text-amber-200/80">Part 3 (15–20)</th>
                       <th className="py-3 px-2 text-center">Shanghais</th>
                       <th className="py-3 px-2 text-center">Doppel-Hits</th>
                       <th className="py-3 px-2 text-right text-slate-500">Zeit</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/40 font-medium">
+                  <tbody className="divide-y divide-white/[0.05] font-medium">
                     {data.todayPdcLeaderboard.map((row) => {
                       const badge = getPdcBadge(row.best_score);
                       return (
-                        <tr key={row.session_id + row.player_name} className="hover:bg-slate-800/40 transition-colors">
+                        <tr key={row.session_id + row.player_name} className="hover:bg-white/[0.04] transition-colors">
                           <td className="py-3 px-2 text-center">
                             {renderRankBadge(row.rank, row.isShared)}
                           </td>
@@ -981,13 +986,13 @@ export default function UnifiedTvBoardClient({
                             <div className="font-black text-white text-sm">
                               {row.player_name}
                               {row.attempt_nr > 1 && (
-                                <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-yellow-300">
+                                <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] bg-white/[0.06] text-amber-300 border border-white/[0.1]">
                                   #{row.attempt_nr}
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-black text-yellow-400 text-base">
+                          <td className="py-3 px-3 text-right font-mono font-black text-amber-300 text-base">
                             {row.best_score}
                           </td>
                           <td className="py-3 px-3 text-center">
@@ -996,19 +1001,19 @@ export default function UnifiedTvBoardClient({
                               <span>{badge.name}</span>
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-amber-300">
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                             {row.score_part1 || '-'}
                           </td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-emerald-300">
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                             {row.score_part2 || '-'}
                           </td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-yellow-300">
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
                             {row.score_part3 || '-'}
                           </td>
-                          <td className="py-3 px-2 text-center font-mono font-bold text-amber-300">
+                          <td className="py-3 px-2 text-center font-mono font-bold text-amber-200">
                             {row.total_shanghais}
                           </td>
-                          <td className="py-3 px-2 text-center font-mono font-bold text-emerald-300">
+                          <td className="py-3 px-2 text-center font-mono font-bold text-slate-200">
                             {row.best_doubles_hit} / 21
                           </td>
                           <td className="py-3 px-2 text-right text-xs font-mono text-slate-500">
@@ -1029,16 +1034,16 @@ export default function UnifiedTvBoardClient({
             ======================================================== */}
         {viewMode === 'fussball' && (
           <div className="space-y-6">
-            <div className="bg-gradient-to-b from-[#071910] via-[#05110b] to-[#020905] rounded-3xl border-2 border-emerald-500/50 p-5 shadow-2xl">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-emerald-500/20">
+            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.07]">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
                     ⚽
                   </div>
                   <div>
                     <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
                       <span>Fußball • 1-gegen-1 Matchboard</span>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
                         Reine Spieler-Duelle
                       </span>
                     </h2>
@@ -1049,18 +1054,24 @@ export default function UnifiedTvBoardClient({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Link
+                    href="/training/fussball"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(245,158,11,0.2)] transition-all"
+                  >
+                    Spiel starten
+                  </Link>
                   <button
                     onClick={() => setViewMode('both')}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all"
+                    className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] text-xs font-bold transition-all"
                   >
-                    ← Zurück zur Gemeinschaftsansicht
+                    ← Zurück
                   </button>
                 </div>
               </div>
 
               {/* 1vs1 Rangliste */}
               {data.todayFussballLeaderboard.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center p-6 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 mt-4">
+                <div className="py-12 flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08] mt-4">
                   <div className="text-4xl mb-3">⚽</div>
                   <h3 className="text-base font-bold text-slate-200">
                     Noch keine 1vs1 Fußball-Matches in diesem Zeitraum
@@ -1070,9 +1081,9 @@ export default function UnifiedTvBoardClient({
                   </p>
                   <Link
                     href="/training/fussball"
-                    className="mt-4 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20"
+                    className="mt-4 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs transition-all shadow-[0_8px_20px_rgba(245,158,11,0.25)]"
                   >
-                    ⚽ 1vs1 Match starten
+                    Spiel starten
                   </Link>
                 </div>
               ) : (
@@ -1080,33 +1091,33 @@ export default function UnifiedTvBoardClient({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs sm:text-sm">
                       <thead>
-                        <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
                           <th className="py-3 px-2 text-center w-12">Platz</th>
                           <th className="py-3 px-3">Spieler</th>
                           <th className="py-3 px-3 text-center">Spiele (S / N)</th>
                           <th className="py-3 px-3 text-center">Tore</th>
                           <th className="py-3 px-3 text-center">Diff.</th>
                           <th className="py-3 px-3 text-right">Siegquote</th>
-                          <th className="py-3 px-3 text-center text-amber-300 hidden sm:table-cell">Bull-Quote</th>
-                          <th className="py-3 px-3 text-center text-emerald-300 hidden sm:table-cell">Doppel-Quote</th>
+                          <th className="py-3 px-3 text-center text-amber-200/80 hidden sm:table-cell">Bull-Quote</th>
+                          <th className="py-3 px-3 text-center text-amber-200/80 hidden sm:table-cell">Doppel-Quote</th>
                           <th className="py-3 px-2 text-center hidden md:table-cell">Darts</th>
                           <th className="py-3 px-2 text-right text-slate-500">Zuletzt</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/40 font-medium">
+                      <tbody className="divide-y divide-white/[0.05] font-medium">
                         {data.todayFussballLeaderboard.map((row) => {
                           const photo = getPlayerPhotoUrl(row.player_name);
                           const initials = getPlayerInitials(row.player_name);
                           return (
                             <tr
                               key={row.player_name}
-                              className={`transition-colors hover:bg-slate-800/40 ${
+                              className={`transition-colors hover:bg-white/[0.04] ${
                                 row.rank === 1
-                                  ? 'bg-emerald-500/10'
+                                  ? 'bg-amber-400/[0.08]'
                                   : row.rank === 2
-                                  ? 'bg-slate-800/20'
+                                  ? 'bg-white/[0.03]'
                                   : row.rank === 3
-                                  ? 'bg-emerald-950/20'
+                                  ? 'bg-amber-900/[0.12]'
                                   : ''
                               }`}
                             >
@@ -1116,7 +1127,7 @@ export default function UnifiedTvBoardClient({
 
                               <td className="py-3 px-3">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center font-bold text-[10px] text-emerald-300">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
                                     {photo ? (
                                       <Image
                                         src={photo}
@@ -1150,25 +1161,25 @@ export default function UnifiedTvBoardClient({
                                 <span
                                   className={`px-2 py-0.5 rounded-md text-[11px] font-black ${
                                     row.goal_diff > 0
-                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                      ? 'bg-amber-400/15 text-amber-300 border border-amber-400/25'
                                       : row.goal_diff < 0
-                                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                      : 'bg-slate-800 text-slate-400'
+                                      ? 'bg-rose-500/15 text-rose-300 border border-rose-500/25'
+                                      : 'bg-white/[0.05] text-slate-400'
                                   }`}
                                 >
                                   {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
                                 </span>
                               </td>
 
-                              <td className="py-3 px-3 text-right font-mono font-black text-emerald-400 text-sm sm:text-base">
+                              <td className="py-3 px-3 text-right font-mono font-black text-amber-300 text-sm sm:text-base">
                                 {row.win_rate.toFixed(1)}%
                               </td>
 
-                              <td className="py-3 px-3 text-center font-mono text-amber-300 hidden sm:table-cell">
+                              <td className="py-3 px-3 text-center font-mono text-slate-300 hidden sm:table-cell">
                                 {row.bull_quote.toFixed(1)}%
                               </td>
 
-                              <td className="py-3 px-3 text-center font-mono text-emerald-300 hidden sm:table-cell">
+                              <td className="py-3 px-3 text-center font-mono text-slate-300 hidden sm:table-cell">
                                 {row.double_quote.toFixed(1)}%
                               </td>
 
@@ -1188,7 +1199,7 @@ export default function UnifiedTvBoardClient({
 
                   {/* 1vs1 Match-Log / Einzelduelle */}
                   {data.todayFussballMatches && data.todayFussballMatches.length > 0 && (
-                    <div className="pt-4 border-t border-slate-800/80 space-y-3">
+                    <div className="pt-4 border-t border-white/[0.07] space-y-3">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                         <span className="flex items-center gap-1.5">
                           <span>⚽ Ausgetragene 1-gegen-1 Duelle ({data.todayFussballMatches.length}):</span>
@@ -1205,9 +1216,9 @@ export default function UnifiedTvBoardClient({
                           return (
                             <div
                               key={m.id}
-                              className="bg-slate-950/80 p-3.5 rounded-2xl border border-emerald-500/30 flex flex-col justify-between gap-2 shadow-inner"
+                              className="bg-white/[0.03] backdrop-blur-xl p-3.5 rounded-2xl border border-white/[0.08] flex flex-col justify-between gap-2 shadow-inner"
                             >
-                              <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-slate-800/60 pb-1.5">
+                              <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-white/[0.06] pb-1.5">
                                 <span className="font-mono text-slate-400">{m.time_label || 'Spiel'}</span>
                                 <span className="text-[11px] text-slate-500 font-mono">
                                   {m.darts_thrown} Darts
@@ -1216,32 +1227,32 @@ export default function UnifiedTvBoardClient({
 
                               <div className="flex items-center justify-between py-1 gap-2">
                                 <div className="flex-1 text-left">
-                                  <div className={`font-black text-sm truncate ${p1IsWinner ? 'text-emerald-300' : 'text-slate-300'}`}>
+                                  <div className={`font-black text-sm truncate ${p1IsWinner ? 'text-amber-300' : 'text-slate-300'}`}>
                                     {m.player1_name}
                                   </div>
                                   {p1IsWinner && (
-                                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
                                       🏆 Sieger
                                     </span>
                                   )}
                                 </div>
 
-                                <div className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 font-mono font-black text-base sm:text-lg text-white shrink-0 shadow-inner">
-                                  <span className={p1IsWinner ? 'text-emerald-400' : 'text-slate-300'}>
+                                <div className="px-3 py-1 rounded-xl bg-black/40 border border-white/[0.08] font-mono font-black text-base sm:text-lg text-white shrink-0 shadow-inner">
+                                  <span className={p1IsWinner ? 'text-amber-300' : 'text-slate-300'}>
                                     {m.player1_goals}
                                   </span>
                                   <span className="text-slate-500 mx-1.5">:</span>
-                                  <span className={p2IsWinner ? 'text-emerald-400' : 'text-slate-300'}>
+                                  <span className={p2IsWinner ? 'text-amber-300' : 'text-slate-300'}>
                                     {m.player2_goals}
                                   </span>
                                 </div>
 
                                 <div className="flex-1 text-right">
-                                  <div className={`font-black text-sm truncate ${p2IsWinner ? 'text-emerald-300' : 'text-slate-300'}`}>
+                                  <div className={`font-black text-sm truncate ${p2IsWinner ? 'text-amber-300' : 'text-slate-300'}`}>
                                     {m.player2_name}
                                   </div>
                                   {p2IsWinner && (
-                                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
                                       🏆 Sieger
                                     </span>
                                   )}
@@ -1264,10 +1275,10 @@ export default function UnifiedTvBoardClient({
             ======================================================== */}
         {viewMode === 'stellen_checken' && (
           <div className="space-y-6">
-            <div className="bg-gradient-to-b from-[#081722] via-[#061018] to-[#04090e] rounded-3xl border-2 border-cyan-500/50 shadow-2xl p-5 sm:p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-5 border-b border-cyan-900/50">
+            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-5 sm:p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-5 border-b border-white/[0.07]">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
                     🎲
                   </div>
                   <div>
@@ -1275,7 +1286,7 @@ export default function UnifiedTvBoardClient({
                       <h2 className="text-xl sm:text-2xl font-black text-white">
                         Stellen & Checken (3–101) • Live-Board
                       </h2>
-                      <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-black">
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 border border-amber-400/20 text-xs font-black">
                         15 Aufnahmen · 200 Sequenzen
                       </span>
                     </div>
@@ -1288,15 +1299,21 @@ export default function UnifiedTvBoardClient({
                 <div className="flex items-center gap-2">
                   <Link
                     href="/training/stellen-checken"
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-cyan-500/20 transition-all"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(245,158,11,0.2)] transition-all"
                   >
-                    🎯 Jetzt Stellen & Checken spielen
+                    Spiel starten
                   </Link>
+                  <button
+                    onClick={() => setViewMode('both')}
+                    className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] text-xs font-bold transition-all"
+                  >
+                    ← Zurück
+                  </button>
                 </div>
               </div>
 
               {(!data.todayStellenCheckenLeaderboard || data.todayStellenCheckenLeaderboard.length === 0) ? (
-                <div className="py-16 text-center space-y-3">
+                <div className="py-16 text-center space-y-3 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
                   <div className="text-4xl">🎲</div>
                   <div className="text-base sm:text-lg font-black text-white">
                     Noch keine Stellen & Checken Runden für diesen Zeitraum erfasst
@@ -1304,12 +1321,20 @@ export default function UnifiedTvBoardClient({
                   <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
                     Starte am Board ein Solo-Training oder ein 1-gegen-1 Duell in „Stellen & Checken“ – das Ergebnis erscheint sofort hier auf dem TV-Board!
                   </p>
+                  <div className="pt-2">
+                    <Link
+                      href="/training/stellen-checken"
+                      className="inline-block px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(245,158,11,0.25)] transition-all"
+                    >
+                      Spiel starten
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-cyan-900/60 text-[11px] uppercase tracking-wider text-cyan-300/80 font-black">
+                      <tr className="border-b border-white/[0.07] text-[10px] uppercase tracking-wider text-slate-400 font-black">
                         <th className="py-3 px-3">Platz</th>
                         <th className="py-3 px-3">Spieler</th>
                         <th className="py-3 px-3 text-center">Sequenz</th>
@@ -1320,7 +1345,7 @@ export default function UnifiedTvBoardClient({
                         <th className="py-3 px-3 text-right">Zeit</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-cyan-950/60 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-white/[0.05] text-xs sm:text-sm">
                       {data.todayStellenCheckenLeaderboard.map((row, idx) => {
                         const photoUrl = getPlayerPhotoUrl(row.player_name);
                         return (
@@ -1328,8 +1353,8 @@ export default function UnifiedTvBoardClient({
                             key={row.session_id + '_' + idx}
                             className={`transition-colors ${
                               row.rank === 1
-                                ? 'bg-amber-500/[0.08] hover:bg-amber-500/[0.12]'
-                                : 'hover:bg-white/[0.03]'
+                                ? 'bg-amber-400/[0.08] hover:bg-amber-400/[0.12]'
+                                : 'hover:bg-white/[0.04]'
                             }`}
                           >
                             <td className="py-3.5 px-3 whitespace-nowrap">
@@ -1338,7 +1363,7 @@ export default function UnifiedTvBoardClient({
 
                             <td className="py-3.5 px-3">
                               <div className="flex items-center gap-3">
-                                <div className="relative w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-cyan-400/40 shrink-0 flex items-center justify-center">
+                                <div className="relative w-9 h-9 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center">
                                   {photoUrl ? (
                                     <Image
                                       src={photoUrl}
@@ -1347,7 +1372,7 @@ export default function UnifiedTvBoardClient({
                                       className="object-cover"
                                     />
                                   ) : (
-                                    <span className="text-xs font-black text-cyan-300">
+                                    <span className="text-xs font-black text-amber-300">
                                       {getPlayerInitials(row.player_name)}
                                     </span>
                                   )}
@@ -1357,7 +1382,7 @@ export default function UnifiedTvBoardClient({
                                     {row.player_name}
                                   </div>
                                   {row.opponent_name && (
-                                    <div className="text-[11px] text-amber-300 font-semibold">
+                                    <div className="text-[11px] text-amber-300/90 font-semibold">
                                       ⚔️ 1vs1 Duell vs. {row.opponent_name}
                                     </div>
                                   )}
@@ -1366,7 +1391,7 @@ export default function UnifiedTvBoardClient({
                             </td>
 
                             <td className="py-3.5 px-3 text-center">
-                              <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono font-black text-xs">
+                              <span className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/[0.1] text-amber-200 font-mono font-black text-xs">
                                 #{String(row.preset_id).padStart(3, '0')}
                               </span>
                             </td>
@@ -1378,7 +1403,7 @@ export default function UnifiedTvBoardClient({
                             </td>
 
                             <td className="py-3.5 px-3 text-right">
-                              <span className="text-lg sm:text-xl font-black font-mono text-amber-400">
+                              <span className="text-lg sm:text-xl font-black font-mono text-amber-300">
                                 {row.points_scored}
                               </span>
                               <span className="text-xs text-slate-400 font-mono ml-1">
@@ -1386,18 +1411,18 @@ export default function UnifiedTvBoardClient({
                               </span>
                             </td>
 
-                            <td className="py-3.5 px-3 text-right font-mono font-bold text-emerald-300">
+                            <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-200">
                               {row.checks_count} / {row.total_rounds}
                             </td>
 
                             <td className="py-3.5 px-3 text-right min-w-[130px]">
                               <div className="flex flex-col items-end gap-1">
-                                <span className="font-mono font-black text-cyan-300 text-sm">
+                                <span className="font-mono font-black text-amber-200 text-sm">
                                   {row.quote_percent.toFixed(1)}%
                                 </span>
-                                <div className="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/10">
+                                <div className="w-24 h-1.5 bg-white/[0.06] rounded-full overflow-hidden border border-white/10">
                                   <div
-                                    className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-full"
+                                    className="h-full bg-gradient-to-r from-amber-300 to-yellow-500 rounded-full"
                                     style={{ width: `${Math.min(100, row.quote_percent)}%` }}
                                   />
                                 </div>
@@ -1424,11 +1449,11 @@ export default function UnifiedTvBoardClient({
         {viewMode === 'archive' && (
           <div className="space-y-6">
             {/* Kalender / Datums-Auswahl Bar */}
-            <div className="bg-gradient-to-r from-slate-950 via-[#0a1226] to-slate-950 rounded-3xl border border-blue-500/40 p-5 shadow-2xl">
+            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-5">
               <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-400" />
+                    <Calendar className="w-5 h-5 text-amber-300" />
                     <h2 className="text-lg sm:text-xl font-black text-white">
                       Trainings-Archiv & Kalender
                     </h2>
@@ -1447,13 +1472,13 @@ export default function UnifiedTvBoardClient({
                     type="date"
                     value={selectedArchiveDate}
                     onChange={(e) => handleArchiveDateSelect(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-400 shadow-inner"
+                    className="bg-white/[0.04] border border-white/[0.12] text-white rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-amber-400/50 shadow-inner"
                   />
                 </div>
               </div>
 
               {/* Schnellauswahl der Trainingstage (Chips) */}
-              <div className="mt-4 pt-3 border-t border-slate-800">
+              <div className="mt-4 pt-3 border-t border-white/[0.07]">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Verfügbare Trainingstage im Vereinsarchiv:
                 </div>
@@ -1467,12 +1492,16 @@ export default function UnifiedTvBoardClient({
                         onClick={() => handleArchiveDateSelect(day.dateStr)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                           selectedArchiveDate === day.dateStr
-                            ? 'bg-blue-600 text-white font-black shadow-lg shadow-blue-500/30 border border-blue-400'
-                            : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                            ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-slate-950 font-black shadow-[0_0_16px_rgba(245,158,11,0.3)]'
+                            : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.08]'
                         }`}
                       >
                         <span>{day.dayLabel}</span>
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/40 text-blue-300">
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                          selectedArchiveDate === day.dateStr
+                            ? 'bg-slate-950/20 text-slate-950 font-black'
+                            : 'bg-black/40 text-amber-300'
+                        }`}>
                           {day.totalSessions} Spiele
                         </span>
                       </button>
@@ -1486,11 +1515,11 @@ export default function UnifiedTvBoardClient({
             {data.currentArchiveDayDetail ? (
               <div className="space-y-5">
                 {/* Tageszusammenfassung Banner */}
-                <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl">
+                <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl">
                   <div>
                     <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                       <span>📅 {data.currentArchiveDayDetail.fullDateLabel}</span>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300 border border-amber-400/20">
                         {data.currentArchiveDayDetail.totalSessions} absolvierte Spiele
                       </span>
                     </h3>
@@ -1500,7 +1529,7 @@ export default function UnifiedTvBoardClient({
                         data.currentArchiveDayDetail.activePlayers.map((p) => (
                           <span
                             key={p}
-                            className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold"
+                            className="px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.1] text-slate-200 text-xs font-semibold"
                           >
                             {p}
                           </span>
@@ -1515,7 +1544,7 @@ export default function UnifiedTvBoardClient({
                     onClick={() => {
                       setViewMode('both');
                     }}
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-slate-700 transition-all flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-amber-300 font-bold text-xs border border-white/[0.1] transition-all flex items-center gap-1.5"
                   >
                     <span>Tages-Ranking in TV-Tabelle ansehen</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -1525,8 +1554,8 @@ export default function UnifiedTvBoardClient({
                 {/* Spiele-Listen des Tages */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                   {/* Doppelquote Spiele */}
-                  <div className="bg-slate-950 rounded-2xl border border-amber-500/30 p-4 shadow-xl flex flex-col">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                  <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 shadow-xl flex flex-col">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.07]">
                       <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5">
                         <span>🎯 Checkout Battle</span>
                         <span className="text-[10px] text-slate-400 font-mono">
@@ -1544,19 +1573,19 @@ export default function UnifiedTvBoardClient({
                         {data.currentArchiveDayDetail.doppelGames.map((g, idx) => (
                           <div
                             key={g.id + idx}
-                            className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs"
+                            className="bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.07] flex items-center justify-between text-xs"
                           >
                             <div>
                               <div className="font-bold text-white">{g.playerName}</div>
                               {g.opponentName && (
                                 <div className="text-[10px] text-slate-400">vs. {g.opponentName}</div>
                               )}
-                              <div className="text-[10px] text-emerald-400 mt-0.5">
+                              <div className="text-[10px] text-amber-200/80 mt-0.5">
                                 Bestes: {g.bestDouble}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-mono font-black text-amber-400 text-sm">
+                              <div className="font-mono font-black text-amber-300 text-sm">
                                 {g.quotePercent.toFixed(1)}%
                               </div>
                               <div className="text-[10px] text-slate-500 font-mono">
@@ -1570,9 +1599,9 @@ export default function UnifiedTvBoardClient({
                   </div>
 
                   {/* PDC Challenge Spiele */}
-                  <div className="bg-slate-950 rounded-2xl border border-yellow-500/30 p-4 shadow-xl flex flex-col">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-                      <h4 className="text-sm font-black text-yellow-300 flex items-center gap-1.5">
+                  <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 shadow-xl flex flex-col">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.07]">
+                      <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5">
                         <span>🏆 PDC Challenge</span>
                         <span className="text-[10px] text-slate-400 font-mono">
                           ({data.currentArchiveDayDetail.pdcGames.length})
@@ -1591,7 +1620,7 @@ export default function UnifiedTvBoardClient({
                           return (
                             <div
                               key={g.id + idx}
-                              className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs"
+                              className="bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.07] flex items-center justify-between text-xs"
                             >
                               <div>
                                 <div className="font-bold text-white">{g.playerName}</div>
@@ -1606,7 +1635,7 @@ export default function UnifiedTvBoardClient({
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-mono font-black text-yellow-400 text-sm">
+                                <div className="font-mono font-black text-amber-300 text-sm">
                                   {g.score} Pkt
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-mono">
@@ -1621,9 +1650,9 @@ export default function UnifiedTvBoardClient({
                   </div>
 
                   {/* Fußball Darts Spiele */}
-                  <div className="bg-slate-950 rounded-2xl border border-emerald-500/30 p-4 shadow-xl flex flex-col">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-                      <h4 className="text-sm font-black text-emerald-300 flex items-center gap-1.5">
+                  <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 shadow-xl flex flex-col">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.07]">
+                      <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5">
                         <span>⚽ Fußball (Soccer Darts)</span>
                         <span className="text-[10px] text-slate-400 font-mono">
                           ({data.currentArchiveDayDetail.fussballGames.length})
@@ -1640,17 +1669,17 @@ export default function UnifiedTvBoardClient({
                         {data.currentArchiveDayDetail.fussballGames.map((g, idx) => (
                           <div
                             key={g.id + idx}
-                            className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs"
+                            className="bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.07] flex items-center justify-between text-xs"
                           >
                             <div>
                               <div className="font-bold text-white flex items-center gap-1.5">
                                 <span>{g.playerName}</span>
                                 {g.isWinner ? (
-                                  <span className="text-[10px] px-1.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                                  <span className="text-[10px] px-1.5 rounded bg-amber-400/15 text-amber-300 font-bold">
                                     Sieg
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] px-1.5 rounded bg-rose-500/20 text-rose-300 font-bold">
+                                  <span className="text-[10px] px-1.5 rounded bg-white/[0.06] text-slate-400 font-bold">
                                     Niederlage
                                   </span>
                                 )}
@@ -1658,7 +1687,7 @@ export default function UnifiedTvBoardClient({
                               <div className="text-[10px] text-slate-400">vs. {g.opponentName}</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-mono font-black text-emerald-400 text-sm">
+                              <div className="font-mono font-black text-amber-300 text-sm">
                                 {g.goalsScored} : {g.goalsConceded}
                               </div>
                               <div className="text-[10px] text-slate-500 font-mono">
@@ -1672,9 +1701,9 @@ export default function UnifiedTvBoardClient({
                   </div>
 
                   {/* Stellen & Checken Spiele */}
-                  <div className="bg-slate-950 rounded-2xl border border-cyan-500/30 p-4 shadow-xl flex flex-col">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-                      <h4 className="text-sm font-black text-cyan-300 flex items-center gap-1.5">
+                  <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 shadow-xl flex flex-col">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.07]">
+                      <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5">
                         <span>🎲 Stellen & Checken</span>
                         <span className="text-[10px] text-slate-400 font-mono">
                           ({data.currentArchiveDayDetail.stellenCheckenGames?.length || 0})
@@ -1692,12 +1721,12 @@ export default function UnifiedTvBoardClient({
                         {data.currentArchiveDayDetail.stellenCheckenGames.map((g, idx) => (
                           <div
                             key={g.id + idx}
-                            className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs"
+                            className="bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.07] flex items-center justify-between text-xs"
                           >
                             <div>
                               <div className="font-bold text-white flex items-center gap-1.5">
                                 <span>{g.playerName}</span>
-                                <span className="text-[10px] font-mono px-1.5 rounded bg-purple-500/20 text-purple-300 font-bold">
+                                <span className="text-[10px] font-mono px-1.5 rounded bg-white/[0.06] text-amber-200 font-bold">
                                   #{String(g.presetId).padStart(3, '0')}
                                 </span>
                               </div>
@@ -1706,7 +1735,7 @@ export default function UnifiedTvBoardClient({
                               )}
                             </div>
                             <div className="text-right">
-                              <div className="font-mono font-black text-amber-400 text-sm">
+                              <div className="font-mono font-black text-amber-300 text-sm">
                                 {g.pointsScored} / {g.maxPossiblePoints} Pkt
                               </div>
                               <div className="text-[10px] text-slate-500 font-mono">
@@ -1732,28 +1761,28 @@ export default function UnifiedTvBoardClient({
       {/* ========================================================
           FOOTER / TICKER
           ======================================================== */}
-      <footer className="bg-slate-950 border-t border-slate-800/80 px-4 py-2.5 text-[11px] text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="relative z-10 bg-white/[0.02] backdrop-blur-xl border-t border-white/[0.07] px-4 py-2.5 text-[11px] text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           <span className="text-slate-400 font-medium">
             Lions TV-Board • Auto-Sync alle 8s • Gleichstand teilt den Platz automatisch (🤝)
           </span>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <Link href="/doppelquote" className="hover:text-amber-400 transition-colors">
-            🎯 Checkout spielen
+          <Link href="/doppelquote" className="hover:text-amber-300 transition-colors">
+            🎯 Checkout Battle
           </Link>
           <span>•</span>
-          <Link href="/training/pdc-challenge" className="hover:text-amber-400 transition-colors">
-            🏆 PDC Routine spielen
+          <Link href="/training/pdc-challenge" className="hover:text-amber-300 transition-colors">
+            🏆 PDC Challenge
           </Link>
           <span>•</span>
-          <Link href="/training/fussball" className="hover:text-emerald-400 transition-colors">
-            ⚽ Fußball spielen
+          <Link href="/training/fussball" className="hover:text-amber-300 transition-colors">
+            ⚽ Fußball Darts
           </Link>
           <span>•</span>
-          <Link href="/training/stellen-checken" className="hover:text-cyan-400 transition-colors">
-            🎲 Stellen & Checken spielen
+          <Link href="/training/stellen-checken" className="hover:text-amber-300 transition-colors">
+            🎲 Stellen & Checken
           </Link>
         </div>
       </footer>

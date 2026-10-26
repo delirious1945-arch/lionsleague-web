@@ -253,7 +253,7 @@ export default function TrainingSelectionClient({
                 data-ui-id="TRAINING.GAME_PDC.START_BTN"
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
-                <span>Challenge starten</span>
+                <span>Spiel starten</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -302,7 +302,7 @@ export default function TrainingSelectionClient({
                 data-ui-id="TRAINING.GAME_FUSSBALL.START_BTN"
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
-                <span>Match anpfeifen</span>
+                <span>Spiel starten</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -351,7 +351,7 @@ export default function TrainingSelectionClient({
                 data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.START_BTN"
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
-                <span>Training starten</span>
+                <span>Spiel starten</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
