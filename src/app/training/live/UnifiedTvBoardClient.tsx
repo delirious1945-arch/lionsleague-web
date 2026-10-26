@@ -237,62 +237,44 @@ export default function UnifiedTvBoardClient({
   return (
     <div className="min-h-screen bg-[#040711] text-slate-100 flex flex-col font-sans select-none antialiased">
       {/* ========================================================
-          TV HEADER / CONTROL BAR
+          TV HEADER / CONTROL BAR (AUFGERÄUMT & EINZEILIG)
           ======================================================== */}
-      <header className="bg-gradient-to-r from-slate-950 via-[#070b19] to-slate-950 border-b border-amber-500/20 px-4 py-3 sm:py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-2xl">
-        <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
-          {/* Logo, Titel & Digital-Uhr */}
-          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+      <header className="bg-gradient-to-r from-slate-950 via-[#070b19] to-slate-950 border-b border-amber-500/20 px-4 py-2.5 sticky top-0 z-40 backdrop-blur-md shadow-2xl">
+        <div className="max-w-[1920px] mx-auto flex flex-wrap xl:flex-nowrap items-center justify-between gap-3">
+          {/* 1. LINKS: Zurück-Button & Einzeiliger Titel */}
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/training"
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-all text-xs font-bold whitespace-nowrap"
               title="Zurück zum Trainingsmenü"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Training</span>
+              <span>Training</span>
             </Link>
 
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-lg shadow-[0_0_15px_rgba(245,158,11,0.4)] border border-amber-400/40">
-                🎯
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
-                    <span>LIONS TV-BOARD</span>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30 animate-pulse">
-                      LIVE
-                    </span>
-                  </h1>
-                </div>
-                <p className="text-[11px] text-slate-400 hidden sm:block">
-                  SC Weyhausen Dartsport • Trainings-Arena
-                </p>
-              </div>
-            </div>
-
-            {/* Uhrzeit */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-amber-400 font-mono text-sm sm:text-base font-bold shadow-inner">
-              <Clock className="w-3.5 h-3.5 text-amber-400/80" />
-              <span>{currentTime || '--:--:--'}</span>
-            </div>
+            <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2 whitespace-nowrap">
+              <span>LIONS TV-BOARD</span>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/40 animate-pulse">
+                LIVE
+              </span>
+            </h1>
           </div>
 
-          {/* Steuerung: Ansichten (Tabs) */}
-          <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-2xl border border-slate-800/80 overflow-x-auto max-w-full">
+          {/* 2. MITTE: Spiel-Auswahl (Tabs ohne Scrollbalken) */}
+          <div className="flex items-center justify-center gap-1 bg-slate-950/90 p-1 rounded-2xl border border-slate-800/90 flex-wrap sm:flex-nowrap order-3 xl:order-2 w-full xl:w-auto">
             <button
               onClick={() => {
                 setViewMode('both');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'both' && timeframe !== 'archive'
                   ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black shadow-lg shadow-amber-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-slate-900'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Gemeinschaft (Beide Spiele)</span>
+              <span>Kombi-Ansicht</span>
             </button>
 
             <button
@@ -300,7 +282,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('doppelquote');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'doppelquote' && timeframe !== 'archive'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-black'
                   : 'text-slate-300 hover:text-white hover:bg-slate-900'
@@ -314,7 +296,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('pdc');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'pdc' && timeframe !== 'archive'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-black'
                   : 'text-slate-300 hover:text-white hover:bg-slate-900'
@@ -328,7 +310,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('fussball');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'fussball' && timeframe !== 'archive'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 font-black'
                   : 'text-slate-300 hover:text-white hover:bg-slate-900'
@@ -342,9 +324,9 @@ export default function UnifiedTvBoardClient({
                 setViewMode('stellen_checken');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'stellen_checken' && timeframe !== 'archive'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-black'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-black shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                   : 'text-slate-300 hover:text-white hover:bg-slate-900'
               }`}
             >
@@ -356,25 +338,24 @@ export default function UnifiedTvBoardClient({
                 setViewMode('archive');
                 setTimeframe('archive');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'archive' || timeframe === 'archive'
                   ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50 font-black'
                   : 'text-slate-300 hover:text-white hover:bg-slate-900'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>Archiv & Kalender</span>
+              <span>Archiv</span>
             </button>
           </div>
 
-          {/* Steuerung: Timeframe / Kalender + TV Tools */}
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-            {/* Zeitraum (wenn nicht Archiv-Ansicht) */}
+          {/* 3. RECHTS: Zeitraum-Wahl, Uhrzeit & TV-Tools */}
+          <div className="flex items-center gap-2 shrink-0 order-2 xl:order-3">
             {viewMode !== 'archive' && (
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+              <div className="flex items-center gap-0.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
                 <button
                   onClick={() => handleTimeframeChange('today')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'today'
                       ? 'bg-amber-500 text-slate-950 font-black'
                       : 'text-slate-400 hover:text-white'
@@ -385,7 +366,7 @@ export default function UnifiedTvBoardClient({
                 </button>
                 <button
                   onClick={() => handleTimeframeChange('month')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'month'
                       ? 'bg-amber-500 text-slate-950 font-black'
                       : 'text-slate-400 hover:text-white'
@@ -396,7 +377,7 @@ export default function UnifiedTvBoardClient({
                 </button>
                 <button
                   onClick={() => handleTimeframeChange('all')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'all'
                       ? 'bg-amber-500 text-slate-950 font-black'
                       : 'text-slate-400 hover:text-white'
@@ -408,11 +389,17 @@ export default function UnifiedTvBoardClient({
               </div>
             )}
 
-            {/* Sync & Audio */}
+            {/* Uhrzeit */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-amber-400 font-mono text-xs sm:text-sm font-bold shadow-inner whitespace-nowrap">
+              <Clock className="w-3.5 h-3.5 text-amber-400/80" />
+              <span>{currentTime || '--:--:--'}</span>
+            </div>
+
+            {/* Sync, Audio & Vollbild */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setSoundAlert(!soundAlert)}
-                className={`p-2 rounded-xl border transition-all ${
+                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${
                   soundAlert
                     ? 'bg-slate-900 text-amber-400 border-amber-500/30'
                     : 'bg-slate-900 text-slate-500 border-slate-800'
@@ -425,16 +412,16 @@ export default function UnifiedTvBoardClient({
               <button
                 onClick={() => refreshData(timeframe, selectedArchiveDate)}
                 disabled={isUpdating}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center gap-1 text-xs font-mono font-bold"
+                className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center gap-1 text-xs font-mono font-bold cursor-pointer"
                 title="Jetzt aktualisieren"
               >
-                <RefreshCw className={`w-4 h-4 text-amber-400 ${isUpdating ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isUpdating ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline text-amber-400">{countdown}s</span>
               </button>
 
               <button
                 onClick={toggleFullscreen}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all"
+                className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all cursor-pointer"
                 title={isFullscreen ? 'Vollbild beenden' : 'Vollbild (TV-Modus)'}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -1749,7 +1736,7 @@ export default function UnifiedTvBoardClient({
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-slate-400 font-medium">
-            TV-Board SC Weyhausen • Auto-Sync alle 8s • Gleichstand teilt den Platz automatisch (🤝)
+            Lions TV-Board • Auto-Sync alle 8s • Gleichstand teilt den Platz automatisch (🤝)
           </span>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
