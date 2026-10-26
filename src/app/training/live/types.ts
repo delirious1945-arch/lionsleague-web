@@ -1,4 +1,4 @@
-export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'archive';
+export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'archive';
 
 export type UnifiedTvTimeframe = 'today' | 'month' | 'all' | 'archive';
 
@@ -73,12 +73,30 @@ export interface TvFussballMatch {
   time_label: string;
 }
 
+export interface TvStellenCheckenRow {
+  session_id: string;
+  player_name: string;
+  opponent_name?: string | null;
+  game_mode: 'solo' | '1vs1';
+  preset_id: number;
+  attempt_nr: number;
+  attempt_label: string;
+  time_label: string;
+  points_scored: number;
+  max_possible_points: number;
+  checks_count: number;
+  total_rounds: number;
+  quote_percent: number;
+  rank: number;
+  isShared: boolean;
+}
+
 export interface ArchiveTrainingDaySummary {
   dateStr: string; // YYYY-MM-DD
   dayLabel: string; // e.g. "Donnerstag, 22. Okt."
   totalSessions: number;
   uniquePlayersCount: number;
-  gamesList: ('doppelquote' | 'pdc' | 'fussball')[];
+  gamesList: ('doppelquote' | 'pdc' | 'fussball' | 'stellen_checken')[];
 }
 
 export interface ArchiveDayDetail {
@@ -116,6 +134,19 @@ export interface ArchiveDayDetail {
     dartsThrown: number;
     time: string;
   }[];
+  stellenCheckenGames: {
+    id: string;
+    playerName: string;
+    opponentName?: string | null;
+    gameMode: string;
+    presetId: number;
+    pointsScored: number;
+    maxPossiblePoints: number;
+    checksCount: number;
+    totalRounds: number;
+    quotePercent: number;
+    time: string;
+  }[];
 }
 
 export interface UnifiedTvBoardData {
@@ -126,6 +157,7 @@ export interface UnifiedTvBoardData {
   todayPdcLeaderboard: TvPdcRow[];
   todayFussballLeaderboard: TvFussballRow[];
   todayFussballMatches: TvFussballMatch[];
+  todayStellenCheckenLeaderboard: TvStellenCheckenRow[];
   hasTodayData: boolean;
   hasMonthData: boolean;
   availableArchiveDays: ArchiveTrainingDaySummary[];

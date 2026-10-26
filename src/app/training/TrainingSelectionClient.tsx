@@ -169,7 +169,7 @@ export default function TrainingSelectionClient({
       </div>
 
       {/* Grid of Active Training Games */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" data-ui-id="TRAINING.GAMES.GRID">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6" data-ui-id="TRAINING.GAMES.GRID">
         {/* Spiel 1: Checkout Battle (Doppelquote) */}
         <div
           data-ui-id="TRAINING.GAME_CHECKOUT.CARD"
@@ -451,6 +451,100 @@ export default function TrainingSelectionClient({
                 className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <span>⚽ Match anpfeifen</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Spiel 4: Stellen & Checken (3–101) */}
+        <div
+          data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.CARD"
+          className="relative bg-gradient-to-b from-[#0a1c28] via-[#07131c] to-[#040a10] border-2 border-cyan-500/60 hover:border-cyan-400 rounded-3xl p-6 sm:p-7 shadow-2xl transition-all flex flex-col justify-between"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                NEU & SOFORT SPIELBAR
+              </span>
+              <span className="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded-lg">
+                15 Aufnahmen · 3–101 Pkt
+              </span>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                  🎲
+                </div>
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white">
+                    Stellen & Checken (3–101)
+                  </h3>
+                </div>
+              </div>
+
+              <p className="text-xs sm:text-sm text-slate-300 mt-3 leading-relaxed">
+                Du hast pro Zielzahl genau eine Aufnahme (3 Darts) Zeit: Stelle dir mit 1–2 Darts dein Doppel und checke! 200 fest hinterlegte Zufalls-Sequenzen (#001–#200) sorgen für 100 % faire Vergleiche im Solo oder 1vs1.
+              </p>
+            </div>
+
+            {/* Feature-Liste Stellen & Checken */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>Schnelle Check / Miss Eingabe</span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                <Target className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>200 Zufalls-Sequenzen (#001–#200)</span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                <Trophy className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>1, 2 & 3 Punkte Staffelung</span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                <Tv className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>Live TV-Board & Trainingsfleiß</span>
+              </div>
+            </div>
+
+            {/* Punkte-Kategorien Pill Bar */}
+            <div className="pt-1 flex items-center gap-1.5 overflow-x-auto text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/60">
+                3–60: +1 Punkt
+              </span>
+              <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700/60">
+                61–80: +2 Punkte
+              </span>
+              <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700/60 font-black">
+                81–101: +3 Punkte
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span className="text-[11px] text-slate-400">
+              15 Zahlen · Solo & 1vs1
+            </span>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Link
+                href="/training/live?view=stellen_checken"
+                target="_blank"
+                data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.TV_BTN"
+                className="flex-1 sm:flex-initial px-3.5 py-3 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/40 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                title="Stellen & Checken TV-Board im Vereinsheim"
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span>TV Board</span>
+              </Link>
+              <Link
+                href="/training/stellen-checken"
+                data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.START_BTN"
+                className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <span>🎯 Training starten</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>

@@ -8,9 +8,11 @@ import {
   TvPdcRow,
   TvFussballRow,
   TvFussballMatch,
+  TvStellenCheckenRow,
   ArchiveTrainingDaySummary,
   ArchiveDayDetail,
 } from './types';
+import { ensureStellenCheckenTable } from '../stellen-checken/actions';
 
 function extractRowDate(row: any): string {
   if (row.training_date) {
@@ -104,26 +106,30 @@ export async function getUnifiedTvBoardDataAction(options?: {
       : deTodayDateStr;
 
   try {
+    await ensureStellenCheckenTable();
+
     // 1. Fetch raw data in parallel
-    const [rawDoubles, rawPdc, rawFussball] = await Promise.all([
+    const [rawDoubles, rawPdc, rawFussball, rawStellenChecken] = await Promise.all([
       sql`SELECT * FROM training_doubles ORDER BY created_at ASC`,
       sql`SELECT * FROM training_pdc_challenge ORDER BY created_at ASC`,
       sql`SELECT * FROM training_fussball ORDER BY created_at ASC`,
+      sql`SELECT * FROM training_stellen_checken ORDER BY created_at ASC`.catch(() => []),
     ]);
 
     // Streng reguläre Spiele filtern (Abgebrochene Spiele rausnehmen)
     const doublesRows = rawDoubles.filter((r: any) => Number(r.is_aborted || 0) === 0);
     const pdcRows = rawPdc.filter((r: any) => Number(r.is_aborted || 0) === 0);
     const fussballRows = rawFussball.filter((r: any) => Number(r.is_aborted || 0) === 0);
+    const stellenCheckenRows = rawStellenChecken.filter((r: any) => Number(r.is_aborted || 0) === 0);
 
-    // 2. Identify available archive days across all 3 game types
+    // 2. Identify available archive days across all 4 game types
     const dayMap = new Map<string, {
       sessionsCount: number;
       players: Set<string>;
-      games: Set<'doppelquote' | 'pdc' | 'fussball'>;
+      games: Set<'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken'>;
     }>();
 
-    const registerDay = (row: any, game: 'doppelquote' | 'pdc' | 'fussball') => {
+    const registerDay = (row: any, game: 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken') => {
       const d = extractRowDate(row);
       if (!d || d.length !== 10) return;
       if (!dayMap.has(d)) {
@@ -141,6 +147,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
     doublesRows.forEach((r: any) => registerDay(r, 'doppelquote'));
     pdcRows.forEach((r: any) => registerDay(r, 'pdc'));
     fussballRows.forEach((r: any) => registerDay(r, 'fussball'));
+    stellenCheckenRows.forEach((r: any) => registerDay(r, 'stellen_checken'));
 
     const availableArchiveDays: ArchiveTrainingDaySummary[] = Array.from(dayMap.entries())
       .map(([dStr, meta]) => ({
@@ -154,34 +161,41 @@ export async function getUnifiedTvBoardDataAction(options?: {
 
     const hasTodayData =
       doublesRows.some((r: any) => extractRowDate(r) === deTodayDateStr) ||
-      pdcRows.some((r: any) => extractRowDate(r) === deTodayDateStr);
+      pdcRows.some((r: any) => extractRowDate(r) === deTodayDateStr) ||
+      stellenCheckenRows.some((r: any) => extractRowDate(r) === deTodayDateStr);
 
     const hasMonthData =
       doublesRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
-      pdcRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
+      pdcRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
+      stellenCheckenRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
 
     // 3. Filter rows based on active timeframe
     let activeDoubles: any[] = [];
     let activePdc: any[] = [];
     let activeFussball: any[] = [];
+    let activeStellenChecken: any[] = [];
     const humanFussball1vs1 = fussballRows.filter(isHuman1vs1Fussball);
 
     if (timeframe === 'today') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
       activeFussball = humanFussball1vs1.filter((r: any) => extractRowDate(r) === deTodayDateStr);
+      activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
     } else if (timeframe === 'month') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activeFussball = humanFussball1vs1.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
+      activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
     } else if (timeframe === 'all') {
       activeDoubles = doublesRows;
       activePdc = pdcRows;
       activeFussball = humanFussball1vs1;
+      activeStellenChecken = stellenCheckenRows;
     } else if (timeframe === 'archive') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activeFussball = humanFussball1vs1.filter((r: any) => extractRowDate(r) === selectedDateStr);
+      activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
     }
 
     // 4. Build Doppelquote Leaderboard with Single-Session or Aggregated
@@ -642,6 +656,152 @@ export async function getUnifiedTvBoardDataAction(options?: {
     }
     todayFussballMatches.sort((a, b) => b.id.localeCompare(a.id));
 
+    // 8b. Build Stellen & Checken Leaderboard
+    const todayStellenCheckenLeaderboard: TvStellenCheckenRow[] = [];
+
+    if (timeframe === 'today' || timeframe === 'archive') {
+      const playerAttemptCounter = new Map<string, number>();
+
+      for (const r of activeStellenChecken) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+
+        const attemptNr = (playerAttemptCounter.get(pName) || 0) + 1;
+        playerAttemptCounter.set(pName, attemptNr);
+
+        const rounds = Number(r.total_rounds || 15);
+        const checks = Number(r.checks_count || 0);
+        const pts = Number(r.points_scored || 0);
+        const maxPts = Number(r.max_possible_points || 28);
+        const presetId = Number(r.preset_id || 1);
+        const quote_percent = rounds > 0 ? Number(((checks / rounds) * 100).toFixed(1)) : 0;
+
+        todayStellenCheckenLeaderboard.push({
+          session_id: String(r.session_id || r.id || ''),
+          player_name: pName,
+          opponent_name: r.opponent_name ? String(r.opponent_name) : null,
+          game_mode: r.game_mode === '1vs1' ? '1vs1' : 'solo',
+          preset_id: presetId,
+          attempt_nr: attemptNr,
+          attempt_label: `Durchgang #${attemptNr}`,
+          time_label: formatTime(r.created_at),
+          points_scored: pts,
+          max_possible_points: maxPts,
+          checks_count: checks,
+          total_rounds: rounds,
+          quote_percent,
+          rank: 0,
+          isShared: false,
+        });
+      }
+    } else {
+      // MONAT / GESAMT: Bestes Spiel pro Spieler + Anzahl Durchgänge
+      const scMap = new Map<string, {
+        player_name: string;
+        sessions_count: number;
+        best_points: number;
+        max_possible_points: number;
+        best_checks: number;
+        total_rounds: number;
+        best_preset_id: number;
+        last_time: any;
+      }>();
+
+      for (const r of activeStellenChecken) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+        const pts = Number(r.points_scored || 0);
+        const checks = Number(r.checks_count || 0);
+        const rounds = Number(r.total_rounds || 15);
+        const maxPts = Number(r.max_possible_points || 28);
+        const presetId = Number(r.preset_id || 1);
+
+        if (!scMap.has(pName)) {
+          scMap.set(pName, {
+            player_name: pName,
+            sessions_count: 1,
+            best_points: pts,
+            max_possible_points: maxPts,
+            best_checks: checks,
+            total_rounds: rounds,
+            best_preset_id: presetId,
+            last_time: r.created_at,
+          });
+        } else {
+          const entry = scMap.get(pName)!;
+          entry.sessions_count += 1;
+          if (pts > entry.best_points || (pts === entry.best_points && checks > entry.best_checks)) {
+            entry.best_points = pts;
+            entry.max_possible_points = maxPts;
+            entry.best_checks = checks;
+            entry.total_rounds = rounds;
+            entry.best_preset_id = presetId;
+          }
+          entry.last_time = r.created_at;
+        }
+      }
+
+      for (const p of scMap.values()) {
+        const quote_percent =
+          p.total_rounds > 0 ? Number(((p.best_checks / p.total_rounds) * 100).toFixed(1)) : 0;
+
+        todayStellenCheckenLeaderboard.push({
+          session_id: `agg_sc_${p.player_name}`,
+          player_name: p.player_name,
+          opponent_name: null,
+          game_mode: 'solo',
+          preset_id: p.best_preset_id,
+          attempt_nr: p.sessions_count,
+          attempt_label: `${p.sessions_count} ${p.sessions_count === 1 ? 'Spiel' : 'Spiele'} (Bestwert)`,
+          time_label: formatTime(p.last_time),
+          points_scored: p.best_points,
+          max_possible_points: p.max_possible_points,
+          checks_count: p.best_checks,
+          total_rounds: p.total_rounds,
+          quote_percent,
+          rank: 0,
+          isShared: false,
+        });
+      }
+    }
+
+    // Sortierung Stellen & Checken: Punkte absteigend, dann Checks absteigend
+    todayStellenCheckenLeaderboard.sort((a, b) => {
+      if (b.points_scored !== a.points_scored) return b.points_scored - a.points_scored;
+      if (b.checks_count !== a.checks_count) return b.checks_count - a.checks_count;
+      return b.quote_percent - a.quote_percent;
+    });
+
+    // Geteilte Ränge zuweisen
+    let currentScRank = 1;
+    for (let i = 0; i < todayStellenCheckenLeaderboard.length; i++) {
+      if (i > 0) {
+        const prev = todayStellenCheckenLeaderboard[i - 1];
+        const curr = todayStellenCheckenLeaderboard[i];
+        const isTie =
+          curr.points_scored === prev.points_scored && curr.checks_count === prev.checks_count;
+        if (!isTie) {
+          currentScRank = i + 1;
+        }
+      }
+      todayStellenCheckenLeaderboard[i].rank = currentScRank;
+    }
+    for (let i = 0; i < todayStellenCheckenLeaderboard.length; i++) {
+      const prevMatch =
+        i > 0 &&
+        todayStellenCheckenLeaderboard[i].points_scored ===
+          todayStellenCheckenLeaderboard[i - 1].points_scored &&
+        todayStellenCheckenLeaderboard[i].checks_count ===
+          todayStellenCheckenLeaderboard[i - 1].checks_count;
+      const nextMatch =
+        i < todayStellenCheckenLeaderboard.length - 1 &&
+        todayStellenCheckenLeaderboard[i].points_scored ===
+          todayStellenCheckenLeaderboard[i + 1].points_scored &&
+        todayStellenCheckenLeaderboard[i].checks_count ===
+          todayStellenCheckenLeaderboard[i + 1].checks_count;
+      todayStellenCheckenLeaderboard[i].isShared = prevMatch || nextMatch;
+    }
+
     // 9. Build detailed archive summary for the selected date if timeframe is archive or on demand
     let currentArchiveDayDetail: ArchiveDayDetail | null = null;
     const targetDayForDetail = timeframe === 'archive' ? selectedDateStr : (availableArchiveDays[0]?.dateStr || deTodayDateStr);
@@ -650,6 +810,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       const dayDoubles = doublesRows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
       const dayPdc = pdcRows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
       const dayFussball = fussballRows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
+      const dayStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
 
       const activePlayersSet = new Set<string>();
       dayDoubles.forEach((r: any) => {
@@ -670,11 +831,15 @@ export async function getUnifiedTvBoardDataAction(options?: {
           activePlayersSet.add(String(r.opponent_name).trim());
         }
       });
+      dayStellenChecken.forEach((r: any) => {
+        if (r.player_name) activePlayersSet.add(String(r.player_name).trim());
+        if (r.opponent_name) activePlayersSet.add(String(r.opponent_name).trim());
+      });
 
       currentArchiveDayDetail = {
         dateStr: targetDayForDetail,
         fullDateLabel: formatGermanDateLabel(targetDayForDetail),
-        totalSessions: dayDoubles.length + dayPdc.length + dayFussball.length,
+        totalSessions: dayDoubles.length + dayPdc.length + dayFussball.length + dayStellenChecken.length,
         activePlayers: Array.from(activePlayersSet),
         doppelGames: dayDoubles.map((r: any) => {
           const d = Number(r.total_darts || 0);
@@ -710,6 +875,23 @@ export async function getUnifiedTvBoardDataAction(options?: {
           dartsThrown: Number(r.darts_thrown || 0),
           time: formatTime(r.created_at),
         })),
+        stellenCheckenGames: dayStellenChecken.map((r: any) => {
+          const rds = Number(r.total_rounds || 15);
+          const chks = Number(r.checks_count || 0);
+          return {
+            id: String(r.id || r.session_id),
+            playerName: String(r.player_name || ''),
+            opponentName: r.opponent_name ? String(r.opponent_name) : null,
+            gameMode: String(r.game_mode || 'solo'),
+            presetId: Number(r.preset_id || 1),
+            pointsScored: Number(r.points_scored || 0),
+            maxPossiblePoints: Number(r.max_possible_points || 28),
+            checksCount: chks,
+            totalRounds: rds,
+            quotePercent: rds > 0 ? Number(((chks / rds) * 100).toFixed(1)) : 0,
+            time: formatTime(r.created_at),
+          };
+        }),
       };
     }
 
@@ -721,6 +903,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       todayPdcLeaderboard,
       todayFussballLeaderboard,
       todayFussballMatches,
+      todayStellenCheckenLeaderboard,
       hasTodayData,
       hasMonthData,
       availableArchiveDays,
@@ -742,6 +925,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       todayPdcLeaderboard: [],
       todayFussballLeaderboard: [],
       todayFussballMatches: [],
+      todayStellenCheckenLeaderboard: [],
       hasTodayData: false,
       hasMonthData: false,
       availableArchiveDays: [],

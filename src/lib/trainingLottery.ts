@@ -167,6 +167,28 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
     console.error('Fehler beim Abfragen von training_fussball für Verlosung:', err);
   }
 
+  // 4. Stellen & Checken (3–101)
+  try {
+    const scRows = await sql`
+      SELECT player_name, player_id, count(*)::int as cnt
+      FROM training_stellen_checken
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND total_rounds >= 15
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
+      GROUP BY player_name, player_id
+    `;
+
+    for (const r of scRows) {
+      const name = String(r.player_name).trim();
+      const current = playerStats.get(name) || { playerId: r.player_id ?? null, count: 0 };
+      current.count += Number(r.cnt);
+      if (r.player_id && !current.playerId) current.playerId = r.player_id;
+      playerStats.set(name, current);
+    }
+  } catch (err) {
+    // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
+  }
+
   return playerStats;
 }
 
@@ -471,13 +493,16 @@ export interface PlayerMonthlyTrainingStat {
   fussballSolo: number;
   fussball1vs1: number;
   totalFussball: number;
+  stellenCheckenSolo: number;
+  stellenChecken1vs1: number;
+  totalStellenChecken: number;
   totalCompletedGames: number;
   isQualified: boolean;
   isBlockedByPastWin: boolean;
   isMonthWinner: boolean;
   gamesList: {
     id: number;
-    gameType: 'doubles' | 'pdc' | 'fussball';
+    gameType: 'doubles' | 'pdc' | 'fussball' | 'stellen_checken';
     gameMode: string;
     opponentName: string | null;
     date: string;
@@ -587,6 +612,23 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     ORDER BY COALESCE(training_date, created_at::text) DESC;
   `;
 
+  let stellenCheckenSessions: any[] = [];
+  try {
+    stellenCheckenSessions = await sql`
+      SELECT 
+        id, session_id, player_name, opponent_name, game_mode, preset_id,
+        points_scored, max_possible_points, checks_count, total_rounds,
+        check_quote, training_date, created_at, is_winner
+      FROM training_stellen_checken
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND total_rounds >= 15
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+      ORDER BY COALESCE(training_date, created_at::text) DESC;
+    `;
+  } catch {
+    stellenCheckenSessions = [];
+  }
+
   // 4. Sperrfrist & Gewinner des Monats ermitteln
   const blockedPlayers = await getBlockedPlayersForMonth(selectedMonthKey);
   const winnerRows = await sql`
@@ -616,6 +658,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       fussballSolo: 0,
       fussball1vs1: 0,
       totalFussball: 0,
+      stellenCheckenSolo: 0,
+      stellenChecken1vs1: 0,
+      totalStellenChecken: 0,
       totalCompletedGames: 0,
       isQualified: false,
       isBlockedByPastWin: blockedPlayers.has(name),
@@ -642,6 +687,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         fussballSolo: 0,
         fussball1vs1: 0,
         totalFussball: 0,
+        stellenCheckenSolo: 0,
+        stellenChecken1vs1: 0,
+        totalStellenChecken: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -690,6 +738,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         fussballSolo: 0,
         fussball1vs1: 0,
         totalFussball: 0,
+        stellenCheckenSolo: 0,
+        stellenChecken1vs1: 0,
+        totalStellenChecken: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -738,6 +789,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         fussballSolo: 0,
         fussball1vs1: 0,
         totalFussball: 0,
+        stellenCheckenSolo: 0,
+        stellenChecken1vs1: 0,
+        totalStellenChecken: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -765,6 +819,57 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       opponentName: opp + (isBot ? botLevel : ''),
       date: s.training_date || s.created_at,
       summary: `Fußball: ${s.goals_scored} : ${s.goals_conceded} Tore (${s.darts_thrown} Darts)`,
+      isWinner: Number(s.is_winner ?? 0),
+    });
+  }
+
+  // Stellen & Checken zuweisen
+  for (const s of stellenCheckenSessions) {
+    const name = String(s.player_name).trim();
+    let stat = statsMap.get(name);
+    if (!stat) {
+      stat = {
+        playerName: name,
+        playerId: null,
+        team: 'Gast',
+        doublesSolo: 0,
+        doubles1vs1: 0,
+        totalDoubles: 0,
+        pdcSolo: 0,
+        pdc1vs1: 0,
+        totalPdc: 0,
+        fussballSolo: 0,
+        fussball1vs1: 0,
+        totalFussball: 0,
+        stellenCheckenSolo: 0,
+        stellenChecken1vs1: 0,
+        totalStellenChecken: 0,
+        totalCompletedGames: 0,
+        isQualified: false,
+        isBlockedByPastWin: blockedPlayers.has(name),
+        isMonthWinner: winnerName === name,
+        gamesList: [],
+      };
+      statsMap.set(name, stat);
+    }
+
+    const isSolo = s.game_mode === 'solo';
+    if (isSolo) {
+      stat.stellenCheckenSolo += 1;
+    } else {
+      stat.stellenChecken1vs1 += 1;
+    }
+    stat.totalStellenChecken += 1;
+    stat.totalCompletedGames += 1;
+
+    const qPct = s.check_quote ? (Number(s.check_quote) * 100).toFixed(1) + '%' : '0.0%';
+    stat.gamesList.push({
+      id: Number(s.id),
+      gameType: 'stellen_checken',
+      gameMode: s.game_mode || 'solo',
+      opponentName: s.opponent_name || null,
+      date: s.training_date || s.created_at,
+      summary: `Stellen & Checken (#${String(s.preset_id || 1).padStart(3, '0')}): ${s.points_scored}/${s.max_possible_points || 28} Pkt • ${s.checks_count}/15 (${qPct})`,
       isWinner: Number(s.is_winner ?? 0),
     });
   }

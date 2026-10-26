@@ -62,7 +62,8 @@ export default function UnifiedTvBoardClient({
   const prevSessionTotalRef = useRef<number>(
     initialData.todayDoppelLeaderboard.length +
     initialData.todayPdcLeaderboard.length +
-    (initialData.todayFussballMatches?.length || 0)
+    (initialData.todayFussballMatches?.length || 0) +
+    (initialData.todayStellenCheckenLeaderboard?.length || 0)
   );
 
   // Digital-Uhr
@@ -118,7 +119,8 @@ export default function UnifiedTvBoardClient({
       const currentTotal =
         result.todayDoppelLeaderboard.length +
         result.todayPdcLeaderboard.length +
-        (result.todayFussballMatches?.length || 0);
+        (result.todayFussballMatches?.length || 0) +
+        (result.todayStellenCheckenLeaderboard?.length || 0);
       if (currentTotal > prevSessionTotalRef.current) {
         playLivePing();
       }
@@ -337,6 +339,20 @@ export default function UnifiedTvBoardClient({
 
             <button
               onClick={() => {
+                setViewMode('stellen_checken');
+                if (timeframe === 'archive') setTimeframe('today');
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                viewMode === 'stellen_checken' && timeframe !== 'archive'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-black'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <span>🎲 Stellen & Checken</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setViewMode('archive');
                 setTimeframe('archive');
               }}
@@ -452,6 +468,11 @@ export default function UnifiedTvBoardClient({
                 <span>⚽</span>
                 <span>Fußball 1vs1 Matchboard</span>
               </span>
+            ) : viewMode === 'stellen_checken' ? (
+              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 font-black flex items-center gap-1">
+                <span>🎲</span>
+                <span>Stellen & Checken (3–101)</span>
+              </span>
             ) : (
               <span className="px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/40 font-black">
                 Archiv & Kalender
@@ -473,15 +494,19 @@ export default function UnifiedTvBoardClient({
 
           <div className="flex items-center gap-3 text-slate-400 text-[11px]">
             <span>
-              <strong className="text-white font-mono">{data.todayDoppelLeaderboard.length}</strong> Doppel-Durchgänge
+              <strong className="text-white font-mono">{data.todayDoppelLeaderboard.length}</strong> Doppel
             </span>
             <span>•</span>
             <span>
-              <strong className="text-white font-mono">{data.todayPdcLeaderboard.length}</strong> PDC-Durchgänge
+              <strong className="text-white font-mono">{data.todayPdcLeaderboard.length}</strong> PDC
             </span>
             <span>•</span>
             <span>
               <strong className="text-white font-mono">{data.todayFussballMatches?.length || 0}</strong> Fußball 1vs1
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="text-white font-mono">{data.todayStellenCheckenLeaderboard?.length || 0}</strong> Stellen & Checken
             </span>
             <span>•</span>
             <span>Stand: {data.lastUpdate || 'soeben'}</span>
@@ -1248,6 +1273,165 @@ export default function UnifiedTvBoardClient({
         )}
 
         {/* ========================================================
+            VIEW 4B: STELLEN & CHECKEN (3–101) DETAIL-BOARD
+            ======================================================== */}
+        {viewMode === 'stellen_checken' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-b from-[#081722] via-[#061018] to-[#04090e] rounded-3xl border-2 border-cyan-500/50 shadow-2xl p-5 sm:p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-5 border-b border-cyan-900/50">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                    🎲
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-xl sm:text-2xl font-black text-white">
+                        Stellen & Checken (3–101) • Live-Board
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-black">
+                        15 Aufnahmen · 200 Sequenzen
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+                      Wertung: Zahlen 3–60 = <strong>+1 Pkt</strong> • 61–80 = <strong>+2 Pkt</strong> • 81–101 = <strong>+3 Pkt</strong> • Gleichstand teilt den Platz (🤝)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/training/stellen-checken"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-cyan-500/20 transition-all"
+                  >
+                    🎯 Jetzt Stellen & Checken spielen
+                  </Link>
+                </div>
+              </div>
+
+              {(!data.todayStellenCheckenLeaderboard || data.todayStellenCheckenLeaderboard.length === 0) ? (
+                <div className="py-16 text-center space-y-3">
+                  <div className="text-4xl">🎲</div>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    Noch keine Stellen & Checken Runden für diesen Zeitraum erfasst
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+                    Starte am Board ein Solo-Training oder ein 1-gegen-1 Duell in „Stellen & Checken“ – das Ergebnis erscheint sofort hier auf dem TV-Board!
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-cyan-900/60 text-[11px] uppercase tracking-wider text-cyan-300/80 font-black">
+                        <th className="py-3 px-3">Platz</th>
+                        <th className="py-3 px-3">Spieler</th>
+                        <th className="py-3 px-3 text-center">Sequenz</th>
+                        <th className="py-3 px-3 text-center">Modus / Durchgang</th>
+                        <th className="py-3 px-3 text-right">Punkte</th>
+                        <th className="py-3 px-3 text-right">Checks (15 R.)</th>
+                        <th className="py-3 px-3 text-right">Check-Quote</th>
+                        <th className="py-3 px-3 text-right">Zeit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-cyan-950/60 text-xs sm:text-sm">
+                      {data.todayStellenCheckenLeaderboard.map((row, idx) => {
+                        const photoUrl = getPlayerPhotoUrl(row.player_name);
+                        return (
+                          <tr
+                            key={row.session_id + '_' + idx}
+                            className={`transition-colors ${
+                              row.rank === 1
+                                ? 'bg-amber-500/[0.08] hover:bg-amber-500/[0.12]'
+                                : 'hover:bg-white/[0.03]'
+                            }`}
+                          >
+                            <td className="py-3.5 px-3 whitespace-nowrap">
+                              {renderRankBadge(row.rank, row.isShared)}
+                            </td>
+
+                            <td className="py-3.5 px-3">
+                              <div className="flex items-center gap-3">
+                                <div className="relative w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-cyan-400/40 shrink-0 flex items-center justify-center">
+                                  {photoUrl ? (
+                                    <Image
+                                      src={photoUrl}
+                                      alt={row.player_name}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-xs font-black text-cyan-300">
+                                      {getPlayerInitials(row.player_name)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-black text-white text-sm sm:text-base">
+                                    {row.player_name}
+                                  </div>
+                                  {row.opponent_name && (
+                                    <div className="text-[11px] text-amber-300 font-semibold">
+                                      ⚔️ 1vs1 Duell vs. {row.opponent_name}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-center">
+                              <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono font-black text-xs">
+                                #{String(row.preset_id).padStart(3, '0')}
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-center">
+                              <span className="text-xs text-slate-300 font-semibold">
+                                {row.attempt_label}
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right">
+                              <span className="text-lg sm:text-xl font-black font-mono text-amber-400">
+                                {row.points_scored}
+                              </span>
+                              <span className="text-xs text-slate-400 font-mono ml-1">
+                                / {row.max_possible_points} Pkt
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right font-mono font-bold text-emerald-300">
+                              {row.checks_count} / {row.total_rounds}
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right min-w-[130px]">
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="font-mono font-black text-cyan-300 text-sm">
+                                  {row.quote_percent.toFixed(1)}%
+                                </span>
+                                <div className="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/10">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-full"
+                                    style={{ width: `${Math.min(100, row.quote_percent)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right font-mono text-xs text-slate-400">
+                              {row.time_label}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
             VIEW 5: ARCHIV & KALENDER (DATUMSAUSWAHL & PROTOKOLL)
             ======================================================== */}
         {viewMode === 'archive' && (
@@ -1352,7 +1536,7 @@ export default function UnifiedTvBoardClient({
                 </div>
 
                 {/* Spiele-Listen des Tages */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                   {/* Doppelquote Spiele */}
                   <div className="bg-slate-950 rounded-2xl border border-amber-500/30 p-4 shadow-xl flex flex-col">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
@@ -1499,6 +1683,54 @@ export default function UnifiedTvBoardClient({
                       </div>
                     )}
                   </div>
+
+                  {/* Stellen & Checken Spiele */}
+                  <div className="bg-slate-950 rounded-2xl border border-cyan-500/30 p-4 shadow-xl flex flex-col">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                      <h4 className="text-sm font-black text-cyan-300 flex items-center gap-1.5">
+                        <span>🎲 Stellen & Checken</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          ({data.currentArchiveDayDetail.stellenCheckenGames?.length || 0})
+                        </span>
+                      </h4>
+                    </div>
+
+                    {!data.currentArchiveDayDetail.stellenCheckenGames ||
+                    data.currentArchiveDayDetail.stellenCheckenGames.length === 0 ? (
+                      <div className="text-xs text-slate-500 py-6 text-center">
+                        Keine Stellen & Checken Spiele an diesem Tag
+                      </div>
+                    ) : (
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[400px] pr-1">
+                        {data.currentArchiveDayDetail.stellenCheckenGames.map((g, idx) => (
+                          <div
+                            key={g.id + idx}
+                            className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs"
+                          >
+                            <div>
+                              <div className="font-bold text-white flex items-center gap-1.5">
+                                <span>{g.playerName}</span>
+                                <span className="text-[10px] font-mono px-1.5 rounded bg-purple-500/20 text-purple-300 font-bold">
+                                  #{String(g.presetId).padStart(3, '0')}
+                                </span>
+                              </div>
+                              {g.opponentName && (
+                                <div className="text-[10px] text-slate-400">vs. {g.opponentName}</div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="font-mono font-black text-amber-400 text-sm">
+                                {g.pointsScored} / {g.maxPossiblePoints} Pkt
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-mono">
+                                {g.checksCount}/{g.totalRounds} ({g.quotePercent.toFixed(0)}%) • {g.time}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1520,7 +1752,7 @@ export default function UnifiedTvBoardClient({
             TV-Board SC Weyhausen • Auto-Sync alle 8s • Gleichstand teilt den Platz automatisch (🤝)
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Link href="/doppelquote" className="hover:text-amber-400 transition-colors">
             🎯 Checkout spielen
           </Link>
@@ -1531,6 +1763,10 @@ export default function UnifiedTvBoardClient({
           <span>•</span>
           <Link href="/training/fussball" className="hover:text-emerald-400 transition-colors">
             ⚽ Fußball spielen
+          </Link>
+          <span>•</span>
+          <Link href="/training/stellen-checken" className="hover:text-cyan-400 transition-colors">
+            🎲 Stellen & Checken spielen
           </Link>
         </div>
       </footer>

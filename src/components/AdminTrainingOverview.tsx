@@ -235,6 +235,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
               <th className="py-3 px-2 text-center">Checkout Battle (Solo / 1vs1)</th>
               <th className="py-3 px-2 text-center">PDC Challenge (Solo / 1vs1)</th>
               <th className="py-3 px-2 text-center">Fußball (Bot / 1vs1)</th>
+              <th className="py-3 px-2 text-center">Stellen & Checken (Solo / 1vs1)</th>
               <th className="py-3 px-3 text-center">Gesamt</th>
               <th className="py-3 px-3">Fortschritt (Ziel: 20)</th>
               <th className="py-3 px-3 text-right">Lostopf-Status</th>
@@ -243,7 +244,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
           <tbody className="divide-y divide-white/5">
             {filteredPlayers.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-slate-500">
+                <td colSpan={9} className="py-8 text-center text-slate-500">
                   Keine Spieler für die ausgewählten Filterkriterien gefunden.
                 </td>
               </tr>
@@ -314,6 +315,16 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                           <strong className="text-white">{p.totalFussball}</strong>{' '}
                           <span className="text-[11px] text-slate-400">
                             ({p.fussballSolo}b / {p.fussball1vs1}d)
+                          </span>
+                        </span>
+                      </td>
+
+                      {/* Stellen & Checken */}
+                      <td className="py-3.5 px-2 text-center">
+                        <span className="font-mono font-semibold">
+                          <strong className="text-white">{p.totalStellenChecken || 0}</strong>{' '}
+                          <span className="text-[11px] text-slate-400">
+                            ({p.stellenCheckenSolo || 0}s / {p.stellenChecken1vs1 || 0}d)
                           </span>
                         </span>
                       </td>
@@ -391,7 +402,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                     {/* Aufklappbare Einzelspiele des Spielers */}
                     {isExpanded && p.gamesList.length > 0 && (
                       <tr className="bg-slate-900/90 border-t border-b border-emerald-500/30 animate-fadeIn">
-                        <td colSpan={8} className="p-4">
+                        <td colSpan={9} className="p-4">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                               <span>
@@ -426,9 +437,17 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                                             ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                                             : g.gameType === 'pdc'
                                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                            : g.gameType === 'stellen_checken'
+                                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                                             : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                         }`}>
-                                          {g.gameType === 'doubles' ? 'Checkout' : g.gameType === 'pdc' ? 'PDC' : '⚽ Fußball'}
+                                          {g.gameType === 'doubles'
+                                            ? 'Checkout'
+                                            : g.gameType === 'pdc'
+                                            ? 'PDC'
+                                            : g.gameType === 'stellen_checken'
+                                            ? '🎯 Stellen & Checken'
+                                            : '⚽ Fußball'}
                                         </span>
                                         <span className="font-bold text-white">
                                           {g.gameMode === 'solo' ? 'Solo' : `1vs1 vs. ${g.opponentName || 'Gegner'}`}
