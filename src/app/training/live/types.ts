@@ -1,4 +1,4 @@
-export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'archive';
+export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'archive';
 
 export type UnifiedTvTimeframe = 'today' | 'month' | 'all' | 'archive';
 
@@ -38,6 +38,39 @@ export interface TvPdcRow {
   rank: number;
   isShared: boolean;
   opponent_name?: string | null;
+}
+
+export interface TvFussballRow {
+  player_name: string;
+  matches_count: number;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  goals_scored: number;
+  goals_conceded: number;
+  goal_diff: number;
+  bull_hits: number;
+  bull_attempts: number;
+  bull_quote: number;
+  double_hits: number;
+  double_attempts: number;
+  double_quote: number;
+  darts_thrown: number;
+  rank: number;
+  isShared: boolean;
+  last_time: string;
+}
+
+export interface TvFussballMatch {
+  id: string;
+  session_id: string;
+  player1_name: string;
+  player2_name: string;
+  player1_goals: number;
+  player2_goals: number;
+  winner_name: string;
+  darts_thrown: number;
+  time_label: string;
 }
 
 export interface ArchiveTrainingDaySummary {
@@ -91,6 +124,8 @@ export interface UnifiedTvBoardData {
   monthLabel: string;
   todayDoppelLeaderboard: TvDoppelquoteRow[];
   todayPdcLeaderboard: TvPdcRow[];
+  todayFussballLeaderboard: TvFussballRow[];
+  todayFussballMatches: TvFussballMatch[];
   hasTodayData: boolean;
   hasMonthData: boolean;
   availableArchiveDays: ArchiveTrainingDaySummary[];

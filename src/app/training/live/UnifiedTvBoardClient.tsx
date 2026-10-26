@@ -60,7 +60,9 @@ export default function UnifiedTvBoardClient({
   const [soundAlert, setSoundAlert] = useState<boolean>(true);
 
   const prevSessionTotalRef = useRef<number>(
-    initialData.todayDoppelLeaderboard.length + initialData.todayPdcLeaderboard.length
+    initialData.todayDoppelLeaderboard.length +
+    initialData.todayPdcLeaderboard.length +
+    (initialData.todayFussballMatches?.length || 0)
   );
 
   // Digital-Uhr
@@ -114,7 +116,9 @@ export default function UnifiedTvBoardClient({
       });
 
       const currentTotal =
-        result.todayDoppelLeaderboard.length + result.todayPdcLeaderboard.length;
+        result.todayDoppelLeaderboard.length +
+        result.todayPdcLeaderboard.length +
+        (result.todayFussballMatches?.length || 0);
       if (currentTotal > prevSessionTotalRef.current) {
         playLivePing();
       }
@@ -319,6 +323,20 @@ export default function UnifiedTvBoardClient({
 
             <button
               onClick={() => {
+                setViewMode('fussball');
+                if (timeframe === 'archive') setTimeframe('today');
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                viewMode === 'fussball' && timeframe !== 'archive'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 font-black'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <span>⚽ Fußball (1vs1)</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setViewMode('archive');
                 setTimeframe('archive');
               }}
@@ -429,6 +447,11 @@ export default function UnifiedTvBoardClient({
               <span className="px-2.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300 border border-yellow-500/40 font-black">
                 PDC Challenge Detail-Board
               </span>
+            ) : viewMode === 'fussball' ? (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 font-black flex items-center gap-1">
+                <span>⚽</span>
+                <span>Fußball 1vs1 Matchboard</span>
+              </span>
             ) : (
               <span className="px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/40 font-black">
                 Archiv & Kalender
@@ -455,6 +478,10 @@ export default function UnifiedTvBoardClient({
             <span>•</span>
             <span>
               <strong className="text-white font-mono">{data.todayPdcLeaderboard.length}</strong> PDC-Durchgänge
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="text-white font-mono">{data.todayFussballMatches?.length || 0}</strong> Fußball 1vs1
             </span>
             <span>•</span>
             <span>Stand: {data.lastUpdate || 'soeben'}</span>
@@ -986,7 +1013,242 @@ export default function UnifiedTvBoardClient({
         )}
 
         {/* ========================================================
-            VIEW 4: ARCHIV & KALENDER (DATUMSAUSWAHL & PROTOKOLL)
+            VIEW 4: FUßBALL 1vs1 MATCHBOARD
+            ======================================================== */}
+        {viewMode === 'fussball' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-b from-[#071910] via-[#05110b] to-[#020905] rounded-3xl border-2 border-emerald-500/50 p-5 shadow-2xl">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-emerald-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                    ⚽
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+                      <span>Fußball • 1-gegen-1 Matchboard</span>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                        Reine Spieler-Duelle
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Offizielle 1vs1 Liga-Duelle zwischen Spielern (Matches gegen den Computer werden hier nicht gewertet).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setViewMode('both')}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all"
+                  >
+                    ← Zurück zur Gemeinschaftsansicht
+                  </button>
+                </div>
+              </div>
+
+              {/* 1vs1 Rangliste */}
+              {data.todayFussballLeaderboard.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center p-6 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 mt-4">
+                  <div className="text-4xl mb-3">⚽</div>
+                  <h3 className="text-base font-bold text-slate-200">
+                    Noch keine 1vs1 Fußball-Matches in diesem Zeitraum
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-md mt-1">
+                    Hier werden ausschließlich echte 1-gegen-1 Duelle zwischen zwei Spielern gelistet. Fordere jetzt deinen Trainingspartner zu einem Fußball-Match heraus!
+                  </p>
+                  <Link
+                    href="/training/fussball"
+                    className="mt-4 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20"
+                  >
+                    ⚽ 1vs1 Match starten
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-6 mt-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                          <th className="py-3 px-2 text-center w-12">Platz</th>
+                          <th className="py-3 px-3">Spieler</th>
+                          <th className="py-3 px-3 text-center">Spiele (S / N)</th>
+                          <th className="py-3 px-3 text-center">Tore</th>
+                          <th className="py-3 px-3 text-center">Diff.</th>
+                          <th className="py-3 px-3 text-right">Siegquote</th>
+                          <th className="py-3 px-3 text-center text-amber-300 hidden sm:table-cell">Bull-Quote</th>
+                          <th className="py-3 px-3 text-center text-emerald-300 hidden sm:table-cell">Doppel-Quote</th>
+                          <th className="py-3 px-2 text-center hidden md:table-cell">Darts</th>
+                          <th className="py-3 px-2 text-right text-slate-500">Zuletzt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/40 font-medium">
+                        {data.todayFussballLeaderboard.map((row) => {
+                          const photo = getPlayerPhotoUrl(row.player_name);
+                          const initials = getPlayerInitials(row.player_name);
+                          return (
+                            <tr
+                              key={row.player_name}
+                              className={`transition-colors hover:bg-slate-800/40 ${
+                                row.rank === 1
+                                  ? 'bg-emerald-500/10'
+                                  : row.rank === 2
+                                  ? 'bg-slate-800/20'
+                                  : row.rank === 3
+                                  ? 'bg-emerald-950/20'
+                                  : ''
+                              }`}
+                            >
+                              <td className="py-3 px-2 text-center">
+                                {renderRankBadge(row.rank, row.isShared)}
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center font-bold text-[10px] text-emerald-300">
+                                    {photo ? (
+                                      <Image
+                                        src={photo}
+                                        alt={row.player_name}
+                                        width={32}
+                                        height={32}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <span>{initials}</span>
+                                    )}
+                                  </div>
+                                  <div className="font-black text-white text-xs sm:text-sm tracking-tight">
+                                    {row.player_name}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono">
+                                <span className="font-bold text-white">{row.matches_count}</span>{' '}
+                                <span className="text-[11px] text-slate-400">
+                                  ({row.wins}S / {row.losses}N)
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono font-bold text-slate-200">
+                                {row.goals_scored} : {row.goals_conceded}
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono">
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[11px] font-black ${
+                                    row.goal_diff > 0
+                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                      : row.goal_diff < 0
+                                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                      : 'bg-slate-800 text-slate-400'
+                                  }`}
+                                >
+                                  {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-3 text-right font-mono font-black text-emerald-400 text-sm sm:text-base">
+                                {row.win_rate.toFixed(1)}%
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono text-amber-300 hidden sm:table-cell">
+                                {row.bull_quote.toFixed(1)}%
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono text-emerald-300 hidden sm:table-cell">
+                                {row.double_quote.toFixed(1)}%
+                              </td>
+
+                              <td className="py-3 px-2 text-center font-mono text-slate-400 hidden md:table-cell">
+                                {row.darts_thrown}
+                              </td>
+
+                              <td className="py-3 px-2 text-right text-xs font-mono text-slate-500">
+                                {row.last_time || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* 1vs1 Match-Log / Einzelduelle */}
+                  {data.todayFussballMatches && data.todayFussballMatches.length > 0 && (
+                    <div className="pt-4 border-t border-slate-800/80 space-y-3">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                        <span className="flex items-center gap-1.5">
+                          <span>⚽ Ausgetragene 1-gegen-1 Duelle ({data.todayFussballMatches.length}):</span>
+                        </span>
+                        <span className="text-slate-500 text-[11px]">
+                          Chronologisch sortiert
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        {data.todayFussballMatches.map((m) => {
+                          const p1IsWinner = m.player1_goals > m.player2_goals;
+                          const p2IsWinner = m.player2_goals > m.player1_goals;
+                          return (
+                            <div
+                              key={m.id}
+                              className="bg-slate-950/80 p-3.5 rounded-2xl border border-emerald-500/30 flex flex-col justify-between gap-2 shadow-inner"
+                            >
+                              <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-slate-800/60 pb-1.5">
+                                <span className="font-mono text-slate-400">{m.time_label || 'Spiel'}</span>
+                                <span className="text-[11px] text-slate-500 font-mono">
+                                  {m.darts_thrown} Darts
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between py-1 gap-2">
+                                <div className="flex-1 text-left">
+                                  <div className={`font-black text-sm truncate ${p1IsWinner ? 'text-emerald-300' : 'text-slate-300'}`}>
+                                    {m.player1_name}
+                                  </div>
+                                  {p1IsWinner && (
+                                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                      🏆 Sieger
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 font-mono font-black text-base sm:text-lg text-white shrink-0 shadow-inner">
+                                  <span className={p1IsWinner ? 'text-emerald-400' : 'text-slate-300'}>
+                                    {m.player1_goals}
+                                  </span>
+                                  <span className="text-slate-500 mx-1.5">:</span>
+                                  <span className={p2IsWinner ? 'text-emerald-400' : 'text-slate-300'}>
+                                    {m.player2_goals}
+                                  </span>
+                                </div>
+
+                                <div className="flex-1 text-right">
+                                  <div className={`font-black text-sm truncate ${p2IsWinner ? 'text-emerald-300' : 'text-slate-300'}`}>
+                                    {m.player2_name}
+                                  </div>
+                                  {p2IsWinner && (
+                                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                      🏆 Sieger
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            VIEW 5: ARCHIV & KALENDER (DATUMSAUSWAHL & PROTOKOLL)
             ======================================================== */}
         {viewMode === 'archive' && (
           <div className="space-y-6">

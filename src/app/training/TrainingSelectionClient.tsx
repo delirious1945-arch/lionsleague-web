@@ -436,9 +436,19 @@ export default function TrainingSelectionClient({
             </span>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Link
+                href="/training/live?view=fussball"
+                target="_blank"
+                data-ui-id="TRAINING.GAME_FUSSBALL.TV_BTN"
+                className="flex-1 sm:flex-initial px-3.5 py-3 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                title="1vs1 TV-Board im Vereinsheim"
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span>TV Board</span>
+              </Link>
+              <Link
                 href="/training/fussball"
                 data-ui-id="TRAINING.GAME_FUSSBALL.START_BTN"
-                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <span>⚽ Match anpfeifen</span>
                 <ArrowRight className="w-3.5 h-3.5" />

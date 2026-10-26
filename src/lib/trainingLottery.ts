@@ -150,8 +150,9 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
       SELECT player_name, player_id, count(*)::int as cnt
       FROM training_fussball
       WHERE (is_aborted IS NULL OR is_aborted = 0)
-        AND darts_thrown >= 6
         AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
+        AND player_name NOT LIKE 'Computer%'
+        AND player_name NOT LIKE 'Bot%'
       GROUP BY player_name, player_id
     `;
 
@@ -467,13 +468,16 @@ export interface PlayerMonthlyTrainingStat {
   pdcSolo: number;
   pdc1vs1: number;
   totalPdc: number;
+  fussballSolo: number;
+  fussball1vs1: number;
+  totalFussball: number;
   totalCompletedGames: number;
   isQualified: boolean;
   isBlockedByPastWin: boolean;
   isMonthWinner: boolean;
   gamesList: {
     id: number;
-    gameType: 'doubles' | 'pdc';
+    gameType: 'doubles' | 'pdc' | 'fussball';
     gameMode: string;
     opponentName: string | null;
     date: string;
@@ -510,6 +514,10 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
     FROM training_pdc_challenge
     WHERE is_aborted IS NULL OR is_aborted = 0
+    UNION
+    SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
+    FROM training_fussball
+    WHERE is_aborted IS NULL OR is_aborted = 0
     ORDER BY m DESC;
   `;
 
@@ -543,7 +551,7 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     ORDER BY name ASC;
   `;
 
-  // 3. Doubles & PDC Sessions für den Monat abrufen
+  // 3. Doubles, PDC & Fußball Sessions für den Monat abrufen
   const doublesSessions = await sql`
     SELECT 
       id, session_id, player_name, opponent_name, game_mode, 
@@ -563,6 +571,19 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     WHERE (is_aborted IS NULL OR is_aborted = 0)
       AND total_score IS NOT NULL
       AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+    ORDER BY COALESCE(training_date, created_at::text) DESC;
+  `;
+
+  const fussballSessions = await sql`
+    SELECT 
+      id, session_id, player_name, opponent_name, game_mode, is_computer, computer_level,
+      training_date, created_at, target_goals, goals_scored, goals_conceded,
+      darts_thrown, is_winner
+    FROM training_fussball
+    WHERE (is_aborted IS NULL OR is_aborted = 0)
+      AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+      AND player_name NOT LIKE 'Computer%'
+      AND player_name NOT LIKE 'Bot%'
     ORDER BY COALESCE(training_date, created_at::text) DESC;
   `;
 
@@ -592,6 +613,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       pdcSolo: 0,
       pdc1vs1: 0,
       totalPdc: 0,
+      fussballSolo: 0,
+      fussball1vs1: 0,
+      totalFussball: 0,
       totalCompletedGames: 0,
       isQualified: false,
       isBlockedByPastWin: blockedPlayers.has(name),
@@ -615,6 +639,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         pdcSolo: 0,
         pdc1vs1: 0,
         totalPdc: 0,
+        fussballSolo: 0,
+        fussball1vs1: 0,
+        totalFussball: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -660,6 +687,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         pdcSolo: 0,
         pdc1vs1: 0,
         totalPdc: 0,
+        fussballSolo: 0,
+        fussball1vs1: 0,
+        totalFussball: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -686,6 +716,56 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       date: s.training_date || s.created_at,
       summary: `PDC Score: ${s.total_score} Pkt (${s.badge_color || '-'}es Abzeichen)`,
       isWinner: s.is_winner ?? 0,
+    });
+  }
+
+  // Fußball zuweisen
+  for (const s of fussballSessions) {
+    const name = String(s.player_name).trim();
+    if (name.toLowerCase().startsWith('computer')) continue;
+    let stat = statsMap.get(name);
+    if (!stat) {
+      stat = {
+        playerName: name,
+        playerId: null,
+        team: 'Gast',
+        doublesSolo: 0,
+        doubles1vs1: 0,
+        totalDoubles: 0,
+        pdcSolo: 0,
+        pdc1vs1: 0,
+        totalPdc: 0,
+        fussballSolo: 0,
+        fussball1vs1: 0,
+        totalFussball: 0,
+        totalCompletedGames: 0,
+        isQualified: false,
+        isBlockedByPastWin: blockedPlayers.has(name),
+        isMonthWinner: winnerName === name,
+        gamesList: [],
+      };
+      statsMap.set(name, stat);
+    }
+
+    const isBot = s.game_mode === '1vsComputer' || Number(s.is_computer || 0) === 1;
+    if (isBot) {
+      stat.fussballSolo += 1;
+    } else {
+      stat.fussball1vs1 += 1;
+    }
+    stat.totalFussball += 1;
+    stat.totalCompletedGames += 1;
+
+    const botLevel = s.computer_level ? ` (${s.computer_level})` : '';
+    const opp = s.opponent_name || (isBot ? 'Computer' : 'Gegner');
+    stat.gamesList.push({
+      id: Number(s.id),
+      gameType: 'fussball',
+      gameMode: isBot ? 'vs. Computer' : '1vs1',
+      opponentName: opp + (isBot ? botLevel : ''),
+      date: s.training_date || s.created_at,
+      summary: `Fußball: ${s.goals_scored} : ${s.goals_conceded} Tore (${s.darts_thrown} Darts)`,
+      isWinner: Number(s.is_winner ?? 0),
     });
   }
 
