@@ -5,38 +5,10 @@ import { revalidatePath } from 'next/cache';
 import { StellenCheckenHistoryItem, StellenCheckenSessionSavePayload } from './types';
 import { sanitizeTrainingDate } from '@/lib/dateUtils';
 
-let tableInitialized = false;
-
 export async function ensureStellenCheckenTable() {
-  if (tableInitialized) return;
-  try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS training_stellen_checken (
-        id SERIAL PRIMARY KEY,
-        session_id TEXT NOT NULL,
-        player_id INTEGER,
-        player_name TEXT NOT NULL,
-        opponent_name TEXT,
-        game_mode TEXT NOT NULL DEFAULT 'solo',
-        preset_id INTEGER NOT NULL,
-        points_scored INTEGER NOT NULL DEFAULT 0,
-        max_possible_points INTEGER NOT NULL DEFAULT 28,
-        checks_count INTEGER NOT NULL DEFAULT 0,
-        total_rounds INTEGER NOT NULL DEFAULT 15,
-        check_quote NUMERIC(5,4) NOT NULL DEFAULT 0,
-        is_winner INTEGER NOT NULL DEFAULT 0,
-        is_aborted INTEGER NOT NULL DEFAULT 0,
-        round_details JSONB,
-        training_date TEXT NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-    await sql`CREATE INDEX IF NOT EXISTS idx_stellen_checken_date ON training_stellen_checken(training_date)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_stellen_checken_player ON training_stellen_checken(player_name)`;
-    tableInitialized = true;
-  } catch (err) {
-    console.error('Fehler beim Initialisieren von training_stellen_checken:', err);
-  }
+  // Tabelle training_stellen_checken existiert bereits fest in Supabase.
+  // Keine DDL-Ausführung zur Laufzeit über den Transaction Pooler nötig.
+  return;
 }
 
 export async function saveStellenCheckenSessionAction(sessions: StellenCheckenSessionSavePayload[]) {

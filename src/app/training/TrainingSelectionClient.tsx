@@ -72,7 +72,6 @@ export default function TrainingSelectionClient({
 
             <Link
               href="/training/live"
-              target="_blank"
               data-ui-id="TRAINING.HEADER.TV_BOARD_BTN"
               className="px-4 py-2 rounded-xl bg-amber-400/[0.08] hover:bg-amber-400/[0.16] text-amber-200 border border-amber-400/40 font-bold text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md shadow-[inset_0_1px_0_0_rgba(251,191,36,0.2)] transition-all cursor-pointer"
             >
@@ -187,7 +186,6 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
               <Link
                 href="/training/live?view=doppelquote"
-                target="_blank"
                 data-ui-id="TRAINING.GAME_CHECKOUT.TV_BTN"
                 className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
                 title="Live-Ranking für TV im Vereinsheim"
@@ -239,7 +237,6 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
               <Link
                 href="/training/live?view=pdc"
-                target="_blank"
                 data-ui-id="TRAINING.GAME_PDC.TV_BTN"
                 className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
                 title="Live-Ranking für TV im Vereinsheim"
@@ -288,7 +285,6 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
               <Link
                 href="/training/live?view=fussball"
-                target="_blank"
                 data-ui-id="TRAINING.GAME_FUSSBALL.TV_BTN"
                 className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
                 title="1vs1 TV-Board im Vereinsheim"
@@ -337,7 +333,6 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
               <Link
                 href="/training/live?view=stellen_checken"
-                target="_blank"
                 data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.TV_BTN"
                 className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
                 title="Stellen & Checken TV-Board im Vereinsheim"

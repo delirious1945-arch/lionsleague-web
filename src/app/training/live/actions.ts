@@ -12,7 +12,6 @@ import {
   ArchiveTrainingDaySummary,
   ArchiveDayDetail,
 } from './types';
-import { ensureStellenCheckenTable } from '../stellen-checken/actions';
 
 function extractRowDate(row: any): string {
   if (row.training_date) {
@@ -106,8 +105,6 @@ export async function getUnifiedTvBoardDataAction(options?: {
       : deTodayDateStr;
 
   try {
-    await ensureStellenCheckenTable();
-
     // 1. Fetch raw data in parallel
     const [rawDoubles, rawPdc, rawFussball, rawStellenChecken] = await Promise.all([
       sql`SELECT * FROM training_doubles ORDER BY created_at ASC`,

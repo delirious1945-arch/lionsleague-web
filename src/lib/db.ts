@@ -19,8 +19,9 @@ export const sql =
   globalForSql.sql ??
   postgres(connectionString, {
     prepare: false,
+    fetch_types: false,
     ssl: 'require',
-    max: 3,
+    max: 6,
     idle_timeout: 10,
     max_lifetime: 60 * 5,
     connect_timeout: 15,
