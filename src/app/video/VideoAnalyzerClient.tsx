@@ -14,10 +14,13 @@ import {
   Camera,
   Activity,
   CheckCircle2,
-  AlertCircle,
   SwitchCamera,
-  HelpCircle,
   Save,
+  Eye,
+  EyeOff,
+  ChevronLeft,
+  ChevronRight,
+  Gauge,
 } from 'lucide-react';
 import { UserSession } from '@/app/actions';
 
@@ -25,7 +28,12 @@ interface VideoAnalyzerClientProps {
   user: UserSession;
 }
 
-type InputSource = 'camera' | 'upload' | 'demo';
+type InputSource = 'demo' | 'upload' | 'camera';
+
+interface Point {
+  x: number;
+  y: number;
+}
 
 interface BiomechanicMetrics {
   elbowAngle: number;
@@ -38,14 +46,34 @@ interface BiomechanicMetrics {
 }
 
 export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) {
-  const [source, setSource] = useState<InputSource>('demo');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [source, setSource] = useState<InputSource>('upload'); // Direkt upload als Fokus
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
-  const [statusMessage, setStatusMessage] = useState<string>('Bereit für die Analyse.');
+  const [statusMessage, setStatusMessage] = useState<string>(
+    'Lade ein Video hoch oder nutze die Kamera, um deinen Wurf zu analysieren.'
+  );
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
-  // Live Biomechanik-Zustand
+  // Wichtig: Beim Video-Upload standardmäßig KEINE Demo oder störenden Linien anzeigen!
+  const [showMarkers, setShowMarkers] = useState<boolean>(false);
+  const [hasUploadedVideo, setHasUploadedVideo] = useState<boolean>(false);
+
+  // Interaktive Marker für Winkelmessung auf dem Video (Schulter, Ellenbogen, Handgelenk)
+  const [points, setPoints] = useState<{
+    shoulder: Point;
+    elbow: Point;
+    wrist: Point;
+  }>({
+    shoulder: { x: 220, y: 220 },
+    elbow: { x: 320, y: 190 },
+    wrist: { x: 420, y: 120 },
+  });
+  const [draggingPoint, setDraggingPoint] = useState<'shoulder' | 'elbow' | 'wrist' | null>(null);
+
+  // Biomechanik Kennzahlen
   const [metrics, setMetrics] = useState<BiomechanicMetrics>({
     elbowAngle: 98.4,
     drawbackAngle: 62.0,
@@ -61,7 +89,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const animationFrameRef = useRef<number | null>(null);
   const demoTimeRef = useRef<number>(0);
 
-  // Stop camera stream
+  // Stoppt Kamera-Stream
   const stopCameraStream = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
@@ -70,10 +98,30 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
   }, []);
 
+  // Winkelberechnung aus 3 Punkten
+  const calculateAngle = (s: Point, e: Point, w: Point): number => {
+    const v1 = { x: s.x - e.x, y: s.y - e.y };
+    const v2 = { x: w.x - e.x, y: w.y - e.y };
+    const dot = v1.x * v2.x + v1.y * v2.y;
+    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+    if (mag1 === 0 || mag2 === 0) return 90;
+    const rad = Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2))));
+    return Math.round(((rad * 180) / Math.PI) * 10) / 10;
+  };
+
+  // Phase bestimmen anhand des Winkels
+  const determinePhase = (angle: number): BiomechanicMetrics['phase'] => {
+    if (angle < 75) return 'drawback';
+    if (angle < 92) return 'acceleration';
+    if (angle <= 112) return 'release';
+    return 'follow_through';
+  };
+
   // Start Live Camera
   const startCamera = async (targetFacing: 'user' | 'environment') => {
     stopCameraStream();
-    setStatusMessage('Kamera wird initialisiert...');
+    setStatusMessage('Kamera wird gestartet...');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -86,16 +134,15 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
-        setIsRecording(true);
-        setStatusMessage('Live-Kamera aktiv. Halte die Wurfarm-Seite im Bild.');
+        setIsPlaying(true);
+        setStatusMessage('Live-Kamera aktiv (100% lokal im Browser).');
       }
     } catch (err) {
       console.error('Kamerafehler:', err);
-      setStatusMessage('Kamera-Zugriff nicht möglich oder verweigert. Nutze Demo oder Upload.');
+      setStatusMessage('Kamera-Zugriff nicht möglich. Bitte nutze "Video hochladen".');
     }
   };
 
-  // Switch camera facing mode (Handys)
   const toggleFacingMode = () => {
     const nextMode = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(nextMode);
@@ -104,7 +151,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
   };
 
-  // Handle Video File Upload
+  // Video-Upload Handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     stopCameraStream();
     const file = e.target.files?.[0];
@@ -117,12 +164,57 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       videoRef.current.load();
       videoRef.current.play();
       setIsPlaying(true);
-      setStatusMessage(`Geladen: ${file.name} (100% lokal im Browser)`);
+      setHasUploadedVideo(true);
+      setSource('upload');
+      setShowMarkers(false); // Beim Upload standardmäßig KEINE störenden Linien!
+      setStatusMessage(`Geladen: ${file.name} (100% lokal auf deinem Gerät)`);
     }
   };
 
-  // Demo Simulation Loop
+  // Video Play/Pause Toggle
+  const togglePlayPause = () => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      videoRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  // Video Geschwindigkeit ändern (z. B. 0.25x für Super-Zeitlupe)
+  const changePlaybackRate = (rate: number) => {
+    setPlaybackRate(rate);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+    }
+  };
+
+  // Frame schrittweise vor/zurück (+/- 1 Frame bei 30fps = ~0.033s)
+  const stepFrame = (frames: number) => {
+    if (!videoRef.current) return;
+    videoRef.current.pause();
+    setIsPlaying(false);
+    videoRef.current.currentTime = Math.max(
+      0,
+      Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + frames * (1 / 30))
+    );
+  };
+
+  // Timeline Slider Change
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const targetTime = parseFloat(e.target.value);
+    setCurrentTime(targetTime);
+    if (videoRef.current) {
+      videoRef.current.currentTime = targetTime;
+    }
+  };
+
+  // Demo Simulation Loop (Wird AUSSCHLIESSLICH bei source === 'demo' ausgeführt!)
   const runDemoAnimation = useCallback(() => {
+    if (source !== 'demo') return; // Sofortiger Abbruch, wenn kein Demo-Modus!
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -130,16 +222,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     demoTimeRef.current += 0.035;
     const t = demoTimeRef.current;
-
-    // Simulation eines 3-Phasen Wurfs: 0..0.4 Rückzug, 0.4..0.6 Beschleunigung/Release, 0.6..1.0 Follow-Through
-    const cycle = (t % 3) / 3; // 0 bis 1
+    const cycle = (t % 3) / 3;
 
     let currentPhase: BiomechanicMetrics['phase'] = 'setup';
     let currentElbowAngle = 90;
 
     if (cycle < 0.35) {
       currentPhase = 'drawback';
-      currentElbowAngle = 90 - Math.sin((cycle / 0.35) * (Math.PI / 2)) * 32; // bis ca 58°
+      currentElbowAngle = 90 - Math.sin((cycle / 0.35) * (Math.PI / 2)) * 32;
     } else if (cycle < 0.6) {
       currentPhase = 'acceleration';
       const p = (cycle - 0.35) / 0.25;
@@ -160,34 +250,31 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     // Canvas zeichnen
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Virtueller Hintergrund wenn keine Kamera/Video läuft
-    if (source === 'demo') {
-      ctx.fillStyle = '#060a15';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#060a15';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Dezente Gitterlinien
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < canvas.width; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
-
-      // Zielscheibe Silhouette rechts
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
-      ctx.lineWidth = 3;
+    // Gitterlinien
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 40) {
       ctx.beginPath();
-      ctx.ellipse(canvas.width - 40, canvas.height / 2, 10, 80, 0, 0, Math.PI * 2);
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
       ctx.stroke();
     }
+    for (let y = 0; y < canvas.height; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    // Zielscheibe Silhouette rechts
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(canvas.width - 40, canvas.height / 2, 10, 80, 0, 0, Math.PI * 2);
+    ctx.stroke();
 
     // Pose Koordinaten
     const shoulderX = canvas.width * 0.32;
@@ -195,29 +282,26 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const upperArmLength = 95;
     const forearmLength = 85;
 
-    // Schulter ist relativ fixiert, Ellenbogen zeigt nach vorne/oben
     const elbowX = shoulderX + upperArmLength * Math.cos(0.25);
     const elbowY = shoulderY - upperArmLength * Math.sin(0.25);
 
-    // Unterarm rotiert basierend auf Winkel
     const forearmRad = 0.25 + (Math.PI - (currentElbowAngle * Math.PI) / 180);
     const wristX = elbowX + forearmLength * Math.cos(forearmRad);
     const wristY = elbowY - forearmLength * Math.sin(forearmRad);
 
-    // Hand/Dartspitze
     const dartLength = 28;
     const dartX = wristX + dartLength * Math.cos(forearmRad - 0.2);
     const dartY = wristY - dartLength * Math.sin(forearmRad - 0.2);
 
-    // 1. Rumpf & Oberkörper (Orientierung)
+    // Rumpf
     ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(shoulderX - 30, shoulderY + 160); // Hüfte
-    ctx.lineTo(shoulderX, shoulderY); // Rücken
+    ctx.moveTo(shoulderX - 30, shoulderY + 160);
+    ctx.lineTo(shoulderX, shoulderY);
     ctx.stroke();
 
-    // 2. Schulter-Horizontallinie (Stabilitäts-Referenz)
+    // Schulterlinie
     ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
     ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1.5;
@@ -227,7 +311,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 3. Biomechanische Gelenkachsen (Smaragdgrün / Cyan)
+    // Gelenkachsen
     ctx.strokeStyle = '#10b981';
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
@@ -237,7 +321,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     ctx.lineTo(wristX, wristY);
     ctx.stroke();
 
-    // 4. Dart-Vektor
+    // Dart-Vektor
     ctx.strokeStyle = '#00d4ff';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -245,14 +329,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     ctx.lineTo(dartX, dartY);
     ctx.stroke();
 
-    // 5. Gelenkknoten (Punkte)
-    const joints = [
-      { x: shoulderX, y: shoulderY, label: 'Schulter' },
-      { x: elbowX, y: elbowY, label: 'Ellenbogen' },
-      { x: wristX, y: wristY, label: 'Handgelenk' },
-    ];
-
-    joints.forEach((j) => {
+    // Punkte
+    [
+      { x: shoulderX, y: shoulderY },
+      { x: elbowX, y: elbowY },
+      { x: wristX, y: wristY },
+    ].forEach((j) => {
       ctx.fillStyle = '#00d4ff';
       ctx.beginPath();
       ctx.arc(j.x, j.y, 6, 0, Math.PI * 2);
@@ -262,19 +344,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ctx.stroke();
     });
 
-    // 6. Ellenbogen-Winkelbogen & HUD Text
+    // Ellenbogen-Winkelbogen
     ctx.strokeStyle = 'rgba(0, 212, 255, 0.7)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(elbowX, elbowY, 26, 0.25 - 0.5, 0.25 + 0.5);
     ctx.stroke();
 
-    // HUD Beschriftung direkt am Gelenk
     ctx.font = 'bold 13px monospace';
     ctx.fillStyle = '#10b981';
     ctx.fillText(`${Math.round(currentElbowAngle)}°`, elbowX + 12, elbowY - 14);
 
-    // Trajektorie / Release Indikator
     if (currentPhase === 'release') {
       ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
       ctx.lineWidth = 2;
@@ -293,19 +373,105 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     animationFrameRef.current = requestAnimationFrame(runDemoAnimation);
   }, [source]);
 
-  // Effekt für Modus-Wechsel
+  // Video Marker Overlay zeichnen (NUR wenn showMarkers aktiv ist und ein Video läuft)
+  const drawVideoMarkers = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Wenn nicht im Demo-Modus und showMarkers AUS ist -> Canvas bleibt absolut leer!
+    if (source !== 'demo' && !showMarkers) {
+      return;
+    }
+
+    if (source !== 'demo' && showMarkers) {
+      const { shoulder, elbow, wrist } = points;
+      const angle = calculateAngle(shoulder, elbow, wrist);
+      const phase = determinePhase(angle);
+
+      setMetrics((prev) => ({
+        ...prev,
+        elbowAngle: angle,
+        releaseAngle: angle,
+        phase,
+      }));
+
+      // 1. Arm-Linie zeichnen
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(shoulder.x, shoulder.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.lineTo(wrist.x, wrist.y);
+      ctx.stroke();
+
+      // 2. Horizontale Schulterlinie
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(shoulder.x - 50, shoulder.y);
+      ctx.lineTo(shoulder.x + 120, shoulder.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 3. Gelenkknoten zeichnen
+      const jointList = [
+        { key: 'shoulder' as const, pt: shoulder, label: 'Schulter' },
+        { key: 'elbow' as const, pt: elbow, label: 'Ellenbogen' },
+        { key: 'wrist' as const, pt: wrist, label: 'Handgelenk' },
+      ];
+
+      jointList.forEach((j) => {
+        ctx.fillStyle = draggingPoint === j.key ? '#f59e0b' : '#00d4ff';
+        ctx.beginPath();
+        ctx.arc(j.pt.x, j.pt.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(j.label, j.pt.x + 12, j.pt.y + 4);
+      });
+
+      // 4. Winkelbogen & Anzeige am Ellenbogen
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(elbow.x, elbow.y, 28, 0, Math.PI * 0.7);
+      ctx.stroke();
+
+      ctx.font = 'bold 15px monospace';
+      ctx.fillStyle = '#10b981';
+      ctx.fillText(`${angle}°`, elbow.x + 14, elbow.y - 12);
+    }
+  }, [source, showMarkers, points, draggingPoint]);
+
+  // Effekt für Modus-Wechsel & Animation
   useEffect(() => {
     if (source === 'camera') {
       startCamera(facingMode);
     } else if (source === 'demo') {
       stopCameraStream();
-      setStatusMessage('Interaktive Simulation aktiv. Tracking-Punkte in Echtzeit.');
+      setStatusMessage('Interaktive Simulation aktiv.');
+      animationFrameRef.current = requestAnimationFrame(runDemoAnimation);
     } else if (source === 'upload') {
       stopCameraStream();
-      setStatusMessage('Wähle eine Videodatei aus, um die Analyse zu starten.');
+      if (!hasUploadedVideo) {
+        setStatusMessage('Wähle eine Videodatei aus, um deinen Wurf zu analysieren.');
+      }
     }
 
-    animationFrameRef.current = requestAnimationFrame(runDemoAnimation);
+    // Wenn nicht im Demo-Modus, einmalig Marker rendern
+    if (source !== 'demo') {
+      drawVideoMarkers();
+    }
 
     return () => {
       stopCameraStream();
@@ -313,7 +479,73 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [source, runDemoAnimation, facingMode, stopCameraStream]);
+  }, [source, runDemoAnimation, drawVideoMarkers, facingMode, stopCameraStream, hasUploadedVideo]);
+
+  // Wenn sich die Punkte oder showMarkers im Upload/Kamera-Modus ändern: Marker neu zeichnen
+  useEffect(() => {
+    if (source !== 'demo') {
+      drawVideoMarkers();
+    }
+  }, [source, showMarkers, points, drawVideoMarkers]);
+
+  // Mouse & Touch Interaktion für Marker
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (source === 'demo' || !showMarkers) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    // Prüfen, welcher Punkt angeklickt wurde
+    const threshold = 30; // Pixel Toleranz
+    const distShoulder = Math.hypot(clickX - points.shoulder.x, clickY - points.shoulder.y);
+    const distElbow = Math.hypot(clickX - points.elbow.x, clickY - points.elbow.y);
+    const distWrist = Math.hypot(clickX - points.wrist.x, clickY - points.wrist.y);
+
+    if (distElbow < threshold) {
+      setDraggingPoint('elbow');
+    } else if (distWrist < threshold) {
+      setDraggingPoint('wrist');
+    } else if (distShoulder < threshold) {
+      setDraggingPoint('shoulder');
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!draggingPoint || source === 'demo' || !showMarkers) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const currentX = (e.clientX - rect.left) * scaleX;
+    const currentY = (e.clientY - rect.top) * scaleY;
+
+    setPoints((prev) => ({
+      ...prev,
+      [draggingPoint]: {
+        x: Math.max(10, Math.min(canvas.width - 10, currentX)),
+        y: Math.max(10, Math.min(canvas.height - 10, currentY)),
+      },
+    }));
+  };
+
+  const handlePointerUp = () => {
+    setDraggingPoint(null);
+  };
+
+  // Video Time Update
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+      setDuration(videoRef.current.duration || 0);
+    }
+  };
 
   // Phasen-Bezeichnungen auf Deutsch
   const phaseLabels: Record<BiomechanicMetrics['phase'], { label: string; color: string }> = {
@@ -326,7 +558,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
   const handleSaveMetrics = () => {
     setIsSaved(true);
-    setStatusMessage('Metrik erfolgreich lokal im Spielerprofil vermerkt!');
+    setStatusMessage('Wurfwinkel erfolgreich im Spielerprofil vermerkt!');
     setTimeout(() => setIsSaved(false), 4000);
   };
 
@@ -376,21 +608,31 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       {/* 2. Steuerungsleiste: Eingangsquelle wählen */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-md">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setSource('demo')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              source === 'demo'
+          {/* Upload Button */}
+          <label
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              source === 'upload'
                 ? 'bg-emerald-500 text-slate-950 font-black shadow-[0_0_15px_rgba(16,185,129,0.4)]'
                 : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Interaktive Demo</span>
-          </button>
+            <Upload className="w-3.5 h-3.5" />
+            <span>Eigenes Video hochladen</span>
+            <input
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </label>
 
+          {/* Live Kamera */}
           <button
-            onClick={() => setSource('camera')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => {
+              setSource('camera');
+              setShowMarkers(false);
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               source === 'camera'
                 ? 'bg-emerald-500 text-slate-950 font-black shadow-[0_0_15px_rgba(16,185,129,0.4)]'
                 : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
@@ -400,38 +642,61 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             <span>Live-Kamera</span>
           </button>
 
-          <label
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              source === 'upload'
+          {/* Demo-Modus */}
+          <button
+            onClick={() => {
+              setSource('demo');
+              stopCameraStream();
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              source === 'demo'
                 ? 'bg-emerald-500 text-slate-950 font-black shadow-[0_0_15px_rgba(16,185,129,0.4)]'
                 : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
             }`}
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Video hochladen</span>
-            <input
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => {
-                setSource('upload');
-                handleFileUpload(e);
-              }}
-            />
-          </label>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Demo-Simulation</span>
+          </button>
         </div>
 
-        {/* Kamera-Umschalter bei Mobilgeräten */}
-        {source === 'camera' && (
-          <button
-            onClick={toggleFacingMode}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-semibold cursor-pointer"
-            title="Kamera wechseln (Front / Rück)"
-          >
-            <SwitchCamera className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Kamera wechseln</span>
-          </button>
-        )}
+        {/* Video / Kamera Zusatz-Tools */}
+        <div className="flex items-center gap-2">
+          {source === 'camera' && (
+            <button
+              onClick={toggleFacingMode}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-semibold cursor-pointer"
+              title="Kamera wechseln (Front / Rück)"
+            >
+              <SwitchCamera className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Kamera wechseln</span>
+            </button>
+          )}
+
+          {/* Mess-Marker Schalter für echtes Video */}
+          {source !== 'demo' && (
+            <button
+              onClick={() => setShowMarkers(!showMarkers)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                showMarkers
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40 shadow-sm'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-400 border-white/10'
+              }`}
+              title={showMarkers ? 'Winkel-Marker ausblenden' : 'Winkel-Marker einblenden'}
+            >
+              {showMarkers ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Winkel-Marker aktiv</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Winkel-Marker einblenden</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 3. Analyse-Bereich: Video/Canvas Grid */}
@@ -439,23 +704,34 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         {/* Linke Spalte: Viewport mit Video & Canvas-Overlay */}
         <div className="lg:col-span-8 flex flex-col gap-3">
           <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-slate-950 border-2 border-emerald-500/20 shadow-2xl flex items-center justify-center">
-            {/* HTML5 Video Element (für Kamera oder Upload) */}
+            {/* HTML5 Video Element */}
             <video
               ref={videoRef}
               playsInline
               muted
               loop
-              className={`absolute inset-0 w-full h-full object-cover ${
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleTimeUpdate}
+              className={`absolute inset-0 w-full h-full object-contain bg-black ${
                 source === 'demo' ? 'hidden' : 'block'
               }`}
             />
 
-            {/* Canvas Overlay für KI-Pose-Tracking & Gelenkachsen */}
+            {/* Canvas Overlay: Im Demo-Modus simuliert, im Video-Modus nur aktiv wenn showMarkers=true */}
             <canvas
               ref={canvasRef}
               width={640}
               height={360}
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              className={`absolute inset-0 w-full h-full object-contain ${
+                source !== 'demo' && !showMarkers
+                  ? 'pointer-events-none opacity-0'
+                  : source !== 'demo' && showMarkers
+                  ? 'cursor-crosshair'
+                  : 'pointer-events-none'
+              }`}
             />
 
             {/* Phasen-Badge Overlay oben rechts */}
@@ -469,15 +745,91 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </span>
             </div>
 
-            {/* Live-Gradanzeige Overlay unten links */}
-            <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10">
-              <Activity className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs text-slate-400 font-bold">Winkel:</span>
-              <span className="text-sm font-mono font-black text-emerald-400">
-                {metrics.elbowAngle.toFixed(1)}°
-              </span>
-            </div>
+            {/* Live-Gradanzeige Overlay unten links (wird nur angezeigt bei Demo oder wenn showMarkers an ist) */}
+            {(source === 'demo' || showMarkers) && (
+              <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10">
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs text-slate-400 font-bold">Winkel:</span>
+                <span className="text-sm font-mono font-black text-emerald-400">
+                  {metrics.elbowAngle.toFixed(1)}°
+                </span>
+              </div>
+            )}
           </div>
+
+          {/* 4. Player-Steuerung für hochgeladenes Video */}
+          {source === 'upload' && hasUploadedVideo && (
+            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/10 backdrop-blur-md space-y-3 shadow-md">
+              {/* Zeitleiste / Timeline Scrubber */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-slate-400 w-12 text-right">
+                  {currentTime.toFixed(2)}s
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 10}
+                  step={0.01}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className="flex-1 accent-emerald-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                />
+                <span className="text-xs font-mono text-slate-400 w-12">
+                  {(duration || 0).toFixed(2)}s
+                </span>
+              </div>
+
+              {/* Steuerungsbuttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-2">
+                  {/* Play/Pause */}
+                  <button
+                    onClick={togglePlayPause}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs hover:bg-emerald-400 transition-all cursor-pointer shadow-md"
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    <span>{isPlaying ? 'Pause' : 'Abspielen'}</span>
+                  </button>
+
+                  {/* Einzelbild vor/zurück */}
+                  <button
+                    onClick={() => stepFrame(-1)}
+                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-bold transition-all cursor-pointer"
+                    title="1 Frame zurück"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => stepFrame(1)}
+                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-bold transition-all cursor-pointer"
+                    title="1 Frame vor"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Geschwindigkeitswahl: Zeitlupe für Darts */}
+                <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-white/5">
+                  <span className="text-[10px] font-bold text-slate-500 px-1.5 flex items-center gap-1">
+                    <Gauge className="w-3 h-3 text-cyan-400" /> Speed:
+                  </span>
+                  {[0.25, 0.5, 1.0].map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => changePlaybackRate(rate)}
+                      className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        playbackRate === rate
+                          ? 'bg-emerald-500 text-slate-950 font-black'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Status-Leiste unter dem Video */}
           <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-400">
@@ -485,7 +837,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               {statusMessage}
             </span>
-            <span className="text-[11px] font-mono text-slate-500">60 FPS • Pose Landmarker</span>
+            <span className="text-[11px] font-mono text-slate-500">
+              {source === 'demo' ? 'Simulations-Modus' : '100% On-Device Video'}
+            </span>
           </div>
         </div>
 
@@ -493,7 +847,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         <div className="lg:col-span-4 space-y-4">
           <div className="p-5 rounded-3xl bg-slate-900/90 border border-white/10 backdrop-blur-xl shadow-xl space-y-4">
             <h2 className="text-base font-black text-white flex items-center justify-between">
-              <span>Biomechanik-Werte</span>
+              <span>Wurfwinkel & Analyse</span>
               <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
                 Score: {metrics.consistencyScore}/100
               </span>
@@ -502,13 +856,23 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             {/* Metrik 1: Abwurfwinkel */}
             <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
               <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-slate-300">Release-Winkel (Abwurf)</span>
-                <span className="text-emerald-400 font-mono text-sm">{metrics.releaseAngle}°</span>
+                <span className="text-slate-300">Gemessener Winkel</span>
+                <span className="text-emerald-400 font-mono text-sm">{metrics.elbowAngle}°</span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Optimaler BBDV-Korridor: 92° – 105°. Dein Wurf löst exakt im idealen Flugbogen.
+                Optimaler BBDV-Release-Korridor: 92° – 105°.
               </p>
             </div>
+
+            {/* Hinweis zur Marker-Justierung im Video */}
+            {source !== 'demo' && (
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 space-y-1">
+                <p className="font-bold">💡 Video-Tipp:</p>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Über <strong>„Winkel-Marker einblenden“</strong> kannst du Schulter, Ellenbogen und Handgelenk auf dem Standbild exakt nachjustieren, um deinen Release-Winkel frame-genau zu vermessen.
+                </p>
+              </div>
+            )}
 
             {/* Metrik 2: Rückzugtiefe */}
             <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
@@ -532,17 +896,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </p>
             </div>
 
-            {/* Metrik 4: Durchschwung */}
-            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-slate-300">Follow-Through Streckung</span>
-                <span className="text-purple-400 font-mono text-sm">{metrics.followThroughAngle}°</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Ausgeprägte Endstreckung zur Stabilisierung der Flugbahn zum Board.
-              </p>
-            </div>
-
             {/* Button zum Speichern im Spielerprofil */}
             <button
               onClick={handleSaveMetrics}
@@ -560,7 +913,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  <span>Analyse-Metrik im Profil sichern</span>
+                  <span>Winkel im Profil sichern</span>
                 </>
               )}
             </button>
