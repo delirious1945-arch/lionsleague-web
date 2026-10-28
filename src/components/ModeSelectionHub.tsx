@@ -128,10 +128,19 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
           </div>
         </Link>
 
-        {/* Kachel 3: Video-Wurfstilanalyse (Coming Soon / Unkenntlich) */}
+        {/* Kachel 3: Video-Wurfstilanalyse (Coming Soon / Unkenntlich, nur für Admins anwählbar) */}
         <div
+          onClick={() => {
+            if (user.isAdmin) {
+              router.push('/video');
+            }
+          }}
           data-ui-id="HOME.TILES.VIDEO_CARD"
-          className="group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 border-slate-700/60 shadow-2xl select-none cursor-not-allowed"
+          className={`group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 shadow-2xl select-none transition-all duration-300 ${
+            user.isAdmin
+              ? 'border-emerald-500/40 hover:border-emerald-400 cursor-pointer hover:scale-[1.01] active:scale-[0.99]'
+              : 'border-slate-700/60 cursor-not-allowed pointer-events-none'
+          }`}
         >
           {/* Hintergrundbild stark weichgezeichnet & unkenntlich gemacht */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#062016] to-slate-950" />
@@ -156,7 +165,7 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
                 </span>
               </div>
               <span className="text-[10px] sm:text-xs font-bold text-emerald-400/90 uppercase tracking-widest">
-                In Entwicklung
+                {user.isAdmin ? 'In Entwicklung • Admin-Zugang aktiv' : 'In Entwicklung'}
               </span>
             </div>
           </div>
