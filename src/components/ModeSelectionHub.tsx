@@ -131,13 +131,13 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
         {/* Kachel 3: Video-Wurfstilanalyse (Coming Soon / Unkenntlich, nur für Admins anwählbar) */}
         <div
           onClick={() => {
-            if (user.isAdmin) {
+            if (user.role === 'admin') {
               router.push('/video');
             }
           }}
           data-ui-id="HOME.TILES.VIDEO_CARD"
           className={`group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 shadow-2xl select-none transition-all duration-300 ${
-            user.isAdmin
+            user.role === 'admin'
               ? 'border-emerald-500/40 hover:border-emerald-400 cursor-pointer hover:scale-[1.01] active:scale-[0.99]'
               : 'border-slate-700/60 cursor-not-allowed pointer-events-none'
           }`}
@@ -165,7 +165,7 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
                 </span>
               </div>
               <span className="text-[10px] sm:text-xs font-bold text-emerald-400/90 uppercase tracking-widest">
-                {user.isAdmin ? 'In Entwicklung • Admin-Zugang aktiv' : 'In Entwicklung'}
+                {user.role === 'admin' ? 'In Entwicklung • Admin-Zugang aktiv' : 'In Entwicklung'}
               </span>
             </div>
           </div>

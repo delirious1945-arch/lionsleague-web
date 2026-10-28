@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function VideoPage() {
   const session = await getSessionAction();
-  if (!session || !session.isAdmin) {
+  if (!session || session.role !== 'admin') {
     redirect('/');
   }
 
