@@ -483,9 +483,9 @@ export default function FussballClient({ players, initialHistory }: FussballClie
         setStats(lastShot.prevStats);
       }
 
-      addTicker(`Dart ${lastShot.dartNum} rückgängig gemacht.`);
-    } else if (gameMode === '1vs1' && historyStack.length > 0) {
-      // 2. Im 1vs1-Modus: Wenn noch kein Dart in der neuen Aufnahme geworfen wurde, vorherige Aufnahme zurückholen
+      addTicker(`Dart ${lastShot.dartNum} rückgängig gemacht (Eingabe zurückgesetzt).`);
+    } else if (historyStack.length > 0) {
+      // 2. Wenn noch kein Dart in der neuen Aufnahme geworfen wurde, vorherige Aufnahme zurückholen (1vs1 & 1vsComputer)
       const lastTurn = historyStack[0];
       setHistoryStack(prev => prev.slice(1));
 
@@ -1027,7 +1027,7 @@ export default function FussballClient({ players, initialHistory }: FussballClie
                   onClick={handleUndo}
                   disabled={
                     isBotThinking ||
-                    (currentTurnShots.length === 0 && (gameMode === '1vsComputer' || historyStack.length === 0))
+                    (currentTurnShots.length === 0 && historyStack.length === 0)
                   }
                   className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                 >
