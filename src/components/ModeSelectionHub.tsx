@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { UserSession, logoutAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
-import { LogOut, Settings, SunMoon, ShieldCheck, Sparkles } from 'lucide-react';
+import { LogOut, Settings, SunMoon, ShieldCheck, Sparkles, Lock } from 'lucide-react';
 import DynamicRankingTileContent from './DynamicRankingTileContent';
 import TrainingLotteryWidget from './TrainingLotteryWidget';
 import { LotteryWinner } from '@/lib/trainingLottery';
@@ -128,51 +128,66 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
           </div>
         </Link>
 
-        {/* Kachel 3: Video-Wurfstilanalyse */}
-        <Link
-          href="/video"
+        {/* Kachel 3: Video-Wurfstilanalyse (Coming Soon / Unkenntlich) */}
+        <div
           data-ui-id="HOME.TILES.VIDEO_CARD"
-          className="group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 border-emerald-500/30 hover:border-emerald-400 shadow-2xl hover:shadow-[0_0_35px_rgba(16,185,129,0.35)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+          className="group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 border-slate-700/60 shadow-2xl select-none cursor-not-allowed"
         >
-          {/* Hintergrundbild oder Tech-Gradient */}
+          {/* Hintergrundbild stark weichgezeichnet & unkenntlich gemacht */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#062016] to-slate-950" />
           <Image
             src="/video-banner.jpg"
             alt="Video-Wurfstilanalyse"
             fill
-            className="object-cover object-center group-hover:scale-105 transition-transform duration-500 opacity-75"
+            className="object-cover object-center blur-2xl scale-125 opacity-30 grayscale-[60%] brightness-50"
           />
 
-          {/* Dunkler Gradient-Overlay für beste Lesbarkeit */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+          {/* Milchglas- und Abdunklungs-Overlay */}
+          <div className="absolute inset-0 backdrop-blur-xl bg-slate-950/65" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/40" />
 
-          {/* Badges oben links */}
-          <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-10 flex flex-col gap-1.5">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-black uppercase tracking-wider backdrop-blur-md shadow-sm">
+          {/* Zentrale COMING SOON Einblendung */}
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 text-center">
+            <div className="px-5 py-2.5 sm:px-6 sm:py-3 rounded-2xl bg-slate-900/90 border-2 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.25)] backdrop-blur-md flex flex-col items-center gap-1">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-base sm:text-xl xl:text-2xl font-black uppercase tracking-[0.2em] text-white drop-shadow">
+                  Coming Soon
+                </span>
+              </div>
+              <span className="text-[10px] sm:text-xs font-bold text-emerald-400/90 uppercase tracking-widest">
+                In Entwicklung
+              </span>
+            </div>
+          </div>
+
+          {/* Badges oben links (gedimmt) */}
+          <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-10 flex flex-col gap-1.5 opacity-60">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 text-[10px] font-black uppercase tracking-wider backdrop-blur-md">
               <Sparkles className="w-3 h-3 text-emerald-400" />
               KI-Wurfanalyse
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 text-slate-300 border border-slate-700/60 text-[9px] font-bold backdrop-blur-md">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 text-slate-400 border border-slate-700/60 text-[9px] font-bold backdrop-blur-md">
               <ShieldCheck className="w-3 h-3 text-emerald-400" />
               100% On-Device • DSGVO
             </span>
           </div>
 
-          {/* Titel & Pfeil */}
-          <div className="relative z-10 p-4 sm:p-7 flex items-center justify-between">
+          {/* Titel unten (gedimmt) */}
+          <div className="relative z-10 p-4 sm:p-7 flex items-center justify-between opacity-50">
             <div>
               <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-emerald-400 block mb-0.5">
                 Biomechanik & Release
               </span>
-              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide group-hover:text-emerald-400 transition-colors drop-shadow-md">
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide drop-shadow-md">
                 Video-Wurfstil
               </h2>
             </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 rounded-2xl bg-emerald-500/20 group-hover:bg-emerald-500 text-emerald-300 group-hover:text-slate-950 border border-emerald-400/30 flex items-center justify-center font-black text-lg sm:text-2xl transition-all shrink-0 ml-2 shadow-lg">
-              →
+            <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 rounded-2xl bg-slate-800/80 text-slate-400 border border-slate-700 flex items-center justify-center font-black text-lg sm:text-xl shrink-0 ml-2">
+              <Lock className="w-5 h-5" />
             </div>
           </div>
-        </Link>
+        </div>
 
       </div>
 
