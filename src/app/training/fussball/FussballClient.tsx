@@ -21,6 +21,13 @@ interface ShotRecord {
   dartNum: number;
   type: 'bull_hit' | 'bull_miss' | 'goal' | 'goal_miss';
   label: string;
+  prevBallPossession?: 1 | 2 | null;
+  prevP1Goals?: number;
+  prevP2Goals?: number;
+  prevStats?: {
+    p1Darts: number; p1BullAttempts: number; p1BullHits: number; p1DoubleAttempts: number; p1DoubleHits: number;
+    p2Darts: number; p2BullAttempts: number; p2BullHits: number; p2DoubleAttempts: number; p2DoubleHits: number;
+  };
 }
 
 interface TurnHistory {
@@ -168,6 +175,12 @@ export default function FussballClient({ players, initialHistory }: FussballClie
     const isP1 = currentTurn === 1;
     const activeName = isP1 ? p1Name : getP2DisplayName();
 
+    // Snapshots VOR diesem Wurf sichern (für exaktes Undo)
+    const prevBallPossession = ballPossession;
+    const prevP1Goals = p1Goals;
+    const prevP2Goals = p2Goals;
+    const prevStats = { ...stats };
+
     let newBallPossession = ballPossession;
     let newP1Goals = p1Goals;
     let newP2Goals = p2Goals;
@@ -226,7 +239,11 @@ export default function FussballClient({ players, initialHistory }: FussballClie
     const shotRecord: ShotRecord = {
       dartNum: currentDart,
       type: actionType,
-      label: shotLabel
+      label: shotLabel,
+      prevBallPossession,
+      prevP1Goals,
+      prevP2Goals,
+      prevStats
     };
 
     const newShots = [...currentTurnShots, shotRecord];
@@ -438,6 +455,62 @@ export default function FussballClient({ players, initialHistory }: FussballClie
       setSaveStatus('✅ Spiel in Supabase Cloud gespeichert & für Monatsverlosung gewertet!');
     } else {
       setSaveStatus('⚠️ Fehler beim Speichern: ' + res.error);
+    }
+  };
+
+  // Wurf rückgängig machen (Undo - setzt Ballbesitz, Tore & Stats exakt zurück)
+  const handleUndo = () => {
+    if (gameOver || isBotThinking) return;
+
+    if (currentTurnShots.length > 0) {
+      // 1. Wurf innerhalb der aktuellen Aufnahme rückgängig machen
+      const lastShot = currentTurnShots[currentTurnShots.length - 1];
+
+      setCurrentTurnShots(prev => prev.slice(0, -1));
+      setCurrentDart(lastShot.dartNum as 1 | 2 | 3);
+
+      // Ballbesitz komplett auf den Zustand VOR diesem Wurf zurücksetzen!
+      if (lastShot.prevBallPossession !== undefined) {
+        setBallPossession(lastShot.prevBallPossession);
+      }
+      if (lastShot.prevP1Goals !== undefined) {
+        setP1Goals(lastShot.prevP1Goals);
+      }
+      if (lastShot.prevP2Goals !== undefined) {
+        setP2Goals(lastShot.prevP2Goals);
+      }
+      if (lastShot.prevStats) {
+        setStats(lastShot.prevStats);
+      }
+
+      addTicker(`Dart ${lastShot.dartNum} rückgängig gemacht.`);
+    } else if (gameMode === '1vs1' && historyStack.length > 0) {
+      // 2. Im 1vs1-Modus: Wenn noch kein Dart in der neuen Aufnahme geworfen wurde, vorherige Aufnahme zurückholen
+      const lastTurn = historyStack[0];
+      setHistoryStack(prev => prev.slice(1));
+
+      setCurrentTurn(lastTurn.playerNum);
+      const remainingShots = lastTurn.shots.slice(0, -1);
+      const undoneShot = lastTurn.shots[lastTurn.shots.length - 1];
+
+      setCurrentTurnShots(remainingShots);
+      setCurrentDart(lastTurn.shots.length as 1 | 2 | 3);
+
+      if (undoneShot.prevBallPossession !== undefined) {
+        setBallPossession(undoneShot.prevBallPossession);
+      }
+      if (undoneShot.prevP1Goals !== undefined) {
+        setP1Goals(undoneShot.prevP1Goals);
+      }
+      if (undoneShot.prevP2Goals !== undefined) {
+        setP2Goals(undoneShot.prevP2Goals);
+      }
+      if (undoneShot.prevStats) {
+        setStats(undoneShot.prevStats);
+      }
+
+      const prevPlayerName = lastTurn.playerNum === 1 ? p1Name : p2Name;
+      addTicker(`Aufnahme von ${prevPlayerName} zurückgeholt (Dart ${lastTurn.shots.length}).`);
     }
   };
 
@@ -951,20 +1024,11 @@ export default function FussballClient({ players, initialHistory }: FussballClie
 
                 <button
                   type="button"
-                  onClick={() => {
-                    if (currentDart > 1 && currentTurnShots.length > 0) {
-                      const lastShot = currentTurnShots[currentTurnShots.length - 1];
-                      setCurrentTurnShots(prev => prev.slice(0, -1));
-                      setCurrentDart((currentDart - 1) as 1 | 2 | 3);
-                      // Tore anpassen falls Tor war
-                      if (lastShot.type === 'goal') {
-                        if (currentTurn === 1) setP1Goals(prev => Math.max(0, prev - 1));
-                        else setP2Goals(prev => Math.max(0, prev - 1));
-                      }
-                      addTicker('Letzter Wurf rückgängig gemacht.');
-                    }
-                  }}
-                  disabled={currentDart === 1 || isBotThinking}
+                  onClick={handleUndo}
+                  disabled={
+                    isBotThinking ||
+                    (currentTurnShots.length === 0 && (gameMode === '1vsComputer' || historyStack.length === 0))
+                  }
                   className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
