@@ -128,7 +128,7 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
           </div>
         </Link>
 
-        {/* Kachel 3: Video-Wurfstilanalyse (Coming Soon / Unkenntlich, nur für Admins anwählbar) */}
+        {/* Kachel 3: Geheimes Feature (Coming Soon / Komplett unkenntlich, nur für Admins anwählbar) */}
         <div
           onClick={() => {
             if (user.role === 'admin') {
@@ -142,18 +142,18 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
               : 'border-slate-700/60 cursor-not-allowed pointer-events-none'
           }`}
         >
-          {/* Hintergrundbild stark weichgezeichnet & unkenntlich gemacht */}
+          {/* Hintergrundbild extrem stark weichgezeichnet & unkenntlich gemacht */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#062016] to-slate-950" />
           <Image
             src="/video-banner.jpg"
-            alt="Video-Wurfstilanalyse"
+            alt="Coming Soon"
             fill
-            className="object-cover object-center blur-2xl scale-125 opacity-30 grayscale-[60%] brightness-50"
+            className="object-cover object-center blur-3xl scale-150 opacity-25 grayscale brightness-50"
           />
 
           {/* Milchglas- und Abdunklungs-Overlay */}
-          <div className="absolute inset-0 backdrop-blur-xl bg-slate-950/65" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/40" />
+          <div className="absolute inset-0 backdrop-blur-2xl bg-slate-950/75" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/50" />
 
           {/* Zentrale COMING SOON Einblendung */}
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 text-center">
@@ -165,31 +165,31 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
                 </span>
               </div>
               <span className="text-[10px] sm:text-xs font-bold text-emerald-400/90 uppercase tracking-widest">
-                {user.role === 'admin' ? 'In Entwicklung • Admin-Zugang aktiv' : 'In Entwicklung'}
+                {user.role === 'admin' ? 'Geheimprojekt • Admin-Zugang aktiv' : 'Geheimes Feature'}
               </span>
             </div>
           </div>
 
-          {/* Badges oben links (gedimmt) */}
-          <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-10 flex flex-col gap-1.5 opacity-60">
+          {/* Badges oben links (komplett unkenntlich / geschwärzt) */}
+          <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-10 flex flex-col gap-1.5 opacity-40" aria-hidden="true">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 text-[10px] font-black uppercase tracking-wider backdrop-blur-md">
               <Sparkles className="w-3 h-3 text-emerald-400" />
-              KI-Wurfanalyse
+              <span className="blur-[5px] select-none">••••••••••••••</span>
             </span>
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 text-slate-400 border border-slate-700/60 text-[9px] font-bold backdrop-blur-md">
               <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              100% On-Device • DSGVO
+              <span className="blur-[5px] select-none">••••••••••••••</span>
             </span>
           </div>
 
-          {/* Titel unten (gedimmt) */}
-          <div className="relative z-10 p-4 sm:p-7 flex items-center justify-between opacity-50">
+          {/* Titel unten (komplett unkenntlich / verschwommen) */}
+          <div className="relative z-10 p-4 sm:p-7 flex items-center justify-between opacity-35" aria-hidden="true">
             <div>
-              <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-emerald-400 block mb-0.5">
-                Biomechanik & Release
+              <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-emerald-400 block mb-0.5 blur-[5px] select-none">
+                ••••••••••••••••••
               </span>
-              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide drop-shadow-md">
-                Video-Wurfstil
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide drop-shadow-md blur-[7px] select-none">
+                ••••••••••••••
               </h2>
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 rounded-2xl bg-slate-800/80 text-slate-400 border border-slate-700 flex items-center justify-center font-black text-lg sm:text-xl shrink-0 ml-2">
