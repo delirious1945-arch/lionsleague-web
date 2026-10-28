@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { UserSession, logoutAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
-import { LogOut, Settings, SunMoon } from 'lucide-react';
+import { LogOut, Settings, SunMoon, ShieldCheck, Sparkles } from 'lucide-react';
 import DynamicRankingTileContent from './DynamicRankingTileContent';
 import TrainingLotteryWidget from './TrainingLotteryWidget';
 import { LotteryWinner } from '@/lib/trainingLottery';
@@ -50,10 +50,10 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
         currentUser={user.name}
       />
 
-      {/* Haupt-Bereich: Ranking-System & Trainingsmodus nebeneinander auf voller Bildschirmbreite */}
+      {/* Haupt-Bereich: Ranking, Training & Video-Wurfstilanalyse nebeneinander auf voller Bildschirmbreite */}
       <div
         data-ui-id="HOME.TILES.GRID"
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 flex-1 min-h-[380px] sm:min-h-[460px] lg:min-h-[500px]"
+        className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-5 flex-1 min-h-[380px] sm:min-h-[460px] lg:min-h-[500px]"
       >
         {/* Kachel 1: Ranking-System */}
         <Link
@@ -84,11 +84,11 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
               <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-amber-400 block mb-0.5">
                 Wettkampf & Liga
               </span>
-              <h2 className="text-xl sm:text-3xl md:text-4xl font-black text-white tracking-wide group-hover:text-amber-400 transition-colors drop-shadow-md">
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide group-hover:text-amber-400 transition-colors drop-shadow-md">
                 Ranking-System
               </h2>
             </div>
-            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-amber-500/20 group-hover:bg-amber-500 text-amber-300 group-hover:text-slate-950 border border-amber-400/30 flex items-center justify-center font-black text-lg sm:text-2xl transition-all shrink-0 ml-3 shadow-lg">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 rounded-2xl bg-amber-500/20 group-hover:bg-amber-500 text-amber-300 group-hover:text-slate-950 border border-amber-400/30 flex items-center justify-center font-black text-lg sm:text-2xl transition-all shrink-0 ml-2 shadow-lg">
               →
             </div>
           </div>
@@ -118,11 +118,57 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
               <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-cyan-400 block mb-0.5">
                 Training & Wurf-Tools
               </span>
-              <h2 className="text-xl sm:text-3xl md:text-4xl font-black text-white tracking-wide group-hover:text-cyan-400 transition-colors drop-shadow-md">
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide group-hover:text-cyan-400 transition-colors drop-shadow-md">
                 Trainingsmodus
               </h2>
             </div>
-            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-cyan-500/20 group-hover:bg-cyan-500 text-cyan-300 group-hover:text-slate-950 border border-cyan-400/30 flex items-center justify-center font-black text-lg sm:text-2xl transition-all shrink-0 ml-3 shadow-lg">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 rounded-2xl bg-cyan-500/20 group-hover:bg-cyan-500 text-cyan-300 group-hover:text-slate-950 border border-cyan-400/30 flex items-center justify-center font-black text-lg sm:text-2xl transition-all shrink-0 ml-2 shadow-lg">
+              →
+            </div>
+          </div>
+        </Link>
+
+        {/* Kachel 3: Video-Wurfstilanalyse */}
+        <Link
+          href="/video"
+          data-ui-id="HOME.TILES.VIDEO_CARD"
+          className="group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 border-emerald-500/30 hover:border-emerald-400 shadow-2xl hover:shadow-[0_0_35px_rgba(16,185,129,0.35)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+        >
+          {/* Hintergrundbild oder Tech-Gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#062016] to-slate-950" />
+          <Image
+            src="/video-banner.jpg"
+            alt="Video-Wurfstilanalyse"
+            fill
+            className="object-cover object-center group-hover:scale-105 transition-transform duration-500 opacity-75"
+          />
+
+          {/* Dunkler Gradient-Overlay für beste Lesbarkeit */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+
+          {/* Badges oben links */}
+          <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-10 flex flex-col gap-1.5">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-black uppercase tracking-wider backdrop-blur-md shadow-sm">
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+              KI-Wurfanalyse
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 text-slate-300 border border-slate-700/60 text-[9px] font-bold backdrop-blur-md">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              100% On-Device • DSGVO
+            </span>
+          </div>
+
+          {/* Titel & Pfeil */}
+          <div className="relative z-10 p-4 sm:p-7 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-emerald-400 block mb-0.5">
+                Biomechanik & Release
+              </span>
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide group-hover:text-emerald-400 transition-colors drop-shadow-md">
+                Video-Wurfstil
+              </h2>
+            </div>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 rounded-2xl bg-emerald-500/20 group-hover:bg-emerald-500 text-emerald-300 group-hover:text-slate-950 border border-emerald-400/30 flex items-center justify-center font-black text-lg sm:text-2xl transition-all shrink-0 ml-2 shadow-lg">
               →
             </div>
           </div>

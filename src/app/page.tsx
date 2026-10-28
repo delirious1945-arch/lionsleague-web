@@ -1,4 +1,6 @@
 import React from 'react';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import Podium from '@/components/Podium';
 import TeamBattle from '@/components/TeamBattle';
 import KingsOf26 from '@/components/KingsOf26';
@@ -44,13 +46,23 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-5 animate-fadeIn">
-      {/* Sub-Header Banner */}
-      <div className="lions-card px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-lg">
-        <div className="flex items-center gap-2.5">
+      {/* Sub-Header Banner mit Zurück-Button zur Hauptauswahl */}
+      <div className="lions-card px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            data-ui-id="DASHBOARD.NAV.BACK_BTN"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition-all shadow-sm"
+            title="Zurück zur Hauptauswahl (Ranking / Training / Video)"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Hauptauswahl</span>
+          </Link>
+          <div className="h-4 w-px bg-white/10 hidden sm:block" />
           <span className="text-base font-black tracking-wider uppercase text-white flex items-center gap-2">
             <span>🎯</span> Liga Dashboard
           </span>
-          <span className="text-xs font-semibold text-slate-400">
+          <span className="text-xs font-semibold text-slate-400 hidden md:inline">
             • Gesamtwertung & Team-Statistiken
           </span>
         </div>
