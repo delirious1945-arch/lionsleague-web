@@ -6,30 +6,37 @@ import { FussballSessionSavePayload } from './types';
 import { sanitizeTrainingDate } from '@/lib/dateUtils';
 
 export async function saveFussballSessionAction(sessions: FussballSessionSavePayload[]) {
-  try {
-    for (const s of sessions) {
-      const validTrainingDate = sanitizeTrainingDate(s.training_date);
-      await sql`
-        INSERT INTO training_fussball (
-          session_id, player_id, player_name, opponent_name, is_computer, computer_level,
-          game_mode, target_goals, goals_scored, goals_conceded, darts_thrown,
-          bull_hits, bull_attempts, double_hits, double_attempts,
-          is_winner, training_date
-        ) VALUES (
-          ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name}, ${s.is_computer}, ${s.computer_level ?? null},
-          ${s.game_mode}, ${s.target_goals}, ${s.goals_scored}, ${s.goals_conceded}, ${s.darts_thrown},
-          ${s.bull_hits}, ${s.bull_attempts}, ${s.double_hits}, ${s.double_attempts},
-          ${s.is_winner}, ${validTrainingDate}
-        )
-      `;
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      for (const s of sessions) {
+        const validTrainingDate = sanitizeTrainingDate(s.training_date);
+        await sql`
+          INSERT INTO training_fussball (
+            session_id, player_id, player_name, opponent_name, is_computer, computer_level,
+            game_mode, target_goals, goals_scored, goals_conceded, darts_thrown,
+            bull_hits, bull_attempts, double_hits, double_attempts,
+            is_winner, training_date
+          ) VALUES (
+            ${s.session_id}, ${s.player_id ?? null}, ${s.player_name}, ${s.opponent_name}, ${s.is_computer}, ${s.computer_level ?? null},
+            ${s.game_mode}, ${s.target_goals}, ${s.goals_scored}, ${s.goals_conceded}, ${s.darts_thrown},
+            ${s.bull_hits}, ${s.bull_attempts}, ${s.double_hits}, ${s.double_attempts},
+            ${s.is_winner}, ${validTrainingDate}
+          )
+        `;
+      }
+      revalidatePath('/training');
+      revalidatePath('/training/fussball');
+      return { success: true };
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Fehler beim Speichern des Fußball-Spiels (Versuch ${attempt}/3):`, error);
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 600 * attempt));
+      }
     }
-    revalidatePath('/training');
-    revalidatePath('/training/fussball');
-    return { success: true };
-  } catch (error: any) {
-    console.error('Fehler beim Speichern des Fußball-Spiels in Supabase:', error);
-    return { success: false, error: error.message || 'Speichern fehlgeschlagen' };
   }
+  return { success: false, error: lastError?.message || 'Speichern fehlgeschlagen' };
 }
 
 export async function getFussballHistoryAction(limit: number = 20) {
