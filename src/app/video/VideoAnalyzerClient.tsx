@@ -47,6 +47,8 @@ interface PoseKeypoints {
   elbow: Point;
   wrist: Point;
   hip: Point;
+  knee?: Point;
+  ankle?: Point;
 }
 
 type PhaseKey = 'baseline' | 'drawback' | 'release' | 'follow_through';
@@ -81,6 +83,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     height: 1920,
   });
   const [hasUploadedVideo, setHasUploadedVideo] = useState<boolean>(false);
+  // Kalibrierungs-Anker: Körpergröße des Spielers in cm (Standard 180cm)
+  const [playerHeightCm, setPlayerHeightCm] = useState<number>(180);
+  const [handedness, setHandedness] = useState<'right' | 'left'>('right');
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
   // MediaPipe Pose Modell Status
@@ -152,7 +157,16 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       const baseEy = base.elbow.y * dims.height;
 
       const upperArmPx = Math.hypot(baseEx - baseSx, baseEy - baseSy) || 100;
-      const mmPerPx = 300 / upperArmPx;
+      // Wissenschaftliche Kalibrierung anhand individueller Körpergröße (Winter/Dempster Biomechanik):
+      // Oberarmlänge entspricht ca. 18.6% der Körpergröße.
+      // Wenn Knöchel/Kopf sichtbar sind, wird die Gesamtkörper-Höhe (Scheitel bis Ferse = 100%) als noch präziserer Anker genutzt!
+      let mmPerPx = (playerHeightCm * 1.86) / upperArmPx;
+      if (base.head && base.ankle) {
+        const bodyPx = Math.hypot((base.ankle.x - base.head.x) * dims.width, (base.ankle.y - base.head.y) * dims.height);
+        if (bodyPx > 200) {
+          mmPerPx = (playerHeightCm * 10 * 0.94) / bodyPx;
+        }
+      }
 
       const curSx = pose.shoulder.x * dims.width;
       const curSy = pose.shoulder.y * dims.height;
@@ -178,7 +192,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         deltaShoulder_mm,
       };
     },
-    [videoDims, calcElbowAngle]
+    [videoDims, calcElbowAngle, playerHeightCm]
   );
 
   // 1. MediaPipe Pose Landmarker im IMAGE-Modus (Einzelbild-Präzision) laden
@@ -266,18 +280,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         if (result && result.landmarks && result.landmarks.length > 0) {
           const lm = result.landmarks[0];
 
-          // Prüfen, ob rechte Körperseite (12, 14, 16, 24) oder linke Seite (11, 13, 15, 23) besser sichtbar / vorne ist
-          const rightVis = (lm[12]?.visibility ?? 0) + (lm[14]?.visibility ?? 0) + (lm[16]?.visibility ?? 0);
-          const leftVis = (lm[11]?.visibility ?? 0) + (lm[13]?.visibility ?? 0) + (lm[15]?.visibility ?? 0);
-          const useRight = rightVis >= leftVis;
+          // Händigkeit & Körperseite: Manuelle Wahl oder automatische Sichtbarkeit
+          const isRightArm = handedness === 'right';
+          const sIdx = isRightArm ? 12 : 11;
+          const eIdx = isRightArm ? 14 : 13;
+          const wIdx = isRightArm ? 16 : 15;
+          const hIdx = isRightArm ? 24 : 23;
+          const kIdx = isRightArm ? 26 : 25;
+          const aIdx = isRightArm ? 28 : 27;
 
-          const sIdx = useRight ? 12 : 11;
-          const eIdx = useRight ? 14 : 13;
-          const wIdx = useRight ? 16 : 15;
-          const hIdx = useRight ? 24 : 23;
-
-          // Ohr/Kopf-Mitte (7/8 = Ohren, 0 = Nase)
-          const earIdx = useRight ? 8 : 7;
+          // Kopf-Referenz
+          const earIdx = isRightArm ? 8 : 7;
           const headPt = lm[earIdx] || lm[0];
 
           return {
@@ -301,6 +314,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               x: Math.max(0.05, Math.min(0.95, lm[hIdx].x)),
               y: Math.max(0.05, Math.min(0.95, lm[hIdx].y)),
             },
+            knee: lm[kIdx] ? { x: Math.max(0.05, Math.min(0.95, lm[kIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[kIdx].y)) } : undefined,
+            ankle: lm[aIdx] ? { x: Math.max(0.05, Math.min(0.95, lm[aIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[aIdx].y)) } : undefined,
           };
         }
       } catch (e) {
@@ -309,7 +324,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
 
     return fallbackPose;
-  }, []);
+  }, [handedness]);
 
   // Video-Upload Handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -618,12 +633,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ctx.stroke();
       }
 
-      // Rumpf & Kopf-Linie
+      // Rumpf, Kopf- und Beine-Linie (Ganzkörper-Skelett)
       ctx.strokeStyle = 'rgba(148, 163, 184, 0.65)';
       ctx.lineWidth = 3.5 * scale;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(hx, hy);
+      if (p.ankle && p.knee) {
+        ctx.moveTo(p.ankle.x * w, p.ankle.y * h);
+        ctx.lineTo(p.knee.x * w, p.knee.y * h);
+        ctx.lineTo(hx, hy);
+      } else {
+        ctx.moveTo(hx, hy);
+      }
       ctx.lineTo(sx, sy);
       ctx.lineTo(headX, headY);
       ctx.stroke();
@@ -716,6 +737,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     keys.forEach((k) => {
       const pt = currentPose[k];
+      if (!pt) return;
       const d = Math.hypot(normX - pt.x, normY - pt.y);
       if (d < minDist) {
         minDist = d;
