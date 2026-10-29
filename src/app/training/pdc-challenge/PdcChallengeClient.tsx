@@ -1287,13 +1287,9 @@ export default function PdcChallengeClient({
                     {p1Name}
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase font-bold text-zinc-400">Aktueller Stand</div>
-                    <div className="text-xl sm:text-2xl font-black font-mono text-amber-400">{p1Stats.totalScore} Pkt</div>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${p1Stats.badge.badgeClass}`}>
-                    {p1Stats.badge.name}
+                <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black shadow-md ${p1Stats.badge.badgeClass}`}>
+                    {p1Stats.badge.icon} {p1Stats.badge.name}
                   </span>
                 </div>
               </div>
@@ -1319,9 +1315,6 @@ export default function PdcChallengeClient({
                           ⏸️ Wartet (Spieler 1)
                         </span>
                       )}
-                    </div>
-                    <div className="font-mono font-black text-amber-400 text-lg sm:text-xl">
-                      {p1Stats.totalScore} Pkt
                     </div>
                   </div>
                   <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 1 ? 'text-white drop-shadow-md' : 'text-zinc-400'}`}>
@@ -1355,9 +1348,6 @@ export default function PdcChallengeClient({
                           ⏸️ Wartet (Spieler 2)
                         </span>
                       )}
-                    </div>
-                    <div className="font-mono font-black text-amber-400 text-lg sm:text-xl">
-                      {p2Stats.totalScore} Pkt
                     </div>
                   </div>
                   <div className={`mt-2 text-2xl sm:text-4xl font-black tracking-tight ${activePlayer === 2 ? 'text-white drop-shadow-md' : 'text-zinc-400'}`}>
@@ -1496,10 +1486,10 @@ export default function PdcChallengeClient({
 
                       let btnStyle =
                         val === 0
-                          ? 'bg-zinc-800/80 hover:bg-zinc-700 border-zinc-700 text-zinc-400'
+                          ? 'bg-zinc-900 hover:bg-red-950/30 hover:border-red-800/50 border-zinc-800 text-zinc-400'
                           : isSix
-                          ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-zinc-950 font-black border-amber-300 shadow-lg shadow-amber-500/30'
-                          : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-white font-black';
+                          ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 text-zinc-950 font-black border-emerald-300 shadow-lg shadow-emerald-500/30'
+                          : 'bg-zinc-800 hover:bg-zinc-700 hover:border-emerald-500/50 border-zinc-700 text-white font-black';
 
                       return (
                         <button
@@ -1513,17 +1503,17 @@ export default function PdcChallengeClient({
                           </div>
                           <div
                             className={`text-[10px] font-mono font-bold ${
-                              isSix ? 'text-zinc-950' : 'text-amber-400'
+                              isSix ? 'text-zinc-950' : val === 0 ? 'text-zinc-500' : 'text-emerald-400'
                             }`}
                           >
                             {basePts} Pkt
                           </div>
                           {isSix ? (
-                            <div className="text-[9px] uppercase font-black text-zinc-950 bg-amber-300 px-1.5 py-0.2 rounded mt-0.5">
+                            <div className="text-[9px] uppercase font-black text-zinc-950 bg-emerald-300 px-1.5 py-0.2 rounded mt-0.5">
                               Shanghai?
                             </div>
                           ) : (
-                            <div className="text-[9px] text-zinc-400">
+                            <div className={`text-[9px] ${val === 0 ? 'text-red-400/80 font-bold' : 'text-zinc-400'}`}>
                               {val === 0 ? 'Fehlwurf' : `${val}x`}
                             </div>
                           )}
@@ -1537,56 +1527,27 @@ export default function PdcChallengeClient({
               {/* STAGE 2: DOPPELRUNDE (D1-D20 + BULL) */}
               {stage === 'part2' && (
                 <div className="space-y-6">
-                  {/* Timeline der 21 Doppel */}
-                  <div className="overflow-x-auto pb-2" data-ui-id="PDC.MATCH.DOUBLES_TIMELINE">
-                    <div className="flex items-center gap-1.5 min-w-max justify-center">
-                      {PART2_TARGETS.map((t, idx) => {
-                        const currentState = activePlayer === 1 ? stateP1 : stateP2;
-                        const hit = currentState.part2Hits[t];
-                        const isCur = currentTargetIndex === idx;
-
-                        let style = 'bg-zinc-950 border-zinc-800 text-zinc-500';
-                        if (hit === true) {
-                          style = 'bg-zinc-800 border-amber-400 text-amber-400 font-black shadow-md shadow-amber-500/20';
-                        } else if (hit === false) {
-                          style = 'bg-zinc-950/80 border-zinc-800 text-zinc-600';
-                        } else if (isCur) {
-                          style = 'bg-amber-500 text-zinc-950 font-black ring-2 ring-amber-300 scale-110';
-                        }
-
-                        return (
-                          <div
-                            key={t}
-                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center text-xs font-bold transition-all ${style}`}
-                          >
-                            {t === 'Bull' ? 'B' : t.replace('D', '')}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Aufnahme & 3 Darts Statusanzeige in Teil 2 */}
+                  {/* Aufnahme & 3 Darts Statusanzeige in Teil 2 (vergrößerte Fokus-Ansicht) */}
                   <div
                     data-ui-id="PDC.MATCH.DOUBLES_STATUS"
-                    className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 sm:p-4 text-center space-y-2.5"
+                    className="bg-zinc-950/90 border-2 border-zinc-700/80 rounded-3xl p-5 sm:p-7 text-center space-y-4 shadow-xl"
                   >
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      <span className="text-xs uppercase font-black tracking-wider text-amber-400 bg-zinc-900 px-3 py-1 rounded-full border border-amber-500/40">
+                    <div className="flex flex-wrap items-center justify-center gap-2.5">
+                      <span className="text-xs sm:text-sm uppercase font-black tracking-wider text-amber-400 bg-zinc-900 px-4 py-1.5 rounded-full border border-amber-500/40 shadow-sm">
                         Aufnahme {Math.floor(currentTargetIndex / 3) + 1} von 7
                       </span>
-                      <span className="text-xs uppercase font-black tracking-wider text-zinc-300 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-700">
+                      <span className="text-xs sm:text-sm uppercase font-black tracking-wider text-zinc-300 bg-zinc-900 px-4 py-1.5 rounded-full border border-zinc-700 shadow-sm">
                         Dart {(currentTargetIndex % 3) + 1} von 3
                       </span>
                       {gameMode === '1vs1' && (
-                        <span className="text-xs font-bold text-zinc-300 bg-zinc-900 px-2.5 py-1 rounded-full border border-zinc-700">
+                        <span className="text-xs sm:text-sm font-bold text-zinc-300 bg-zinc-900 px-3.5 py-1.5 rounded-full border border-zinc-700">
                           Am Wurf: <strong className="text-white">{activePlayer === 1 ? p1Name : p2Name}</strong>
                         </span>
                       )}
                     </div>
 
-                    {/* Visuelle Anzeige der 3 Darts / Doppel dieser Aufnahme */}
-                    <div className="flex items-center justify-center gap-2 pt-1">
+                    {/* Visuelle Anzeige der 3 Darts / Doppel dieser Aufnahme - Groß & Klar */}
+                    <div className="flex items-center justify-center gap-3 sm:gap-4 pt-1">
                       {PART2_TARGETS.slice(Math.floor(currentTargetIndex / 3) * 3, Math.floor(currentTargetIndex / 3) * 3 + 3).map((targetName, dIdx) => {
                         const isCurrentDart = dIdx === (currentTargetIndex % 3);
                         const curHits = (activePlayer === 1 ? stateP1 : stateP2).part2Hits;
@@ -1595,33 +1556,33 @@ export default function PdcChallengeClient({
                         return (
                           <div
                             key={targetName}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-black transition-all ${
+                            className={`flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2.5 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border-2 font-black transition-all ${
                               isCurrentDart
-                                ? 'bg-amber-500 text-zinc-950 border-amber-300 ring-2 ring-amber-300 shadow-md shadow-amber-500/30 scale-105'
+                                ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-zinc-950 border-amber-300 ring-4 ring-amber-300/40 shadow-xl shadow-amber-500/40 scale-105'
                                 : hitVal === true
-                                ? 'bg-zinc-800 text-amber-400 border-amber-400/80'
+                                ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500 shadow-md shadow-emerald-500/30'
                                 : hitVal === false
-                                ? 'bg-zinc-950 text-zinc-500 border-zinc-800'
-                                : 'bg-zinc-900 text-zinc-600 border-zinc-800'
+                                ? 'bg-red-950/60 text-red-400 border-red-900/80'
+                                : 'bg-zinc-900 text-zinc-500 border-zinc-800'
                             }`}
                           >
-                            <span className="text-[11px] opacity-80">Dart {dIdx + 1}:</span>
-                            <span className="font-mono text-sm sm:text-base">{targetName}</span>
-                            {hitVal === true && <span>🎯</span>}
-                            {hitVal === false && <span>❌</span>}
+                            <span className="text-xs uppercase opacity-80">Dart {dIdx + 1}</span>
+                            <span className="font-mono text-xl sm:text-2xl font-black">{targetName}</span>
+                            {hitVal === true && <span className="text-emerald-400 text-lg">🎯</span>}
+                            {hitVal === false && <span className="text-red-400 text-lg">❌</span>}
                           </div>
                         );
                       })}
                     </div>
 
-                    <div className="text-xs text-zinc-300 pt-1">
+                    <div className="text-sm sm:text-base text-zinc-200 pt-1 font-medium">
                       {currentTargetLabel === 'Bull' ? (
-                        <span>🎯 <strong>Bullseye (Inner Bull / Rot):</strong> Genau 1 Dart! Treffer = <strong>100 Punkte</strong>.</span>
+                        <span>🎯 <strong>Bullseye (Inner Bull / Rot):</strong> Genau 1 Dart! Treffer = <strong className="text-emerald-400">100 Punkte</strong>.</span>
                       ) : (
-                        <span>🎯 <strong>{currentTargetLabel}:</strong> Genau 1 Dart auf dieses Doppel! Treffer = <strong>50 Punkte</strong>.</span>
+                        <span>🎯 <strong>{currentTargetLabel}:</strong> Genau 1 Dart auf dieses Doppel! Treffer = <strong className="text-emerald-400">50 Punkte</strong>.</span>
                       )}
                       {gameMode === '1vs1' && (
-                        <div className="text-[11px] text-amber-400/90 mt-0.5">
+                        <div className="text-xs text-amber-400/90 mt-1">
                           Nach 3 Eintragungen wechselt der Wurf zu <strong>{activePlayer === 1 ? p2Name : p1Name}</strong>.
                         </div>
                       )}
@@ -1633,21 +1594,21 @@ export default function PdcChallengeClient({
                     <button
                       onClick={() => handleDoubleDart(false)}
                       data-ui-id="PDC.MATCH.DOUBLE_MISS_BTN"
-                      className="py-6 px-4 rounded-3xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 border-2 border-zinc-700 text-white font-black text-lg transition-all shadow-xl cursor-pointer flex flex-col items-center justify-center gap-1"
+                      className="py-6 px-4 rounded-3xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/40 hover:to-zinc-900 hover:border-red-700/60 active:scale-95 border-2 border-zinc-700 text-zinc-200 font-black text-lg transition-all shadow-xl cursor-pointer flex flex-col items-center justify-center gap-1 group"
                     >
-                      <span className="text-2xl">❌</span>
-                      <span>Daneben</span>
-                      <span className="text-xs font-mono text-zinc-400">0 Punkte</span>
+                      <span className="text-2xl group-hover:scale-110 transition-transform">❌</span>
+                      <span className="group-hover:text-red-300 transition-colors">Daneben</span>
+                      <span className="text-xs font-mono text-zinc-400 group-hover:text-red-400/70">0 Punkte (Miss)</span>
                     </button>
 
                     <button
                       onClick={() => handleDoubleDart(true)}
                       data-ui-id="PDC.MATCH.DOUBLE_HIT_BTN"
-                      className="py-6 px-4 rounded-3xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 active:scale-95 border-2 border-amber-300 text-zinc-950 font-black text-lg transition-all shadow-xl shadow-amber-500/30 cursor-pointer flex flex-col items-center justify-center gap-1"
+                      className="py-6 px-4 rounded-3xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 border-2 border-emerald-300 text-zinc-950 font-black text-lg transition-all shadow-xl shadow-emerald-500/30 cursor-pointer flex flex-col items-center justify-center gap-1 group"
                     >
-                      <span className="text-2xl">🎯</span>
-                      <span>TREFFER!</span>
-                      <span className="text-xs font-mono text-zinc-950 font-bold">
+                      <span className="text-2xl group-hover:scale-110 transition-transform">🎯</span>
+                      <span className="tracking-wide">TREFFER!</span>
+                      <span className="text-xs font-mono text-zinc-950 font-black bg-emerald-400/80 px-2 py-0.5 rounded-full">
                         +{currentTargetLabel === 'Bull' ? 100 : 50} Punkte
                       </span>
                     </button>

@@ -81,6 +81,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     height: 1920,
   });
   const [hasUploadedVideo, setHasUploadedVideo] = useState<boolean>(false);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
   // MediaPipe Pose Modell Status
   const [isModelReady, setIsModelReady] = useState<boolean>(false);
@@ -317,20 +318,23 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     if (!file) return;
 
     const url = URL.createObjectURL(file);
+    setVideoSrc(url);
+    setHasUploadedVideo(true);
+    setSource('upload');
+    setBaselinePose(null);
+    setCurrentPose(null);
+    setSnapshots(null);
+    setIsPlaying(false);
+    setStatusMessage(
+      `Video „${file.name}“ geladen! Spule zu deiner Ausgangshaltung (Stand) und klicke auf „2. Nullpunkt setzen“.`
+    );
+
     if (videoRef.current) {
       videoRef.current.srcObject = null;
       videoRef.current.src = url;
       videoRef.current.load();
-      setHasUploadedVideo(true);
-      setSource('upload');
-      setBaselinePose(null);
-      setCurrentPose(null);
-      setSnapshots(null);
-      setIsPlaying(false);
-      setStatusMessage(
-        'Video geladen! Spule zu deiner Ausgangshaltung (Stand) und klicke auf „1. Nullpunkt setzen“.'
-      );
     }
+    e.target.value = '';
   };
 
   // Sobald die Metadaten des Videos geladen sind: Echte Video-Auflösung übernehmen!
@@ -343,6 +347,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setVideoDims({ width: w, height: h });
     setDuration(video.duration || 0);
     video.playbackRate = playbackRate;
+    // Erstes Standbild sicher sichtbar machen
+    if (video.currentTime === 0) {
+      video.currentTime = 0.05;
+    }
   };
 
   // SCHRITT 2: Nullpunkt (Baseline) auf dem aktuellen Standbild setzen
@@ -1057,6 +1065,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               >
                 <video
                   ref={videoRef}
+                  src={videoSrc ?? undefined}
                   playsInline
                   muted
                   onLoadedMetadata={handleLoadedMetadata}

@@ -1,3 +1,112 @@
+# 🛡️ Autonomous Development & Quality Rules (AGENTS.md)
+*Gültige Leitplanken für alle Antigravity-Agenten im Projekt Lions Weyhausen Ranking Website*
+
+---
+
+## 1. Projektziel & Mission
+Kontinuierliche, sichere und autonome Weiterentwicklung der webbasierten Dart-Ranking- und Analyseplattform der Lions Weyhausen. Ziel ist maximale Datenintegrität, präzise Ranking-Berechnungen nach BBDV-Standard und absolute Stabilität für die Spieler und Admins.
+
+---
+
+## 2. Allgemeine Grundregeln (Für jeden Agenten verbindlich)
+1. **Sprache:** Alle Erklärungen, UI-Texte, Kommentare und Berichte sind auf **Deutsch** zu verfassen.
+2. **Architektur-Respekt:** Vor jeder Codeänderung ist die bestehende Architektur (`app.py`, `database.py`, `pages/`, `analytics/`) zu analysieren.
+3. **Schutz der Produktionsdaten:** Experimente und Entwicklungen finden **niemals** direkt auf `dart_data.db` statt. Änderungen werden in isolierten Bereichen (`test_env/`, separaten Branches/Workspaces) vorgenommen.
+4. **Sicherheitsgrenzen:** Keine Passwörter, API-Tokens (z. B. Supabase Secrets) oder sensible Daten im Code, in Logs oder in Berichten.
+5. **Kein Test-Disabling:** Niemals bestehende Tests oder Plausibilitätsprüfungen abschwächen oder deaktivieren, nur um ein Quality Gate zu passieren.
+6. **Lückenlose Protokollierung:** Jede autonome Aktion erzeugt ein transparentes Protokoll nach dem definierten Übergabestandard.
+
+---
+
+## 3. Ranking- & Datenqualität (BBDV-Standard)
+1. **Baseline-Prinzip:** Vor jeder Optimierung am Ranking-Algorithmus (z. B. Gewichtungen in `database.py`, Average-Berechnungen in `analytics/`) wird eine reproduzierbare Baseline auf einem festen Testdatensatz ermittelt.
+2. **Keine Ranking-Verzerrung:** Änderungen am Ranking dürfen historische Platzierungen nicht unplausibel verschieben. Jede Anpassung muss mathematisch nachweisbar begründet sein.
+3. **Plausibilitätskriterien:**
+   - First-to-3 im Best-of-5 (genau 3 Gewinnlegs erforderlich).
+   - Maximal 2 Einzel pro Spieler an einem Spieltag.
+   - Checkouts $\le 170$ und Ausschluss von Bogey-Numbers (159, 162, 163, 165, 166, 168, 169).
+   - 3-Dart-Average-Formel: $(\text{Punkte} / \text{Darts}) \times 3$.
+
+---
+
+## 4. Test- & Validierungsstufen (Quality Gates)
+Jeder autonome Verbesserungszyklus muss folgende 4 Gates durchlaufen:
+* **Gate 1 (Syntax & Imports):** Fehlerfreies Laden aller Module, keine zirkulären Abhängigkeiten.
+* **Gate 2 (DB-Integrität):** Schema-Konsistenz in SQLite und Supabase-Kompatibilität, keine verwaisten Fremdschlüssel.
+* **Gate 3 (Regressions- & Ranking-Tests):** Bestehende Matches und Statistiken liefern identische oder nachweisbar verbesserte Ergebnisse.
+* **Gate 4 (Security & Performance):** Keine sensiblen Leaks, keine Deadlocks, Ausführungszeit unter Schwellenwert.
+
+---
+
+## 5. Freigabe- & Rollout-Regeln
+* **Automatisches Staging:** Änderungen, die alle Quality Gates zu 100% bestehen und keine destruktiven Schemaänderungen enthalten, dürfen in das Staging-Environment übertragen werden.
+* **Menschliche Freigabe erforderlich bei:**
+  - Destruktiven Datenbank-Migrationen (DROP, Spaltenlöschungen).
+  - Grundlegenden Änderungen am Regel- oder Punktesystem.
+  - Fehlgeschlagenen Quality Gates oder Warnungen im Audit.
+  - Änderungen an Authentifizierungs- oder Rollenrechten.
+
+---
+
+## 6. Berichterstattung an den Admin (Sebastian)
+Jeder Zyklus schließt mit einem kompakten Management-Bericht ab:
+1. **Was wurde analysiert?** (Metriken, Fehlerquellen, Performance)
+2. **Was wurde verbessert?** (Konkrete Änderung im Code)
+3. **Welche Tests wurden ausgeführt?** (Ergebnisse Gate 1–4)
+4. **Baseline vs. Kandidat:** (Messbarer Vorher-/Nachher-Vergleich)
+5. **Verbleibende Risiken & Freigabeempfehlung** (Auto-Rollout oder manuelle Freigabe)
+
+---
+
+## 7. Agenten-Netzwerk: Rollen & Rechte
+*Ergänzt am 28.10.2026, erweitert am 29.10.2026 um Game-Optimizer & UI-Cleaner.*
+
+| Agent | Skills | Rechte | Grenze |
+|---|---|---|---|
+| **Orchestrator** | `daily-report`, Priorisierung | Aufgaben verteilen, Berichte schreiben | Keine Codeänderung |
+| **Analyst** | `daily-audit`, `ranking-evaluation` | Nur lesend, nur Kopie bzw. `test_env/` | Nie auf `dart_data.db` schreiben |
+| **Coding-Agent** | `safe-implementation` | Schreibt nur im eigenen Branch/Worktree | Max. 1 Verbesserung pro Zyklus, kein Merge, keine Ranking-Logik |
+| **QA + Security** | `quality-gate`, `release-review` | Führt Tests aus, prüft Secrets/Rollen/Datenschutz | Darf Tests niemals abschwächen |
+| **Game-Optimizer** | `game-simulation`, `flow-audit` | Testet & optimiert Trainingsspiele; steuert Unteragenten für Spielsimulationen | Keine Änderung an Ranking-/Ligamatch-Logik |
+| **UI-Cleaner** | `ui-styling-only`, `ux-declutter` | Detektiert redundante/störende UI-Elemente, korrigiert Farbsemantik (Grün=Hit, Rot=Miss) | Keine Änderung an Backend-/Datenbanklogik |
+
+1. **Trennung der Verantwortung:** Wer etwas baut, bewertet und gibt es nicht selbst frei.
+2. **Unteragenten für Game-Simulation:** Der `Game-Optimizer` nutzt autonome Subagents/Simulatoren, die vollständige Spielverläufe durchspielen, Randfälle prüfen (Undo, Punkte-Obergrenzen, Abbrüche) und Fehlerberichte erzeugen.
+3. **UI-Cleaner Leitplanken:** Konzentration auf Spiel-Fokus, Reduktion von visueller Überladung auf dem Dartboard/Mobile-Screen, strikte Einhaltung der Farb-Semantik: Treffer/Erfolg = Smaragdgrün, Fehlwurf/Warnung = Rot/Grau.
+
+---
+
+## 8. Schutz der Ranking-Logik (Doppelte Bestätigung)
+1. **Ranking- und Punktelogik darf niemals ohne doppelte, ausdrückliche Bestätigung von Sebastian geändert werden.** Betroffen sind insbesondere Gewichtungen in `database.py`, Average-Berechnungen in `analytics/` (z. B. `calculate_3dart_average`) sowie Tabellen- und Ranglogik.
+2. **Doppelte Bestätigung heißt:** (a) Zustimmung zum konkreten Änderungsvorschlag mit Baseline-vs-Kandidat-Vergleich **und** (b) eine zweite, separate Bestätigung unmittelbar vor der Übernahme.
+3. **Vorschläge sind ausdrücklich erlaubt.** Agenten dürfen Änderungen als Bericht, Diff oder Branch-Entwurf vorschlagen, aber nicht anwenden oder in Produktion übernehmen.
+4. Keine autonome Ausnahme: Auch bestandene Quality Gates ersetzen diese Bestätigung nicht.
+
+---
+
+## 9. Zusätzliche Leitplanken für Entwicklung & Analyse
+1. **Isolierte Arbeit:** Änderungen erfolgen ausschließlich in separaten Git-Branches oder Worktrees, niemals direkt auf dem Hauptzweig. Solange kein Git-Repository eingerichtet ist, wird nur in Kopien bzw. `test_env/` gearbeitet und vorab eine Sicherungskopie des Projekts erstellt.
+2. **Dokumentationspflicht:** Jede relevante Änderung wird mit Grund, Dateien und Testergebnis dokumentiert.
+3. **Schutz vor Daten-Leakage:** Der Referenzdatensatz (`test_env/reference_data/`) darf nicht zum Anpassen von Parametern verwendet werden. Prognosemodelle werden zeitlich getrennt validiert (Training auf früheren Spieltagen, Test auf späteren).
+4. **Prognosen sind keine Fakten:** Prädiktive Analysen und What-if-Szenarien werden stets mit Datenbasis (Anzahl Legs/Spiele) und Unsicherheit ausgewiesen. Bei zu wenig Daten erfolgt ein Hinweis statt einer Zahl.
+5. **Kosten- und Abbruchlimit:** Pro Zyklus gilt ein festes Limit. Nach wiederholten Fehlschlägen (Standard: 3) bricht der Zyklus ab und meldet an Sebastian.
+6. **Keine Zeitsteuerung ohne Freigabe:** Geplante bzw. nächtliche Agentenläufe werden erst eingerichtet, wenn Regeln und Skills freigegeben sind, und zunächst nur als Audit und Bericht.
+
+---
+
+## 10. Datenschutz für Video-Daten (Video-Engine)
+1. Videos von Personen sind personenbezogene Daten. Es dürfen nur Lions-Spieler **mit ausdrücklicher Einwilligung** aufgenommen und analysiert werden.
+2. **Videos verbleiben auf dem Gerät des Spielers.** In die Datenbank (Supabase) werden ausschließlich berechnete Metriken zurückgespielt (z. B. Winkel, Zeitpunkte), niemals Videos, Frames oder Dateipfade.
+3. Der Spieler muss seine Analysedaten jederzeit einsehen und löschen können. Zugriff nur für den Spieler selbst und Admins.
+4. Keine Videos, Frames oder personenbezogenen Pfade im Repository, in Logs oder in Berichten.
+5. Video-Funktionen erfordern **immer manuelle Freigabe** (personenbezogene Daten, neue Tabellen, neue Abhängigkeiten).
+6. Korrelationen zwischen Wurfstil und Scoring werden als Zusammenhang mit Stichprobengröße ausgewiesen, nie als Kausalbehauptung.
+
+---
+
+## 11. Prognose-Basis
+Prädiktive Analysen und What-if-Szenarien dürfen Liga-Daten und Trainingsdaten (`doppeltraining_app`) nutzen. Beide Quellen werden getrennt ausgewiesen und nicht ungeprüft vermischt.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
