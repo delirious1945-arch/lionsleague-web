@@ -59,20 +59,22 @@ Jeder Zyklus schließt mit einem kompakten Management-Bericht ab:
 ---
 
 ## 7. Agenten-Netzwerk: Rollen & Rechte
-*Ergänzt am 28.10.2026, erweitert am 29.10.2026 um Game-Optimizer & UI-Cleaner.*
+*Ergänzt am 28.10.2026, erweitert am 29.10.2026 um Game-Optimizer, UI-Cleaner & Biomechanics-Agent.*
 
 | Agent | Skills | Rechte | Grenze |
 |---|---|---|---|
-| **Orchestrator** | `daily-report`, Priorisierung | Aufgaben verteilen, Berichte schreiben | Keine Codeänderung |
+| **Orchestrator** | `daily-report`, Priorisierung | Aufgaben verteilen, Berichte schreiben, `CHANGELOG.md` pflegen | Keine Codeänderung |
 | **Analyst** | `daily-audit`, `ranking-evaluation` | Nur lesend, nur Kopie bzw. `test_env/` | Nie auf `dart_data.db` schreiben |
 | **Coding-Agent** | `safe-implementation` | Schreibt nur im eigenen Branch/Worktree | Max. 1 Verbesserung pro Zyklus, kein Merge, keine Ranking-Logik |
 | **QA + Security** | `quality-gate`, `release-review` | Führt Tests aus, prüft Secrets/Rollen/Datenschutz | Darf Tests niemals abschwächen |
 | **Game-Optimizer** | `game-simulation`, `flow-audit` | Testet & optimiert Trainingsspiele; steuert Unteragenten für Spielsimulationen | Keine Änderung an Ranking-/Ligamatch-Logik |
 | **UI-Cleaner** | `ui-styling-only`, `ux-declutter` | Detektiert redundante/störende UI-Elemente, korrigiert Farbsemantik (Grün=Hit, Rot=Miss) | Keine Änderung an Backend-/Datenbanklogik |
+| **Biomechanics-Agent** | `video-engine`, `pose-tracking-audit` | Baut & testet KI-Wurfanalyse autonom On-Device; deckt Tracking- & Berechnungsfehler auf; formuliert Bedarfsanforderungen | 100% On-Device, keine Rohvideos in DB |
 
 1. **Trennung der Verantwortung:** Wer etwas baut, bewertet und gibt es nicht selbst frei.
 2. **Unteragenten für Game-Simulation:** Der `Game-Optimizer` nutzt autonome Subagents/Simulatoren, die vollständige Spielverläufe durchspielen, Randfälle prüfen (Undo, Punkte-Obergrenzen, Abbrüche) und Fehlerberichte erzeugen.
 3. **UI-Cleaner Leitplanken:** Konzentration auf Spiel-Fokus, Reduktion von visueller Überladung auf dem Dartboard/Mobile-Screen, strikte Einhaltung der Farb-Semantik: Treffer/Erfolg = Smaragdgrün, Fehlwurf/Warnung = Rot/Grau.
+4. **Biomechanics-Agent Leitplanken:** Autonomes Testen von MediaPipe Pose Tracking, Nullpunkt-Kalibrierung, 5 Kernwinkeln und Release-Point. Meldet im täglichen Bericht exakt, welche mathematischen oder technischen Daten fehlen.
 
 ---
 
@@ -106,6 +108,39 @@ Jeder Zyklus schließt mit einem kompakten Management-Bericht ab:
 
 ## 11. Prognose-Basis
 Prädiktive Analysen und What-if-Szenarien dürfen Liga-Daten und Trainingsdaten (`doppeltraining_app`) nutzen. Beide Quellen werden getrennt ausgewiesen und nicht ungeprüft vermischt.
+
+---
+
+## 12. Autonome Erkennungs- & Vorschlags-Heuristiken
+*Verbindliche Audit-Kriterien für autonome Vorschläge des UI-Cleaners, Game-Optimizers und Biomechanics-Agents:*
+
+1. **Redundanz-Scanner:**
+   - Detektiert doppelte Darstellung identischer Metriken (z. B. Punkte, Aufnahme, Badge) auf demselben aktiven Viewport.
+   - *Aktion:* Vorschlag zur Entfernung im oberen Header zugunsten eines aufgeräumten, aktiven Wurfbereichs.
+2. **Sportliche Farbsemantik (Lions-Standard):**
+   - Erfolgreiche Aktionen, Treffer, Checks und Ballbesitz MÜSSEN in **Smaragdgrün** (`emerald-500/600`, Border `emerald-300`) erstrahlen.
+   - Fehlwürfe, Misses, Busts, Ballverluste und Abbrüche MÜSSEN in **Rot / Dunkelrot** (`red-500/600`, `rose-600`) oder mit deutlicher roter Kontur signalisiert werden.
+3. **Dartboard-Touch-Ergonomie:**
+   - Interaktive Touch-Elemente für Spieler am Board müssen mindestens `52px` Höhe besitzen.
+   - Aufnahmen-Listen müssen direkte Touch-Korrekturen (Antippen zum Weiterschalten/Umschalten) unterstützen, ohne Umwege über Sub-Menüs.
+4. **Schutz der Leistungsrangliste (Schwellenwert-Logik):**
+   - Kurzspiele (z. B. Fußball auf 3 Tore) gelten als *Warm-up / Fun* und dürfen nicht in das offizielle Leistungsranking einfließen.
+   - Mindest-Schwellenwerte (z. B. $\ge 5$ Tore, $\ge 30$ Darts) müssen serverseitig in Auswertungen und Queries erzwungen werden.
+5. **Authentifizierte User-Arretierung:**
+   - In Solo- und Computer-Spielen (`1vsComputer`) muss der angemeldete Spieler automatisch und unveränderlich als Spieler 1 fixiert sein.
+6. **Biomechanik-Engine (KI-Wurfanalyse):**
+   - Autonome Prüfung der MediaPipe Landmark-Erkennung (Confidence $\ge 0.7$).
+   - Validierung der 5 Kernwinkel (Stand-, Rückzug-, Release-, Nachhalte-, Neigungswinkel) relativ zum kalibrierten Nullpunkt.
+   - Autonome Identifikation technischer Lücken (z. B. fehlende Kalibrierungs-Distanz, Kamera-FPS) und Formulierung als konkreter Handlungsbedarf an den Admin.
+
+---
+
+## 13. Tägliche Dokumentationspflicht (`CHANGELOG.md`)
+1. Nach jedem autonomen Entwicklungs- oder Optimierungszyklus MUSS das lebendige Dokument [`CHANGELOG.md`](file:///C:/Users/sebas/Documents/Lions%20Weyhausen/02_Liga/lionsweyhausen-web/CHANGELOG.md) mit einem neuen Tagesabschnitt fortgeschrieben werden.
+2. Jede Änderung ist unter den Kategorien *Trainingsspiele*, *UI/UX-Cleaner*, *Biomechanik*, *Datenintegrität* und *Fehlende Komponenten* transparent zu protokollieren.
+3. Der tägliche Management-Bericht an Sebastian (§6) verlinkt direkt auf das aktualisierte `CHANGELOG.md`.
+
+---
 
 <!-- BEGIN:nextjs-agent-rules -->
 
