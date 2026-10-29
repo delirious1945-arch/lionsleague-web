@@ -153,7 +153,6 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
         AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
         AND player_name NOT LIKE 'Computer%'
         AND player_name NOT LIKE 'Bot%'
-        AND target_goals >= 5
       GROUP BY player_name, player_id
     `;
 
@@ -174,7 +173,6 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
       SELECT player_name, player_id, count(*)::int as cnt
       FROM training_stellen_checken
       WHERE (is_aborted IS NULL OR is_aborted = 0)
-        AND total_rounds >= 15
         AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
       GROUP BY player_name, player_id
     `;
@@ -205,7 +203,7 @@ export async function getBlockedPlayersForMonth(monthKey: string): Promise<Set<s
       const rows = await sql`
         SELECT player_name 
         FROM training_lottery_winners
-        WHERE month_key = ANY(${pastMonths})
+        WHERE month_key IN ${sql(pastMonths)}
       `;
       for (const r of rows) {
         if (r.player_name) {
@@ -610,7 +608,6 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
       AND player_name NOT LIKE 'Computer%'
       AND player_name NOT LIKE 'Bot%'
-      AND target_goals >= 5
     ORDER BY COALESCE(training_date, created_at::text) DESC;
   `;
 
@@ -623,7 +620,6 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         check_quote, training_date, created_at, is_winner
       FROM training_stellen_checken
       WHERE (is_aborted IS NULL OR is_aborted = 0)
-        AND total_rounds >= 15
         AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
       ORDER BY COALESCE(training_date, created_at::text) DESC;
     `;

@@ -16,6 +16,11 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 ## [2026-10-29] – Autonomes Agenten-Netzwerk, UI-Cleaner & Trainings-Optimierung
 
 ### 🎯 Trainingsspiele & Game-Optimizer
+- **Korrektur Spielzähler & Trainingsfleiß-Wertung (`src/lib/trainingLottery.ts`):**
+  - **Grundsatz:** Jedes regulär gespielte Match geht ausnahmslos mit **+1** in die Zählung der absolvierten Spiele und den Lostopf für den Trainingsfleiß ein.
+  - **Ursachenbehebung für Michael Kranz:** Ein restriktiver Filter (`target_goals >= 5`), der eigentlich für ein 1vs1-Leistungsranking gedacht war, hatte in den Zähl-Queries der Monatsverlosung versehentlich 10 absolvierte 3-Tore-Matches ignoriert. Dadurch sank sein Zählerstand fälschlicherweise von 29 auf 19 und stieg nach 5 Runden *Stellen & Checken* scheinbar nur auf 24.
+  - **Korrektur:** Der Filter wurde in den Zähl-Queries (`getCompletedGamesByPlayerForMonth` und `getAdminTrainingOverviewData`) entfernt. Michael Kranz steht nun exakt bei **34 absolvierten Spielen** (9x Doppelquote, 9x PDC Challenge, 11x Fußball Darts, 5x Stellen & Checken).
+  - **Datenbank-Stabilität:** Postgres-Array-Abfrage in `getBlockedPlayersForMonth` auf `IN ${sql(pastMonths)}` korrigiert.
 - **Fußball Darts Battle (`/training/fussball`):**
   - **Ranking-Schwellenwert:** Spiele auf 3 Tore gelten als *„Warm-up / Fun“* und fließen nicht in die Vereinsrangliste ein. Erst ab **mindestens 5 Toren** (`5, 7, 10 Tore`) wird das Match für das Leistungsranking und die Monatsverlosung gewertet.
   - **Server-Filterung:** In `src/lib/trainingLottery.ts` wurde die Abfrage serverseitig mit `AND target_goals >= 5` abgesichert.
