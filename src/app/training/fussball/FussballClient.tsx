@@ -15,6 +15,7 @@ import {
 interface FussballClientProps {
   players: Player[];
   initialHistory: any[];
+  currentUser?: { name?: string; role?: string; id?: number } | null;
 }
 
 interface ShotRecord {
@@ -38,11 +39,12 @@ interface TurnHistory {
   prevP2Goals: number;
 }
 
-export default function FussballClient({ players, initialHistory }: FussballClientProps) {
+export default function FussballClient({ players, initialHistory, currentUser }: FussballClientProps) {
+  const defaultPlayerName = currentUser?.name || players[0]?.name || 'Sebastian Kirste';
   // Setup State
   const [isGameStarted, setIsGameStarted] = useState<boolean>(false);
   const [gameMode, setGameMode] = useState<'1vs1' | '1vsComputer'>('1vsComputer');
-  const [p1Name, setP1Name] = useState<string>(players[0]?.name || 'Sebastian Kirste');
+  const [p1Name, setP1Name] = useState<string>(defaultPlayerName);
   const [p2Name, setP2Name] = useState<string>(players[1]?.name || 'Dirk Ostermann');
   const [computerDifficulty, setComputerDifficulty] = useState<ComputerDifficulty>('bezirksliga');
   const [targetGoals, setTargetGoals] = useState<number>(5);
@@ -452,7 +454,11 @@ export default function FussballClient({ players, initialHistory }: FussballClie
     setSaveStatus('Speichere Ergebnis automatisch in Supabase Cloud...');
     const res = await saveFussballSessionAction(payloads);
     if (res.success) {
-      setSaveStatus('✅ Spiel in Supabase Cloud gespeichert & für Monatsverlosung gewertet!');
+      if (targetGoals >= 5) {
+      setSaveStatus('✅ Spiel in Supabase Cloud gespeichert & für das Leistungsranking gewertet!');
+    } else {
+      setSaveStatus('ℹ️ Warm-up Spiel abgeschlossen (nicht im Leistungsranking gewertet, da unter 5 Toren).');
+    }
     } else {
       setSaveStatus('⚠️ Fehler beim Speichern: ' + res.error);
     }
@@ -616,13 +622,21 @@ export default function FussballClient({ players, initialHistory }: FussballClie
           {/* Spieler Auswahl */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-sky-400 uppercase tracking-wider block mb-1.5">
-                Spieler 1 (Heimteam)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-sky-400 uppercase tracking-wider block">
+                  Spieler 1 (Heimteam)
+                </label>
+                {gameMode === '1vsComputer' && currentUser?.name && (
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                    ✓ Angemeldeter Spieler
+                  </span>
+                )}
+              </div>
               <select
                 value={p1Name}
                 onChange={(e) => setP1Name(e.target.value)}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none focus:border-blue-500"
+                disabled={gameMode === '1vsComputer' && Boolean(currentUser?.name)}
+                className="w-full bg-slate-950 border border-white/10 disabled:opacity-80 disabled:cursor-not-allowed rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none focus:border-blue-500"
               >
                 {players.map(p => (
                   <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
@@ -699,25 +713,49 @@ export default function FussballClient({ players, initialHistory }: FussballClie
 
           {/* Ziel-Tore */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-              Ziel-Tore zum Sieg
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {[3, 5, 7, 10].map(val => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setTargetGoals(val)}
-                  className={`py-3 rounded-xl border text-center font-black text-sm transition-all cursor-pointer ${
-                    targetGoals === val
-                      ? 'bg-emerald-600 border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105'
-                      : 'bg-slate-950 border-white/10 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {val} Tore
-                </button>
-              ))}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                Ziel-Tore zum Sieg
+              </label>
+              <span className="text-[11px] text-amber-400 font-bold">
+                ⭐ Offizielles Vereins-Ranking ab mindestens 5 Toren!
+              </span>
             </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[3, 5, 7, 10].map(val => {
+                const isRanking = val >= 5;
+                const isSelected = targetGoals === val;
+
+                return (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setTargetGoals(val)}
+                    className={`py-3 px-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 border-2 border-emerald-300 text-slate-950 font-black shadow-lg shadow-emerald-500/30 scale-105'
+                        : 'bg-slate-950 border-white/10 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="text-base font-black">{val} Tore</span>
+                    <span className={`text-[10px] font-bold ${
+                      isSelected
+                        ? 'text-slate-950'
+                        : isRanking
+                        ? 'text-emerald-400'
+                        : 'text-zinc-500'
+                    }`}>
+                      {isRanking ? '✓ Ranking-Wertung' : 'Warm-up / Fun (kein Ranking)'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {targetGoals < 5 && (
+              <p className="text-[11px] text-amber-400/90 bg-amber-950/30 border border-amber-500/30 rounded-xl p-2.5">
+                ⚠️ <strong>Hinweis Warm-up:</strong> Ein Spiel auf 3 Tore gilt als kurzes Warm-up und wird <strong>nicht</strong> in das offizielle Leistungsranking bzw. die Monatsverlosung aufgenommen. Wähle mindestens 5 Tore für die Ranglistenwertung.
+              </p>
+            )}
           </div>
 
           {/* Start Button */}

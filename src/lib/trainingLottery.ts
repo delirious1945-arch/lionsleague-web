@@ -153,6 +153,7 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
         AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
         AND player_name NOT LIKE 'Computer%'
         AND player_name NOT LIKE 'Bot%'
+        AND target_goals >= 5
       GROUP BY player_name, player_id
     `;
 
@@ -609,6 +610,7 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
       AND player_name NOT LIKE 'Computer%'
       AND player_name NOT LIKE 'Bot%'
+      AND target_goals >= 5
     ORDER BY COALESCE(training_date, created_at::text) DESC;
   `;
 

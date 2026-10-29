@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { getPlayers } from '@/lib/data';
+import { getSessionAction } from '@/app/actions';
 import { getFussballHistoryAction } from './actions';
 import FussballClient from './FussballClient';
 
@@ -11,14 +12,15 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function FussballPage() {
-  const [players, history] = await Promise.all([
+  const [players, history, session] = await Promise.all([
     getPlayers(),
     getFussballHistoryAction(30),
+    getSessionAction(),
   ]);
 
   return (
     <main className="min-h-screen py-4 sm:py-6 bg-[#050811] text-slate-100">
-      <FussballClient players={players} initialHistory={history} />
+      <FussballClient players={players} initialHistory={history} currentUser={session} />
     </main>
   );
 }

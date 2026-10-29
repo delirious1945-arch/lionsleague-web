@@ -550,6 +550,29 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     }
   };
 
+
+  // Direkte Touch-Korrektur auf einer Shot-Box: Waehlt die Aufnahme an oder schaltet bei erneutem Antippen Treffer durch (0 -> 1 -> 2 -> 3 -> 0)
+  const handleDirectShotClick = (idx: number) => {
+    const curVal = curShots[idx];
+    if (currentShotIndex === idx && curVal !== null) {
+      const nextVal = (curVal + 1) % 4;
+      playHitSound(nextVal);
+      if (gameMode === 'solo' || activePlayer === 1) {
+        const newP1 = { ...scoresP1 };
+        newP1[curTarget] = [...newP1[curTarget]];
+        newP1[curTarget][idx] = nextVal;
+        setScoresP1(newP1);
+      } else {
+        const newP2 = { ...scoresP2 };
+        newP2[curTarget] = [...newP2[curTarget]];
+        newP2[curTarget][idx] = nextVal;
+        setScoresP2(newP2);
+      }
+    } else {
+      setCurrentShotIndex(idx);
+    }
+  };
+
   // Korrektur (Undo)
   const handleUndo = () => {
     if (gameMode === 'solo') {
@@ -1711,16 +1734,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               </div>
             </div>
 
-            {/* Aufnahme Zähler */}
-            <div className="shrink-0 text-right" data-ui-id="CHECKOUT.MATCH.HERO_SHOT_COUNTER">
-              <div className="text-[10px] sm:text-xs uppercase font-bold text-zinc-400 tracking-wider">
-                Aufnahme
-              </div>
-              <div className="text-2xl sm:text-4xl font-black font-mono text-amber-400">
-                {currentShotIndex + 1}
-                <span className="text-xs sm:text-sm text-zinc-400 font-sans font-bold"> / 10</span>
-              </div>
-            </div>
+
           </div>
 
           {/* 1 vs 1 Duell Score-Vergleich */}
@@ -1834,64 +1848,74 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               />
             </div>
 
-            {/* 10 Shot Boxes */}
-            <div className="grid grid-cols-10 gap-1.5 mt-3" data-ui-id="CHECKOUT.MATCH.SHOT_BOXES">
+            {/* 10 Shot Boxes (Größer mit direkter Touch-Korrektur & Smaragdgrün-Semantik) */}
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 mt-3" data-ui-id="CHECKOUT.MATCH.SHOT_BOXES">
               {curShots.map((val, idx) => {
                 const isCurrent = idx === currentShotIndex;
-                let bgCls = 'bg-zinc-950 text-zinc-600 border-zinc-800';
-                if (isCurrent) bgCls = 'bg-amber-500 text-zinc-950 font-black border-amber-400 ring-2 ring-amber-400/50 scale-105';
-                else if (val === 0) bgCls = 'bg-zinc-800 text-zinc-400 border-zinc-700';
-                else if (val === 1) bgCls = 'bg-zinc-700 text-white font-bold border-zinc-600';
-                else if (val === 2) bgCls = 'bg-zinc-700 text-white font-bold border-amber-500/40';
-                else if (val === 3) bgCls = 'bg-amber-400 text-zinc-950 font-black border-amber-300';
+                let bgCls = 'bg-zinc-950/80 text-zinc-600 border-zinc-800';
+                if (isCurrent) {
+                  bgCls = 'bg-amber-400 text-zinc-950 font-black border-amber-300 ring-4 ring-amber-400/50 scale-105 shadow-lg shadow-amber-500/30 z-10';
+                } else if (val === 0) {
+                  bgCls = 'bg-red-950/30 text-red-400/80 border-red-900/40 line-through';
+                } else if (val === 1) {
+                  bgCls = 'bg-emerald-950/70 text-emerald-300 border-emerald-600/60 font-black shadow-sm';
+                } else if (val === 2) {
+                  bgCls = 'bg-emerald-900/80 text-emerald-200 border-emerald-500 font-black shadow-sm';
+                } else if (val === 3) {
+                  bgCls = 'bg-gradient-to-br from-emerald-600 to-emerald-500 text-zinc-950 font-black border-emerald-300 shadow-md shadow-emerald-500/30';
+                }
 
                 return (
                   <button
                     key={idx}
-                    onClick={() => setCurrentShotIndex(idx)}
-                    className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-all border ${bgCls} cursor-pointer`}
+                    type="button"
+                    onClick={() => handleDirectShotClick(idx)}
+                    title={`Aufnahme ${idx + 1} anwählen oder antippen zum Durchschalten`}
+                    className={`min-h-[54px] sm:min-h-[60px] rounded-xl flex flex-col items-center justify-center p-1 text-sm sm:text-base transition-all border-2 ${bgCls} cursor-pointer active:scale-95`}
                   >
-                    <span className="text-[8px] opacity-75">{idx + 1}</span>
-                    <span>{val !== null ? val : '·'}</span>
+                    <span className="text-[10px] sm:text-xs font-bold uppercase opacity-80">#{idx + 1}</span>
+                    <span className="text-base sm:text-lg font-black font-mono">
+                      {val !== null ? val : '·'}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* TOUCH BUTTONS (0, 1, 2, 3 TREFFER) */}
-          <div className="grid grid-cols-2 gap-2.5" data-ui-id="CHECKOUT.MATCH.INPUT_GRID">
+                    {/* TOUCH BUTTONS (0, 1, 2, 3 TREFFER - Smaragdgrün & Rot/Miss) */}
+          <div className="grid grid-cols-2 gap-3" data-ui-id="CHECKOUT.MATCH.INPUT_GRID">
             <button
               onClick={() => handleScore(0)}
               data-ui-id="CHECKOUT.MATCH.INPUT_0"
-              className="py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-750 active:bg-zinc-900 border border-zinc-700 text-zinc-300 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
+              className="py-5 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/40 hover:to-zinc-900 border-2 border-zinc-700 hover:border-red-700/60 text-zinc-300 hover:text-red-300 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer group"
             >
-              0
-              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mt-0.5">0 Treffer</span>
+              <span className="group-hover:scale-110 transition-transform">0</span>
+              <span className="text-xs font-bold text-zinc-400 group-hover:text-red-400/80 uppercase tracking-wider mt-0.5">0 Treffer (Miss)</span>
             </button>
             <button
               onClick={() => handleScore(1)}
               data-ui-id="CHECKOUT.MATCH.INPUT_1"
-              className="py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-650 active:bg-zinc-800 border border-zinc-600 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
+              className="py-5 rounded-2xl bg-emerald-950/80 hover:bg-emerald-900 active:scale-95 border-2 border-emerald-600/70 text-emerald-300 font-black text-2xl flex flex-col items-center justify-center transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
             >
-              1
-              <span className="text-[10px] font-semibold text-zinc-300 uppercase tracking-wider mt-0.5">1 Treffer</span>
+              <span>1</span>
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider mt-0.5">1 Treffer</span>
             </button>
             <button
               onClick={() => handleScore(2)}
               data-ui-id="CHECKOUT.MATCH.INPUT_2"
-              className="py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-650 active:bg-zinc-800 border border-amber-500/40 text-white font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-md cursor-pointer"
+              className="py-5 rounded-2xl bg-emerald-900/90 hover:bg-emerald-800 active:scale-95 border-2 border-emerald-500 text-emerald-200 font-black text-2xl flex flex-col items-center justify-center transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
             >
-              2
-              <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider mt-0.5">2 Treffer</span>
+              <span>2</span>
+              <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider mt-0.5">2 Treffer</span>
             </button>
             <button
               onClick={() => handleScore(3)}
               data-ui-id="CHECKOUT.MATCH.INPUT_3"
-              className="py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 border border-amber-400 text-zinc-950 font-black text-2xl flex flex-col items-center justify-center active:scale-95 transition-all shadow-lg shadow-amber-500/25 cursor-pointer"
+              className="py-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 active:scale-95 border-2 border-emerald-300 text-zinc-950 font-black text-2xl flex flex-col items-center justify-center transition-all shadow-xl shadow-emerald-500/30 cursor-pointer"
             >
-              3 ⭐
-              <span className="text-[10px] font-black text-zinc-950 uppercase tracking-wider mt-0.5">Maximum!</span>
+              <span>3 ⭐</span>
+              <span className="text-xs font-black text-zinc-950 uppercase tracking-wider mt-0.5">Maximum!</span>
             </button>
           </div>
 

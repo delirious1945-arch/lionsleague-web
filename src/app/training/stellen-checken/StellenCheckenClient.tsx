@@ -877,11 +877,11 @@ export default function StellenCheckenClient({
 
                 let boxClass = 'bg-slate-950/80 border-white/10 text-slate-500';
                 if (isCurrent) {
-                  boxClass = 'bg-cyan-500/25 border-cyan-400 text-white ring-2 ring-cyan-400/50 scale-105';
+                  boxClass = 'bg-amber-400 text-zinc-950 font-black border-amber-300 ring-4 ring-amber-400/50 scale-105 shadow-md shadow-amber-500/30 z-10';
                 } else if (p1Done) {
                   boxClass = p1Done.checked
-                    ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
-                    : 'bg-rose-950/50 border-rose-500/40 text-rose-400/80';
+                    ? 'bg-emerald-950/90 border-emerald-500 text-emerald-300 font-black shadow-sm'
+                    : 'bg-red-950/40 border-red-900/60 text-red-400/80 line-through';
                 }
 
                 return (
@@ -998,18 +998,18 @@ export default function StellenCheckenClient({
               </div>
             </div>
 
-            {/* ZWEI GROSSE TASTEN: CHECK ODER MISS */}
+            {/* ZWEI GROSSE TASTEN: CHECK ODER MISS (Lions-Farbsemantik) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 max-w-2xl mx-auto">
               <button
                 type="button"
                 onClick={() => handleDecision(true)}
-                className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 active:scale-[0.98] text-slate-950 font-black text-xl sm:text-2xl shadow-xl shadow-emerald-500/25 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
+                className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-[0.98] border-2 border-emerald-300 text-slate-950 font-black text-xl sm:text-2xl shadow-xl shadow-emerald-500/30 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 group-hover:scale-105 transition-transform">
                   <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
-                  <span>CHECK!</span>
+                  <span className="tracking-wide">CHECK!</span>
                 </div>
-                <span className="text-xs font-extrabold uppercase tracking-wider bg-slate-950/20 px-3 py-0.5 rounded-full">
+                <span className="text-xs font-black uppercase tracking-wider bg-emerald-400/80 px-3 py-0.5 rounded-full text-zinc-950">
                   +{currentTier.points} {currentTier.points === 1 ? 'Punkt' : 'Punkte'}
                 </span>
               </button>
@@ -1017,13 +1017,13 @@ export default function StellenCheckenClient({
               <button
                 type="button"
                 onClick={() => handleDecision(false)}
-                className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 active:scale-[0.98] text-white font-black text-xl sm:text-2xl shadow-xl shadow-rose-600/25 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
+                className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/50 hover:to-zinc-900 active:scale-[0.98] border-2 border-zinc-700 hover:border-red-700/60 text-zinc-300 hover:text-red-300 font-black text-xl sm:text-2xl shadow-xl shadow-red-950/20 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 group-hover:scale-105 transition-transform">
                   <XCircle className="w-7 h-7 stroke-[2.5]" />
-                  <span>MISS</span>
+                  <span className="tracking-wide">MISS</span>
                 </div>
-                <span className="text-xs font-bold uppercase tracking-wider bg-black/25 px-3 py-0.5 rounded-full text-rose-100">
+                <span className="text-xs font-bold uppercase tracking-wider bg-zinc-950/60 px-3 py-0.5 rounded-full text-zinc-400 group-hover:text-red-400/80">
                   0 Punkte • Nächste Zahl
                 </span>
               </button>
