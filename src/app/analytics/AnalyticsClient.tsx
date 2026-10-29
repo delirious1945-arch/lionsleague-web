@@ -12,6 +12,7 @@ import RadarChart from '@/components/analytics/RadarChart';
 import LegTrendChart from '@/components/analytics/LegTrendChart';
 import DartsToWinWidget from '@/components/analytics/DartsToWinWidget';
 import LegAnatomyWidget from '@/components/analytics/LegAnatomyWidget';
+import WhatIfSimulatorWidget from '@/components/analytics/WhatIfSimulatorWidget';
 import PlayerAvatar from '@/components/PlayerAvatar';
 
 interface AnalyticsClientProps {
@@ -33,8 +34,8 @@ export default function AnalyticsClient({
   selectedSeason,
   isAdmin = false,
 }: AnalyticsClientProps) {
-  // Tabs: 'single' | 'h2h' | 'matrix'
-  const [activeTab, setActiveTab] = useState<'single' | 'h2h' | 'matrix'>('single');
+  // Tabs: 'single' | 'h2h' | 'matrix' | 'whatif'
+  const [activeTab, setActiveTab] = useState<'single' | 'h2h' | 'matrix' | 'whatif'>('single');
 
   // Single Player Tab
   const [selectedPlayerId, setSelectedPlayerId] = useState<number>(
@@ -201,6 +202,17 @@ export default function AnalyticsClient({
           }`}
         >
           <span>📊</span> DAE-Matrix (Alle Spieler)
+        </button>
+
+        <button
+          onClick={() => setActiveTab('whatif')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'whatif'
+              ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-200 border border-purple-400/60 shadow-lg shadow-purple-500/20'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <span>🔮</span> What-if-Prognose
         </button>
       </div>
 
@@ -1294,6 +1306,17 @@ export default function AnalyticsClient({
             </table>
           </div>
         </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* TAB 4: WHAT-IF-PROGNOSE & LEISTUNGS-SIMULATOR */}
+      {/* ==================================================== */}
+      {activeTab === 'whatif' && (
+        <WhatIfSimulatorWidget
+          players={players}
+          allLegVisits={allLegVisits}
+          initialPlayerId={selectedPlayerId}
+        />
       )}
     </div>
   );

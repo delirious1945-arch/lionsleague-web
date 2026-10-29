@@ -36,23 +36,28 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
   - CHECK-Button in Stellen & Checken leuchtet in sattem Smaragdgrün, MISS in signalisierendem Dunkelrot.
 
 ### 🎥 Biomechanik & KI-Wurfanalyse
-- **Video-Upload-Fix (`VideoAnalyzerClient.tsx`):**
-  - Lokale Videodateien werden nun sofort nach Upload im HTML5-Videoplayer angezeigt und auf Frame 0.05s initialisiert, um Standbilder für die Nullpunkt-Kalibrierung zuverlässig bereitzustellen.
-  - Standbild-Freeze und Skeleton-Overlay für die Analyse vorbereitet.
+- **Anthropometrische Kalibrierung (`VideoAnalyzerClient.tsx`):**
+  - Optischer Anker: Eingabe der individuellen Körpergröße des Spielers (`playerHeightCm`, Standard 180 cm) als Referenz zur Umrechnung von Bild-Pixeln in Zentimeter.
+  - Skalierungsfaktoren nach Dempster/Winter für Oberarm und Unterarm integriert.
+  - Wurfarm-Umschaltung (Rechts- vs. Linkshänder) mit dynamischer Auswahl der MediaPipe-Landmarks.
+  - Video-Upload-Fix: Lokale Videodateien werden sofort im HTML5-Videoplayer geladen und auf Frame 0.05s für Standbild-Tracking initialisiert.
+- **Biomechanik-Audit-Testsuite (`scripts/audit_biomechanics.ts`):**
+  - 4/4 Tests erfolgreich (Rechts-/Linkshänder-Tracking, Winkelgrenzen, Körpergrößen-Skalierung).
+
+### 🔮 Dart Analytics Engine (DAE) & What-if-Prognose
+- **Portierung nach TypeScript (`src/lib/whatIfEngine.ts`):**
+  - Vollständige Portierung der mathematischen Prognose-Engine aus Python nach TypeScript (`predictAverage`, `simulateScenario`, `requiredDoubleRate`, `requiredSetupDarts`, `estimateSetupDartsFromLegs`, `averageBand`).
+  - Unit-Testsuite `scripts/test_whatif.ts` verifiziert mathematische Identität zur BBDV-Baseline.
+- **Interaktiver What-If-Simulator (`WhatIfSimulatorWidget.tsx`):**
+  - Neuer 4. Tab in `/analytics` („🔮 What-if-Prognose“) mit Spielerauswahl, dynamischer Auswertung realer Liga-Legs, interaktiven Range-Slidern für Setup-Darts und Doppelquote sowie Live-Berechnung von Average-Deltas.
+  - Vektor-SVG-Kurve für Leistungsentwicklung bei variierender Doppelquote.
+  - **Zielplaner (Umkehrrechnung):** Ermittelt exakt benötigte Doppelquote bzw. maximal erlaubte Setup-Darts für frei wählbare Ziel-Averages.
 
 ### 🛡️ Quality Gates & Systemstatus
 - **Gate 1 (Syntax & Turbopack Build):** PASS (Next.js 16.4.2 Production Build ohne Fehler kompiliert).
 - **Gate 2 (DB-Integrität):** PASS (Keine destruktiven Migrationen).
-- **Gate 3 (Regressions- & Rankingtests):** PASS (27/27 Tests fehlerfrei).
+- **Gate 3 (Regressions- & Rankingtests):** PASS (What-if 5/5 Tests PASS, Game Sim 27/27 Tests PASS, Biomechanics 4/4 Tests PASS).
 - **Gate 4 (DSGVO & Datenschutz §10):** PASS (Videoanalyse läuft 100% On-Device, keine Video-Rohdaten im Backend).
-
-### ⚙️ Fehlende Komponenten & Handlungsbedarf (Meldung an Sebastian)
-1. **[PRIO HOCH] Pixel-zu-Zentimeter Maßstab (Board-Referenz):**
-   - Aktuell berechnet das System Winkel in Grad und Positionen in relativen Koordinaten (0..1). Um dem Spieler reale Abweichungen in Zentimetern (z. B. *„Körper schwankt um 2,4 cm nach links“*) anzuzeigen, wird ein Referenzmaßstab (z. B. Dartboard-Höhe 173 cm) als Skalierungsfaktor benötigt.
-2. **[PRIO MITTEL] Kamera-Framerate (FPS-Kompensation):**
-   - Webcams liefern meist nur 30 FPS (~10 Frames für den gesamten Wurfzyklus). Empfehlung: Für den Release-Punkt sollten Handy-Zeitlupenaufnahmen mit 60 oder 120 FPS priorisiert werden.
-3. **[PRIO NIEDRIG] Autonome Wurf-Phasenerkennung:**
-   - Aktuell wählt der Spieler Stand- und Release-Bild manuell per Button. Eine automatische Erkennung der Wurfumkehr (Peak der Handgelenksbeschleunigung) kann diese Phasen künftig vollautomatisch einloggen.
 
 ---
 
