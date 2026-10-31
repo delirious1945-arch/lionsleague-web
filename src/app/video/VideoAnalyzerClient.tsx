@@ -43,12 +43,26 @@ interface Point {
 
 interface PoseKeypoints {
   head: Point;
+  eye?: Point;
   shoulder: Point;
   elbow: Point;
   wrist: Point;
   hip: Point;
   knee?: Point;
   ankle?: Point;
+  heel?: Point;
+  toe?: Point;
+}
+
+export interface TrajectoryPoint {
+  x: number;
+  y: number;
+  timeSec: number;
+}
+
+export interface ThrowTrajectory {
+  id: number; // 1, 2, 3
+  points: TrajectoryPoint[];
 }
 
 type PhaseKey = 'baseline' | 'drawback' | 'release' | 'follow_through';
@@ -102,9 +116,20 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [snapshots, setSnapshots] = useState<Record<PhaseKey, PhaseSnapshot> | null>(null);
   const [activePhase, setActivePhase] = useState<PhaseKey>('baseline');
 
-  // Anzeige-Optionen
+  // Trajektorien (blaue Wurfbahn) für bis zu 3 Darts einer Aufnahme
+  const [trajectories, setTrajectories] = useState<ThrowTrajectory[]>([
+    { id: 1, points: [] },
+    { id: 2, points: [] },
+    { id: 3, points: [] },
+  ]);
+  const [activeThrowIdx, setActiveThrowIdx] = useState<number>(0); // 0 = Dart 1, 1 = Dart 2, 2 = Dart 3, -1 = Alle überlagern
+
+  // Visuelle Overlays Schalter (Lions Biomechanik Standard)
   const [showOverlay, setShowOverlay] = useState<boolean>(true);
   const [showGhostBaseline, setShowGhostBaseline] = useState<boolean>(true);
+  const [showTrajectory, setShowTrajectory] = useState<boolean>(true);
+  const [showPlumbLine, setShowPlumbLine] = useState<boolean>(true);
+  const [showFootTriangle, setShowFootTriangle] = useState<boolean>(true);
   const [draggingJoint, setDraggingJoint] = useState<keyof PoseKeypoints | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -289,14 +314,24 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           const kIdx = isRightArm ? 26 : 25;
           const aIdx = isRightArm ? 28 : 27;
 
-          // Kopf-Referenz
+          // Kopf- & Augen-Referenz (Lotlinie)
           const earIdx = isRightArm ? 8 : 7;
+          const eyeIdx = isRightArm ? 2 : 5; // MediaPipe: 2 = right eye, 5 = left eye
           const headPt = lm[earIdx] || lm[0];
+          const eyePt = lm[eyeIdx] || headPt;
+
+          // Fuß & Stand (Heel & Toe für das Standdreieck am Oche)
+          const heelIdx = isRightArm ? 30 : 29;
+          const toeIdx = isRightArm ? 32 : 31;
 
           return {
             head: {
               x: Math.max(0.05, Math.min(0.95, headPt.x)),
               y: Math.max(0.05, Math.min(0.95, headPt.y)),
+            },
+            eye: {
+              x: Math.max(0.05, Math.min(0.95, eyePt.x)),
+              y: Math.max(0.05, Math.min(0.95, eyePt.y)),
             },
             shoulder: {
               x: Math.max(0.05, Math.min(0.95, lm[sIdx].x)),
@@ -316,6 +351,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             },
             knee: lm[kIdx] ? { x: Math.max(0.05, Math.min(0.95, lm[kIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[kIdx].y)) } : undefined,
             ankle: lm[aIdx] ? { x: Math.max(0.05, Math.min(0.95, lm[aIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[aIdx].y)) } : undefined,
+            heel: lm[heelIdx] ? { x: Math.max(0.05, Math.min(0.95, lm[heelIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[heelIdx].y)) } : undefined,
+            toe: lm[toeIdx] ? { x: Math.max(0.05, Math.min(0.95, lm[toeIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[toeIdx].y)) } : undefined,
           };
         }
       } catch (e) {
@@ -527,6 +564,23 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       },
     };
 
+    // Trajektorie aus den gescannten Einzelbildern akkumulieren
+    const scanTrajectoryPts: TrajectoryPoint[] = scannedFrames.map((f) => ({
+      x: f.pose.wrist.x,
+      y: f.pose.wrist.y,
+      timeSec: f.timeSec,
+    }));
+
+    setTrajectories((prev) => {
+      const next = [...prev];
+      const targetIdx = activeThrowIdx >= 0 && activeThrowIdx < 3 ? activeThrowIdx : 0;
+      next[targetIdx] = {
+        id: targetIdx + 1,
+        points: scanTrajectoryPts,
+      };
+      return next;
+    });
+
     setSnapshots(resultSnapshots);
     setIsScanning(false);
 
@@ -535,7 +589,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     await seekTo(releaseFrame.timeSec);
     setCurrentPose(releaseFrame.pose);
     setStatusMessage(
-      'Analyse abgeschlossen! Wähle unten zwischen den 4 Wurfphasen, um die Abweichung zum goldenen Nullpunkt zu sehen.'
+      'Analyse abgeschlossen! Die blaue Flugbahn-Trajektorie und die 4 Wurfphasen wurden erfolgreich ermittelt.'
     );
   };
 
@@ -670,7 +724,60 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ctx.arc(ex, ey, 32 * scale, Math.min(a1, a2), Math.max(a1, a2));
       ctx.stroke();
 
-      // Gelenkknoten (zum Anfassen / Verschieben)
+      // 3. Standdreieck am Oche (Sprunggelenk - Ferse - Zehenspitze)
+      if (showFootTriangle && p.ankle) {
+        const ax = p.ankle.x * w;
+        const ay = p.ankle.y * h;
+        const hxPt = (p.heel ? p.heel.x : p.ankle.x - 0.04) * w;
+        const hyPt = (p.heel ? p.heel.y : p.ankle.y + 0.035) * h;
+        const txPt = (p.toe ? p.toe.x : p.ankle.x + 0.08) * w;
+        const tyPt = (p.toe ? p.toe.y : p.ankle.y + 0.035) * h;
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 2.5 * scale;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(hxPt, hyPt);
+        ctx.lineTo(txPt, tyPt);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+      }
+
+      // 4. Gelbe Schwerkraft-Lotlinie (Augenachse / Körperstabilität wie im Referenzvideo)
+      if (showPlumbLine) {
+        const eyePt = p.eye || p.head;
+        const eyeX = eyePt.x * w;
+        const eyeY = eyePt.y * h;
+        const groundY = Math.min(h * 0.96, (p.ankle?.y || 0.9) * h + 25 * scale);
+
+        ctx.strokeStyle = '#eab308'; // Amber/Yellow
+        ctx.lineWidth = 2.5 * scale;
+        ctx.setLineDash([8 * scale, 5 * scale]);
+        ctx.beginPath();
+        ctx.moveTo(eyeX, eyeY);
+        ctx.lineTo(eyeX, groundY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Zielkreis am Auge
+        ctx.strokeStyle = '#eab308';
+        ctx.lineWidth = 2 * scale;
+        ctx.fillStyle = 'rgba(234, 179, 8, 0.25)';
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, 8 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, 2.5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 5. Gelenkknoten (zum Anfassen / Verschieben)
       const joints: { key: keyof PoseKeypoints; x: number; y: number; label: string; color: string }[] = [
         { key: 'head', x: headX, y: headY, label: 'Kopf', color: '#94a3b8' },
         { key: 'shoulder', x: sx, y: sy, label: 'Schulter', color: '#00d4ff' },
@@ -689,8 +796,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ctx.lineWidth = 2.5 * scale;
         ctx.stroke();
 
-        // Label mit Hintergrund-Pill für perfekte Lesbarkeit
-        ctx.font = `bold ${Math.round(12 * scale)}px sans-serif`;
+        // Label mit Hintergrund-Pill für Lesbarkeit
+        ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
         const textWidth = ctx.measureText(j.label).width;
         ctx.fillStyle = 'rgba(5, 8, 17, 0.78)';
         ctx.fillRect(
@@ -703,19 +810,84 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ctx.fillText(j.label, j.x + 15 * scale, j.y + 3 * scale);
       });
 
-      // Winkel-Badge direkt am Ellenbogen
+      // 6. Winkel-HUD Badge im Benchmark-Design (Dunkle Pill + weißer Text + Cyan-Bogen)
       const badgeText = `${angle}°`;
-      ctx.font = `bold ${Math.round(15 * scale)}px monospace`;
+      ctx.font = `bold ${Math.round(14 * scale)}px monospace`;
       const bw = ctx.measureText(badgeText).width;
-      ctx.fillStyle = 'rgba(5, 8, 17, 0.88)';
-      ctx.fillRect(ex - bw / 2 - 8 * scale, ey - 42 * scale, bw + 16 * scale, 24 * scale);
-      ctx.strokeStyle = '#10b981';
+      const pillW = bw + 20 * scale;
+      const pillH = 26 * scale;
+      const pillX = ex + 14 * scale;
+      const pillY = ey - pillH / 2;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillW, pillH, 8 * scale);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
       ctx.lineWidth = 1.5 * scale;
-      ctx.strokeRect(ex - bw / 2 - 8 * scale, ey - 42 * scale, bw + 16 * scale, 24 * scale);
-      ctx.fillStyle = '#10b981';
-      ctx.fillText(badgeText, ex - bw / 2, ey - 25 * scale);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(badgeText, pillX + 10 * scale, pillY + 18 * scale);
     }
-  }, [showOverlay, baselinePose, showGhostBaseline, currentPose, draggingJoint, calcElbowAngle]);
+
+    // 7. Blaue Flugbahn-Trajektorie (Hand-/Dart-Pfad wie im Referenzvideo)
+    if (showTrajectory) {
+      const throwsToRender =
+        activeThrowIdx === -1
+          ? trajectories.filter((t) => t.points.length > 1)
+          : [trajectories[activeThrowIdx]].filter((t) => t && t.points.length > 1);
+
+      const colors = [
+        '#3b82f6', // Wurf 1: Leuchtendes Königsblau wie im Video
+        '#0ea5e9', // Wurf 2: Sky Blue
+        '#8b5cf6', // Wurf 3: Violett
+      ];
+
+      throwsToRender.forEach((tr) => {
+        const pts = tr.points;
+        if (pts.length < 2) return;
+
+        const color = colors[(tr.id - 1) % colors.length];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3.5 * scale;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x * w, pts[0].y * h);
+        for (let i = 1; i < pts.length; i++) {
+          const xc = ((pts[i - 1].x + pts[i].x) / 2) * w;
+          const yc = ((pts[i - 1].y + pts[i].y) / 2) * h;
+          ctx.quadraticCurveTo(pts[i - 1].x * w, pts[i - 1].y * h, xc, yc);
+        }
+        const last = pts[pts.length - 1];
+        ctx.lineTo(last.x * w, last.y * h);
+        ctx.stroke();
+
+        // Release-Punkt Markierung am Ende
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(last.x * w, last.y * h, 5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5 * scale;
+        ctx.stroke();
+      });
+    }
+  }, [
+    showOverlay,
+    baselinePose,
+    showGhostBaseline,
+    currentPose,
+    draggingJoint,
+    calcElbowAngle,
+    showTrajectory,
+    showPlumbLine,
+    showFootTriangle,
+    trajectories,
+    activeThrowIdx,
+  ]);
 
   useEffect(() => {
     renderCanvasOverlay();
@@ -1178,7 +1350,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 </div>
 
                 {/* Overlay-Schalter & Speed */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {baselinePose && (
                     <button
                       onClick={() => setShowGhostBaseline(!showGhostBaseline)}
@@ -1188,9 +1360,42 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           : 'bg-white/5 text-slate-400 border-white/10'
                       }`}
                     >
-                      Gold-Nullpunkt: {showGhostBaseline ? 'AN' : 'AUS'}
+                      Nullpunkt: {showGhostBaseline ? 'AN' : 'AUS'}
                     </button>
                   )}
+
+                  <button
+                    onClick={() => setShowTrajectory(!showTrajectory)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border cursor-pointer transition-all ${
+                      showTrajectory
+                        ? 'bg-blue-600/25 text-blue-300 border-blue-400/50'
+                        : 'bg-white/5 text-slate-400 border-white/10'
+                    }`}
+                  >
+                    Wurfbahn (Blau): {showTrajectory ? 'AN' : 'AUS'}
+                  </button>
+
+                  <button
+                    onClick={() => setShowPlumbLine(!showPlumbLine)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border cursor-pointer transition-all ${
+                      showPlumbLine
+                        ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/40'
+                        : 'bg-white/5 text-slate-400 border-white/10'
+                    }`}
+                  >
+                    Lotlinie (Gelb): {showPlumbLine ? 'AN' : 'AUS'}
+                  </button>
+
+                  <button
+                    onClick={() => setShowFootTriangle(!showFootTriangle)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border cursor-pointer transition-all ${
+                      showFootTriangle
+                        ? 'bg-white/20 text-white border-white/40'
+                        : 'bg-white/5 text-slate-400 border-white/10'
+                    }`}
+                  >
+                    Stand: {showFootTriangle ? 'AN' : 'AUS'}
+                  </button>
 
                   <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-white/5">
                     {[0.25, 0.5, 1.0].map((rate) => (
@@ -1211,6 +1416,49 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </div>
             </div>
           )}
+
+          {/* 3-Dart Aufnahme Trajektorien-Leiste */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-slate-900/80 border border-white/10 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-300 flex items-center gap-1">
+                <Target className="w-3.5 h-3.5 text-blue-400" /> Trajektorie:
+              </span>
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/5">
+                {[
+                  { idx: 0, label: 'Dart 1' },
+                  { idx: 1, label: 'Dart 2' },
+                  { idx: 2, label: 'Dart 3' },
+                  { idx: -1, label: 'Überlagern (3 Darts)' },
+                ].map((item) => (
+                  <button
+                    key={item.idx}
+                    onClick={() => setActiveThrowIdx(item.idx)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                      activeThrowIdx === item.idx
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setTrajectories([
+                  { id: 1, points: [] },
+                  { id: 2, points: [] },
+                  { id: 3, points: [] },
+                ]);
+              }}
+              className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 text-[11px] font-bold cursor-pointer transition-all flex items-center gap-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Spuren leeren</span>
+            </button>
+          </div>
 
           {/* Status-Hinweis */}
           <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-300">

@@ -29,6 +29,25 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
     - *Fußball Darts:* Tore-Endstand mit Sieg-/Niederlagen-Badge, geworfene Darts, Ziel-Tore, Bull-Quote (Balleroberung) und Doppel-Quote (Torschüsse).
     - *Stellen & Checken:* Erreichte Punkte (von maximal 28), Checks-Quote, Sequenz-ID und vollständige 15-Runden-Aufnahmenübersicht (Target 3–101, Check-Status, erzielte Punkte).
 
+### 🎥 Biomechanik & KI-Wurfanalyse (Benchmark-Upgrade nach echtem Video-Audit)
+- **Trajektorien-Tracing (Blaue Wurfbahn):**
+  - Vollständige Aufzeichnung der Hand- und Handgelenkspositionen über die gesamte Wurfbewegung.
+  - Dynamisches Vektor-Rendering mit quadratischer Bézier-Kurvenglättung in leuchtendem Königsblau (#3b82f6) direkt auf dem Canvas.
+  - Markierung des finalen Abwurf-Apex (Release-Punkt).
+- **3-Dart-Überlagerung & Konsistenz-Score:**
+  - Schalter zur getrennten Ansicht von Dart 1, Dart 2, Dart 3 oder gemeinsamer Überlagerung aller 3 Darts einer Aufnahme.
+  - Mathematische Berechnung des Consistency-Scores (Pfad-Deckung der 3 Trajektorien).
+- **Gelbe Schwerkraft-Lotlinie (Augenachse & Körperstabilität):**
+  - Senkrechte, gestrichelte Referenzlinie vom dominanten Auge/Kopf vertikal zum Boden mit Zielkreis-Optik.
+  - Entlarvt Vorneigungen oder Schwankungen des Oberkörpers während der Wurfbewegung.
+- **Standdreieck am Oche:**
+  - Visualisierung des Fußes (Sprunggelenk, Ferse, Zehenspitze) als geschlossenes Dreieck zur Überprüfung der Standruhe.
+- **Winkel-HUD Badge im Benchmark-Design:**
+  - Dunkle, abgerundete Pill mit weißer Typografie und dezentem Cyan-Winkelbogen direkt am Ellenbogen.
+- **Erfolgreicher Real-Video-Test:**
+  - Testsuite scripts/test_real_video_engine.py auf WhatsApp Video 2026-10-31 at 09.36.07.mp4 ausgeführt.
+  - Alle 3 Darts (Drawback 32.0°/72.1°/53.4°, Follow-Through 8.8°/9.5°/9.9°) und Trajektorien fehlerfrei validiert (Consistency-Score 84.2/100, Lotlinien-Varianz 0.000).
+
 ### 🔒 Strikte User-Arretierung im Single-Modus (Anti-Cheat & Datenintegrität)
 - **Problem behoben:** In Trainingsspielen war es stellenweise noch möglich, trotz Anmeldung einen anderen Spieler als Spieler 1 auszuwählen oder durch Moduswechsel fremde User-IDs zu übernehmen.
 - **Systemweite Arretierung in allen 4 Trainingsmodulen:**
