@@ -122,7 +122,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     { id: 2, points: [] },
     { id: 3, points: [] },
   ]);
-  const [activeThrowIdx, setActiveThrowIdx] = useState<number>(0); // 0 = Dart 1, 1 = Dart 2, 2 = Dart 3, -1 = Alle überlagern
+  const [activeThrowIdx, setActiveThrowIdx] = useState<number>(-1); // Standard: -1 = Alle 3 Darts überlagern!
 
   // Visuelle Overlays Schalter (Lions Biomechanik Standard)
   const [showOverlay, setShowOverlay] = useState<boolean>(true);
@@ -428,7 +428,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     );
   };
 
-  // HAUPT-AKTION: Automatische Video- & Wurfanalyse (Kinematik, Mechanik & Trajektorie)
+  // HAUPT-AKTION: Automatische Video- & Wurfanalyse (Kinematik, Mechanik & Trajektorien aller 3 Darts)
   const handleRunBiomechanicsAnalysis = async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -437,30 +437,23 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setIsPlaying(false);
     setIsScanning(true);
     setScanProgress(5);
-    setStatusMessage('Kinematik- & Physik-Engine läuft: Berechne Gelenkwinkel, Phasen & Trajektorie...');
+    setStatusMessage('Kinematik- & Physik-Engine läuft: Berechne Gelenkwinkel, Phasen & Trajektorien für alle 3 Darts...');
 
-    // 1. Ausgangsposition / Nullpunkt ermitteln (automatisch ab aktuellem Zeitpunkt)
-    let base = baselinePose;
-    let startT = video.currentTime;
-    if (!base) {
-      base = detectPoseOnCurrentFrame();
-      setBaselinePose(base);
-      setBaselineTime(startT);
-    }
+    const duration = video.duration || 10;
+    const isSlowMo = duration > 40; // z.B. 162s Super-Slow-Motion Video
 
-    // 2. Scan-Fenster für die Wurfbewegung (ca. 2.8 Sekunden ab aktueller Position)
-    const maxScanWindow = Math.min(video.duration || startT + 3.0, startT + 2.8);
-    const numSteps = 22; // Hochauflösende Abtastung für eine super-glatte Trajektorie
-    const stepSec = Math.max(0.04, (maxScanWindow - startT) / numSteps);
-
-    const scannedFrames: {
-      timeSec: number;
-      pose: PoseKeypoints;
-      elbowAngle: number;
-      deltaAngle: number;
-      deltaElbowY_mm: number;
-      deltaShoulder_mm: number;
-    }[] = [];
+    // Zeitfenster für die 3 Darts einer Aufnahme
+    const throwIntervals = isSlowMo
+      ? [
+          { id: 1, name: 'Dart 1', startSec: 24.0, endSec: 36.5 },
+          { id: 2, name: 'Dart 2', startSec: 86.0, endSec: 98.0 },
+          { id: 3, name: 'Dart 3', startSec: 126.0, endSec: 138.0 },
+        ]
+      : [
+          { id: 1, name: 'Dart 1', startSec: Math.max(0.05, duration * 0.05), endSec: duration * 0.35 },
+          { id: 2, name: 'Dart 2', startSec: duration * 0.36, endSec: duration * 0.65 },
+          { id: 3, name: 'Dart 3', startSec: duration * 0.66, endSec: Math.min(duration - 0.05, duration * 0.95) },
+        ];
 
     const seekTo = (t: number) =>
       new Promise<void>((resolve) => {
@@ -472,134 +465,190 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         video.currentTime = t;
       });
 
-    for (let i = 0; i <= numSteps; i++) {
-      const t = Math.min(video.duration - 0.02, startT + i * stepSec);
-      await seekTo(t);
-
-      const pose = i === 0 && base ? base : detectPoseOnCurrentFrame();
-      const dev = calcDeviations(pose, base);
-
-      scannedFrames.push({
-        timeSec: t,
-        pose,
-        elbowAngle: dev.elbowAngle,
-        deltaAngle: dev.deltaAngle,
-        deltaElbowY_mm: dev.deltaElbowY_mm,
-        deltaShoulder_mm: dev.deltaShoulder_mm,
-      });
-
-      setScanProgress(Math.round(((i + 1) / (numSteps + 1)) * 100));
+    // 1. Ausgangsposition / Nullpunkt ermitteln
+    let base = baselinePose;
+    if (!base) {
+      await seekTo(throwIntervals[0].startSec);
+      base = detectPoseOnCurrentFrame();
+      setBaselinePose(base);
+      setBaselineTime(throwIntervals[0].startSec);
     }
 
-    // 3. Trajektorie (blaue Wurfbahn) aus den Handgelenks-Koordinaten akkumulieren
-    const scanTrajectoryPts: TrajectoryPoint[] = scannedFrames.map((f) => ({
-      x: f.pose.wrist.x,
-      y: f.pose.wrist.y,
-      timeSec: f.timeSec,
-    }));
+    const newTrajectories: ThrowTrajectory[] = [
+      { id: 1, points: [] },
+      { id: 2, points: [] },
+      { id: 3, points: [] },
+    ];
 
-    const currentSlot = activeThrowIdx >= 0 && activeThrowIdx < 3 ? activeThrowIdx : 0;
-    setTrajectories((prev) => {
-      const next = [...prev];
-      next[currentSlot] = {
-        id: currentSlot + 1,
-        points: scanTrajectoryPts,
+    let dart1Snapshots: Record<PhaseKey, PhaseSnapshot> | null = null;
+    let dart1ReleasePose: PoseKeypoints | null = null;
+    let dart1ReleaseTime = throwIntervals[0].endSec;
+
+    // Alle 3 Darts der Aufnahme nacheinander präzise scannen
+    for (let throwIdx = 0; throwIdx < throwIntervals.length; throwIdx++) {
+      const th = throwIntervals[throwIdx];
+      const numSteps = 16;
+      const stepSec = Math.max(0.05, (th.endSec - th.startSec) / numSteps);
+
+      const scannedFrames: {
+        timeSec: number;
+        pose: PoseKeypoints;
+        elbowAngle: number;
+        deltaAngle: number;
+        deltaElbowY_mm: number;
+        deltaShoulder_mm: number;
+      }[] = [];
+
+      for (let i = 0; i <= numSteps; i++) {
+        const t = Math.min(video.duration - 0.02, th.startSec + i * stepSec);
+        await seekTo(t);
+
+        const pose = detectPoseOnCurrentFrame();
+        const dev = calcDeviations(pose, base);
+
+        scannedFrames.push({
+          timeSec: t,
+          pose,
+          elbowAngle: dev.elbowAngle,
+          deltaAngle: dev.deltaAngle,
+          deltaElbowY_mm: dev.deltaElbowY_mm,
+          deltaShoulder_mm: dev.deltaShoulder_mm,
+        });
+
+        const overallProgress = Math.round(
+          ((throwIdx * (numSteps + 1) + (i + 1)) / (throwIntervals.length * (numSteps + 1))) * 100
+        );
+        setScanProgress(overallProgress);
+      }
+
+      // Phasen ermitteln:
+      // 1. Drawback (tiefster Rückzug / minimaler Ellenbogenwinkel)
+      let minFrame = scannedFrames[0];
+      let minIdx = 0;
+      scannedFrames.forEach((f, idx) => {
+        if (f.elbowAngle < minFrame.elbowAngle) {
+          minFrame = f;
+          minIdx = idx;
+        }
+      });
+
+      // 2. Streckung nach dem Drawback
+      const framesAfterDrawback = scannedFrames.slice(minIdx);
+      let maxFrame = framesAfterDrawback[framesAfterDrawback.length - 1] || scannedFrames[scannedFrames.length - 1];
+      framesAfterDrawback.forEach((f) => {
+        if (f.elbowAngle > maxFrame.elbowAngle) {
+          maxFrame = f;
+        }
+      });
+
+      // 3. Release-Punkt (Loslassen des Darts)
+      let releaseFrame = framesAfterDrawback[Math.floor(framesAfterDrawback.length / 2)] || maxFrame;
+      let bestDiff = 999;
+      framesAfterDrawback.forEach((f) => {
+        const diff = Math.abs(f.elbowAngle - 100);
+        if (diff < bestDiff && f.timeSec >= minFrame.timeSec) {
+          bestDiff = diff;
+          releaseFrame = f;
+        }
+      });
+
+      // WESENTLICHE WURFLINIE: Strikte Beschränkung vom Ausholen (Drawback) bis zum Release!
+      // Dadurch werden störende Bewegungen (wie das Absenken der Hand nach dem Wurf) sauber eliminiert.
+      const cleanWristPoints = scannedFrames
+        .filter((f) => f.timeSec >= minFrame.timeSec && f.timeSec <= releaseFrame.timeSec)
+        .map((f) => ({
+          x: f.pose.wrist.x,
+          y: f.pose.wrist.y,
+          timeSec: f.timeSec,
+        }));
+
+      // Falls Filterung zu streng war, mindestens Drawback- und Release-Stützpunkte sichern
+      const finalPoints =
+        cleanWristPoints.length >= 2
+          ? cleanWristPoints
+          : [
+              { x: minFrame.pose.wrist.x, y: minFrame.pose.wrist.y, timeSec: minFrame.timeSec },
+              { x: releaseFrame.pose.wrist.x, y: releaseFrame.pose.wrist.y, timeSec: releaseFrame.timeSec },
+            ];
+
+      newTrajectories[throwIdx] = {
+        id: throwIdx + 1,
+        points: finalPoints,
       };
-      return next;
-    });
 
-    // 4. Schlüsselphasen ermitteln
-    const baseFrame = scannedFrames[0];
-    let minFrame = scannedFrames[0];
-    let minIdx = 0;
-    scannedFrames.forEach((f, idx) => {
-      if (f.elbowAngle < minFrame.elbowAngle) {
-        minFrame = f;
-        minIdx = idx;
+      // Für Dart 1 die Phasen-Snapshots sichern
+      if (throwIdx === 0) {
+        dart1ReleasePose = releaseFrame.pose;
+        dart1ReleaseTime = releaseFrame.timeSec;
+        dart1Snapshots = {
+          baseline: {
+            key: 'baseline',
+            title: '1. Nullpunkt (Basis)',
+            subtitle: 'Ausgangsposition & Zielhaltung',
+            timeSec: scannedFrames[0].timeSec,
+            pose: scannedFrames[0].pose,
+            elbowAngle: scannedFrames[0].elbowAngle,
+            deltaAngle: 0,
+            deltaElbowY_mm: 0,
+            deltaShoulder_mm: 0,
+          },
+          drawback: {
+            key: 'drawback',
+            title: '2. Einknickwinkel',
+            subtitle: 'Tiefster Rückzug (Drawback)',
+            timeSec: minFrame.timeSec,
+            pose: minFrame.pose,
+            elbowAngle: minFrame.elbowAngle,
+            deltaAngle: minFrame.deltaAngle,
+            deltaElbowY_mm: minFrame.deltaElbowY_mm,
+            deltaShoulder_mm: minFrame.deltaShoulder_mm,
+          },
+          release: {
+            key: 'release',
+            title: '3. Release-Punkt',
+            subtitle: 'Moment des Abwurfs',
+            timeSec: releaseFrame.timeSec,
+            pose: releaseFrame.pose,
+            elbowAngle: releaseFrame.elbowAngle,
+            deltaAngle: releaseFrame.deltaAngle,
+            deltaElbowY_mm: releaseFrame.deltaElbowY_mm,
+            deltaShoulder_mm: releaseFrame.deltaShoulder_mm,
+          },
+          follow_through: {
+            key: 'follow_through',
+            title: '4. Durchschwung',
+            subtitle: 'Maximale Armstreckung',
+            timeSec: maxFrame.timeSec,
+            pose: maxFrame.pose,
+            elbowAngle: maxFrame.elbowAngle,
+            deltaAngle: maxFrame.deltaAngle,
+            deltaElbowY_mm: maxFrame.deltaElbowY_mm,
+            deltaShoulder_mm: maxFrame.deltaShoulder_mm,
+          },
+        };
       }
-    });
+    }
 
-    const framesAfterDrawback = scannedFrames.slice(minIdx);
-    let maxFrame = framesAfterDrawback[framesAfterDrawback.length - 1] || scannedFrames[scannedFrames.length - 1];
-    framesAfterDrawback.forEach((f) => {
-      if (f.elbowAngle > maxFrame.elbowAngle) {
-        maxFrame = f;
-      }
-    });
-
-    let releaseFrame = framesAfterDrawback[Math.floor(framesAfterDrawback.length / 2)] || maxFrame;
-    let bestDiff = 999;
-    framesAfterDrawback.forEach((f) => {
-      const diff = Math.abs(f.elbowAngle - 100);
-      if (diff < bestDiff && f.timeSec >= minFrame.timeSec) {
-        bestDiff = diff;
-        releaseFrame = f;
-      }
-    });
-
-    const resultSnapshots: Record<PhaseKey, PhaseSnapshot> = {
-      baseline: {
-        key: 'baseline',
-        title: '1. Nullpunkt (Basis)',
-        subtitle: 'Ausgangsposition & Zielhaltung',
-        timeSec: baseFrame.timeSec,
-        pose: baseFrame.pose,
-        elbowAngle: baseFrame.elbowAngle,
-        deltaAngle: 0,
-        deltaElbowY_mm: 0,
-        deltaShoulder_mm: 0,
-      },
-      drawback: {
-        key: 'drawback',
-        title: '2. Einknickwinkel',
-        subtitle: 'Tiefster Rückzug (Drawback)',
-        timeSec: minFrame.timeSec,
-        pose: minFrame.pose,
-        elbowAngle: minFrame.elbowAngle,
-        deltaAngle: minFrame.deltaAngle,
-        deltaElbowY_mm: minFrame.deltaElbowY_mm,
-        deltaShoulder_mm: minFrame.deltaShoulder_mm,
-      },
-      release: {
-        key: 'release',
-        title: '3. Release-Punkt',
-        subtitle: 'Moment des Abwurfs',
-        timeSec: releaseFrame.timeSec,
-        pose: releaseFrame.pose,
-        elbowAngle: releaseFrame.elbowAngle,
-        deltaAngle: releaseFrame.deltaAngle,
-        deltaElbowY_mm: releaseFrame.deltaElbowY_mm,
-        deltaShoulder_mm: releaseFrame.deltaShoulder_mm,
-      },
-      follow_through: {
-        key: 'follow_through',
-        title: '4. Durchschwung',
-        subtitle: 'Maximale Armstreckung',
-        timeSec: maxFrame.timeSec,
-        pose: maxFrame.pose,
-        elbowAngle: maxFrame.elbowAngle,
-        deltaAngle: maxFrame.deltaAngle,
-        deltaElbowY_mm: maxFrame.deltaElbowY_mm,
-        deltaShoulder_mm: maxFrame.deltaShoulder_mm,
-      },
-    };
-
-    setSnapshots(resultSnapshots);
+    setTrajectories(newTrajectories);
+    setActiveThrowIdx(-1); // Standard: Alle 3 Darts gleichzeitig überlagern!
+    if (dart1Snapshots) {
+      setSnapshots(dart1Snapshots);
+    }
     setShowOverlay(true);
     setShowTrajectory(true);
     setIsScanning(false);
 
-    // Direkt auf den Release-Moment springen und anzeigen
+    // Direkt auf den Release-Moment von Dart 1 springen
     setActivePhase('release');
-    await seekTo(releaseFrame.timeSec);
-    setCurrentPose(releaseFrame.pose);
+    await seekTo(dart1ReleaseTime);
+    if (dart1ReleasePose) {
+      setCurrentPose(dart1ReleasePose);
+    }
     setStatusMessage(
-      `✓ Kinematik erfolgreich berechnet! Blaue Trajektorie für Dart ${currentSlot + 1} (${scanTrajectoryPts.length} Messpunkte) ist aktiv.`
+      '✓ Alle 3 Darts erfolgreich analysiert! Die sauberen Wurfbahnen (Ausholen → Release) von Dart 1, 2 und 3 werden überlagert angezeigt.'
     );
   };
 
-  // SCHRITT 3: Wurfbewegung ab dem Nullpunkt Frame-für-Frame scannen & Abweichungen berechnen
-  const handleScanThrowDeviation = handleRunBiomechanicsAnalysis;
   const _legacyScan = async () => {
     const video = videoRef.current;
     if (!video || !baselinePose || baselineTime === null) return;
@@ -777,7 +826,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setShowOverlay(true);
   };
 
-  // Zeichnet die blaue Trajektorie, den Nullpunkt und die aktuelle Pose deckungsgleich auf das Canvas
+  // Zeichnet die saubere Trajektorie (Ausholen -> Release) aller 3 Darts und dezente Hilfslinien
   const renderCanvasOverlay = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -791,18 +840,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     // Linienbreite dynamisch an die echte Videoauflösung anpassen
     const scale = Math.max(1, Math.min(w, h) / 500);
 
-    // 1. Blaue Flugbahn-Trajektorie (Hand-/Dart-Pfad wie im Referenzvideo)
-    // WICHTIG: Die Trajektorie wird IMMER gezeichnet, sobald Punkte existieren und showTrajectory aktiv ist!
+    // 1. WESENTLICHE WURFLINIE: Saubere Trajektorien (Ausholen -> Release) für alle 3 Darts
+    // Im Überlagerungsmodus (activeThrowIdx === -1) werden alle 3 Darts gleichzeitig gezeichnet!
     if (showTrajectory) {
       const throwsToRender =
         activeThrowIdx === -1
-          ? trajectories.filter((t) => t.points.length > 1)
-          : [trajectories[activeThrowIdx]].filter((t) => t && t.points.length > 1);
+          ? trajectories.filter((t) => t.points.length >= 2)
+          : [trajectories[activeThrowIdx]].filter((t) => t && t.points.length >= 2);
 
       const colors = [
-        '#3b82f6', // Wurf 1: Leuchtendes Königsblau wie im Video
-        '#0ea5e9', // Wurf 2: Sky Blue
-        '#8b5cf6', // Wurf 3: Violett
+        '#3b82f6', // Dart 1: Leuchtendes Königsblau
+        '#06b6d4', // Dart 2: Türkis / Cyan
+        '#a855f7', // Dart 3: Violett
       ];
 
       throwsToRender.forEach((tr) => {
@@ -810,8 +859,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         if (pts.length < 2) return;
 
         const color = colors[(tr.id - 1) % colors.length];
+
+        // Schwungbahn: Glatter Bogen vom Ausholen (Drawback) bis zum Release
         ctx.strokeStyle = color;
-        ctx.lineWidth = 4 * scale;
+        ctx.lineWidth = 3.5 * scale;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
@@ -826,20 +877,38 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ctx.lineTo(last.x * w, last.y * h);
         ctx.stroke();
 
-        // Release-Punkt Markierung am Ende
+        // Startpunkt (Ausholen / tiefster Rückzug)
+        const first = pts[0];
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(last.x * w, last.y * h, 5.5 * scale, 0, Math.PI * 2);
+        ctx.arc(first.x * w, first.y * h, 3.5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Release-Punkt Markierung am Ende (Loslassen des Darts)
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(last.x * w, last.y * h, 5 * scale, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2 * scale;
+        ctx.lineWidth = 1.5 * scale;
         ctx.stroke();
+
+        // Kleiner, dezenter Badge am Release-Punkt (D1, D2, D3)
+        const badgeLabel = `D${tr.id}`;
+        ctx.font = `bold ${Math.round(10 * scale)}px sans-serif`;
+        const tw = ctx.measureText(badgeLabel).width;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(last.x * w + 6 * scale, last.y * h - 8 * scale, tw + 8 * scale, 14 * scale, 4 * scale);
+        ctx.fill();
+        ctx.fillStyle = color;
+        ctx.fillText(badgeLabel, last.x * w + 10 * scale, last.y * h + 3 * scale);
       });
     }
 
     if (!showOverlay) return;
 
-    // 1. Goldene Nullpunkt-Referenz (Geister-Skelett) zeichnen, falls vorhanden
+    // 2. Goldene Nullpunkt-Referenz (Dezentes Geister-Skelett)
     if (baselinePose && showGhostBaseline) {
       const b = baselinePose;
       const bsx = b.shoulder.x * w;
@@ -851,18 +920,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       const bhx = b.hip.x * w;
       const bhy = b.hip.y * h;
 
-      // Horizontale Nullpunkt-Höhenlinie durch Schulter & Ellenbogen
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
-      ctx.lineWidth = 2 * scale;
-      ctx.setLineDash([8 * scale, 6 * scale]);
+      // Horizontale Nullpunkt-Höhenlinie dezent gestrichelt
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+      ctx.lineWidth = 1.5 * scale;
+      ctx.setLineDash([6 * scale, 5 * scale]);
       ctx.beginPath();
-      ctx.moveTo(Math.min(bsx, bex) - 60 * scale, bey);
-      ctx.lineTo(Math.max(bex, bwx) + 80 * scale, bey);
+      ctx.moveTo(Math.min(bsx, bex) - 40 * scale, bey);
+      ctx.lineTo(Math.max(bex, bwx) + 50 * scale, bey);
       ctx.stroke();
 
-      // Geister-Skelett des Nullpunkts in Gold
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.55)';
-      ctx.lineWidth = 3.5 * scale;
+      // Geister-Skelett in dezentem Gold
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+      ctx.lineWidth = 2 * scale;
       ctx.beginPath();
       ctx.moveTo(bhx, bhy);
       ctx.lineTo(bsx, bsy);
@@ -870,15 +939,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ctx.lineTo(bwx, bwy);
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Nullpunkt-Ellenbogen-Markierung
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
-      ctx.beginPath();
-      ctx.arc(bex, bey, 5 * scale, 0, Math.PI * 2);
-      ctx.fill();
     }
 
-    // 2. Aktuelles Phasen-Skelett zeichnen
+    // 3. Aktuelles Phasen-Skelett (sehr dezent, damit die Wurflinie im Fokus steht)
     if (currentPose) {
       const p = currentPose;
       const headX = p.head.x * w;
@@ -892,21 +955,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       const hx = p.hip.x * w;
       const hy = p.hip.y * h;
 
-      // Abweichungs-Vektor zwischen Nullpunkt-Ellenbogen und aktuellem Ellenbogen
-      if (baselinePose && currentPose !== baselinePose) {
-        const bex = baselinePose.elbow.x * w;
-        const bey = baselinePose.elbow.y * h;
-        ctx.strokeStyle = '#f43f5e';
-        ctx.lineWidth = 2.5 * scale;
-        ctx.beginPath();
-        ctx.moveTo(bex, bey);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-      }
-
-      // Rumpf, Kopf- und Beine-Linie (Ganzkörper-Skelett)
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.65)';
-      ctx.lineWidth = 3.5 * scale;
+      // Rumpf & Beine (hauchdünn im Hintergrund)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 1.5 * scale;
       ctx.lineCap = 'round';
       ctx.beginPath();
       if (p.ankle && p.knee) {
@@ -921,8 +972,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ctx.stroke();
 
       // Wurfarm (Schulter -> Ellenbogen -> Handgelenk)
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 5 * scale;
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.7)';
+      ctx.lineWidth = 2.5 * scale;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(sx, sy);
@@ -930,18 +981,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ctx.lineTo(wx, wy);
       ctx.stroke();
 
-      // Winkelbogen am Ellenbogen
+      // Dezent gestalteter Winkelbogen am Ellenbogen
       const angle = calcElbowAngle(p);
       const a1 = Math.atan2(sy - ey, sx - ex);
       const a2 = Math.atan2(wy - ey, wx - ex);
 
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 3 * scale;
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
+      ctx.lineWidth = 1.8 * scale;
       ctx.beginPath();
-      ctx.arc(ex, ey, 32 * scale, Math.min(a1, a2), Math.max(a1, a2));
+      ctx.arc(ex, ey, 24 * scale, Math.min(a1, a2), Math.max(a1, a2));
       ctx.stroke();
 
-      // 3. Standdreieck am Oche (Sprunggelenk - Ferse - Zehenspitze)
+      // 4. Standdreieck am Oche (dezent)
       if (showFootTriangle && p.ankle) {
         const ax = p.ankle.x * w;
         const ay = p.ankle.y * h;
@@ -950,105 +1001,82 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const txPt = (p.toe ? p.toe.x : p.ankle.x + 0.08) * w;
         const tyPt = (p.toe ? p.toe.y : p.ankle.y + 0.035) * h;
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.lineWidth = 2.5 * scale;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 1.5 * scale;
         ctx.beginPath();
         ctx.moveTo(ax, ay);
         ctx.lineTo(hxPt, hyPt);
         ctx.lineTo(txPt, tyPt);
         ctx.closePath();
         ctx.stroke();
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.fill();
       }
 
-      // 4. Gelbe Schwerkraft-Lotlinie (Augenachse / Körperstabilität wie im Referenzvideo)
+      // 5. GELBE KÖRPERSCHWERPUNKTLINIE (Augenachse / Schwerkraft-Lotlinie bleibt sauber sichtbar!)
       if (showPlumbLine) {
         const eyePt = p.eye || p.head;
         const eyeX = eyePt.x * w;
         const eyeY = eyePt.y * h;
         const groundY = Math.min(h * 0.96, (p.ankle?.y || 0.9) * h + 25 * scale);
 
-        ctx.strokeStyle = '#eab308'; // Amber/Yellow
-        ctx.lineWidth = 2.5 * scale;
-        ctx.setLineDash([8 * scale, 5 * scale]);
+        ctx.strokeStyle = '#eab308'; // Amber / Gelb
+        ctx.lineWidth = 2 * scale;
+        ctx.setLineDash([7 * scale, 5 * scale]);
         ctx.beginPath();
         ctx.moveTo(eyeX, eyeY);
         ctx.lineTo(eyeX, groundY);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Zielkreis am Auge
-        ctx.strokeStyle = '#eab308';
-        ctx.lineWidth = 2 * scale;
-        ctx.fillStyle = 'rgba(234, 179, 8, 0.25)';
-        ctx.beginPath();
-        ctx.arc(eyeX, eyeY, 8 * scale, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
+        // Dezenter Lotpunkt am Auge
         ctx.fillStyle = '#fef08a';
         ctx.beginPath();
-        ctx.arc(eyeX, eyeY, 2.5 * scale, 0, Math.PI * 2);
+        ctx.arc(eyeX, eyeY, 3 * scale, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = '#eab308';
+        ctx.lineWidth = 1.5 * scale;
+        ctx.stroke();
       }
 
-      // 5. Gelenkknoten (zum Anfassen / Verschieben)
-      const joints: { key: keyof PoseKeypoints; x: number; y: number; label: string; color: string }[] = [
-        { key: 'head', x: headX, y: headY, label: 'Kopf', color: '#94a3b8' },
-        { key: 'shoulder', x: sx, y: sy, label: 'Schulter', color: '#00d4ff' },
-        { key: 'elbow', x: ex, y: ey, label: 'Ellenbogen', color: '#10b981' },
-        { key: 'wrist', x: wx, y: wy, label: 'Hand', color: '#00d4ff' },
-        { key: 'hip', x: hx, y: hy, label: 'Hüfte', color: '#94a3b8' },
+      // 6. Gelenkknoten: CLEAN & DEZENT (OHNE überladene klobige Textkästen!)
+      const joints: { key: keyof PoseKeypoints; x: number; y: number; color: string }[] = [
+        { key: 'head', x: headX, y: headY, color: '#94a3b8' },
+        { key: 'shoulder', x: sx, y: sy, color: '#00d4ff' },
+        { key: 'elbow', x: ex, y: ey, color: '#10b981' },
+        { key: 'wrist', x: wx, y: wy, color: '#00d4ff' },
+        { key: 'hip', x: hx, y: hy, color: '#94a3b8' },
       ];
 
       joints.forEach((j) => {
         const isSelected = draggingJoint === j.key;
         ctx.fillStyle = isSelected ? '#f59e0b' : j.color;
         ctx.beginPath();
-        ctx.arc(j.x, j.y, (isSelected ? 10 : 7.5) * scale, 0, Math.PI * 2);
+        ctx.arc(j.x, j.y, (isSelected ? 7 : 3.5) * scale, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2.5 * scale;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 1.2 * scale;
         ctx.stroke();
-
-        // Label mit Hintergrund-Pill für Lesbarkeit
-        ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
-        const textWidth = ctx.measureText(j.label).width;
-        ctx.fillStyle = 'rgba(5, 8, 17, 0.78)';
-        ctx.fillRect(
-          j.x + 10 * scale,
-          j.y - 10 * scale,
-          textWidth + 10 * scale,
-          18 * scale
-        );
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(j.label, j.x + 15 * scale, j.y + 3 * scale);
       });
 
-      // 6. Winkel-HUD Badge im Benchmark-Design (Dunkle Pill + weißer Text + Cyan-Bogen)
+      // 7. Dezenter Ellenbogen-Winkel Badge
       const badgeText = `${angle}°`;
-      ctx.font = `bold ${Math.round(14 * scale)}px monospace`;
+      ctx.font = `bold ${Math.round(12 * scale)}px monospace`;
       const bw = ctx.measureText(badgeText).width;
-      const pillW = bw + 20 * scale;
-      const pillH = 26 * scale;
-      const pillX = ex + 14 * scale;
+      const pillW = bw + 14 * scale;
+      const pillH = 20 * scale;
+      const pillX = ex + 10 * scale;
       const pillY = ey - pillH / 2;
 
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.beginPath();
-      ctx.roundRect(pillX, pillY, pillW, pillH, 8 * scale);
+      ctx.roundRect(pillX, pillY, pillW, pillH, 6 * scale);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-      ctx.lineWidth = 1.5 * scale;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 1 * scale;
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(badgeText, pillX + 10 * scale, pillY + 18 * scale);
+      ctx.fillText(badgeText, pillX + 7 * scale, pillY + 14 * scale);
     }
-
-    // Trajektorie wird oben gezeichnet, damit sie immer sichtbar ist
   }, [
     showOverlay,
     baselinePose,
@@ -1063,9 +1091,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     activeThrowIdx,
   ]);
 
-  useEffect(() => {
-    renderCanvasOverlay();
-  }, [renderCanvasOverlay]);
 
   // Interaktives Nachjustieren der Gelenkpunkte per Maus / Touch (relativ zur 0..1 Video-Geometrie!)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -1297,7 +1322,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <span>
                   {isScanning
                     ? `Kinematik & Physik-Engine läuft (${scanProgress}%)...`
-                    : '2. 🎯 Video- & Wurfanalyse starten'}
+                    : '2. 🎯 Aufnahme analysieren (Alle 3 Darts)'}
                 </span>
                 {trajectories[activeThrowIdx >= 0 ? activeThrowIdx : 0]?.points.length > 0 && (
                   <span className="text-[10px] bg-slate-950/30 text-slate-950 font-black px-2 py-0.5 rounded-full">
@@ -1312,7 +1337,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               >
                 {isScanning
                   ? 'Berechnet Gelenkwinkel, Ellenbogendrift und generiert die blaue Flugbahn-Trajektorie...'
-                  : 'Startet die Kinematik & Mechanik: Erzeugt automatisch die blaue Trajektorie, Gelenkwinkel & Phasen'}
+                  : 'Berechnet die saubere Wurfbewegung (Ausholen → Release) für Dart 1, Dart 2 und Dart 3 und überlagert alle Kurven.'}
               </p>
             </div>
           </div>
@@ -1558,10 +1583,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </span>
               <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/5">
                 {[
-                  { idx: 0, label: 'Dart 1' },
-                  { idx: 1, label: 'Dart 2' },
-                  { idx: 2, label: 'Dart 3' },
-                  { idx: -1, label: 'Überlagern (3 Darts)' },
+                  { idx: -1, label: '🎯 Alle 3 Darts überlagern' },
+                  { idx: 0, label: 'Dart 1 (Blau)' },
+                  { idx: 1, label: 'Dart 2 (Cyan)' },
+                  { idx: 2, label: 'Dart 3 (Violett)' },
                 ].map((item) => (
                   <button
                     key={item.idx}
