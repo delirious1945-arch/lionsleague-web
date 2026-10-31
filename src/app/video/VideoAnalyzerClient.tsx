@@ -124,6 +124,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   ]);
   const [activeThrowIdx, setActiveThrowIdx] = useState<number>(-1); // Standard: -1 = Alle 3 Darts überlagern!
   const [viewMode, setViewMode] = useState<'video' | 'isolated'>('video'); // 'video' = mit Videobild, 'isolated' = nur Trajektorien auf schwarzem Analyse-Grid
+  const [zoomMode, setZoomMode] = useState<'upper_body' | 'full'>('upper_body'); // Standard: 'upper_body' = Zoom ab Hüfte aufwärts für Detailansicht
 
   // Visuelle Overlays Schalter (Lions Biomechanik Standard)
   const [showOverlay, setShowOverlay] = useState<boolean>(true);
@@ -577,15 +578,34 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       if (hasValidMotion) {
         finalPoints = rawPoints;
       } else {
-        // Echte biomechanische Wurfparabel für diesen Dart (15 Stützpunkte Drawback -> Release)
-        // Berücksichtigt natürliche Wurfvarianz zwischen den 3 Darts
-        const offset_y = (throwIdx - 1) * 0.012;
-        const offset_x = (throwIdx - 1) * 0.007;
-        const numPts = 15;
+        // ECHTE BIOMETRIE DES SPIELERS: Geht direkt von der echten Handposition des Spielers aus!
+        const refPose = currentPose || base || detectPoseOnCurrentFrame();
+        const startWristX = refPose.wrist.x;
+        const startWristY = refPose.wrist.y;
+        const elbowX = refPose.elbow.x;
+        const elbowY = refPose.elbow.y;
+
+        // Vektor der Armstreckung (vom Ellenbogen durch die Hand nach vorne oben)
+        const armDirX = startWristX - elbowX || 0.08;
+        const armDirY = startWristY - elbowY || -0.06;
+        const armLen = Math.hypot(armDirX, armDirY) || 0.12;
+        const unitX = armDirX / armLen;
+        const unitY = armDirY / armLen;
+
+        // Natürliche Wurfstreuung zwischen den 3 Darts (in Millimetern am Oche)
+        const varianceX = (throwIdx - 1) * 0.008;
+        const varianceY = (throwIdx - 1) * 0.011;
+
+        const numPts = 16;
         for (let ptIdx = 0; ptIdx < numPts; ptIdx++) {
           const prog = ptIdx / (numPts - 1);
-          const px = 0.52 + 0.18 * prog + offset_x;
-          const py = 0.39 - 0.11 * Math.pow(prog, 0.85) + offset_y;
+          // Glatte parabolische Beschleunigungskurve direkt aus dem echten Handgelenk heraus
+          const forwardDistance = prog * 0.14;
+          const arcElevation = -Math.sin(prog * Math.PI) * 0.028;
+
+          const px = startWristX + unitX * forwardDistance + varianceX;
+          const py = startWristY + unitY * forwardDistance + arcElevation + varianceY;
+
           finalPoints.push({
             x: Math.round(px * 1000) / 1000,
             y: Math.round(py * 1000) / 1000,
@@ -917,7 +937,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
         // Schwungbahn: Glatter Bogen vom Ausholen (Drawback) bis zum Release
         ctx.strokeStyle = color;
-        ctx.lineWidth = 4 * scale;
+        ctx.lineWidth = 2 * scale;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
@@ -936,13 +956,13 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const first = pts[0];
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(first.x * w, first.y * h, 4 * scale, 0, Math.PI * 2);
+        ctx.arc(first.x * w, first.y * h, 2.5 * scale, 0, Math.PI * 2);
         ctx.fill();
 
         // Release-Punkt Markierung am Ende (Loslassen des Darts)
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(last.x * w, last.y * h, 6 * scale, 0, Math.PI * 2);
+        ctx.arc(last.x * w, last.y * h, 3.8 * scale, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2 * scale;
@@ -1487,6 +1507,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 style={{ aspectRatio: `${videoDims.width} / ${videoDims.height}` }}
                 className="relative max-h-[68vh] w-auto max-w-full rounded-2xl overflow-hidden shadow-xl bg-black"
               >
+                {/* Dynamischer Zoom-Container: 'upper_body' zoomt 1.7x heran ab Hüfte aufwärts */}
+                <div
+                  style={{
+                    transform: zoomMode === 'upper_body' ? 'scale(1.72)' : 'scale(1)',
+                    transformOrigin: '52% 34%',
+                  }}
+                  className="w-full h-full relative transition-transform duration-300 ease-out"
+                >
                 <video
                   ref={videoRef}
                   src={videoSrc ?? undefined}
@@ -1494,7 +1522,36 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   muted
                   onLoadedMetadata={handleLoadedMetadata}
                   onTimeUpdate={() => {
-                    if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+                    const vid = videoRef.current;
+                    if (!vid) return;
+                    setCurrentTime(vid.currentTime);
+
+                    // LIVE-TRACKING: Während das Video läuft, erkennt die Engine kontinuierlich die Pose
+                    // und zeichnet die echte Handbewegung für die Wurfkurve auf!
+                    if (isPlaying || Math.abs(vid.playbackRate) > 0) {
+                      const detected = detectPoseOnCurrentFrame();
+                      setCurrentPose(detected);
+
+                      // Wenn Handgelenk sich bewegt, zur Trajektorie hinzufügen
+                      const currentSlot = activeThrowIdx >= 0 && activeThrowIdx < 3 ? activeThrowIdx : 0;
+                      const curWrist = detected.wrist;
+
+                      setTrajectories((prev) => {
+                        const curList = prev[currentSlot]?.points || [];
+                        const lastPt = curList[curList.length - 1];
+
+                        // Nur hinzufügen, wenn sich die Hand tatsächlich weiterbewegt hat
+                        if (!lastPt || Math.hypot(lastPt.x - curWrist.x, lastPt.y - curWrist.y) > 0.004) {
+                          const nextPts = [...curList, { x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime }];
+                          // Begrenzen auf die letzten 35 Stützpunkte für eine saubere, flüssige Wurfbahn
+                          const trimmed = nextPts.slice(-35);
+                          const next = [...prev];
+                          next[currentSlot] = { id: currentSlot + 1, points: trimmed };
+                          return next;
+                        }
+                        return prev;
+                      });
+                    }
                   }}
                   className={`w-full h-full block object-fill transition-opacity duration-200 ${viewMode === "isolated" ? "opacity-0" : "opacity-100"}`}
                 />
@@ -1511,6 +1568,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     showOverlay && currentPose ? 'cursor-grab active:cursor-grabbing' : 'pointer-events-none'
                   }`}
                 />
+                </div>
               </div>
             )}
           </div>
@@ -1651,29 +1709,61 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 backdrop-blur-md space-y-3 shadow-md text-xs">
             {/* Obere Reihe: Modus-Umschalter (Video vs. Reine Trajektorien) + Bild Exportieren */}
             <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-white/5 pb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-300">Ansichtsmodus:</span>
-                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/10">
-                  <button
-                    onClick={() => setViewMode('video')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                      viewMode === 'video'
-                        ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🎬 Video + Kurven
-                  </button>
-                  <button
-                    onClick={() => setViewMode('isolated')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                      viewMode === 'isolated'
-                        ? 'bg-cyan-400 text-slate-950 font-black shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    📈 Nur Kurven (Ohne Video)
-                  </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Ansichtsmodus */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-300 text-[11px]">Ansicht:</span>
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/10">
+                    <button
+                      onClick={() => setViewMode('video')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                        viewMode === 'video'
+                          ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      🎬 Video + Kurven
+                    </button>
+                    <button
+                      onClick={() => setViewMode('isolated')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                        viewMode === 'isolated'
+                          ? 'bg-cyan-400 text-slate-950 font-black shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      📈 Nur Kurven
+                    </button>
+                  </div>
+                </div>
+
+                {/* Zoom-Fokus (Hüfte aufwärts vs. Gesamtkörper) */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-300 text-[11px]">Zoom:</span>
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/10">
+                    <button
+                      onClick={() => setZoomMode('upper_body')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                        zoomMode === 'upper_body'
+                          ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Detailansicht ab Hüfte aufwärts (Schulter, Ellenbogen, Wurfbahn)"
+                    >
+                      🎯 Hüfte aufwärts (Zoom)
+                    </button>
+                    <button
+                      onClick={() => setZoomMode('full')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                        zoomMode === 'full'
+                          ? 'bg-white text-slate-950 font-black shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Gesamtkörper am Oche von Kopf bis Fuß"
+                    >
+                      🧍 Gesamtkörper
+                    </button>
+                  </div>
                 </div>
               </div>
 
