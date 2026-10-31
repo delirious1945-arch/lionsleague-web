@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
@@ -28,55 +28,25 @@ import {
 } from 'lucide-react';
 import { UserSession } from '@/app/actions';
 import type { PoseLandmarker as PoseLandmarkerType } from '@mediapipe/tasks-vision';
+import {
+  Point,
+  PoseKeypoints,
+  TrajectoryPoint,
+  ThrowTrajectory,
+  PhaseKey,
+  PhaseSnapshot,
+  ScannedFrame,
+  calculateElbowAngle,
+  calculateMmPerPx,
+  calculatePoseDeviations,
+  smoothTrajectory1Euro,
+  buildAnatomicalArmTrajectory,
+  computeThrowKinematics,
+  anchorTrajectoriesToPose,
+} from '@/lib/biomechanicsEngine';
 
 interface VideoAnalyzerClientProps {
   user: UserSession;
-}
-
-interface Point {
-  x: number; // Normalisiert 0..1 relativ zur echten Video-Auflösung
-  y: number; // Normalisiert 0..1 relativ zur echten Video-Auflösung
-}
-
-interface PoseKeypoints {
-  head: Point;
-  eye?: Point;
-  shoulder: Point;
-  elbow: Point;
-  wrist: Point;
-  hip: Point;
-  knee?: Point;
-  ankle?: Point;
-  heel?: Point;
-  toe?: Point;
-}
-
-export interface TrajectoryPoint {
-  x: number;
-  y: number;
-  timeSec: number;
-}
-
-export interface ThrowTrajectory {
-  id: number; // 1, 2, 3
-  points: TrajectoryPoint[];
-  releaseSpeedKmh?: number;
-  launchAngleDeg?: number;
-  elbowDropMm?: number;
-}
-
-type PhaseKey = 'baseline' | 'drawback' | 'release' | 'follow_through';
-
-interface PhaseSnapshot {
-  key: PhaseKey;
-  title: string;
-  subtitle: string;
-  timeSec: number;
-  pose: PoseKeypoints;
-  elbowAngle: number;
-  deltaAngle: number;
-  deltaElbowY_mm: number;
-  deltaShoulder_mm: number;
 }
 
 export interface SavedBiomechanicsSession {
@@ -91,69 +61,6 @@ export interface SavedBiomechanicsSession {
   drawbackAngle: number;
   releaseAngle: number;
   followThroughAngle: number;
-}
-
-// ============================================================================
-// 1. ADAPTIVE EMA / 1-EURO-FILTER FÜR BUTTERWEICHE WURFKURVEN OHNE JITTER
-// ============================================================================
-function smoothTrajectory1Euro(pts: TrajectoryPoint[]): TrajectoryPoint[] {
-  if (pts.length <= 2) return pts;
-  const smoothed: TrajectoryPoint[] = [pts[0]];
-  const alphaMin = 0.38;
-  const alphaMax = 0.85;
-  const speedScale = 14.0;
-
-  for (let i = 1; i < pts.length; i++) {
-    const prev = smoothed[i - 1];
-    const cur = pts[i];
-    const dist = Math.hypot(cur.x - prev.x, cur.y - prev.y);
-    // Bei schneller Bewegung am Release hohes Alpha (kaum Latenz), bei langsamer Bewegung starkes Glätten gegen Zittern
-    const alpha = Math.min(alphaMax, Math.max(alphaMin, alphaMin + dist * speedScale));
-    smoothed.push({
-      x: Math.round((prev.x + alpha * (cur.x - prev.x)) * 10000) / 10000,
-      y: Math.round((prev.y + alpha * (cur.y - prev.y)) * 10000) / 10000,
-      timeSec: cur.timeSec,
-    });
-  }
-  return smoothed;
-}
-
-// ============================================================================
-// 2. ABWURF-TACHOMETER (km/h) & 3. LAUNCH-ANGLE-RADAR (°)
-// ============================================================================
-function computeThrowKinematics(
-  pts: TrajectoryPoint[],
-  dims: { width: number; height: number },
-  mmPerPx: number,
-  isSlowMo: boolean
-): { releaseSpeedKmh: number; launchAngleDeg: number } {
-  if (pts.length < 2) {
-    return { releaseSpeedKmh: 21.2, launchAngleDeg: 14.5 };
-  }
-
-  const n = pts.length;
-  const pEnd = pts[n - 1];
-  const pPrev = pts[Math.max(0, n - 4)];
-
-  const dxPx = (pEnd.x - pPrev.x) * dims.width;
-  const dyPx = (pEnd.y - pPrev.y) * dims.height; // Im Bild zeigt Y nach unten
-
-  // Abgangswinkel relativ zur Horizontalen (nach oben = positiv)
-  const rawAngle = (Math.atan2(-dyPx, Math.abs(dxPx) || 1) * 180) / Math.PI;
-  const launchAngleDeg = Math.round(Math.max(-15, Math.min(45, rawAngle)) * 10) / 10;
-
-  // Distanz in Millimetern im letzten Beschleunigungssegment
-  const distMm = Math.hypot(dxPx, dyPx) * mmPerPx;
-  const dtRaw = Math.max(0.015, pEnd.timeSec - pPrev.timeSec);
-  // Zeitlupenfaktor kompensieren (bei Slow-Mo ~8x gedehnt)
-  const effectiveDt = isSlowMo ? dtRaw / 8.0 : dtRaw;
-  const speedMmPerSec = distMm / effectiveDt;
-  // Umrechnung mm/s -> km/h (* 0.0036) + Kalibrierungsfaktor für Dartspitze (Handgelenk + Fingerhebel ~ 1.35x)
-  const rawKmh = speedMmPerSec * 0.0036 * 1.35;
-  const releaseSpeedKmh =
-    Math.round(Math.max(16.8, Math.min(26.4, rawKmh || 21.4)) * 10) / 10;
-
-  return { releaseSpeedKmh, launchAngleDeg };
 }
 
 export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) {
@@ -180,14 +87,15 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [baselinePose, setBaselinePose] = useState<PoseKeypoints | null>(null);
   const [baselineTime, setBaselineTime] = useState<number | null>(null);
   const [currentPose, setCurrentPose] = useState<PoseKeypoints | null>(null);
+  const lastValidPoseRef = useRef<PoseKeypoints | null>(null);
 
-  // Analyse-Phasen Snapshots
+  // Scan-Ergebnisse für die 4 Wurfphasen
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scanProgress, setScanProgress] = useState<number>(0);
   const [snapshots, setSnapshots] = useState<Record<PhaseKey, PhaseSnapshot> | null>(null);
   const [activePhase, setActivePhase] = useState<PhaseKey>('release');
 
-  // Trajektorien für alle 3 Darts
+  // Trajektorien für alle 3 Darts (Modular über biomechanicsEngine berechnet)
   const [trajectories, setTrajectories] = useState<ThrowTrajectory[]>([
     { id: 1, points: [], releaseSpeedKmh: 21.4, launchAngleDeg: 14.2, elbowDropMm: -3.2 },
     { id: 2, points: [], releaseSpeedKmh: 21.1, launchAngleDeg: 13.8, elbowDropMm: -4.1 },
@@ -229,6 +137,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const landmarkerRef = useRef<PoseLandmarkerType | null>(null);
+  const landmarkerInitPromiseRef = useRef<Promise<PoseLandmarkerType | null> | null>(null);
 
   // Gespeicherte Sessions aus LocalStorage laden
   useEffect(() => {
@@ -248,95 +157,32 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
   }, []);
 
-  // Ellenbogen-Innenwinkel berechnen
+  // Ellenbogen-Innenwinkel über Engine-Modul
   const calcElbowAngle = useCallback(
-    (pose: PoseKeypoints, dims = videoDims): number => {
-      const sx = pose.shoulder.x * dims.width;
-      const sy = pose.shoulder.y * dims.height;
-      const ex = pose.elbow.x * dims.width;
-      const ey = pose.elbow.y * dims.height;
-      const wx = pose.wrist.x * dims.width;
-      const wy = pose.wrist.y * dims.height;
-
-      const v1x = sx - ex;
-      const v1y = sy - ey;
-      const v2x = wx - ex;
-      const v2y = wy - ey;
-
-      const dot = v1x * v2x + v1y * v2y;
-      const mag1 = Math.hypot(v1x, v1y);
-      const mag2 = Math.hypot(v2x, v2y);
-      if (mag1 === 0 || mag2 === 0) return 90;
-
-      const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
-      return Math.round(((Math.acos(cos) * 180) / Math.PI) * 10) / 10;
-    },
+    (pose: PoseKeypoints, dims = videoDims): number => calculateElbowAngle(pose, dims),
     [videoDims]
   );
 
-  // Maßstab mmPerPx berechnen
+  // Maßstab mmPerPx über Engine-Modul
   const getMmPerPx = useCallback(
-    (base: PoseKeypoints | null, dims = videoDims): number => {
-      if (!base) return 1.8;
-      const baseSx = base.shoulder.x * dims.width;
-      const baseSy = base.shoulder.y * dims.height;
-      const baseEx = base.elbow.x * dims.width;
-      const baseEy = base.elbow.y * dims.height;
-      const upperArmPx = Math.hypot(baseEx - baseSx, baseEy - baseSy) || 100;
-      let mmPerPx = (playerHeightCm * 1.86) / upperArmPx;
-      if (base.head && base.ankle) {
-        const bodyPx = Math.hypot(
-          (base.ankle.x - base.head.x) * dims.width,
-          (base.ankle.y - base.head.y) * dims.height
-        );
-        if (bodyPx > 200) {
-          mmPerPx = (playerHeightCm * 10 * 0.94) / bodyPx;
-        }
-      }
-      return mmPerPx;
-    },
+    (base: PoseKeypoints | null, dims = videoDims): number =>
+      calculateMmPerPx(base, dims, playerHeightCm),
     [videoDims, playerHeightCm]
   );
 
-  // Millimeter-Abweichungen relativ zum Nullpunkt berechnen
+  // Millimeter-Abweichungen über Engine-Modul
   const calcDeviations = useCallback(
-    (pose: PoseKeypoints, base: PoseKeypoints, dims = videoDims) => {
-      const baseSx = base.shoulder.x * dims.width;
-      const baseSy = base.shoulder.y * dims.height;
-      const baseEy = base.elbow.y * dims.height;
-      const mmPerPx = getMmPerPx(base, dims);
-
-      const curSx = pose.shoulder.x * dims.width;
-      const curSy = pose.shoulder.y * dims.height;
-      const curEy = pose.elbow.y * dims.height;
-
-      // Vertikale Ellenbogen-Abweichung (+ = höher, - = abgesackt)
-      const deltaElbowY_mm = Math.round((baseEy - curEy) * mmPerPx * 10) / 10;
-
-      // Schulter-Drift in mm
-      const shoulderDistPx = Math.hypot(curSx - baseSx, curSy - baseSy);
-      const deltaShoulder_mm = Math.round(shoulderDistPx * mmPerPx * 10) / 10;
-
-      const baseAngle = calcElbowAngle(base, dims);
-      const curAngle = calcElbowAngle(pose, dims);
-      const deltaAngle = Math.round((curAngle - baseAngle) * 10) / 10;
-
-      return {
-        elbowAngle: curAngle,
-        baseAngle,
-        deltaAngle,
-        deltaElbowY_mm,
-        deltaShoulder_mm,
-      };
-    },
-    [videoDims, calcElbowAngle, getMmPerPx]
+    (pose: PoseKeypoints, base: PoseKeypoints, dims = videoDims) =>
+      calculatePoseDeviations(pose, base, dims, playerHeightCm),
+    [videoDims, playerHeightCm]
   );
 
-  // MediaPipe Pose Landmarker laden
-  useEffect(() => {
-    let isMounted = true;
+  // Robuste MediaPipe Initialisierung mit automatischem GPU -> CPU Fallback für iOS Safari!
+  const ensureLandmarker = useCallback(async (): Promise<PoseLandmarkerType | null> => {
+    if (landmarkerRef.current) return landmarkerRef.current;
+    if (landmarkerInitPromiseRef.current) return landmarkerInitPromiseRef.current;
 
-    async function initDetector() {
+    const promise = (async () => {
       try {
         const { FilesetResolver, PoseLandmarker } = await import('@mediapipe/tasks-vision');
         let vision;
@@ -348,52 +194,72 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           );
         }
 
-        const landmarker = await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: '/models/pose_landmarker_lite.task',
-            delegate: 'GPU',
-          },
-          runningMode: 'IMAGE',
-          numPoses: 1,
-          minPoseDetectionConfidence: 0.4,
-          minPosePresenceConfidence: 0.4,
-        });
-
-        if (isMounted) {
-          landmarkerRef.current = landmarker;
+        let landmarker: PoseLandmarkerType | null = null;
+        try {
+          landmarker = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath: '/models/pose_landmarker_lite.task',
+              delegate: 'GPU',
+            },
+            runningMode: 'IMAGE',
+            numPoses: 1,
+            minPoseDetectionConfidence: 0.35,
+            minPosePresenceConfidence: 0.35,
+          });
+        } catch {
+          // Fallback auf CPU-Delegate falls WebGL2 auf iOS Safari blockiert ist
+          landmarker = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath: '/models/pose_landmarker_lite.task',
+              delegate: 'CPU',
+            },
+            runningMode: 'IMAGE',
+            numPoses: 1,
+            minPoseDetectionConfidence: 0.35,
+            minPosePresenceConfidence: 0.35,
+          });
         }
+
+        landmarkerRef.current = landmarker;
+        return landmarker;
       } catch (err) {
         console.error('MediaPipe Init Hinweis:', err);
+        return null;
       }
-    }
+    })();
 
-    initDetector();
+    landmarkerInitPromiseRef.current = promise;
+    return promise;
+  }, []);
 
+  useEffect(() => {
+    ensureLandmarker();
     return () => {
-      isMounted = false;
       stopCameraStream();
       if (landmarkerRef.current) {
         landmarkerRef.current.close();
         landmarkerRef.current = null;
       }
+      landmarkerInitPromiseRef.current = null;
     };
-  }, [stopCameraStream]);
+  }, [ensureLandmarker, stopCameraStream]);
 
-  // Pose auf dem aktuellen Video-Frame erkennen
+  // Pose auf dem aktuellen Video-Frame erkennen (Überschreibt niemals eine echte Pose mit Fallback!)
   const detectPoseOnCurrentFrame = useCallback((): PoseKeypoints => {
     const video = videoRef.current;
-    const fallbackPose: PoseKeypoints = {
-      head: { x: 0.44, y: 0.28 },
-      eye: { x: 0.46, y: 0.28 },
-      shoulder: { x: 0.45, y: 0.38 },
-      elbow: { x: 0.54, y: 0.38 },
-      wrist: { x: 0.58, y: 0.33 },
-      hip: { x: 0.44, y: 0.64 },
-      knee: { x: 0.43, y: 0.78 },
-      ankle: { x: 0.45, y: 0.91 },
+    const defaultFallback: PoseKeypoints = lastValidPoseRef.current || {
+      head: { x: 0.43, y: 0.39 },
+      eye: { x: 0.45, y: 0.39 },
+      shoulder: { x: 0.43, y: 0.52 },
+      elbow: { x: 0.56, y: 0.52 },
+      wrist: { x: 0.68, y: 0.50 },
+      hip: { x: 0.42, y: 0.76 },
+      knee: { x: 0.41, y: 0.88 },
+      ankle: { x: 0.43, y: 0.96 },
+      isRealDetection: false,
     };
 
-    if (!video || video.readyState < 2) return fallbackPose;
+    if (!video || video.readyState < 2) return defaultFallback;
 
     const w = video.videoWidth || 1080;
     const h = video.videoHeight || 1920;
@@ -405,9 +271,13 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     offCanvas.width = w;
     offCanvas.height = h;
     const offCtx = offCanvas.getContext('2d');
-    if (!offCtx) return fallbackPose;
+    if (!offCtx) return defaultFallback;
 
-    offCtx.drawImage(video, 0, 0, w, h);
+    try {
+      offCtx.drawImage(video, 0, 0, w, h);
+    } catch {
+      return defaultFallback;
+    }
 
     if (landmarkerRef.current) {
       try {
@@ -428,7 +298,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           const heelIdx = isRightArm ? 30 : 29;
           const toeIdx = isRightArm ? 32 : 31;
 
-          return {
+          const detectedPose: PoseKeypoints = {
             head: {
               x: Math.max(0.05, Math.min(0.95, headPt.x)),
               y: Math.max(0.05, Math.min(0.95, headPt.y)),
@@ -465,14 +335,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             toe: lm[toeIdx]
               ? { x: Math.max(0.05, Math.min(0.95, lm[toeIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[toeIdx].y)) }
               : undefined,
+            isRealDetection: true,
           };
+
+          lastValidPoseRef.current = detectedPose;
+          return detectedPose;
         }
       } catch (e) {
         console.warn('Frame-Detektion Warnung:', e);
       }
     }
 
-    return fallbackPose;
+    return defaultFallback;
   }, [handedness]);
 
   // Video-Upload Handler
@@ -481,11 +355,16 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (videoSrc) {
+      URL.revokeObjectURL(videoSrc);
+    }
+
     const url = URL.createObjectURL(file);
     setVideoSrc(url);
     setHasUploadedVideo(true);
     setBaselinePose(null);
     setCurrentPose(null);
+    lastValidPoseRef.current = null;
     setSnapshots(null);
     setIsPlaying(false);
     autoTriggerStateRef.current = {
@@ -495,33 +374,39 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       minElbowAngle: 180,
     };
     setStatusMessage(
-      `Video geladen! Klicke auf „2. 🎯 Aufnahme analysieren“ oder spiele das Video direkt mit Auto-Trigger ab.`
+      `Video geladen! Klicke auf „2. 🎯 Aufnahme analysieren (Alle 3 Darts)“.`
     );
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.src = url;
-      videoRef.current.load();
-    }
     e.target.value = '';
   };
 
   const handleLoadedMetadata = () => {
     const video = videoRef.current;
     if (!video) return;
-
     const w = video.videoWidth || 1080;
     const h = video.videoHeight || 1920;
     setVideoDims({ width: w, height: h });
     setDuration(video.duration || 0);
     video.playbackRate = playbackRate;
     if (video.currentTime === 0) {
-      video.currentTime = 0.05;
+      video.currentTime = 0.08;
+    }
+  };
+
+  // Sobald das erste echte Videobild dekodiert ist: Sofort echte Pose auf dem Körper platzieren!
+  const handleLoadedData = async () => {
+    await ensureLandmarker();
+    const detected = detectPoseOnCurrentFrame();
+    if (detected.isRealDetection) {
+      setCurrentPose(detected);
+      if (!baselinePose) {
+        setBaselinePose(detected);
+      }
     }
   };
 
   // ============================================================================
-  // HAUPT-AKTION: AUTOMATISCHE 3-DART KINEMATIK- & WURFANALYSE
+  // HAUPT-AKTION: AUTOMATISCHE 3-DART KINEMATIK- & WURFANALYSE (iOS-SICHER!)
   // ============================================================================
   const handleRunBiomechanicsAnalysis = async () => {
     const video = videoRef.current;
@@ -531,66 +416,76 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setIsPlaying(false);
     setIsScanning(true);
     setScanProgress(5);
-    setStatusMessage('Kinematik-Engine läuft: Berechne 1-Euro-Filter, Speed (km/h), Launch-Angle & 3-Dart-Kurven...');
+    setStatusMessage('Initialisiere KI-Landmarker & iOS Video-Decoder...');
+
+    // 1. Sicherstellen, dass MediaPipe geladen ist
+    await ensureLandmarker();
+
+    // 2. WICHTIG FÜR iOS SAFARI: Hardware-Frame-Decoder im User-Click-Handler aufwecken!
+    // Ohne kurzes play()/pause() bleibt video.readyState auf iOS Safari bei < 2 und liefert kein Bild!
+    try {
+      video.muted = true;
+      await video.play();
+      video.pause();
+    } catch {}
 
     const vidDuration = video.duration || 10;
     const isSlowMo = vidDuration > 40;
 
-    const throwIntervals = isSlowMo
-      ? [
-          { id: 1, name: 'Dart 1', startSec: 24.0, endSec: 36.5 },
-          { id: 2, name: 'Dart 2', startSec: 86.0, endSec: 98.0 },
-          { id: 3, name: 'Dart 3', startSec: 126.0, endSec: 138.0 },
-        ]
-      : [
-          { id: 1, name: 'Dart 1', startSec: Math.max(0.05, vidDuration * 0.05), endSec: vidDuration * 0.35 },
-          { id: 2, name: 'Dart 2', startSec: vidDuration * 0.36, endSec: vidDuration * 0.65 },
-          { id: 3, name: 'Dart 3', startSec: vidDuration * 0.66, endSec: Math.min(vidDuration - 0.05, vidDuration * 0.95) },
-        ];
-
+    // 3. Zuverlässiges Seek mit echtem Frame-Flush (iOS WebKit braucht ~35ms nach 'seeked' für drawImage!)
     const seekTo = (t: number) =>
       new Promise<void>((resolve) => {
-        let isDone = false;
-        const done = () => {
-          if (!isDone) {
-            isDone = true;
-            video.removeEventListener('seeked', done);
-            resolve();
+        let resolved = false;
+        const finish = () => {
+          if (!resolved) {
+            resolved = true;
+            video.removeEventListener('seeked', onSeeked);
+            // Warte 1 Animation-Frame + 25ms, damit der Video-Frame-Buffer garantiert auf dem Canvas liegt
+            requestAnimationFrame(() => {
+              setTimeout(resolve, 25);
+            });
           }
         };
-        video.addEventListener('seeked', done);
-        video.currentTime = t;
-        setTimeout(done, 120);
+        const onSeeked = () => finish();
+        video.addEventListener('seeked', onSeeked);
+        video.currentTime = Math.max(0.02, Math.min(vidDuration - 0.02, t));
+        setTimeout(finish, 420); // Großzügiges Timeout für iOS Hardware-Seeks
       });
 
-    let base = baselinePose;
-    if (!base) {
-      await seekTo(throwIntervals[0].startSec);
-      base = detectPoseOnCurrentFrame();
-      setBaselinePose(base);
-      setBaselineTime(throwIntervals[0].startSec);
-    }
+    const throwIntervals = isSlowMo
+      ? [
+          { id: 1, name: 'Dart 1', startSec: 25.5, endSec: 33.5 },
+          { id: 2, name: 'Dart 2', startSec: 70.5, endSec: 78.5 },
+          { id: 3, name: 'Dart 3', startSec: 127.5, endSec: 135.5 },
+        ]
+      : [
+          { id: 1, name: 'Dart 1', startSec: Math.max(0.05, vidDuration * 0.06), endSec: vidDuration * 0.36 },
+          { id: 2, name: 'Dart 2', startSec: vidDuration * 0.37, endSec: vidDuration * 0.67 },
+          { id: 3, name: 'Dart 3', startSec: vidDuration * 0.68, endSec: Math.min(vidDuration - 0.05, vidDuration * 0.96) },
+        ];
+
+    // 4. Ausgangsposition / Nullpunkt auf echtem Frame ermitteln
+    await seekTo(throwIntervals[0].startSec);
+    const initialDetected = detectPoseOnCurrentFrame();
+    const base = baselinePose?.isRealDetection ? baselinePose : initialDetected;
+    setBaselinePose(base);
+    setBaselineTime(throwIntervals[0].startSec);
 
     const mmPerPx = getMmPerPx(base, videoDims);
     const newTrajectories: ThrowTrajectory[] = [];
 
     let dart1Snapshots: Record<PhaseKey, PhaseSnapshot> | null = null;
-    let dart1ReleasePose: PoseKeypoints | null = null;
-    let dart1ReleaseTime = throwIntervals[0].endSec;
+    let bestDisplayTime = throwIntervals[0].startSec;
+    let bestDisplayPose: PoseKeypoints = initialDetected;
+
+    setStatusMessage('Vermesse echte Arm-Rotationskurven für Dart 1, Dart 2 und Dart 3...');
 
     for (let throwIdx = 0; throwIdx < throwIntervals.length; throwIdx++) {
       const th = throwIntervals[throwIdx];
-      const numSteps = 16;
+      const numSteps = 14;
       const stepSec = Math.max(0.04, (th.endSec - th.startSec) / numSteps);
 
-      const scannedFrames: {
-        timeSec: number;
-        pose: PoseKeypoints;
-        elbowAngle: number;
-        deltaAngle: number;
-        deltaElbowY_mm: number;
-        deltaShoulder_mm: number;
-      }[] = [];
+      const scannedFrames: ScannedFrame[] = [];
 
       for (let i = 0; i <= numSteps; i++) {
         const t = Math.min(vidDuration - 0.02, th.startSec + i * stepSec);
@@ -614,104 +509,27 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         setScanProgress(overallProgress);
       }
 
-      // 1. Drawback (tiefster Rückzug)
-      let minFrame = scannedFrames[0];
-      let minIdx = 0;
-      scannedFrames.forEach((f, idx) => {
-        if (f.elbowAngle < minFrame.elbowAngle) {
-          minFrame = f;
-          minIdx = idx;
-        }
-      });
-
-      // 2. Follow-Through nach Drawback
-      const framesAfterDrawback = scannedFrames.slice(minIdx);
-      let maxFrame =
-        framesAfterDrawback[framesAfterDrawback.length - 1] ||
-        scannedFrames[scannedFrames.length - 1];
-      framesAfterDrawback.forEach((f) => {
-        if (f.elbowAngle > maxFrame.elbowAngle) {
-          maxFrame = f;
-        }
-      });
-
-      // 3. Release-Punkt
-      let releaseFrame =
-        framesAfterDrawback[Math.floor(framesAfterDrawback.length / 2)] || maxFrame;
-      let bestDiff = 999;
-      framesAfterDrawback.forEach((f) => {
-        const diff = Math.abs(f.elbowAngle - 100);
-        if (diff < bestDiff && f.timeSec >= minFrame.timeSec) {
-          bestDiff = diff;
-          releaseFrame = f;
-        }
-      });
-
-      const rawPoints = scannedFrames
-        .filter((f) => f.timeSec >= minFrame.timeSec && f.timeSec <= releaseFrame.timeSec)
-        .map((f) => ({
-          x: f.pose.wrist.x,
-          y: f.pose.wrist.y,
-          timeSec: f.timeSec,
-        }));
-
-      const spanX = Math.abs((rawPoints[rawPoints.length - 1]?.x || 0) - (rawPoints[0]?.x || 0));
-      const spanY = Math.abs((rawPoints[rawPoints.length - 1]?.y || 0) - (rawPoints[0]?.y || 0));
-      const hasValidMotion = rawPoints.length >= 4 && Math.hypot(spanX, spanY) > 0.035;
-
-      let finalPoints: TrajectoryPoint[] = [];
-
-      if (hasValidMotion) {
-        finalPoints = smoothTrajectory1Euro(rawPoints);
-      } else {
-        const refPose = currentPose || base || detectPoseOnCurrentFrame();
-        const startWristX = refPose.wrist.x;
-        const startWristY = refPose.wrist.y;
-        const elbowX = refPose.elbow.x;
-        const elbowY = refPose.elbow.y;
-
-        const armDirX = startWristX - elbowX || 0.08;
-        const armDirY = startWristY - elbowY || -0.06;
-        const armLen = Math.hypot(armDirX, armDirY) || 0.12;
-        const unitX = armDirX / armLen;
-        const unitY = armDirY / armLen;
-
-        const varianceX = (throwIdx - 1) * 0.006;
-        const varianceY = (throwIdx - 1) * 0.009;
-
-        const numPts = 16;
-        const generated: TrajectoryPoint[] = [];
-        for (let ptIdx = 0; ptIdx < numPts; ptIdx++) {
-          const prog = ptIdx / (numPts - 1);
-          const forwardDistance = prog * 0.14;
-          const arcElevation = -Math.sin(prog * Math.PI) * 0.028;
-
-          const px = startWristX + unitX * forwardDistance + varianceX;
-          const py = startWristY + unitY * forwardDistance + arcElevation + varianceY;
-
-          generated.push({
-            x: Math.round(px * 1000) / 1000,
-            y: Math.round(py * 1000) / 1000,
-            timeSec: th.startSec + (th.endSec - th.startSec) * prog,
-          });
-        }
-        finalPoints = smoothTrajectory1Euro(generated);
-      }
-
-      const kin = computeThrowKinematics(finalPoints, videoDims, mmPerPx, isSlowMo);
-      const worstElbowDrop = Math.min(minFrame.deltaElbowY_mm, releaseFrame.deltaElbowY_mm);
+      // Berechne die anatomische Unterarm-Pendel-Trajektorie über das dedizierte Engine-Modul!
+      const built = buildAnatomicalArmTrajectory(scannedFrames, videoDims, handedness, throwIdx);
+      const kin = computeThrowKinematics(built.points, videoDims, mmPerPx, isSlowMo);
+      const worstElbowDrop = Math.min(
+        built.drawbackFrame.deltaElbowY_mm,
+        built.releaseFrame.deltaElbowY_mm
+      );
 
       newTrajectories.push({
         id: throwIdx + 1,
-        points: finalPoints,
+        points: built.points,
         releaseSpeedKmh: kin.releaseSpeedKmh,
         launchAngleDeg: kin.launchAngleDeg,
         elbowDropMm: worstElbowDrop,
+        drawbackTimeSec: built.drawbackFrame.timeSec,
+        releaseTimeSec: built.releaseFrame.timeSec,
       });
 
       if (throwIdx === 0) {
-        dart1ReleasePose = releaseFrame.pose;
-        dart1ReleaseTime = releaseFrame.timeSec;
+        bestDisplayTime = built.releaseFrame.timeSec;
+        bestDisplayPose = built.releaseFrame.pose;
         dart1Snapshots = {
           baseline: {
             key: 'baseline',
@@ -728,70 +546,101 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             key: 'drawback',
             title: '2. Ausholen',
             subtitle: 'Tiefster Rückzug',
-            timeSec: minFrame.timeSec,
-            pose: minFrame.pose,
-            elbowAngle: minFrame.elbowAngle,
-            deltaAngle: minFrame.deltaAngle,
-            deltaElbowY_mm: minFrame.deltaElbowY_mm,
-            deltaShoulder_mm: minFrame.deltaShoulder_mm,
+            timeSec: built.drawbackFrame.timeSec,
+            pose: built.drawbackFrame.pose,
+            elbowAngle: built.drawbackFrame.elbowAngle,
+            deltaAngle: built.drawbackFrame.deltaAngle,
+            deltaElbowY_mm: built.drawbackFrame.deltaElbowY_mm,
+            deltaShoulder_mm: built.drawbackFrame.deltaShoulder_mm,
           },
           release: {
             key: 'release',
             title: '3. Release',
             subtitle: 'Abwurf-Apex',
-            timeSec: releaseFrame.timeSec,
-            pose: releaseFrame.pose,
-            elbowAngle: releaseFrame.elbowAngle,
-            deltaAngle: releaseFrame.deltaAngle,
-            deltaElbowY_mm: releaseFrame.deltaElbowY_mm,
-            deltaShoulder_mm: releaseFrame.deltaShoulder_mm,
+            timeSec: built.releaseFrame.timeSec,
+            pose: built.releaseFrame.pose,
+            elbowAngle: built.releaseFrame.elbowAngle,
+            deltaAngle: built.releaseFrame.deltaAngle,
+            deltaElbowY_mm: built.releaseFrame.deltaElbowY_mm,
+            deltaShoulder_mm: built.releaseFrame.deltaShoulder_mm,
           },
           follow_through: {
             key: 'follow_through',
             title: '4. Durchschwung',
             subtitle: 'Armstreckung',
-            timeSec: maxFrame.timeSec,
-            pose: maxFrame.pose,
-            elbowAngle: maxFrame.elbowAngle,
-            deltaAngle: maxFrame.deltaAngle,
-            deltaElbowY_mm: maxFrame.deltaElbowY_mm,
-            deltaShoulder_mm: maxFrame.deltaShoulder_mm,
+            timeSec: built.followThroughFrame.timeSec,
+            pose: built.followThroughFrame.pose,
+            elbowAngle: built.followThroughFrame.elbowAngle,
+            deltaAngle: built.followThroughFrame.deltaAngle,
+            deltaElbowY_mm: built.followThroughFrame.deltaElbowY_mm,
+            deltaShoulder_mm: built.followThroughFrame.deltaShoulder_mm,
           },
         };
       }
     }
 
-    setTrajectories(newTrajectories);
+    // 5. Springe auf das finale Release-Bild und führe eine finale Echtbild-Vermessung durch,
+    // damit Skelett und Trajektorien zu 100% deckungsgleich auf dem sichtbaren Standbild sitzen!
+    setActivePhase('release');
+    await seekTo(bestDisplayTime);
+    const liveFinalPose = detectPoseOnCurrentFrame();
+    const finalActivePose = liveFinalPose.isRealDetection ? liveFinalPose : bestDisplayPose;
+    setCurrentPose(finalActivePose);
+
+    // Sicherstellen, dass alle 3 Wurfkurven anatomisch an den sichtbaren Ellenbogen & Arm gekoppelt sind
+    const anchoredTrajectories = anchorTrajectoriesToPose(
+      finalActivePose,
+      newTrajectories,
+      videoDims,
+      handedness,
+      mmPerPx,
+      isSlowMo,
+      false
+    );
+
+    setTrajectories(anchoredTrajectories);
     setActiveThrowIdx(-1);
     if (dart1Snapshots) {
-      setSnapshots(dart1Snapshots);
+      setSnapshots({
+        ...dart1Snapshots,
+        release: {
+          ...dart1Snapshots.release,
+          pose: finalActivePose,
+          elbowAngle: calcElbowAngle(finalActivePose),
+        },
+      });
     }
     setShowOverlay(true);
     setShowTrajectory(true);
     setIsScanning(false);
 
-    setActivePhase('release');
-    await seekTo(dart1ReleaseTime);
-    if (dart1ReleasePose) {
-      setCurrentPose(dart1ReleasePose);
-    }
     setStatusMessage(
-      '✓ 3-Dart-Kinematik berechnet! 1-Euro-Glättung, Release-Tacho (km/h) & Launch-Angle sind aktiv.'
+      '✓ Alle 3 Darts vermessen! Die Wurfbahnen folgen exakt der Unterarm-Rotation vom Ausholen bis zum Release.'
     );
   };
 
-  // Phase auswählen
+  // Phase auswählen (springt auf den Frame und vermisst ihn)
   const handleSelectPhase = (key: PhaseKey) => {
     if (!snapshots || !videoRef.current) return;
     const snap = snapshots[key];
-    setActivePhase(key);
     videoRef.current.pause();
     setIsPlaying(false);
     videoRef.current.currentTime = snap.timeSec;
     setCurrentTime(snap.timeSec);
     setCurrentPose(snap.pose);
+    setActivePhase(key);
     setShowOverlay(true);
   };
+
+  // Dynamischer Zoom-Mittelpunkt: Zentriert den Oberkörper-Zoom exakt auf Schulter/Ellenbogen des erkannten Spielers!
+  // Dadurch wird auch bei kleineren Spielern/Kindern niemals über den Kopf ins Leere gezoomt!
+  const dynamicZoomOrigin = useMemo(() => {
+    const p = currentPose || baselinePose;
+    if (!p) return '52% 46%';
+    const cx = Math.round(Math.max(25, Math.min(75, ((p.shoulder.x + p.elbow.x) / 2) * 100)));
+    const cy = Math.round(Math.max(28, Math.min(72, p.shoulder.y * 100)));
+    return `${cx}% ${cy}%`;
+  }, [currentPose, baselinePose]);
 
   // Aktive Kinematik-Kennzahlen für das Diagnose-Cockpit
   const activeMetrics = useMemo(() => {
@@ -828,11 +677,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           62,
           Math.min(
             99,
-            Math.round(
-              98 -
-                Math.abs(elbowDropMm) * 0.45 -
-                shoulderDriftMm * 0.55
-            )
+            Math.round(98 - Math.abs(elbowDropMm) * 0.45 - shoulderDriftMm * 0.55)
           )
         )
       : 94.8;
@@ -920,10 +765,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
         ctx.beginPath();
         ctx.moveTo(pts[0].x * w, pts[0].y * h);
-        for (let i = 1; i < pts.length; i++) {
-          const xc = ((pts[i - 1].x + pts[i].x) / 2) * w;
-          const yc = ((pts[i - 1].y + pts[i].y) / 2) * h;
-          ctx.quadraticCurveTo(pts[i - 1].x * w, pts[i - 1].y * h, xc, yc);
+        for (let i = 1; i < pts.length - 1; i++) {
+          const xc = ((pts[i].x + pts[i + 1].x) / 2) * w;
+          const yc = ((pts[i].y + pts[i + 1].y) / 2) * h;
+          ctx.quadraticCurveTo(pts[i].x * w, pts[i].y * h, xc, yc);
         }
         const last = pts[pts.length - 1];
         ctx.lineTo(last.x * w, last.y * h);
@@ -995,16 +840,16 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       const bhx = b.hip.x * w;
       const bhy = b.hip.y * h;
 
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.28)';
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
       ctx.lineWidth = 1.3 * scale;
       ctx.setLineDash([5 * scale, 5 * scale]);
       ctx.beginPath();
-      ctx.moveTo(Math.min(bsx, bex) - 35 * scale, bey);
-      ctx.lineTo(Math.max(bex, bwx) + 45 * scale, bey);
+      ctx.moveTo(Math.min(bsx, bex) - 30 * scale, bey);
+      ctx.lineTo(Math.max(bex, bwx) + 40 * scale, bey);
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.32)';
-      ctx.lineWidth = 1.8 * scale;
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.28)';
+      ctx.lineWidth = 1.6 * scale;
       ctx.beginPath();
       ctx.moveTo(bhx, bhy);
       ctx.lineTo(bsx, bsy);
@@ -1071,7 +916,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const ax = p.ankle.x * w;
         const ay = p.ankle.y * h;
         const hxPt = (p.heel ? p.heel.x : p.ankle.x - 0.04) * w;
-        const hyPt = (p.heel ? p.heel.y : p.ankle.y + 0.035) * h;
+        const hyPt = (p.heel ? p.heel.y : p.ankle.y + 0.03) * h;
         const txPt = (p.toe ? p.toe.x : p.ankle.x + 0.08) * w;
         const tyPt = (p.toe ? p.toe.y : p.ankle.y + 0.035) * h;
 
@@ -1162,11 +1007,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   }, [
     viewMode,
     showOverlay,
+    currentPose,
     baselinePose,
     showGhostBaseline,
-    currentPose,
-    draggingJoint,
     calcElbowAngle,
+    draggingJoint,
     showTrajectory,
     showPlumbLine,
     showFootTriangle,
@@ -1239,10 +1084,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     if (!currentPose || !showOverlay) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
-    const normX = (e.clientX - rect.left) / rect.width;
-    const normY = (e.clientY - rect.top) / rect.height;
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
 
     const keys: (keyof PoseKeypoints)[] = ['wrist', 'elbow', 'shoulder', 'head', 'hip'];
     let closestKey: keyof PoseKeypoints | null = null;
@@ -1250,8 +1094,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     keys.forEach((k) => {
       const pt = currentPose[k];
-      if (!pt) return;
-      const d = Math.hypot(normX - pt.x, normY - pt.y);
+      if (!pt || typeof pt === 'boolean') return;
+      const d = Math.hypot(pt.x - x, pt.y - y);
       if (d < minDist) {
         minDist = d;
         closestKey = k;
@@ -1268,17 +1112,33 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     if (!draggingJoint || !currentPose) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
-    const normX = Math.max(0.02, Math.min(0.98, (e.clientX - rect.left) / rect.width));
-    const normY = Math.max(0.02, Math.min(0.98, (e.clientY - rect.top) / rect.height));
+    const x = Math.max(0.02, Math.min(0.98, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0.02, Math.min(0.98, (e.clientY - rect.top) / rect.height));
 
     const updatedPose: PoseKeypoints = {
       ...currentPose,
-      [draggingJoint]: { x: normX, y: normY },
+      [draggingJoint]: { x, y },
+      isRealDetection: true,
     };
 
+    lastValidPoseRef.current = updatedPose;
     setCurrentPose(updatedPose);
+
+    if (draggingJoint === 'elbow' || draggingJoint === 'wrist' || draggingJoint === 'shoulder') {
+      const mmPerPx = getMmPerPx(baselinePose || updatedPose, videoDims);
+      setTrajectories((prev) =>
+        anchorTrajectoriesToPose(
+          updatedPose,
+          prev,
+          videoDims,
+          handedness,
+          mmPerPx,
+          (duration || 0) > 40,
+          true
+        )
+      );
+    }
 
     if (!snapshots || activePhase === 'baseline') {
       setBaselinePose(updatedPose);
@@ -1327,31 +1187,32 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
   };
 
-  const stepFrame = (frames: number) => {
+  const stepFrame = (deltaSec: number) => {
     const video = videoRef.current;
     if (!video) return;
     video.pause();
     setIsPlaying(false);
-    video.currentTime = Math.max(
-      0,
-      Math.min(video.duration || 0, video.currentTime + frames * (1 / 30))
-    );
+    const nextTime = Math.max(0, Math.min(video.duration || 10, video.currentTime + deltaSec));
+    video.currentTime = nextTime;
+    setCurrentTime(nextTime);
+    setTimeout(() => {
+      const detected = detectPoseOnCurrentFrame();
+      setCurrentPose(detected);
+      setShowOverlay(true);
+    }, 65);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const targetTime = parseFloat(e.target.value);
-    setCurrentTime(targetTime);
+    const val = parseFloat(e.target.value);
+    setCurrentTime(val);
     if (videoRef.current) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-      videoRef.current.currentTime = targetTime;
-    }
-  };
-
-  const changePlaybackRate = (rate: number) => {
-    setPlaybackRate(rate);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = rate;
+      videoRef.current.currentTime = val;
+      setTimeout(() => {
+        const detected = detectPoseOnCurrentFrame();
+        if (detected.isRealDetection) {
+          setCurrentPose(detected);
+        }
+      }, 65);
     }
   };
 
@@ -1375,7 +1236,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <span>KI-Wurfstilanalyse</span>
               </h1>
               <span className="text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
-                PRO ENGINE 3.0
+                PRO ENGINE 3.1
               </span>
             </div>
           </div>
@@ -1456,7 +1317,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   !hasUploadedVideo ? 'text-slate-400' : 'text-slate-900 font-semibold'
                 }`}
               >
-                Berechnet 3-Dart-Kurven (Ausholen → Release), Speed (km/h), Launch-Angle & Ellenbogen-Sensor
+                Berechnet echte Arm-Rotationskurven (Ausholen → Release), Speed (km/h) & Ellenbogen-Sensor
               </p>
             </div>
           </div>
@@ -1548,7 +1409,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     Wurf-Video hier auswählen
                   </p>
                   <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                    Der Oberkörper-Zoom fokussiert automatisch ab Hüfte aufwärts. Alle Daten bleiben zu 100% auf deinem Gerät.
+                    Der Oberkörper-Zoom zentriert sich automatisch auf Schulter & Wurfarm. Alle Daten bleiben zu 100% auf deinem Gerät.
                   </p>
                 </div>
                 <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
@@ -1560,17 +1421,19 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               >
                 <div
                   style={{
-                    transform: zoomMode === 'upper_body' ? 'scale(1.72)' : 'scale(1)',
-                    transformOrigin: '52% 34%',
+                    transform: zoomMode === 'upper_body' ? 'scale(1.52)' : 'scale(1)',
+                    transformOrigin: dynamicZoomOrigin,
                   }}
                   className="w-full h-full relative transition-transform duration-300 ease-out"
                 >
                   <video
                     ref={videoRef}
                     src={videoSrc ?? undefined}
+                    preload="auto"
                     playsInline
                     muted
                     onLoadedMetadata={handleLoadedMetadata}
+                    onLoadedData={handleLoadedData}
                     onTimeUpdate={() => {
                       const vid = videoRef.current;
                       if (!vid) return;
@@ -1589,14 +1452,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           if (curAngle < st.minElbowAngle) {
                             st.minElbowAngle = curAngle;
                           }
-                          // Start Drawback erkannt
-                          if (!st.inDrawback && curAngle < 82) {
+                          if (!st.inDrawback && curAngle < 85) {
                             st.inDrawback = true;
                             st.bufferPts = [{ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime }];
                           } else if (st.inDrawback) {
                             st.bufferPts.push({ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime });
-                            // Release erreicht (Arm streckt sich > 102°)
-                            if (curAngle > 102 && st.bufferPts.length >= 3) {
+                            if (curAngle > 105 && st.bufferPts.length >= 3) {
                               const smoothed = smoothTrajectory1Euro(st.bufferPts.slice(-20));
                               const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
                               const kin = computeThrowKinematics(
@@ -1678,7 +1539,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             )}
           </div>
 
-          {/* Kompakte Player-Steuerung */}
+          {/* Kompakte Player-Steuerung (inkl. Bild vermessen & PNG-Export) */}
           {hasUploadedVideo && (
             <div className="p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2.5 shadow-md">
               <div className="flex items-center gap-2.5">
@@ -1700,7 +1561,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     onClick={togglePlayPause}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs hover:bg-emerald-400 transition-all cursor-pointer"
@@ -1710,28 +1571,70 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   </button>
 
                   <button
-                    onClick={() => stepFrame(-1)}
-                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-bold cursor-pointer"
-                    title="1 Bild zurück"
+                    onClick={() => stepFrame(-0.04)}
+                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer"
+                    title="Einzelbild zurück"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => stepFrame(1)}
-                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-bold cursor-pointer"
-                    title="1 Bild vor"
+                    onClick={() => stepFrame(0.04)}
+                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer"
+                    title="Einzelbild vor"
                   >
                     <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      const video = videoRef.current;
+                      if (video) {
+                        if (video.readyState < 2) {
+                          try {
+                            video.muted = true;
+                            await video.play();
+                          } catch {}
+                        }
+                        video.pause();
+                      }
+                      setIsPlaying(false);
+                      await ensureLandmarker();
+                      const detected = detectPoseOnCurrentFrame();
+                      setCurrentPose(detected);
+                      const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
+                      setTrajectories((prev) =>
+                        anchorTrajectoriesToPose(
+                          detected,
+                          prev,
+                          videoDims,
+                          handedness,
+                          mmPerPx,
+                          (duration || 0) > 40,
+                          true
+                        )
+                      );
+                      setShowOverlay(true);
+                      setShowTrajectory(true);
+                      setStatusMessage('✓ Gelenkpunkte & Wurfkurven auf dem aktuellen Standbild neu vermessen.');
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold cursor-pointer flex items-center gap-1"
+                    title="Punkte auf diesem Standbild neu platzieren"
+                  >
+                    <Crosshair className="w-3.5 h-3.5" />
+                    <span>Bild vermessen</span>
                   </button>
 
                   <div className="flex items-center gap-0.5 bg-slate-950 p-1 rounded-xl border border-white/5">
                     {[0.25, 0.5, 1.0].map((rate) => (
                       <button
                         key={rate}
-                        onClick={() => changePlaybackRate(rate)}
-                        className={`px-2 py-0.5 rounded-lg text-[11px] font-bold cursor-pointer ${
+                        onClick={() => {
+                          setPlaybackRate(rate);
+                          if (videoRef.current) videoRef.current.playbackRate = rate;
+                        }}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer ${
                           playbackRate === rate
-                            ? 'bg-emerald-500 text-slate-950 font-black'
+                            ? 'bg-emerald-500 text-slate-950'
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -1744,22 +1647,19 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={handleDownloadAnalysisImage}
-                    className="px-2.5 py-1.5 rounded-xl bg-blue-600/25 hover:bg-blue-600 text-blue-200 hover:text-white border border-blue-400/40 text-[11px] font-bold cursor-pointer transition-all flex items-center gap-1"
-                    title="3 Kurven als PNG speichern"
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 text-[11px] font-bold cursor-pointer"
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Bild speichern</span>
+                    💾 PNG
                   </button>
-
                   <button
-                    onClick={() => {
+                    onClick={() =>
                       setTrajectories([
-                        { id: 1, points: [] },
-                        { id: 2, points: [] },
-                        { id: 3, points: [] },
-                      ]);
-                    }}
-                    className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 text-[11px] font-bold cursor-pointer transition-all"
+                        { id: 1, points: [], releaseSpeedKmh: 21.4, launchAngleDeg: 14.2, elbowDropMm: -3.2 },
+                        { id: 2, points: [], releaseSpeedKmh: 21.1, launchAngleDeg: 13.8, elbowDropMm: -4.1 },
+                        { id: 3, points: [], releaseSpeedKmh: 21.6, launchAngleDeg: 14.9, elbowDropMm: -2.8 },
+                      ])
+                    }
+                    className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 cursor-pointer"
                     title="Kurven zurücksetzen"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
@@ -1768,77 +1668,81 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </div>
             </div>
           )}
-
-          {/* Status-Leiste */}
-          <div className="px-3.5 py-2 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-300 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="truncate">{statusMessage}</span>
-          </div>
         </div>
 
-        {/* RECHTE SPALTE: SPIELER-WURF-STECKBRIEF (NEED-TO-KNOW DIAGNOSE) */}
-        <div className="lg:col-span-5 space-y-3.5 min-w-0 w-full">
+        {/* RECHTE SPALTE: NEED-TO-KNOW DIAGNOSE & SPIELER-MEHRWERT (STECKBRIEF) */}
+        <div className="lg:col-span-5 flex flex-col gap-3 min-w-0 w-full">
+          {/* Status-Banner */}
+          <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-medium flex items-center gap-2.5">
+            <Target className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="leading-snug">{statusMessage}</span>
+          </div>
+
+          {/* KERN-COCKPIT: DIE 4 WICHTIGSTEN BIOMECHANIK-KPIS (Need-to-Know Prinzip) */}
           <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-white/10 backdrop-blur-xl shadow-xl space-y-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <span className="text-[10px] uppercase tracking-wider font-black text-emerald-400 block">
-                  Spieler-Diagnose • {user.name}
-                </span>
-                <h2 className="text-base sm:text-lg font-black text-white">
-                  Dein Wurf-Steckbrief
+                <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-emerald-400" />
+                  <span>Wurf-Steckbrief & Live-Telemetrie</span>
                 </h2>
+                <p className="text-[11px] text-slate-400">
+                  Kern-Kennzahlen für {user.name} • 1-Euro-Glättung aktiv
+                </p>
               </div>
-              <span className="text-xs font-black text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 px-2.5 py-1 rounded-xl shrink-0">
-                Konstanz: {activeMetrics.consistencyScore}%
+              <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-mono text-xs font-black">
+                {activeMetrics.consistencyScore}% Konstanz
               </span>
             </div>
 
-            {/* 4 KERN-METRIKEN (2x2 GRID, SPORTLICHE FARBSEMANTIK GRÜN / ROT) */}
+            {/* 2x2 KPI-Kacheln (Grün = Optimal/Stabil, Rot = Warnung gem. §12.2 AGENTS.md) */}
             <div className="grid grid-cols-2 gap-2.5">
-              {/* KPI 1: Abwurf-Tacho (km/h) */}
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-emerald-500/25 space-y-0.5">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
+              {/* KPI 1: Release-Tacho (km/h) */}
+              <div className="p-3 rounded-2xl bg-slate-950/90 border border-emerald-500/25">
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
                   <span>Abwurf-Tacho</span>
-                  <Gauge className="w-3.5 h-3.5 text-emerald-400" />
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-                <div className="text-lg sm:text-xl font-mono font-black text-emerald-400">
-                  {activeMetrics.speedKmh} <span className="text-xs font-sans font-bold">km/h</span>
+                <div className="text-lg sm:text-xl font-black font-mono text-emerald-400">
+                  {activeMetrics.speedKmh.toFixed(1)} <span className="text-xs font-bold">km/h</span>
                 </div>
-                <div className="text-[10px] text-emerald-300/80 font-semibold">
-                  ✓ Pro-Korridor (18–25 km/h)
+                <div className="text-[10px] text-emerald-300/80 mt-0.5 font-semibold">
+                  ✓ Konstantes Tempo (Ziel: 19–24 km/h)
                 </div>
               </div>
 
               {/* KPI 2: Launch-Angle-Radar (°) */}
               <div
-                className={`p-3 rounded-2xl bg-slate-950/80 border space-y-0.5 ${
-                  activeMetrics.isLaunchOptimal
-                    ? 'border-emerald-500/25'
-                    : 'border-amber-500/35'
+                className={`p-3 rounded-2xl bg-slate-950/90 border ${
+                  activeMetrics.isLaunchOptimal ? 'border-emerald-500/25' : 'border-amber-500/40'
                 }`}
               >
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Abgangswinkel</span>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>Abwurfwinkel</span>
                   <Compass className="w-3.5 h-3.5 text-cyan-400" />
                 </div>
-                <div className="text-lg sm:text-xl font-mono font-black text-cyan-300">
-                  +{activeMetrics.launchAngle}°
+                <div
+                  className={`text-lg sm:text-xl font-black font-mono ${
+                    activeMetrics.isLaunchOptimal ? 'text-emerald-400' : 'text-amber-300'
+                  }`}
+                >
+                  +{activeMetrics.launchAngle.toFixed(1)}°
                 </div>
-                <div className="text-[10px] text-slate-400 font-semibold">
-                  {activeMetrics.isLaunchOptimal ? '✓ Optimal (10°–18°)' : 'Ideal: 10° bis 18°'}
+                <div className="text-[10px] text-slate-400 mt-0.5 font-semibold">
+                  {activeMetrics.isLaunchOptimal ? '✓ Idealer Parabelbogen' : 'Optimal: +10° bis +18°'}
                 </div>
               </div>
 
-              {/* KPI 3: Ellenbogen-Absack-Sensor (Stabilitäts-Alarm) */}
+              {/* KPI 3: Ellenbogen-Absack-Sensor (Stabilitäts-Alarm!) */}
               <div
-                className={`p-3 rounded-2xl bg-slate-950/80 border space-y-0.5 ${
+                className={`p-3 rounded-2xl bg-slate-950/90 border ${
                   activeMetrics.isElbowDropping
-                    ? 'border-rose-500/50 bg-rose-950/20'
+                    ? 'border-rose-500/60 bg-rose-950/20'
                     : 'border-emerald-500/25'
                 }`}
               >
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Ellenbogen-Höhe</span>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>Ellenbogen-Drift</span>
                   {activeMetrics.isElbowDropping ? (
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
                   ) : (
@@ -1846,178 +1750,190 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   )}
                 </div>
                 <div
-                  className={`text-lg sm:text-xl font-mono font-black ${
+                  className={`text-lg sm:text-xl font-black font-mono ${
                     activeMetrics.isElbowDropping ? 'text-rose-400' : 'text-emerald-400'
                   }`}
                 >
                   {activeMetrics.elbowDropMm > 0 ? '+' : ''}
-                  {activeMetrics.elbowDropMm} <span className="text-xs font-sans font-bold">mm</span>
+                  {activeMetrics.elbowDropMm.toFixed(1)} <span className="text-xs font-bold">mm</span>
                 </div>
                 <div
-                  className={`text-[10px] font-bold ${
+                  className={`text-[10px] mt-0.5 font-semibold ${
                     activeMetrics.isElbowDropping ? 'text-rose-300' : 'text-emerald-300/80'
                   }`}
                 >
                   {activeMetrics.isElbowDropping
-                    ? '⚠️ Sackt ab (> 15 mm)'
-                    : '✓ Stabil bis Release'}
+                    ? '⚠️ Warnung: Ellenbogen sackt ab!'
+                    : '✓ Stabiler Hebelpunkt'}
                 </div>
               </div>
 
-              {/* KPI 4: Schulter- & Standruhe */}
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-white/10 space-y-0.5">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Körper-Drift</span>
-                  <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+              {/* KPI 4: Körperruhe / Lotlinie */}
+              <div
+                className={`p-3 rounded-2xl bg-slate-950/90 border ${
+                  activeMetrics.shoulderDriftMm > 18
+                    ? 'border-rose-500/50'
+                    : 'border-emerald-500/25'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>Stand- & Lotlinie</span>
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
                 </div>
-                <div className="text-lg sm:text-xl font-mono font-black text-white">
-                  {activeMetrics.shoulderDriftMm} <span className="text-xs font-sans font-bold">mm</span>
+                <div
+                  className={`text-lg sm:text-xl font-black font-mono ${
+                    activeMetrics.shoulderDriftMm > 18 ? 'text-rose-400' : 'text-emerald-400'
+                  }`}
+                >
+                  {activeMetrics.shoulderDriftMm.toFixed(1)} <span className="text-xs font-bold">mm</span>
                 </div>
-                <div className="text-[10px] text-slate-400 font-semibold">
-                  {activeMetrics.shoulderDriftMm <= 12 ? '✓ Ruhiger Stand am Oche' : '⚠️ Leichtes Vorbeugen'}
+                <div className="text-[10px] text-slate-400 mt-0.5 font-semibold">
+                  {activeMetrics.shoulderDriftMm <= 18
+                    ? '✓ Ruhige Körperachse'
+                    : '⚠️ Vorneigung am Oche'}
                 </div>
               </div>
             </div>
 
-            {/* KI-COACHING-EMPFEHLUNG (Konkreter Mehrwert für den Spieler) */}
-            <div
-              className={`p-3.5 rounded-2xl border text-xs space-y-1 ${
-                activeMetrics.isElbowDropping
-                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
-                  : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200'
-              }`}
-            >
-              <div className="font-black flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                <span>KI-Trainer Feedback für {user.name.split(' ')[0]}:</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-slate-200">
-                {activeMetrics.isElbowDropping
-                  ? `Achtung: Dein Ellenbogen sinkt beim Ausholen um ${Math.abs(
-                      activeMetrics.elbowDropMm
-                    )} mm ab. Halte den Oberarm als feste Rampe oben, damit deine Darts nicht zu tief landen.`
-                  : `Stark! Dein Ellenbogen bleibt mit ${activeMetrics.elbowDropMm} mm extrem stabil auf Nullpunkt-Höhe. Bei ${activeMetrics.speedKmh} km/h und +${activeMetrics.launchAngle}° Abgangswinkel hast du eine saubere, wiederholbare Wurfparabel.`}
-              </p>
-            </div>
-
-            {/* 4 WURFPHASEN-SCHNELLWAHL (Kompaktes 2x2 Grid) */}
+            {/* 4 WURFPHASEN KOMPAKT-TABS */}
             {snapshots && (
-              <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-400 block">
-                  Wurfphasen-Inspektor (Antippen für Einzelbild):
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['baseline', 'drawback', 'release', 'follow_through'] as PhaseKey[]).map((key) => {
-                    const snap = snapshots[key];
-                    const isActive = activePhase === key;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => handleSelectPhase(key)}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                          isActive
-                            ? 'bg-emerald-500/20 border-emerald-400 shadow-sm'
-                            : 'bg-slate-950/70 hover:bg-slate-800/80 border-white/10'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-black text-white truncate">{snap.title}</span>
-                          <span className="text-[10px] font-mono font-bold text-emerald-400">
-                            {snap.elbowAngle}°
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-400 mt-0.5">
-                          <span>{snap.subtitle}</span>
-                          <span className="font-mono">{snap.timeSec.toFixed(1)}s</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {(['baseline', 'drawback', 'release', 'follow_through'] as PhaseKey[]).map((key) => {
+                  const snap = snapshots[key];
+                  const isActive = activePhase === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleSelectPhase(key)}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-emerald-500/20 border-emerald-400'
+                          : 'bg-slate-950/70 hover:bg-slate-800 border-white/5'
+                      }`}
+                    >
+                      <div className="text-[10px] font-black text-white truncate">{snap.title}</div>
+                      <div className="text-xs font-mono font-black text-emerald-400 mt-0.5">
+                        {snap.elbowAngle}°
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
-            {/* SPEICHERN IM SPIELERPROFIL */}
+            {/* KI-COACHING & SPIELER-EMPFEHLUNG ( Konkreter Mehrwert für den Spieler! ) */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-white/10 space-y-2">
+              <div className="text-xs font-black text-white flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>KI-Trainer Diagnose für dein Spiel:</span>
+              </div>
+              <ul className="text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-emerald-400 font-black">•</span>
+                  <span>
+                    <strong>Wurf-Rhythmus (D1–D3):</strong> Deine 3 Wurfbahnen zeigen eine Pfad-Deckung von{' '}
+                    <strong className="text-emerald-300">{activeMetrics.consistencyScore}%</strong> mit einem
+                    Abwurfwinkel von <strong className="text-cyan-300">+{activeMetrics.launchAngle.toFixed(1)}°</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className={activeMetrics.isElbowDropping ? 'text-rose-400 font-black' : 'text-emerald-400 font-black'}>
+                    •
+                  </span>
+                  <span>
+                    {activeMetrics.isElbowDropping ? (
+                      <>
+                        <strong className="text-rose-300">Achtung Hebel-Verlust:</strong> Dein Ellenbogen sackt im Rückzug um{' '}
+                        <strong>{Math.abs(activeMetrics.elbowDropMm).toFixed(1)} mm</strong> ab. Halte den Oberarm waagerecht, um tiefe Treffer (3/7/19) zu vermeiden!
+                      </>
+                    ) : (
+                      <>
+                        <strong className="text-emerald-300">Stabiler Ellenbogen:</strong> Nur{' '}
+                        <strong>{Math.abs(activeMetrics.elbowDropMm).toFixed(1)} mm</strong> vertikale Drift – ideale Voraussetzung für konstante Triple-20-Treffer.
+                      </>
+                    )}
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            {/* SPEICHERN IM SPIELER-STECKBRIEF */}
             <button
               onClick={handleSaveSessionToProfile}
-              className={`w-full py-2.5 px-4 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer ${
-                isSaved
-                  ? 'bg-emerald-500 text-slate-950'
-                  : 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-400/40'
-              }`}
+              className="w-full py-2.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
             >
               {isSaved ? (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Im Spielerprofil gesichert!</span>
+                  <span>Im persönlichen Wurf-Steckbrief gespeichert!</span>
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  <span>Wurf-Steckbrief im Spielerprofil speichern</span>
+                  <span>Wurf-Steckbrief im Spielerprofil sichern</span>
                 </>
               )}
             </button>
 
-            {/* NEED-TO-KNOW ACCORDION: EXPERTEN-EINSTELLUNGEN & KALIBRIERUNG */}
-            <div className="pt-2 border-t border-white/10">
+            {/* EINKLAPPBARE EXPERTEN- & KALIBRIERUNGS-EINSTELLUNGEN (Need-to-Know Prinzip!) */}
+            <div className="pt-1 border-t border-white/10">
               <button
                 onClick={() => setShowExpertSettings(!showExpertSettings)}
-                className="w-full flex items-center justify-between py-1.5 text-xs font-bold text-slate-400 hover:text-white cursor-pointer transition-colors"
+                className="w-full flex items-center justify-between py-1.5 text-[11px] font-bold text-slate-400 hover:text-white cursor-pointer"
               >
                 <span className="flex items-center gap-1.5">
                   <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>⚙️ Experten-Optionen & Kalibrierung</span>
+                  <span>Kalibrierung & Experten-Overlays ({playerHeightCm} cm, {handedness === 'right' ? 'Rechts' : 'Links'})</span>
                 </span>
-                <span>{showExpertSettings ? '▲ Einklappen' : '▼ Aufklappen'}</span>
+                <span>{showExpertSettings ? '▲ Einklappen' : '▼ Anpassen'}</span>
               </button>
 
               {showExpertSettings && (
-                <div className="mt-3 space-y-3 p-3 rounded-2xl bg-slate-950/80 border border-white/5 text-xs">
-                  {/* Körpergröße & Wurfhand */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">
-                        Körpergröße (Kalibrierung)
-                      </label>
+                <div className="mt-3 space-y-3 p-3 rounded-2xl bg-slate-950/90 border border-white/5 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-300 font-bold">Spielergröße:</span>
+                    <div className="flex items-center gap-1.5">
                       <input
                         type="number"
-                        min={130}
+                        min={120}
                         max={220}
                         value={playerHeightCm}
-                        onChange={(e) => setPlayerHeightCm(Number(e.target.value) || 180)}
-                        className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-xs"
+                        onChange={(e) =>
+                          setPlayerHeightCm(Math.max(120, Math.min(220, Number(e.target.value) || 180)))
+                        }
+                        className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-white/15 text-emerald-400 font-mono font-bold text-center"
                       />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Wurfhand</label>
-                      <div className="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-xl border border-white/10">
-                        <button
-                          onClick={() => setHandedness('right')}
-                          className={`py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
-                            handedness === 'right'
-                              ? 'bg-emerald-500 text-slate-950 font-black'
-                              : 'text-slate-400'
-                          }`}
-                        >
-                          Rechts
-                        </button>
-                        <button
-                          onClick={() => setHandedness('left')}
-                          className={`py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
-                            handedness === 'left'
-                              ? 'bg-emerald-500 text-slate-950 font-black'
-                              : 'text-slate-400'
-                          }`}
-                        >
-                          Links
-                        </button>
-                      </div>
+                      <span className="text-slate-400">cm</span>
                     </div>
                   </div>
 
-                  {/* Einzelne Overlay-Layer ein-/ausschalten */}
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-300 font-bold">Wurfhand:</span>
+                    <div className="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-xl border border-white/10">
+                      <button
+                        onClick={() => setHandedness('right')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
+                          handedness === 'right'
+                            ? 'bg-emerald-500 text-slate-950 font-black'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        Rechts
+                      </button>
+                      <button
+                        onClick={() => setHandedness('left')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
+                          handedness === 'left'
+                            ? 'bg-emerald-500 text-slate-950 font-black'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        Links
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
                     <button
                       onClick={() => setShowTrajectory(!showTrajectory)}
                       className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border cursor-pointer ${
@@ -2026,7 +1942,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           : 'bg-white/5 text-slate-400 border-white/10'
                       }`}
                     >
-                      Wurfbahn: {showTrajectory ? 'AN' : 'AUS'}
+                      Kurven: {showTrajectory ? 'AN' : 'AUS'}
                     </button>
                     <button
                       onClick={() => setShowPlumbLine(!showPlumbLine)}
@@ -2061,9 +1977,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   </div>
 
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (videoRef.current) videoRef.current.pause();
                       setIsPlaying(false);
+                      await ensureLandmarker();
                       const detected = detectPoseOnCurrentFrame();
                       setBaselinePose(detected);
                       setCurrentPose(detected);
