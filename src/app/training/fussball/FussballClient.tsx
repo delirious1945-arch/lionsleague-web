@@ -39,6 +39,39 @@ interface TurnHistory {
   prevP2Goals: number;
 }
 
+const OFFLINE_QUEUE_KEY = 'lions_fussball_offline_queue';
+const ACTIVE_GAME_KEY = 'lions_fussball_active_game';
+const LOCAL_HISTORY_KEY = 'lions_fussball_local_history';
+
+function enqueueOfflineSession(payloads: FussballSessionSavePayload[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    const queue: FussballSessionSavePayload[][] = raw ? JSON.parse(raw) : [];
+    queue.push(payloads);
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  } catch (e) {
+    console.error('Fehler beim Einreihen in Offline-Queue:', e);
+  }
+}
+
+function saveCompletedSessionToLocalArchive(payloads: FussballSessionSavePayload[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(LOCAL_HISTORY_KEY);
+    const history: FussballSessionSavePayload[] = raw ? JSON.parse(raw) : [];
+    const updated = [...payloads, ...history].slice(0, 50);
+    localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(updated));
+  } catch (e) {}
+}
+
+function clearActiveGameCache() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(ACTIVE_GAME_KEY);
+  } catch (e) {}
+}
+
 export default function FussballClient({ players, initialHistory, currentUser }: FussballClientProps) {
   const isBoardUser = Boolean(currentUser?.name && currentUser.name.toLowerCase().startsWith('board'));
   const userPlayerMatch = players.find(
@@ -79,10 +112,82 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     p2Darts: 0, p2BullAttempts: 0, p2BullHits: 0, p2DoubleAttempts: 0, p2DoubleHits: 0,
   });
 
+  const statsRef = useRef(stats);
+  useEffect(() => {
+    statsRef.current = stats;
+  }, [stats]);
+
+  // Touch-Cooldown zur Verhinderung von Ghost-Clicks auf "Match abbrechen" nach Sofortiger Revanche
+  const rematchCooldownRef = useRef<boolean>(false);
+
+  // Auto-Sync von Offline-Spielen bei Wiederverbindung / Start
+  const syncOfflineQueue = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      if (!raw) return;
+      const queue: FussballSessionSavePayload[][] = JSON.parse(raw);
+      if (!Array.isArray(queue) || queue.length === 0) return;
+
+      const remaining: FussballSessionSavePayload[][] = [];
+      for (const item of queue) {
+        try {
+          const res = await saveFussballSessionAction(item);
+          if (!res || !res.success) {
+            remaining.push(item);
+          }
+        } catch (e) {
+          remaining.push(item);
+        }
+      }
+
+      if (remaining.length === 0) {
+        localStorage.removeItem(OFFLINE_QUEUE_KEY);
+      } else {
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+      }
+    } catch (e) {
+      console.error('Fehler bei Offline-Sync:', e);
+    }
+  };
+
+  useEffect(() => {
+    syncOfflineQueue();
+    const handleOnline = () => {
+      syncOfflineQueue();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
   const [historyStack, setHistoryStack] = useState<TurnHistory[]>([]);
   const [gameOver, setGameOver] = useState<boolean>(false);
   const [winner, setWinner] = useState<1 | 2 | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Aktiven Spielstand im Cache sichern (Schutz vor versehentlichem Tab-Schließen)
+  useEffect(() => {
+    if (isGameStarted && !gameOver && (stats.p1Darts > 0 || stats.p2Darts > 0)) {
+      try {
+        localStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify({
+          gameMode,
+          p1Name,
+          p2Name,
+          computerDifficulty,
+          targetGoals,
+          p1Goals,
+          p2Goals,
+          ballPossession,
+          currentTurn,
+          currentDart,
+          stats,
+          updatedAt: Date.now()
+        }));
+      } catch (e) {}
+    }
+  }, [isGameStarted, gameOver, stats, p1Goals, p2Goals, ballPossession, currentTurn, currentDart, gameMode, p1Name, p2Name, computerDifficulty, targetGoals]);
 
   // Sound Synthesizer (Web Audio API)
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -151,8 +256,41 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     setTickerHistory(prev => [msg, ...prev.slice(0, 15)]);
   };
 
+  // Match abbrechen
+  const handleAbortMatch = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    // Blockiere Touch-Bleed-through / Ghost-Clicks direkt nach "Sofortige Revanche"
+    if (rematchCooldownRef.current) return;
+
+    // Wenn noch kein Dart geworfen wurde, sofort ohne Bestätigung abbrechen
+    if (stats.p1Darts === 0 && stats.p2Darts === 0) {
+      clearActiveGameCache();
+      setIsGameStarted(false);
+      return;
+    }
+
+    if (confirm('Möchtest du das laufende Spiel wirklich abbrechen? Der bisherige Spielstand geht verloren.')) {
+      clearActiveGameCache();
+      setIsGameStarted(false);
+    }
+  };
+
   // Spiel starten
-  const handleStartGame = () => {
+  const handleStartGame = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    // 600ms Schutzzeit gegen versehentliches Auslösen von Elementen an derselben Touch-Position
+    rematchCooldownRef.current = true;
+    setTimeout(() => {
+      rematchCooldownRef.current = false;
+    }, 600);
+
+    clearActiveGameCache();
     setIsGameStarted(true);
     setP1Goals(0);
     setP2Goals(0);
@@ -164,10 +302,12 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     setWinner(null);
     setHistoryStack([]);
     setSaveStatus(null);
-    setStats({
+    const initialStats = {
       p1Darts: 0, p1BullAttempts: 0, p1BullHits: 0, p1DoubleAttempts: 0, p1DoubleHits: 0,
       p2Darts: 0, p2BullAttempts: 0, p2BullHits: 0, p2DoubleAttempts: 0, p2DoubleHits: 0,
-    });
+    };
+    setStats(initialStats);
+    statsRef.current = initialStats;
     playWhistle();
     addTicker(`Anpfiff! Erstes Team bei ${targetGoals} Toren gewinnt. ${p1Name} hat die 1. Aufnahme.`);
   };
@@ -200,7 +340,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     let shotLabel = '';
 
     // Stats aktualisieren
-    const newStats = { ...stats };
+    const newStats = { ...statsRef.current };
     if (isP1) {
       newStats.p1Darts += 1;
       if (actionType === 'bull_hit' || actionType === 'bull_miss') {
@@ -220,6 +360,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         if (actionType === 'goal') newStats.p2DoubleHits += 1;
       }
     }
+    statsRef.current = newStats;
     setStats(newStats);
 
     if (actionType === 'bull_hit') {
@@ -371,19 +512,21 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       setCurrentDart((Math.min(dart + 1, 3)) as 1 | 2 | 3);
 
       // Stats für Bot updaten
-      setStats(prev => ({
-        ...prev,
-        p2Darts: prev.p2Darts + 1,
-        p2BullAttempts: prev.p2BullAttempts + (action === 'bull_hit' || action === 'bull_miss' ? 1 : 0),
-        p2BullHits: prev.p2BullHits + (action === 'bull_hit' ? 1 : 0),
-        p2DoubleAttempts: prev.p2DoubleAttempts + (action === 'goal' || action === 'goal_miss' ? 1 : 0),
-        p2DoubleHits: prev.p2DoubleHits + (action === 'goal' ? 1 : 0),
-      }));
+      const botUpdatedStats = {
+        ...statsRef.current,
+        p2Darts: statsRef.current.p2Darts + 1,
+        p2BullAttempts: statsRef.current.p2BullAttempts + (action === 'bull_hit' || action === 'bull_miss' ? 1 : 0),
+        p2BullHits: statsRef.current.p2BullHits + (action === 'bull_hit' ? 1 : 0),
+        p2DoubleAttempts: statsRef.current.p2DoubleAttempts + (action === 'goal' || action === 'goal_miss' ? 1 : 0),
+        p2DoubleHits: statsRef.current.p2DoubleHits + (action === 'goal' ? 1 : 0),
+      };
+      statsRef.current = botUpdatedStats;
+      setStats(botUpdatedStats);
 
       // Gewonnen?
       if (bP2G >= targetGoals) {
         setIsBotThinking(false);
-        endGame(2, bP1G, bP2G);
+        endGame(2, bP1G, bP2G, botUpdatedStats);
         return;
       }
     }
@@ -403,7 +546,9 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   };
 
   // Spielende
-  const endGame = async (winningPlayer: 1 | 2, finalP1G: number, finalP2G: number, finalStats = stats) => {
+  const endGame = async (winningPlayer: 1 | 2, finalP1G: number, finalP2G: number, passedStats?: typeof stats) => {
+    const finalStats = passedStats || statsRef.current;
+    clearActiveGameCache();
     setGameOver(true);
     setWinner(winningPlayer);
     playGameOverSound();
@@ -462,16 +607,25 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       payloads.push(p2Payload);
     }
 
+    // 1. Immer lokal im Browser sichern (Ausfallsicherheit)
+    saveCompletedSessionToLocalArchive(payloads);
+
     setSaveStatus('Speichere Ergebnis automatisch in Supabase Cloud...');
-    const res = await saveFussballSessionAction(payloads);
-    if (res.success) {
-      if (targetGoals >= 5) {
-      setSaveStatus('✅ Spiel in Supabase Cloud gespeichert & für das Leistungsranking gewertet!');
-    } else {
-      setSaveStatus('ℹ️ Warm-up Spiel abgeschlossen (nicht im Leistungsranking gewertet, da unter 5 Toren).');
-    }
-    } else {
-      setSaveStatus('⚠️ Fehler beim Speichern: ' + res.error);
+    try {
+      const res = await saveFussballSessionAction(payloads);
+      if (res && res.success) {
+        if (targetGoals >= 5) {
+          setSaveStatus('✅ Spiel in Supabase Cloud gespeichert & für das Leistungsranking gewertet!');
+        } else {
+          setSaveStatus('ℹ️ Warm-up Spiel abgeschlossen (nicht im Leistungsranking gewertet, da unter 5 Toren).');
+        }
+      } else {
+        enqueueOfflineSession(payloads);
+        setSaveStatus('💾 Spiel lokal im Browser gesichert! Wird synchronisiert, sobald wieder Verbindung besteht.');
+      }
+    } catch (err) {
+      enqueueOfflineSession(payloads);
+      setSaveStatus('💾 Offline-Modus: Spiel lokal gesichert! Automatische Synchronisation bei Internetverbindung.');
     }
   };
 
@@ -497,6 +651,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         setP2Goals(lastShot.prevP2Goals);
       }
       if (lastShot.prevStats) {
+        statsRef.current = lastShot.prevStats;
         setStats(lastShot.prevStats);
       }
 
@@ -523,6 +678,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         setP2Goals(undoneShot.prevP2Goals);
       }
       if (undoneShot.prevStats) {
+        statsRef.current = undoneShot.prevStats;
         setStats(undoneShot.prevStats);
       }
 
@@ -1039,16 +1195,25 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
                   <button
                     type="button"
-                    onClick={handleStartGame}
-                    className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+                    onClick={(e) => handleStartGame(e)}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      handleStartGame(e);
+                    }}
+                    className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer select-none"
                   >
                     <RefreshCw className="w-4 h-4" />
                     <span>Sofortige Revanche</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsGameStarted(false)}
-                    className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition-all cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearActiveGameCache();
+                      setIsGameStarted(false);
+                    }}
+                    className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition-all cursor-pointer select-none"
                   >
                     Neues Match konfigurieren
                   </button>
@@ -1072,12 +1237,8 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm('Möchtest du das aktuelle Spiel abbrechen?')) {
-                      setIsGameStarted(false);
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 transition-colors"
+                  onClick={handleAbortMatch}
+                  className="px-3 py-1.5 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer select-none"
                 >
                   Match abbrechen
                 </button>
