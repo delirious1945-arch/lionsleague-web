@@ -487,3 +487,76 @@ export function computeThrowKinematics(
 
   return { releaseSpeedKmh, launchAngleDeg };
 }
+
+// ----------------------------------------------------------------------------
+// 7. PRÄZISIONS-LERP & KINEMATIK-TIMELINE-ENTKOPPLUNG (0ms Latenz)
+// ----------------------------------------------------------------------------
+export interface TimelinePoseFrame {
+  timeSec: number;
+  pose: PoseKeypoints;
+}
+
+export function interpolateKeypoints(
+  p1: PoseKeypoints,
+  p2: PoseKeypoints,
+  alpha: number
+): PoseKeypoints {
+  const a = Math.max(0, Math.min(1, alpha));
+  const lerp = (v1: number, v2: number) => v1 + (v2 - v1) * a;
+  const lerpPt = (pt1: Point, pt2: Point): Point => ({
+    x: lerp(pt1.x, pt2.x),
+    y: lerp(pt1.y, pt2.y),
+  });
+
+  return {
+    isRealDetection: true,
+    head: lerpPt(p1.head, p2.head),
+    eye: p1.eye && p2.eye ? lerpPt(p1.eye, p2.eye) : p1.eye || p2.eye,
+    shoulder: lerpPt(p1.shoulder, p2.shoulder),
+    elbow: lerpPt(p1.elbow, p2.elbow),
+    wrist: lerpPt(p1.wrist, p2.wrist),
+    hip: lerpPt(p1.hip, p2.hip),
+    knee: p1.knee && p2.knee ? lerpPt(p1.knee, p2.knee) : p1.knee || p2.knee,
+    ankle: p1.ankle && p2.ankle ? lerpPt(p1.ankle, p2.ankle) : p1.ankle || p2.ankle,
+    heel: p1.heel && p2.heel ? lerpPt(p1.heel, p2.heel) : p1.heel || p2.heel,
+    toe: p1.toe && p2.toe ? lerpPt(p1.toe, p2.toe) : p1.toe || p2.toe,
+  };
+}
+
+export function getInterpolatedPose(
+  timeline: TimelinePoseFrame[],
+  currentTime: number
+): PoseKeypoints | null {
+  if (!timeline || timeline.length === 0) return null;
+  if (currentTime <= timeline[0].timeSec) return timeline[0].pose;
+  if (currentTime >= timeline[timeline.length - 1].timeSec) {
+    return timeline[timeline.length - 1].pose;
+  }
+
+  let low = 0;
+  let high = timeline.length - 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (timeline[mid].timeSec <= currentTime) {
+      if (mid === timeline.length - 1 || timeline[mid + 1].timeSec > currentTime) {
+        const p1 = timeline[mid];
+        const p2 = timeline[mid + 1];
+        const dt = p2.timeSec - p1.timeSec;
+        if (dt <= 0.001) return p1.pose;
+        // Bei Pausen zwischen Darts (> 2.5s) nicht schleifend interpolieren
+        if (dt > 2.5) {
+          return currentTime - p1.timeSec < p2.timeSec - currentTime ? p1.pose : p2.pose;
+        }
+        const alpha = (currentTime - p1.timeSec) / dt;
+        return interpolateKeypoints(p1.pose, p2.pose, alpha);
+      }
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return timeline[0].pose;
+}
+

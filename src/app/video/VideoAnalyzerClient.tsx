@@ -42,6 +42,8 @@ import {
   buildAnatomicalArmTrajectory,
   computeThrowKinematics,
   anchorTrajectoriesToPose,
+  TimelinePoseFrame,
+  getInterpolatedPose,
 } from '@/lib/biomechanicsEngine';
 
 interface VideoAnalyzerClientProps {
@@ -86,6 +88,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [baselinePose, setBaselinePose] = useState<PoseKeypoints | null>(null);
   const [baselineTime, setBaselineTime] = useState<number | null>(null);
   const [currentPose, setCurrentPose] = useState<PoseKeypoints | null>(null);
+  const currentPoseRef = useRef<PoseKeypoints | null>(null);
+  // Vorab berechnete Pose-Timeline für 100% entkoppelte, flüssige 60-FPS Wiedergabe (0ms KI-Latenz)
+  const [poseTimeline, setPoseTimeline] = useState<TimelinePoseFrame[]>([]);
+  const poseTimelineRef = useRef<TimelinePoseFrame[]>([]);
   const lastValidPoseRef = useRef<PoseKeypoints | null>(null);
 
   // Scan-Ergebnisse für die 4 Wurfphasen
@@ -364,6 +370,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setHasUploadedVideo(true);
     setBaselinePose(null);
     setCurrentPose(null);
+    currentPoseRef.current = null;
+    setPoseTimeline([]);
+    poseTimelineRef.current = [];
     lastValidPoseRef.current = null;
     setSnapshots(null);
     setIsPlaying(false);
@@ -474,6 +483,19 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     const mmPerPx = getMmPerPx(base, videoDims);
     const newTrajectories: ThrowTrajectory[] = [];
+    const masterTimeline: TimelinePoseFrame[] = [];
+
+    // Nullpunkt am Videoanfang verankern
+    masterTimeline.push({
+      timeSec: 0,
+      pose: base,
+    });
+    if (throwIntervals[0].startSec > 0.5) {
+      masterTimeline.push({
+        timeSec: Math.max(0.1, throwIntervals[0].startSec - 0.5),
+        pose: base,
+      });
+    }
 
     let dart1Snapshots: Record<PhaseKey, PhaseSnapshot> | null = null;
     let bestDisplayTime = throwIntervals[0].startSec;
@@ -483,8 +505,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     for (let throwIdx = 0; throwIdx < throwIntervals.length; throwIdx++) {
       const th = throwIntervals[throwIdx];
-      const numSteps = 14;
-      const stepSec = Math.max(0.04, (th.endSec - th.startSec) / numSteps);
+      const numSteps = isSlowMo ? 24 : 16;
+      const stepSec = Math.max(0.03, (th.endSec - th.startSec) / numSteps);
 
       const scannedFrames: ScannedFrame[] = [];
 
@@ -502,6 +524,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           deltaAngle: dev.deltaAngle,
           deltaElbowY_mm: dev.deltaElbowY_mm,
           deltaShoulder_mm: dev.deltaShoulder_mm,
+        });
+
+        masterTimeline.push({
+          timeSec: t,
+          pose,
         });
 
         const overallProgress = Math.round(
@@ -586,6 +613,15 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     await seekTo(bestDisplayTime);
     const liveFinalPose = detectPoseOnCurrentFrame();
     const finalActivePose = liveFinalPose.isRealDetection ? liveFinalPose : bestDisplayPose;
+    masterTimeline.push({
+      timeSec: vidDuration,
+      pose: finalActivePose,
+    });
+    masterTimeline.sort((a, b) => a.timeSec - b.timeSec);
+    poseTimelineRef.current = masterTimeline;
+    setPoseTimeline(masterTimeline);
+
+    currentPoseRef.current = finalActivePose;
     setCurrentPose(finalActivePose);
 
     // Die 3 ermittelten Original-Wurfkurven direkt und unverfälscht fixieren
@@ -619,6 +655,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setIsPlaying(false);
     videoRef.current.currentTime = snap.timeSec;
     setCurrentTime(snap.timeSec);
+    currentPoseRef.current = snap.pose;
     setCurrentPose(snap.pose);
     setActivePhase(key);
     setShowOverlay(true);
@@ -693,7 +730,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   // ============================================================================
   // CANVAS OVERLAY RENDERING (INKL. LAUNCH-RADAR, SPEED-CHIP & ABSACK-ALARM)
   // ============================================================================
-  const renderCanvasOverlay = useCallback(() => {
+  const renderCanvasOverlay = useCallback((poseOverride?: PoseKeypoints) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -856,8 +893,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
 
     // 3. Aktuelles Phasen-Skelett + Ellenbogen-Absack-Sensor
-    if (currentPose) {
-      const p = currentPose;
+    const p = poseOverride || currentPose;
+    if (p) {
       const headX = p.head.x * w;
       const headY = p.head.y * h;
       const sx = p.shoulder.x * w;
@@ -1018,6 +1055,38 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     renderCanvasOverlay();
   }, [renderCanvasOverlay]);
 
+  // 60-FPS FLÜSSIGE SKELETT-WIEDERGABE OHNE KI-LATENZ (ENTKOPPELTE DUPLIKATION)
+  useEffect(() => {
+    if (!isPlaying) return;
+    let rafId: number;
+    let lastSliderUpdate = 0;
+
+    const tick = () => {
+      const vid = videoRef.current;
+      if (vid && !vid.paused) {
+        const cur = vid.currentTime;
+        if (Math.abs(cur - lastSliderUpdate) > 0.065) {
+          lastSliderUpdate = cur;
+          setCurrentTime(cur);
+        }
+
+        if (poseTimelineRef.current.length > 0) {
+          const pose = getInterpolatedPose(poseTimelineRef.current, cur);
+          if (pose) {
+            currentPoseRef.current = pose;
+            renderCanvasOverlay(pose);
+          }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, [isPlaying, renderCanvasOverlay]);
+
   // Bild-Export
   const handleDownloadAnalysisImage = () => {
     const canvas = canvasRef.current;
@@ -1077,6 +1146,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const video = videoRef.current;
     if (!video) return;
     if (isPlaying) {
+      if (currentPoseRef.current) {
+        setCurrentPose(currentPoseRef.current);
+      }
+      setCurrentTime(video.currentTime);
       video.pause();
       setIsPlaying(false);
     } else {
@@ -1094,6 +1167,16 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const nextTime = Math.max(0, Math.min(video.duration || 10, video.currentTime + deltaSec));
     video.currentTime = nextTime;
     setCurrentTime(nextTime);
+    if (poseTimelineRef.current.length > 0) {
+      const cached = getInterpolatedPose(poseTimelineRef.current, nextTime);
+      if (cached) {
+        currentPoseRef.current = cached;
+        setCurrentPose(cached);
+        renderCanvasOverlay(cached);
+        setShowOverlay(true);
+        return;
+      }
+    }
     setTimeout(() => {
       const detected = detectPoseOnCurrentFrame();
       setCurrentPose(detected);
@@ -1106,6 +1189,15 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setCurrentTime(val);
     if (videoRef.current) {
       videoRef.current.currentTime = val;
+      if (poseTimelineRef.current.length > 0) {
+        const cached = getInterpolatedPose(poseTimelineRef.current, val);
+        if (cached) {
+          currentPoseRef.current = cached;
+          setCurrentPose(cached);
+          renderCanvasOverlay(cached);
+          return;
+        }
+      }
       setTimeout(() => {
         const detected = detectPoseOnCurrentFrame();
         if (detected.isRealDetection) {
@@ -1333,14 +1425,42 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     muted
                     onLoadedMetadata={handleLoadedMetadata}
                     onLoadedData={handleLoadedData}
+                    onPause={() => {
+                      setIsPlaying(false);
+                      if (currentPoseRef.current) {
+                        setCurrentPose(currentPoseRef.current);
+                      }
+                      if (videoRef.current) {
+                        setCurrentTime(videoRef.current.currentTime);
+                      }
+                    }}
+                    onEnded={() => {
+                      setIsPlaying(false);
+                      if (currentPoseRef.current) {
+                        setCurrentPose(currentPoseRef.current);
+                      }
+                      if (videoRef.current) {
+                        setCurrentTime(videoRef.current.currentTime);
+                      }
+                    }}
                     onTimeUpdate={() => {
                       const vid = videoRef.current;
                       if (!vid) return;
+                      if (poseTimelineRef.current.length > 0) {
+                        const cached = getInterpolatedPose(poseTimelineRef.current, vid.currentTime);
+                        if (cached) {
+                          currentPoseRef.current = cached;
+                          renderCanvasOverlay(cached);
+                        }
+                        return;
+                      }
+
                       setCurrentTime(vid.currentTime);
 
                       // LIVE-TRACKING & AUTO-TRIGGER WÄHREND DER WIEDERGABE
                       if (isPlaying || Math.abs(vid.playbackRate) > 0) {
                         const detected = detectPoseOnCurrentFrame();
+                        currentPoseRef.current = detected;
                         setCurrentPose(detected);
 
                         // Wenn bereits analysiert wurde, bleiben die 3 Kurven fest an ihrer Original-Position fixiert!
