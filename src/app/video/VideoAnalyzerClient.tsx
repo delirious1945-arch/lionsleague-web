@@ -428,8 +428,179 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     );
   };
 
+  // HAUPT-AKTION: Automatische Video- & Wurfanalyse (Kinematik, Mechanik & Trajektorie)
+  const handleRunBiomechanicsAnalysis = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.pause();
+    setIsPlaying(false);
+    setIsScanning(true);
+    setScanProgress(5);
+    setStatusMessage('Kinematik- & Physik-Engine läuft: Berechne Gelenkwinkel, Phasen & Trajektorie...');
+
+    // 1. Ausgangsposition / Nullpunkt ermitteln (automatisch ab aktuellem Zeitpunkt)
+    let base = baselinePose;
+    let startT = video.currentTime;
+    if (!base) {
+      base = detectPoseOnCurrentFrame();
+      setBaselinePose(base);
+      setBaselineTime(startT);
+    }
+
+    // 2. Scan-Fenster für die Wurfbewegung (ca. 2.8 Sekunden ab aktueller Position)
+    const maxScanWindow = Math.min(video.duration || startT + 3.0, startT + 2.8);
+    const numSteps = 22; // Hochauflösende Abtastung für eine super-glatte Trajektorie
+    const stepSec = Math.max(0.04, (maxScanWindow - startT) / numSteps);
+
+    const scannedFrames: {
+      timeSec: number;
+      pose: PoseKeypoints;
+      elbowAngle: number;
+      deltaAngle: number;
+      deltaElbowY_mm: number;
+      deltaShoulder_mm: number;
+    }[] = [];
+
+    const seekTo = (t: number) =>
+      new Promise<void>((resolve) => {
+        const onSeeked = () => {
+          video.removeEventListener('seeked', onSeeked);
+          resolve();
+        };
+        video.addEventListener('seeked', onSeeked);
+        video.currentTime = t;
+      });
+
+    for (let i = 0; i <= numSteps; i++) {
+      const t = Math.min(video.duration - 0.02, startT + i * stepSec);
+      await seekTo(t);
+
+      const pose = i === 0 && base ? base : detectPoseOnCurrentFrame();
+      const dev = calcDeviations(pose, base);
+
+      scannedFrames.push({
+        timeSec: t,
+        pose,
+        elbowAngle: dev.elbowAngle,
+        deltaAngle: dev.deltaAngle,
+        deltaElbowY_mm: dev.deltaElbowY_mm,
+        deltaShoulder_mm: dev.deltaShoulder_mm,
+      });
+
+      setScanProgress(Math.round(((i + 1) / (numSteps + 1)) * 100));
+    }
+
+    // 3. Trajektorie (blaue Wurfbahn) aus den Handgelenks-Koordinaten akkumulieren
+    const scanTrajectoryPts: TrajectoryPoint[] = scannedFrames.map((f) => ({
+      x: f.pose.wrist.x,
+      y: f.pose.wrist.y,
+      timeSec: f.timeSec,
+    }));
+
+    const currentSlot = activeThrowIdx >= 0 && activeThrowIdx < 3 ? activeThrowIdx : 0;
+    setTrajectories((prev) => {
+      const next = [...prev];
+      next[currentSlot] = {
+        id: currentSlot + 1,
+        points: scanTrajectoryPts,
+      };
+      return next;
+    });
+
+    // 4. Schlüsselphasen ermitteln
+    const baseFrame = scannedFrames[0];
+    let minFrame = scannedFrames[0];
+    let minIdx = 0;
+    scannedFrames.forEach((f, idx) => {
+      if (f.elbowAngle < minFrame.elbowAngle) {
+        minFrame = f;
+        minIdx = idx;
+      }
+    });
+
+    const framesAfterDrawback = scannedFrames.slice(minIdx);
+    let maxFrame = framesAfterDrawback[framesAfterDrawback.length - 1] || scannedFrames[scannedFrames.length - 1];
+    framesAfterDrawback.forEach((f) => {
+      if (f.elbowAngle > maxFrame.elbowAngle) {
+        maxFrame = f;
+      }
+    });
+
+    let releaseFrame = framesAfterDrawback[Math.floor(framesAfterDrawback.length / 2)] || maxFrame;
+    let bestDiff = 999;
+    framesAfterDrawback.forEach((f) => {
+      const diff = Math.abs(f.elbowAngle - 100);
+      if (diff < bestDiff && f.timeSec >= minFrame.timeSec) {
+        bestDiff = diff;
+        releaseFrame = f;
+      }
+    });
+
+    const resultSnapshots: Record<PhaseKey, PhaseSnapshot> = {
+      baseline: {
+        key: 'baseline',
+        title: '1. Nullpunkt (Basis)',
+        subtitle: 'Ausgangsposition & Zielhaltung',
+        timeSec: baseFrame.timeSec,
+        pose: baseFrame.pose,
+        elbowAngle: baseFrame.elbowAngle,
+        deltaAngle: 0,
+        deltaElbowY_mm: 0,
+        deltaShoulder_mm: 0,
+      },
+      drawback: {
+        key: 'drawback',
+        title: '2. Einknickwinkel',
+        subtitle: 'Tiefster Rückzug (Drawback)',
+        timeSec: minFrame.timeSec,
+        pose: minFrame.pose,
+        elbowAngle: minFrame.elbowAngle,
+        deltaAngle: minFrame.deltaAngle,
+        deltaElbowY_mm: minFrame.deltaElbowY_mm,
+        deltaShoulder_mm: minFrame.deltaShoulder_mm,
+      },
+      release: {
+        key: 'release',
+        title: '3. Release-Punkt',
+        subtitle: 'Moment des Abwurfs',
+        timeSec: releaseFrame.timeSec,
+        pose: releaseFrame.pose,
+        elbowAngle: releaseFrame.elbowAngle,
+        deltaAngle: releaseFrame.deltaAngle,
+        deltaElbowY_mm: releaseFrame.deltaElbowY_mm,
+        deltaShoulder_mm: releaseFrame.deltaShoulder_mm,
+      },
+      follow_through: {
+        key: 'follow_through',
+        title: '4. Durchschwung',
+        subtitle: 'Maximale Armstreckung',
+        timeSec: maxFrame.timeSec,
+        pose: maxFrame.pose,
+        elbowAngle: maxFrame.elbowAngle,
+        deltaAngle: maxFrame.deltaAngle,
+        deltaElbowY_mm: maxFrame.deltaElbowY_mm,
+        deltaShoulder_mm: maxFrame.deltaShoulder_mm,
+      },
+    };
+
+    setSnapshots(resultSnapshots);
+    setShowOverlay(true);
+    setShowTrajectory(true);
+    setIsScanning(false);
+
+    // Direkt auf den Release-Moment springen und anzeigen
+    setActivePhase('release');
+    await seekTo(releaseFrame.timeSec);
+    setCurrentPose(releaseFrame.pose);
+    setStatusMessage(
+      `✓ Kinematik erfolgreich berechnet! Blaue Trajektorie für Dart ${currentSlot + 1} (${scanTrajectoryPts.length} Messpunkte) ist aktiv.`
+    );
+  };
+
   // SCHRITT 3: Wurfbewegung ab dem Nullpunkt Frame-für-Frame scannen & Abweichungen berechnen
-  const handleScanThrowDeviation = async () => {
+  const handleScanThrowDeviation = handleRunBiomechanicsAnalysis;
+  const _legacyScan = async () => {
     const video = videoRef.current;
     if (!video || !baselinePose || baselineTime === null) return;
 
@@ -606,7 +777,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setShowOverlay(true);
   };
 
-  // Zeichnet den Nullpunkt (Gold gestrichelt) und die aktuelle Pose (Smaragdgrün) deckungsgleich auf das Canvas
+  // Zeichnet die blaue Trajektorie, den Nullpunkt und die aktuelle Pose deckungsgleich auf das Canvas
   const renderCanvasOverlay = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -617,10 +788,56 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
 
-    if (!showOverlay) return;
-
-    // Linienbreite dynamisch an die echte Videoauflösung anpassen (z. B. 1080p vs 640p)
+    // Linienbreite dynamisch an die echte Videoauflösung anpassen
     const scale = Math.max(1, Math.min(w, h) / 500);
+
+    // 1. Blaue Flugbahn-Trajektorie (Hand-/Dart-Pfad wie im Referenzvideo)
+    // WICHTIG: Die Trajektorie wird IMMER gezeichnet, sobald Punkte existieren und showTrajectory aktiv ist!
+    if (showTrajectory) {
+      const throwsToRender =
+        activeThrowIdx === -1
+          ? trajectories.filter((t) => t.points.length > 1)
+          : [trajectories[activeThrowIdx]].filter((t) => t && t.points.length > 1);
+
+      const colors = [
+        '#3b82f6', // Wurf 1: Leuchtendes Königsblau wie im Video
+        '#0ea5e9', // Wurf 2: Sky Blue
+        '#8b5cf6', // Wurf 3: Violett
+      ];
+
+      throwsToRender.forEach((tr) => {
+        const pts = tr.points;
+        if (pts.length < 2) return;
+
+        const color = colors[(tr.id - 1) % colors.length];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4 * scale;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x * w, pts[0].y * h);
+        for (let i = 1; i < pts.length; i++) {
+          const xc = ((pts[i - 1].x + pts[i].x) / 2) * w;
+          const yc = ((pts[i - 1].y + pts[i].y) / 2) * h;
+          ctx.quadraticCurveTo(pts[i - 1].x * w, pts[i - 1].y * h, xc, yc);
+        }
+        const last = pts[pts.length - 1];
+        ctx.lineTo(last.x * w, last.y * h);
+        ctx.stroke();
+
+        // Release-Punkt Markierung am Ende
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(last.x * w, last.y * h, 5.5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+      });
+    }
+
+    if (!showOverlay) return;
 
     // 1. Goldene Nullpunkt-Referenz (Geister-Skelett) zeichnen, falls vorhanden
     if (baselinePose && showGhostBaseline) {
@@ -831,50 +1048,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ctx.fillText(badgeText, pillX + 10 * scale, pillY + 18 * scale);
     }
 
-    // 7. Blaue Flugbahn-Trajektorie (Hand-/Dart-Pfad wie im Referenzvideo)
-    if (showTrajectory) {
-      const throwsToRender =
-        activeThrowIdx === -1
-          ? trajectories.filter((t) => t.points.length > 1)
-          : [trajectories[activeThrowIdx]].filter((t) => t && t.points.length > 1);
-
-      const colors = [
-        '#3b82f6', // Wurf 1: Leuchtendes Königsblau wie im Video
-        '#0ea5e9', // Wurf 2: Sky Blue
-        '#8b5cf6', // Wurf 3: Violett
-      ];
-
-      throwsToRender.forEach((tr) => {
-        const pts = tr.points;
-        if (pts.length < 2) return;
-
-        const color = colors[(tr.id - 1) % colors.length];
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3.5 * scale;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x * w, pts[0].y * h);
-        for (let i = 1; i < pts.length; i++) {
-          const xc = ((pts[i - 1].x + pts[i].x) / 2) * w;
-          const yc = ((pts[i - 1].y + pts[i].y) / 2) * h;
-          ctx.quadraticCurveTo(pts[i - 1].x * w, pts[i - 1].y * h, xc, yc);
-        }
-        const last = pts[pts.length - 1];
-        ctx.lineTo(last.x * w, last.y * h);
-        ctx.stroke();
-
-        // Release-Punkt Markierung am Ende
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(last.x * w, last.y * h, 5 * scale, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5 * scale;
-        ctx.stroke();
-      });
-    }
+    // Trajektorie wird oben gezeichnet, damit sie immer sichtbar ist
   }, [
     showOverlay,
     baselinePose,
@@ -983,7 +1157,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       video.pause();
       setIsPlaying(false);
     } else {
-      setShowOverlay(false); // Beim freien Abspielen das Standbild-Skelett ausblenden
+      setShowOverlay(true); // Overlay und Trajektorie beim Abspielen aktiv halten
       video.play();
       setIsPlaying(true);
     }
@@ -1074,112 +1248,71 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         </div>
       </div>
 
-      {/* 2. Schritt-für-Schritt Workflow-Leiste */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* 2. Streamlined Workflow: 1. Video laden -> 2. Video- & Wurfanalyse starten */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
         {/* Schritt 1: Video wählen */}
-        <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800/90 border border-white/10 cursor-pointer transition-all shadow-md">
+        <label className="md:col-span-4 flex items-center justify-between p-4 rounded-2xl bg-slate-900/80 hover:bg-slate-800/90 border border-white/10 cursor-pointer transition-all shadow-md">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center font-black text-sm">
-              1
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center font-black text-sm shrink-0">
+              <Upload className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
               <div className="text-xs font-black text-white flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Video auswählen</span>
+                <span>{hasUploadedVideo ? 'Anderes Video wählen' : '1. Video auswählen'}</span>
               </div>
               <p className="text-[11px] text-slate-400">
-                {hasUploadedVideo ? 'Video geladen (Klick zum Ändern)' : 'Handy-Video (9:16 oder 16:9)'}
+                {hasUploadedVideo ? 'Video aktiv geladen' : 'Smartphone-Aufnahme (9:16 / 16:9)'}
               </p>
             </div>
           </div>
           <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
         </label>
 
-        {/* Schritt 2: Nullpunkt auf Standbild setzen */}
+        {/* Schritt 2: Der große Haupt-Button "Video- & Wurfanalyse starten" */}
         <button
-          onClick={handleSetBaseline}
+          onClick={handleRunBiomechanicsAnalysis}
           disabled={!hasUploadedVideo || isScanning}
-          className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all shadow-md text-left ${
+          className={`md:col-span-8 flex items-center justify-between p-4 rounded-2xl border transition-all shadow-xl text-left ${
             !hasUploadedVideo
               ? 'bg-slate-900/40 border-white/5 opacity-50 cursor-not-allowed'
-              : baselinePose
-              ? 'bg-amber-500/15 border-amber-400/50 hover:bg-amber-500/25 cursor-pointer'
-              : 'bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400 cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+              : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 border-emerald-300 hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.99] cursor-pointer'
           }`}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
-                baselinePose
-                  ? 'bg-amber-500 text-slate-950'
-                  : !hasUploadedVideo
+              className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-base shrink-0 ${
+                !hasUploadedVideo
                   ? 'bg-slate-800 text-slate-400'
-                  : 'bg-slate-950/20 text-slate-950'
+                  : 'bg-slate-950/20 text-slate-950 shadow-inner'
               }`}
             >
-              2
+              <Sparkles className={`w-6 h-6 ${isScanning ? 'animate-spin' : ''}`} />
             </div>
             <div>
               <div
-                className={`text-xs font-black flex items-center gap-1.5 ${
-                  !hasUploadedVideo || baselinePose ? 'text-white' : 'text-slate-950'
+                className={`text-sm sm:text-base font-black flex items-center gap-2 ${
+                  !hasUploadedVideo ? 'text-white' : 'text-slate-950'
                 }`}
               >
-                <Crosshair className="w-3.5 h-3.5" />
-                <span>
-                  {baselinePose ? 'Nullpunkt neu setzen' : 'Nullpunkt setzen (Basis)'}
-                </span>
-              </div>
-              <p
-                className={`text-[11px] ${
-                  !hasUploadedVideo || baselinePose ? 'text-slate-400' : 'text-slate-900 font-medium'
-                }`}
-              >
-                {baselinePose && baselineTime !== null
-                  ? `Aktiv bei ${baselineTime.toFixed(2)}s (${calcElbowAngle(baselinePose)}°)`
-                  : 'Punkte auf Ausgangshaltung legen'}
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Schritt 3: Wurf gegen Nullpunkt analysieren */}
-        <button
-          onClick={handleScanThrowDeviation}
-          disabled={!baselinePose || isScanning}
-          className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all shadow-md text-left ${
-            !baselinePose
-              ? 'bg-slate-900/40 border-white/5 opacity-50 cursor-not-allowed'
-              : 'bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 border-emerald-300 hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] cursor-pointer'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
-                !baselinePose ? 'bg-slate-800 text-slate-400' : 'bg-slate-950/20 text-slate-950'
-              }`}
-            >
-              3
-            </div>
-            <div>
-              <div
-                className={`text-xs font-black flex items-center gap-1.5 ${
-                  !baselinePose ? 'text-white' : 'text-slate-950'
-                }`}
-              >
-                <Sparkles className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
                 <span>
                   {isScanning
-                    ? `Scanne Wurf (${scanProgress}%)...`
-                    : 'Abweichung vom Nullpunkt messen'}
+                    ? `Kinematik & Physik-Engine läuft (${scanProgress}%)...`
+                    : '2. 🎯 Video- & Wurfanalyse starten'}
                 </span>
+                {trajectories[activeThrowIdx >= 0 ? activeThrowIdx : 0]?.points.length > 0 && (
+                  <span className="text-[10px] bg-slate-950/30 text-slate-950 font-black px-2 py-0.5 rounded-full">
+                    ✓ Trajektorie aktiv
+                  </span>
+                )}
               </div>
               <p
-                className={`text-[11px] ${
-                  !baselinePose ? 'text-slate-400' : 'text-slate-900 font-medium'
+                className={`text-xs ${
+                  !hasUploadedVideo ? 'text-slate-400' : 'text-slate-900 font-medium'
                 }`}
               >
-                Vermisst Einknickwinkel, Release & Drift
+                {isScanning
+                  ? 'Berechnet Gelenkwinkel, Ellenbogendrift und generiert die blaue Flugbahn-Trajektorie...'
+                  : 'Startet die Kinematik & Mechanik: Erzeugt automatisch die blaue Trajektorie, Gelenkwinkel & Phasen'}
               </p>
             </div>
           </div>
