@@ -4,6 +4,8 @@ import { getAllMatches, getPlayers } from '@/lib/data';
 import { getSessionAction } from '@/app/actions';
 import { getTrainingHistoryAction } from '@/app/doppelquote/actions';
 import { getPdcChallengeHistoryAction } from '@/app/training/pdc-challenge/actions';
+import { getFussballHistoryAction } from '@/app/training/fussball/actions';
+import { getStellenCheckenHistoryAction } from '@/app/training/stellen-checken/actions';
 import { getAdminTrainingOverviewData } from '@/lib/trainingLottery';
 import { redirect } from 'next/navigation';
 
@@ -18,11 +20,21 @@ export default async function VerwaltungPage() {
     redirect('/?mode=ranking');
   }
 
-  const [matches, players, trainingDoubles, trainingPdc, adminTrainingOverview] = await Promise.all([
+  const [
+    matches,
+    players,
+    trainingDoubles,
+    trainingPdc,
+    trainingFussball,
+    trainingStellenChecken,
+    adminTrainingOverview,
+  ] = await Promise.all([
     getAllMatches(),
     getPlayers(),
     getTrainingHistoryAction(100),
     getPdcChallengeHistoryAction(100),
+    getFussballHistoryAction(100),
+    getStellenCheckenHistoryAction(100),
     getAdminTrainingOverviewData(),
   ]);
 
@@ -33,6 +45,8 @@ export default async function VerwaltungPage() {
         players={players}
         trainingDoubles={trainingDoubles}
         trainingPdc={trainingPdc}
+        trainingFussball={trainingFussball}
+        trainingStellenChecken={trainingStellenChecken}
         adminTrainingOverview={adminTrainingOverview}
       />
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Player } from '@/lib/data';
 import {
@@ -39,6 +39,7 @@ import {
 interface StellenCheckenClientProps {
   players: Player[];
   initialHistory: StellenCheckenHistoryItem[];
+  currentUser?: { name?: string; role?: string; id?: number } | null;
 }
 
 interface TurnSnapshot {
@@ -51,15 +52,31 @@ interface TurnSnapshot {
 export default function StellenCheckenClient({
   players,
   initialHistory,
+  currentUser,
 }: StellenCheckenClientProps) {
   const validPlayers = players.filter((p) => !p.name.startsWith('Board '));
+  const isBoardUser = Boolean(currentUser?.name && currentUser.name.toLowerCase().startsWith('board'));
+  const userPlayerMatch = validPlayers.find(
+    (p) => p.name.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+  );
+  const defaultP1 =
+    !isBoardUser && userPlayerMatch
+      ? userPlayerMatch.name
+      : validPlayers[0]?.name || 'Sebastian Kirste';
 
   // Setup State
   const [isGameStarted, setIsGameStarted] = useState<boolean>(false);
   const [isGameFinished, setIsGameFinished] = useState<boolean>(false);
   const [gameMode, setGameMode] = useState<'solo' | '1vs1'>('solo');
-  const [p1Name, setP1Name] = useState<string>(validPlayers[0]?.name || 'Sebastian Kirste');
+  const [p1Name, setP1Name] = useState<string>(defaultP1);
   const [p2Name, setP2Name] = useState<string>(validPlayers[1]?.name || 'Dirk Ostermann');
+
+  // Arretierung von Spieler 1 im Solo-Modus auf den angemeldeten Benutzer
+  useEffect(() => {
+    if (gameMode === 'solo' && !isBoardUser && userPlayerMatch) {
+      setP1Name(userPlayerMatch.name);
+    }
+  }, [gameMode, isBoardUser, userPlayerMatch]);
 
   // Sequenz-Auswahl ('random' oder feste ID 1..200)
   const [presetMode, setPresetMode] = useState<'random' | 'fixed'>('random');
@@ -594,20 +611,39 @@ export default function StellenCheckenClient({
             {/* Spielerauswahl */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-400 block">
-                  {gameMode === 'solo' ? 'Spieler auswählen' : 'Spieler 1 (beginnt)'}
-                </label>
-                <select
-                  value={p1Name}
-                  onChange={(e) => setP1Name(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-white/15 px-3.5 py-3 text-sm font-bold text-white focus:outline-none focus:border-cyan-400"
-                >
-                  {validPlayers.map((p) => (
-                    <option key={p.id || p.name} value={p.name}>
-                      {p.name} {p.team ? `(${p.team})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-400 block">
+                    {gameMode === 'solo' ? 'Spieler' : 'Spieler 1 (beginnt)'}
+                  </label>
+                  {gameMode === 'solo' && !isBoardUser && userPlayerMatch && (
+                    <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950/80 border border-cyan-500/40 px-2 py-0.5 rounded-full">
+                      ✓ Angemeldet
+                    </span>
+                  )}
+                </div>
+                {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
+                  <div className="w-full rounded-xl bg-slate-950 border border-cyan-500/40 px-3.5 py-3 text-sm font-bold text-white flex items-center justify-between shadow-inner">
+                    <span className="flex items-center gap-2 truncate">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
+                      <span className="truncate">{userPlayerMatch.name}</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
+                      Fest fixiert
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    value={p1Name}
+                    onChange={(e) => setP1Name(e.target.value)}
+                    className="w-full rounded-xl bg-slate-950 border border-white/15 px-3.5 py-3 text-sm font-bold text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  >
+                    {validPlayers.map((p) => (
+                      <option key={p.id || p.name} value={p.name}>
+                        {p.name} {p.team ? `(${p.team})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {gameMode === '1vs1' && (

@@ -40,7 +40,11 @@ interface TurnHistory {
 }
 
 export default function FussballClient({ players, initialHistory, currentUser }: FussballClientProps) {
-  const defaultPlayerName = currentUser?.name || players[0]?.name || 'Sebastian Kirste';
+  const isBoardUser = Boolean(currentUser?.name && currentUser.name.toLowerCase().startsWith('board'));
+  const userPlayerMatch = players.find(
+    (p) => p.name.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+  );
+  const defaultPlayerName = !isBoardUser && userPlayerMatch ? userPlayerMatch.name : (players[0]?.name || 'Sebastian Kirste');
   // Setup State
   const [isGameStarted, setIsGameStarted] = useState<boolean>(false);
   const [gameMode, setGameMode] = useState<'1vs1' | '1vsComputer'>('1vsComputer');
@@ -50,6 +54,13 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   const [targetGoals, setTargetGoals] = useState<number>(5);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [showHelp, setShowHelp] = useState<boolean>(false);
+
+  // Arretierung von Spieler 1 im 1vsComputer-Modus auf den angemeldeten Benutzer
+  useEffect(() => {
+    if (gameMode === '1vsComputer' && !isBoardUser && userPlayerMatch) {
+      setP1Name(userPlayerMatch.name);
+    }
+  }, [gameMode, isBoardUser, userPlayerMatch]);
 
   // In-Game State
   const [p1Goals, setP1Goals] = useState<number>(0);
@@ -626,22 +637,33 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 <label className="text-xs font-bold text-sky-400 uppercase tracking-wider block">
                   Spieler 1 (Heimteam)
                 </label>
-                {gameMode === '1vsComputer' && currentUser?.name && (
+                {gameMode === '1vsComputer' && !isBoardUser && userPlayerMatch && (
                   <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full">
-                    ✓ Angemeldeter Spieler
+                    ✓ Angemeldet
                   </span>
                 )}
               </div>
-              <select
-                value={p1Name}
-                onChange={(e) => setP1Name(e.target.value)}
-                disabled={gameMode === '1vsComputer' && Boolean(currentUser?.name)}
-                className="w-full bg-slate-950 border border-white/10 disabled:opacity-80 disabled:cursor-not-allowed rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none focus:border-blue-500"
-              >
-                {players.map(p => (
-                  <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
-                ))}
-              </select>
+              {gameMode === '1vsComputer' && !isBoardUser && userPlayerMatch ? (
+                <div className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white flex items-center justify-between shadow-inner">
+                  <span className="flex items-center gap-2 truncate">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <span className="truncate">{userPlayerMatch.name}</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
+                    Fest fixiert
+                  </span>
+                </div>
+              ) : (
+                <select
+                  value={p1Name}
+                  onChange={(e) => setP1Name(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  {players.map(p => (
+                    <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {gameMode === '1vs1' ? (

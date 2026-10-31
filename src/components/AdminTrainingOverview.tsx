@@ -93,7 +93,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-300">
-                Monatliche Zuordnung aller absolvierten Spiele (Solo & 1-gegen-1) und Lostopf-Tracking (5 Freigetränke ab 20 Spielen).
+                Zentrale Erfassung aller Vereins-Trainingsmodule (Checkout Battle, PDC Challenge, Fußball Darts & Stellen & Checken). Jedes absolvierte Match zählt +1. Ab 20 Spielen im Monat qualifiziert sich ein Spieler für die Monatsverlosung (5 Freigetränke, 4 Monate Sperrfrist nach Gewinn). Klicke auf einen Spieler, um alle Partien aufzuklappen.
               </p>
             </div>
           </div>

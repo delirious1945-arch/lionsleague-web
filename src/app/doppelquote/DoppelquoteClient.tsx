@@ -31,12 +31,19 @@ const CACHE_KEY = 'lions_active_doppelquote_session_v2';
 export default function DoppelquoteClient({ players, initialHistory, user }: DoppelquoteClientProps) {
   const router = useRouter();
   const isBoardUser = Boolean(user?.name && user.name.toLowerCase().startsWith('board'));
-  const userPlayerMatch = players.find(p => p.name.toLowerCase() === user?.name?.toLowerCase());
+  const userPlayerMatch = players.find(p => p.name.trim().toLowerCase() === user?.name?.trim().toLowerCase());
   const defaultP1 = (!isBoardUser && userPlayerMatch) ? userPlayerMatch.name : (players[0]?.name || 'Sebastian Kirste');
 
   const [gameMode, setGameMode] = useState<'solo' | '1vs1'>('solo');
   const [p1Name, setP1Name] = useState<string>(defaultP1);
   const [p2Name, setP2Name] = useState<string>(players[1]?.name || 'Dirk Ostermann');
+
+  // Arretierung von Spieler 1 im Solo-Modus auf den angemeldeten Benutzer
+  useEffect(() => {
+    if (gameMode === 'solo' && !isBoardUser && userPlayerMatch) {
+      setP1Name(userPlayerMatch.name);
+    }
+  }, [gameMode, isBoardUser, userPlayerMatch]);
   const [activePlayer, setActivePlayer] = useState<1 | 2>(1);
   const [currentTargetIndex, setCurrentTargetIndex] = useState<number>(0);
   const [currentShotIndex, setCurrentShotIndex] = useState<number>(0);
@@ -1376,13 +1383,13 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                     )}
                   </div>
                   {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
-                    <div className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white flex items-center justify-between shadow-inner">
+                    <div className="w-full bg-zinc-950 border border-amber-500/40 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white flex items-center justify-between shadow-inner">
                       <span className="flex items-center gap-2 truncate">
                         <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                        <span className="truncate">{p1Name}</span>
+                        <span className="truncate">{userPlayerMatch.name}</span>
                       </span>
-                      <span className="text-[10px] uppercase font-bold text-amber-400 bg-zinc-900 border border-amber-500/30 px-2 py-0.5 rounded shrink-0 ml-2">
-                        Angemeldet
+                      <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
+                        Fest fixiert
                       </span>
                     </div>
                   ) : (

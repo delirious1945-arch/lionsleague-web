@@ -13,6 +13,36 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 
 ---
 
+## [2026-10-31] – Admin-Zentrale Trainingsintegration & Strikte User-Arretierung im Single-Modus
+
+### 🎯 Trainingsspiele & Admin-Verwaltung (`/verwaltung`)
+- **AdminTrainingOverview Kachelbeschreibung erweitert:**
+  - Ausführliche Erläuterung aller 4 Vereins-Trainingsmodule (Checkout Battle, PDC Challenge, Fußball Darts & Stellen & Checken).
+  - Transparente Erklärung der Zählweise (+1 pro regulär beendetem Match) und der Lostopf-Qualifikation (ab 20 Partien/Monat für 5 Freigetränke, 4 Monate Sperrfrist für Gewinner).
+  - Hinweis auf die interaktive Aufklapp-Funktion jedes Spielers zur Anzeige aller absolvierten Monatseinheiten.
+- **Vollständige Integration aller 4 Trainingsmodule in der Admin-Zentrale:**
+  - Unter „Trainingsleistungen aller Spieler“ werden neben Checkout Battle und PDC Challenge nun auch **Fußball Darts** (`training_fussball`) und **Stellen & Checken** (`training_stellen_checken`) geladen.
+  - **KPI-Header:** Zeigt Gesamtsitzungen über alle 4 Module (`DQ · PDC · FB · S&C`).
+  - **Filter-Pills:** Schnellumschalter für *Alle*, *Doppelquote*, *PDC Challenge*, *Fußball Darts* und *Stellen & Checken* mit jeweiligen Session-Zählern.
+  - **Quick-Access Links:** Direktverlinkung zu allen 4 Trainingsmodulen im Header der Admin-Ansicht.
+  - **Sitzungskarten & Detailaufklapp-Ansichten:**
+    - *Fußball Darts:* Tore-Endstand mit Sieg-/Niederlagen-Badge, geworfene Darts, Ziel-Tore, Bull-Quote (Balleroberung) und Doppel-Quote (Torschüsse).
+    - *Stellen & Checken:* Erreichte Punkte (von maximal 28), Checks-Quote, Sequenz-ID und vollständige 15-Runden-Aufnahmenübersicht (Target 3–101, Check-Status, erzielte Punkte).
+
+### 🔒 Strikte User-Arretierung im Single-Modus (Anti-Cheat & Datenintegrität)
+- **Problem behoben:** In Trainingsspielen war es stellenweise noch möglich, trotz Anmeldung einen anderen Spieler als Spieler 1 auszuwählen oder durch Moduswechsel fremde User-IDs zu übernehmen.
+- **Systemweite Arretierung in allen 4 Trainingsmodulen:**
+  - *Stellen & Checken (`/training/stellen-checken`):* Serverseitige Session-Übergabe in `page.tsx` aktiviert. Im `solo`-Modus ist das Dropdown vollständig durch einen festen Account-Badge (`✓ Angemeldet · Fest fixiert`) ersetzt. `useEffect` erzwingt reaktiven Re-Sync bei Moduswechseln.
+  - *Fußball Darts (`/training/fussball`):* Im `1vsComputer`-Modus ist Spieler 1 unveränderlich an den angemeldeten Benutzer gebunden. Bei Umschalten von `1vs1` zurück zu `1vsComputer` wird Spieler 1 per `useEffect` automatisch wieder auf den Login-User zurückgesetzt.
+  - *PDC Challenge (`/training/pdc-challenge`):* Unicode- und Whitespace-sichere Spielernamens-Normalisierung (`trim().toLowerCase()`). Im `solo`-Modus fester Badge statt Dropdown mit automatischem Re-Sync.
+  - *Checkout Battle (`/doppelquote`):* Identische Normalisierung und strikte Account-Fixierung im Solo-Modus.
+
+### 🛡️ Agenten-Regelwerk (`AGENTS.md`)
+- **§12 Heuristik 5 (Authentifizierte User-Arretierung) geschärft:** Verbindliche Vorschrift für alle Agenten: Im Single-/Solo-Modus MUSS der angemeldete Account unveränderlich als Spieler 1 arretiert werden (Badge statt Dropdown, Re-Sync via `useEffect`).
+- **§12 Heuristik 7 (4-Core-Sync-Pflicht für neue Trainingsmodule) hinzugefügt:** Autonome Pflicht für das Agenten-Netzwerk: Sobald ein neues Trainingsmodul entsteht, muss es zwingend in allen 4 Kernansichten synchronisiert werden (`trainingLottery.ts`, `AdminTrainingOverview.tsx`, `VerwaltungClient.tsx`, TV-Boards).
+
+---
+
 ## [2026-10-29] – Autonomes Agenten-Netzwerk, UI-Cleaner & Trainings-Optimierung
 
 ### 🎯 Trainingsspiele & Game-Optimizer

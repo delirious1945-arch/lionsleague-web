@@ -31,12 +31,16 @@ export default function VerwaltungClient({
   players,
   trainingDoubles = [],
   trainingPdc = [],
+  trainingFussball = [],
+  trainingStellenChecken = [],
   adminTrainingOverview,
 }: {
   matches: MatchRow[];
   players: Player[];
   trainingDoubles?: any[];
   trainingPdc?: any[];
+  trainingFussball?: any[];
+  trainingStellenChecken?: any[];
   adminTrainingOverview?: AdminTrainingOverviewData;
 }) {
   const searchParams = useSearchParams();
@@ -48,7 +52,9 @@ export default function VerwaltungClient({
     : 'matches';
 
   const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'training'>(defaultTab);
-  const [trainingGameType, setTrainingGameType] = useState<'all' | 'doubles' | 'pdc'>('all');
+  const [trainingGameType, setTrainingGameType] = useState<
+    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken'
+  >('all');
   const [trainingPlayerFilter, setTrainingPlayerFilter] = useState<string>('all');
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -447,12 +453,16 @@ export default function VerwaltungClient({
           new Set([
             ...trainingDoubles.map((d: any) => d.player_name),
             ...trainingPdc.map((p: any) => p.player_name),
+            ...trainingFussball.map((f: any) => f.player_name),
+            ...trainingStellenChecken.map((s: any) => s.player_name),
           ].filter(Boolean))
         ).sort();
 
         const combinedSessions = [
           ...trainingDoubles.map((d: any) => ({ ...d, gameType: 'doubles' })),
           ...trainingPdc.map((p: any) => ({ ...p, gameType: 'pdc' })),
+          ...trainingFussball.map((f: any) => ({ ...f, gameType: 'fussball' })),
+          ...trainingStellenChecken.map((s: any) => ({ ...s, gameType: 'stellen_checken' })),
         ].sort((a: any, b: any) => {
           const tA = new Date(a.created_at || a.training_date).getTime();
           const tB = new Date(b.created_at || b.training_date).getTime();
@@ -488,7 +498,7 @@ export default function VerwaltungClient({
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Hier hast du als Admin vollständige Einsicht in alle absolvierten Doppelquote- und PDC-Challenge-Trainings.
+                  Hier hast du als Admin vollständige Einsicht in alle absolvierten Vereins-Trainings (Checkout Battle, PDC Challenge, Fußball Darts & Stellen & Checken).
                 </p>
               </div>
 
@@ -498,7 +508,7 @@ export default function VerwaltungClient({
                   className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <Target size={13} />
-                  <span>Doppelquote Training</span>
+                  <span>Checkout Battle</span>
                   <ExternalLink size={12} />
                 </Link>
                 <Link
@@ -507,6 +517,21 @@ export default function VerwaltungClient({
                 >
                   <Award size={13} />
                   <span>PDC Challenge</span>
+                  <ExternalLink size={12} />
+                </Link>
+                <Link
+                  href="/training/fussball"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <span>⚽ Fußball Darts</span>
+                  <ExternalLink size={12} />
+                </Link>
+                <Link
+                  href="/training/stellen-checken"
+                  className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Target size={13} />
+                  <span>Stellen & Checken</span>
                   <ExternalLink size={12} />
                 </Link>
               </div>
@@ -535,7 +560,7 @@ export default function VerwaltungClient({
                   {combinedSessions.length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5">
-                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC
+                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&C
                 </div>
               </div>
 
@@ -598,6 +623,26 @@ export default function VerwaltungClient({
                 >
                   PDC Challenge ({trainingPdc.length})
                 </button>
+                <button
+                  onClick={() => setTrainingGameType('fussball')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    trainingGameType === 'fussball'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Fußball ({trainingFussball.length})
+                </button>
+                <button
+                  onClick={() => setTrainingGameType('stellen_checken')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    trainingGameType === 'stellen_checken'
+                      ? 'bg-cyan-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Stellen & Checken ({trainingStellenChecken.length})
+                </button>
               </div>
 
               {/* Player Filter */}
@@ -634,6 +679,9 @@ export default function VerwaltungClient({
               <div className="space-y-2.5">
                 {filteredSessions.map((s: any, idx: number) => {
                   const isDq = s.gameType === 'doubles';
+                  const isPdc = s.gameType === 'pdc';
+                  const isFussball = s.gameType === 'fussball';
+                  const isStellenChecken = s.gameType === 'stellen_checken';
                   const isAborted = Boolean(s.is_aborted);
                   const sessionKey = s.session_id ? `${s.session_id}_${s.player_name}_${idx}` : `s_${idx}`;
                   const isExpanded = expandedTrainingKey === sessionKey;
@@ -647,7 +695,7 @@ export default function VerwaltungClient({
                         minute: '2-digit',
                       });
 
-                  const pdcBadge = !isDq ? getPdcBadge(s.total_score || 0) : null;
+                  const pdcBadge = isPdc ? getPdcBadge(s.total_score || 0) : null;
 
                   return (
                     <div
@@ -669,14 +717,28 @@ export default function VerwaltungClient({
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               isDq
                                 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : isPdc
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : isFussball
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                             }`}
                           >
-                            {isDq ? '🎯 Doppelquote' : '🌟 PDC Challenge'}
+                            {isDq
+                              ? '🎯 Checkout Battle'
+                              : isPdc
+                              ? '🌟 PDC Challenge'
+                              : isFussball
+                              ? '⚽ Fußball Darts'
+                              : '🎯 Stellen & Checken'}
                           </span>
                           <span className="font-bold text-white text-sm">{s.player_name}</span>
                           {s.opponent_name && (
-                            <span className="text-slate-400 text-xs">vs. {s.opponent_name}</span>
+                            <span className="text-slate-400 text-xs">
+                              {isFussball && s.is_computer
+                                ? `vs. Computer (${s.computer_level || 'Bot'})`
+                                : `vs. ${s.opponent_name}`}
+                            </span>
                           )}
                           <span className="text-[10px] text-slate-500">· {dStr}</span>
                           {isAborted && (
@@ -687,7 +749,7 @@ export default function VerwaltungClient({
                         </div>
 
                         <div className="flex items-center gap-3">
-                          {isDq ? (
+                          {isDq && (
                             <div className="text-right">
                               <span className="text-emerald-300 font-black text-sm font-mono">
                                 {((s.total_quote ?? 0) * 100).toFixed(1)}%
@@ -696,7 +758,9 @@ export default function VerwaltungClient({
                                 {s.total_hits} / {s.total_darts} Hits
                               </div>
                             </div>
-                          ) : (
+                          )}
+
+                          {isPdc && (
                             <div className="flex items-center gap-2">
                               {pdcBadge && (
                                 <span className={`text-[10px] px-2 py-0.5 rounded font-black ${pdcBadge.badgeClass}`}>
@@ -714,6 +778,28 @@ export default function VerwaltungClient({
                             </div>
                           )}
 
+                          {isFussball && (
+                            <div className="text-right">
+                              <span className={`font-black text-sm font-mono ${s.is_winner ? 'text-emerald-300' : 'text-slate-200'}`}>
+                                {s.goals_scored} : {s.goals_conceded} Tore
+                              </span>
+                              <div className="text-[10px] text-slate-400">
+                                {s.darts_thrown} Darts · {s.bull_hits}/{s.bull_attempts} Bull · {s.double_hits}/{s.double_attempts} D
+                              </div>
+                            </div>
+                          )}
+
+                          {isStellenChecken && (
+                            <div className="text-right">
+                              <span className="text-cyan-300 font-black text-sm font-mono">
+                                {s.points_scored} Pkt.
+                              </span>
+                              <div className="text-[10px] text-slate-400">
+                                {s.checks_count} / {s.total_rounds || 15} Checks ({((s.check_quote ?? 0) * 100).toFixed(1)}%)
+                              </div>
+                            </div>
+                          )}
+
                           {!isAborted && (
                             <div className="text-slate-400">
                               {isExpanded ? <ChevronUp size={16} className="text-emerald-400" /> : <ChevronDown size={16} />}
@@ -725,7 +811,7 @@ export default function VerwaltungClient({
                       {/* EXPANDED DETAILS */}
                       {isExpanded && !isAborted && (
                         <div className="pt-3 border-t border-white/10 space-y-3 animate-fadeIn">
-                          {isDq ? (
+                          {isDq && (
                             /* Doppelquote Breakdown */
                             <div className="space-y-2">
                               <div className="flex items-center justify-between text-[11px] font-bold">
@@ -789,7 +875,9 @@ export default function VerwaltungClient({
                                 })}
                               </div>
                             </div>
-                          ) : (
+                          )}
+
+                          {isPdc && (
                             /* PDC Challenge Breakdown */
                             <div className="space-y-2.5">
                               <div className="grid grid-cols-3 gap-2 text-center">
@@ -835,6 +923,103 @@ export default function VerwaltungClient({
                                             >
                                               <div>{target}</div>
                                               <div>{isHit ? '✓' : '✗'}</div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          )}
+
+                          {isFussball && (
+                            /* Fußball Darts Breakdown */
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Endstand</div>
+                                  <div className={`text-sm font-black ${s.is_winner ? 'text-emerald-400' : 'text-slate-200'}`}>
+                                    {s.goals_scored} : {s.goals_conceded} ({s.is_winner ? 'Sieg 🏆' : 'Niederlage'})
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Darts & Ziel</div>
+                                  <div className="text-sm font-black text-sky-400">{s.darts_thrown} Darts ({s.target_goals} Tore)</div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Bull-Quote (Eroberung)</div>
+                                  <div className="text-sm font-black text-amber-400">
+                                    {s.bull_attempts > 0 ? ((s.bull_hits / s.bull_attempts) * 100).toFixed(1) : 0}% ({s.bull_hits}/{s.bull_attempts})
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Doppel-Quote (Tore)</div>
+                                  <div className="text-sm font-black text-emerald-400">
+                                    {s.double_attempts > 0 ? ((s.double_hits / s.double_attempts) * 100).toFixed(1) : 0}% ({s.double_hits}/{s.double_attempts})
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded-lg border border-white/5 flex items-center justify-between">
+                                <span>⚽ Modus: <strong>{s.is_computer ? `1 vs. Computer (${s.computer_level})` : `1 vs. 1 Duell gegen ${s.opponent_name}`}</strong></span>
+                                <span>Ziel: <strong>{s.target_goals} Tore</strong></span>
+                              </div>
+                            </div>
+                          )}
+
+                          {isStellenChecken && (
+                            /* Stellen & Checken Breakdown */
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Erreichte Punkte</div>
+                                  <div className="text-sm font-black text-cyan-400">
+                                    {s.points_scored} / {s.max_possible_points || 28} Pkt.
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Erfolgreiche Checks</div>
+                                  <div className="text-sm font-black text-emerald-400">
+                                    {s.checks_count} / {s.total_rounds || 15} ({((s.check_quote ?? 0) * 100).toFixed(1)}%)
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Sequenz & Modus</div>
+                                  <div className="text-sm font-black text-amber-400">
+                                    Sequenz #{String(s.preset_id || 1).padStart(3, '0')} · {s.game_mode === 'solo' ? 'Solo' : `1vs1`}
+                                  </div>
+                                </div>
+                              </div>
+                              {(() => {
+                                let rounds: any[] = [];
+                                if (s.round_details) {
+                                  try {
+                                    rounds = typeof s.round_details === 'string' ? JSON.parse(s.round_details) : s.round_details;
+                                  } catch (e) {}
+                                }
+                                if (Array.isArray(rounds) && rounds.length > 0) {
+                                  return (
+                                    <div className="space-y-1">
+                                      <div className="text-[11px] font-bold text-cyan-300">
+                                        15 Runden Aufnahmen-Übersicht (3–101 Punkte):
+                                      </div>
+                                      <div className="grid grid-cols-5 sm:grid-cols-15 gap-1 text-center">
+                                        {rounds.map((r: any, rIdx: number) => {
+                                          const checked = Boolean(r.checked);
+                                          return (
+                                            <div
+                                              key={rIdx}
+                                              className={`py-1 px-0.5 rounded border text-[10px] font-mono font-bold ${
+                                                checked
+                                                  ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                                                  : 'bg-slate-950/60 border-white/5 text-slate-500'
+                                              }`}
+                                            >
+                                              <div>#{r.round || rIdx + 1}</div>
+                                              <div className="text-white text-xs">{r.target}</div>
+                                              <div>{checked ? `+${r.pointsEarned ?? r.pointsPossible ?? 1}` : '0'}</div>
                                             </div>
                                           );
                                         })}

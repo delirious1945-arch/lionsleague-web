@@ -126,12 +126,22 @@ Prädiktive Analysen und What-if-Szenarien dürfen Liga-Daten und Trainingsdaten
 4. **Schutz der Leistungsrangliste (Schwellenwert-Logik):**
    - Kurzspiele (z. B. Fußball auf 3 Tore) gelten als *Warm-up / Fun* und dürfen nicht in das offizielle Leistungsranking einfließen.
    - Mindest-Schwellenwerte (z. B. $\ge 5$ Tore, $\ge 30$ Darts) müssen serverseitig in Auswertungen und Queries erzwungen werden.
-5. **Authentifizierte User-Arretierung:**
-   - In Solo- und Computer-Spielen (`1vsComputer`) muss der angemeldete Spieler automatisch und unveränderlich als Spieler 1 fixiert sein.
+5. **Authentifizierte User-Arretierung (Strikter Single-Modus-Schutz):**
+   - In allen Single-, Solo- und Computer-Spielen (`solo`, `1vsComputer`) MUSS der angemeldete Spieler unveränderlich als Spieler 1 fixiert sein.
+   - Das Dropdown-Menü wird durch einen fixierten Account-Badge (`✓ Angemeldet · Fest fixiert`) ersetzt.
+   - Reaktiver Re-Sync per `useEffect`: Beim Umschalten von Duell-Modi (`1vs1`) zurück in den Single-Modus wird Spieler 1 automatisch wieder auf den angemeldeten User zurückgesetzt.
+   - Spielernamen-Matching MUSS mit Unicode- und Whitespace-Normalisierung (`trim().toLowerCase()`) erfolgen.
 6. **Biomechanik-Engine (KI-Wurfanalyse):**
    - Autonome Prüfung der MediaPipe Landmark-Erkennung (Confidence $\ge 0.7$).
    - Validierung der 5 Kernwinkel (Stand-, Rückzug-, Release-, Nachhalte-, Neigungswinkel) relativ zum kalibrierten Nullpunkt.
    - Autonome Identifikation technischer Lücken (z. B. fehlende Kalibrierungs-Distanz, Kamera-FPS) und Formulierung als konkreter Handlungsbedarf an den Admin.
+7. **Obligatorische Integration neuer Trainingsmodule (4-Core-Sync-Pflicht):**
+   - Sobald ein neues Trainingsspiel implementiert oder erweitert wird, MUSS das Agenten-Netzwerk dieses vollautomatisch in den **4 Core-Verwaltungs- und TV-Ansichten** synchronisieren:
+     1. `src/lib/trainingLottery.ts` (Zählweise +1 pro regulärem Spiel für den 20-Spiele-Lostopf)
+     2. `src/components/AdminTrainingOverview.tsx` (Eigene Tabellenspalte, Tooltip, Spieler-Aufklapphistorie)
+     3. `src/app/verwaltung/page.tsx` & `src/app/verwaltung/VerwaltungClient.tsx` (Datenabfrage, KPI-Zusammenfassung, Filter-Pills, Quick-Links und Session-Card mit aufklappbaren Detailwerten)
+     4. Live-Boards / TV-Ansichten (TV-Board-Kompatibilität und Live-Ticker).
+   - Kein neues Trainingsmodul darf isoliert ohne vollständige Integration in die Admin-Zentrale existieren.
 
 ---
 
