@@ -138,7 +138,7 @@ export default function PdcLiveClient({
   )[0];
 
   return (
-    <div className="forced-dark master-view min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-amber-500/30" data-master="true">
+    <div className="forced-dark master-view min-h-screen w-full max-w-full overflow-x-hidden bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-amber-500/30" data-master="true">
       {/* TV Header Bar */}
       <header className="px-4 py-3 sm:px-6 bg-slate-900/95 border-b border-white/10 flex items-center justify-between gap-4 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3">

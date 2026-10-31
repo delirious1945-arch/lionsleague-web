@@ -537,7 +537,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   const currentWerferHasBall = ballPossession === currentTurn;
 
   return (
-    <div className="max-w-4xl mx-auto px-2 sm:px-4 py-4 space-y-4 select-none">
+    <div className="w-full max-w-4xl overflow-x-hidden mx-auto px-2 sm:px-4 py-4 space-y-4 select-none">
       
       {/* Top Header */}
       <div className="flex items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl p-3 sm:p-4 shadow-xl backdrop-blur-md">

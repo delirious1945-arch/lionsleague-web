@@ -92,15 +92,15 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-[#050811] text-slate-100">
+      <body className="min-h-full flex flex-col bg-[#050811] text-slate-100 max-w-[100vw] overflow-x-hidden">
         {!isAuthenticated ? (
           <LandingPage />
         ) : (
-          <div className="min-h-screen flex flex-col">
+          <div className="min-h-screen flex flex-col w-full max-w-[100vw] overflow-x-hidden">
             <Suspense fallback={<div className="h-16 bg-slate-950/80" />}>
               <Header user={user} seasons={seasons} />
             </Suspense>
-            <main className="flex-1 max-w-[1600px] w-full mx-auto px-2 sm:px-6 py-3 sm:py-4">
+            <main className="flex-1 max-w-[1600px] w-full mx-auto px-2 sm:px-6 py-3 sm:py-4 overflow-x-hidden">
               {children}
             </main>
             <Footer />

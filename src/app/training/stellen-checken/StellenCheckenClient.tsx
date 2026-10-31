@@ -419,7 +419,7 @@ export default function StellenCheckenClient({
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-6 space-y-6">
+    <div className="w-full max-w-5xl overflow-x-hidden mx-auto px-2 sm:px-6 space-y-6">
       {/* Top Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3 shadow-xl">
         <div className="flex items-center gap-3">

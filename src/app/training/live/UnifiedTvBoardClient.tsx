@@ -235,7 +235,7 @@ export default function UnifiedTvBoardClient({
   };
 
   return (
-    <div className="relative min-h-screen bg-[#05070e] text-slate-100 flex flex-col font-sans select-none antialiased">
+    <div className="relative min-h-screen w-full max-w-full overflow-x-hidden bg-[#05070e] text-slate-100 flex flex-col font-sans select-none antialiased">
       {/* Dezente Hintergrund-Lichtquellen für edlen Glassmorphism-Effekt */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
         <div className="absolute top-[10%] left-[15%] w-[30rem] h-[30rem] rounded-full bg-amber-500/[0.05] blur-[140px]" />

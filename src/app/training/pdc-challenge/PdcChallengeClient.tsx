@@ -821,7 +821,7 @@ export default function PdcChallengeClient({
   }, [history, isAdmin, adminPlayerFilter, currentUserName]);
 
   return (
-    <div className="pdc-container max-w-5xl mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-5 animate-fadeIn">
+    <div className="pdc-container w-full max-w-5xl overflow-x-hidden mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-5 animate-fadeIn">
       {/* SHANGHAI FRAGE MODAL (wenn 6 eingegeben wird) */}
       {shanghaiPromptTarget !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">

@@ -932,7 +932,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
   return (
     <div 
-      className="dq-container max-w-[760px] mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4 text-white"
+      className="dq-container w-full max-w-[760px] overflow-x-hidden mx-auto px-2 sm:px-4 py-4 flex flex-col gap-4 text-white"
       style={{ overscrollBehaviorY: 'contain' }}
     >
       {/* EINGABEMASKE: SELBSTEINSCHÄTZUNG DOPPELQUOTE (0 BIS 9 NUMPAD OHNE VORLAGE) */}
