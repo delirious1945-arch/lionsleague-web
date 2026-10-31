@@ -93,6 +93,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [scanProgress, setScanProgress] = useState<number>(0);
   const [snapshots, setSnapshots] = useState<Record<PhaseKey, PhaseSnapshot> | null>(null);
   const [activePhase, setActivePhase] = useState<PhaseKey>('release');
+  // Wenn true, sind die Kurven der Analyse final eingefroren und werden durch Wiedergabe/Seek nicht mehr verändert!
+  const [isAnalysisLocked, setIsAnalysisLocked] = useState<boolean>(false);
 
   // Trajektorien für alle 3 Darts (Modular über biomechanicsEngine berechnet)
   const [trajectories, setTrajectories] = useState<ThrowTrajectory[]>([
@@ -365,6 +367,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     lastValidPoseRef.current = null;
     setSnapshots(null);
     setIsPlaying(false);
+    setIsAnalysisLocked(false);
     autoTriggerStateRef.current = {
       inDrawback: false,
       currentDartSlot: 0,
@@ -452,9 +455,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     const throwIntervals = isSlowMo
       ? [
-          { id: 1, name: 'Dart 1', startSec: 25.5, endSec: 33.5 },
-          { id: 2, name: 'Dart 2', startSec: 70.5, endSec: 78.5 },
-          { id: 3, name: 'Dart 3', startSec: 127.5, endSec: 135.5 },
+          { id: 1, name: 'Dart 1', startSec: 27.5, endSec: 33.5 },
+          { id: 2, name: 'Dart 2', startSec: 81.0, endSec: 87.0 },
+          { id: 3, name: 'Dart 3', startSec: 141.5, endSec: 147.5 },
         ]
       : [
           { id: 1, name: 'Dart 1', startSec: Math.max(0.05, vidDuration * 0.06), endSec: vidDuration * 0.36 },
@@ -585,18 +588,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const finalActivePose = liveFinalPose.isRealDetection ? liveFinalPose : bestDisplayPose;
     setCurrentPose(finalActivePose);
 
-    // Sicherstellen, dass alle 3 Wurfkurven anatomisch an den sichtbaren Ellenbogen & Arm gekoppelt sind
-    const anchoredTrajectories = anchorTrajectoriesToPose(
-      finalActivePose,
-      newTrajectories,
-      videoDims,
-      handedness,
-      mmPerPx,
-      isSlowMo,
-      false
-    );
-
-    setTrajectories(anchoredTrajectories);
+    // Die 3 ermittelten Original-Wurfkurven direkt und unverfälscht fixieren
+    setTrajectories(newTrajectories);
+    setIsAnalysisLocked(true);
     setActiveThrowIdx(-1);
     if (dart1Snapshots) {
       setSnapshots({
@@ -1326,7 +1320,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               >
                 <div
                   style={{
-                    transform: zoomMode === 'upper_body' ? 'scale(2.15)' : 'scale(1)',
+                    transform: zoomMode === 'upper_body' ? 'scale(2.85)' : 'scale(1)',
                     transformOrigin: dynamicZoomOrigin,
                   }}
                   className="w-full h-full relative transition-transform duration-300 ease-out"
@@ -1349,10 +1343,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                         const detected = detectPoseOnCurrentFrame();
                         setCurrentPose(detected);
 
-                        const curAngle = calcElbowAngle(detected);
-                        const curWrist = detected.wrist;
+                        // Wenn bereits analysiert wurde, bleiben die 3 Kurven fest an ihrer Original-Position fixiert!
+                        if (!isAnalysisLocked) {
+                          const curAngle = calcElbowAngle(detected);
+                          const curWrist = detected.wrist;
 
-                        if (autoTriggerEnabled) {
+                          if (autoTriggerEnabled) {
                           const st = autoTriggerStateRef.current;
                           if (curAngle < st.minElbowAngle) {
                             st.minElbowAngle = curAngle;
@@ -1421,6 +1417,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           }
                           return prev;
                         });
+                        }
                       }
                     }}
                     className={`w-full h-full block object-fill transition-opacity duration-200 ${
@@ -1501,21 +1498,25 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                       await ensureLandmarker();
                       const detected = detectPoseOnCurrentFrame();
                       setCurrentPose(detected);
-                      const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
-                      setTrajectories((prev) =>
-                        anchorTrajectoriesToPose(
-                          detected,
-                          prev,
-                          videoDims,
-                          handedness,
-                          mmPerPx,
-                          (duration || 0) > 40,
-                          true
-                        )
-                      );
+                      if (!isAnalysisLocked) {
+                        const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
+                        setTrajectories((prev) =>
+                          anchorTrajectoriesToPose(
+                            detected,
+                            prev,
+                            videoDims,
+                            handedness,
+                            mmPerPx,
+                            (duration || 0) > 40,
+                            true
+                          )
+                        );
+                        setStatusMessage('✓ Gelenkpunkte & Wurfkurven auf dem aktuellen Standbild neu vermessen.');
+                      } else {
+                        setStatusMessage('✓ Gelenkpunkte aktualisiert (Wurfkurven der Analyse bleiben fixiert).');
+                      }
                       setShowOverlay(true);
                       setShowTrajectory(true);
-                      setStatusMessage('✓ Gelenkpunkte & Wurfkurven auf dem aktuellen Standbild neu vermessen.');
                     }}
                     className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold cursor-pointer flex items-center gap-1"
                     title="Punkte auf diesem Standbild neu platzieren"
@@ -1552,13 +1553,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     💾 PNG
                   </button>
                   <button
-                    onClick={() =>
+                    onClick={() => {
+                      setIsAnalysisLocked(false);
                       setTrajectories([
                         { id: 1, points: [], releaseSpeedKmh: 21.4, launchAngleDeg: 14.2, elbowDropMm: -3.2 },
                         { id: 2, points: [], releaseSpeedKmh: 21.1, launchAngleDeg: 13.8, elbowDropMm: -4.1 },
                         { id: 3, points: [], releaseSpeedKmh: 21.6, launchAngleDeg: 14.9, elbowDropMm: -2.8 },
-                      ])
-                    }
+                      ]);
+                    }}
                     className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 cursor-pointer"
                     title="Kurven zurücksetzen"
                   >
