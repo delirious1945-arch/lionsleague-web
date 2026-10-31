@@ -6,6 +6,7 @@ export interface SendApprovalEmailParams {
   summary: string;
   details: string;
   changesDiff?: string;
+  recipientEmail?: string;
 }
 
 function getDb() {
@@ -14,10 +15,10 @@ function getDb() {
   return postgres(dbUrl, { ssl: 'require' });
 }
 
-export async function createApprovalRequestAndSendEmail(params: SendApprovalEmailParams): Promise<{ success: boolean; token?: string; error?: string }> {
+export async function createApprovalRequestAndSendEmail(params: SendApprovalEmailParams): Promise<{ success: boolean; token?: string; error?: string; emailId?: string }> {
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lionsweyhausen.vercel.app').replace(/\/$/, '');
   const resendApiKey = process.env.RESEND_API_KEY;
-  const recipientEmail = 'sebastiankirste@hotmail.com';
+  const recipientEmail = params.recipientEmail || process.env.AGENT_NOTIFICATION_EMAIL || 'delirious1945@gmail.com';
   const token = 'appr_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
 
   // 1. In Supabase agent_approvals Tabelle speichern
@@ -151,7 +152,7 @@ export async function createApprovalRequestAndSendEmail(params: SendApprovalEmai
       return { success: false, token, error: data.message || 'Resend API Fehler' };
     }
 
-    return { success: true, token };
+    return { success: true, token, emailId: data.id };
   } catch (err: any) {
     console.error('Netzwerkfehler beim E-Mail-Versand:', err);
     return { success: false, token, error: err.message };
