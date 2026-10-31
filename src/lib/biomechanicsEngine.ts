@@ -187,12 +187,62 @@ export function smoothTrajectory1Euro(pts: TrajectoryPoint[]): TrajectoryPoint[]
 }
 
 // ----------------------------------------------------------------------------
-// 5. ANATOMISCHE UNTERARM-PENDEL-TRAJEKTORIE (FOLGT 100% DEM ECHTEN ARM!)
+// 4b. CENTRIPETAL CATMULL-ROM SPLINE INTERPOLATION (BUTTERWEICHE VEKTORKURVEN)
 // ----------------------------------------------------------------------------
-// Rekonstruiert aus den echten erkannten Video-Keyframes eines Wurfs (vom
-// tiefsten Ausholen/Drawback über den Scheitelpunkt bis zum Release/Durchschwung)
-// die wahre Rotationskurve des Handgelenks um das echte Ellenbogengelenk.
-// KEINE künstlichen parallelen Linien nach oben!
+export function interpolateCatmullRomSpline(
+  pts: TrajectoryPoint[],
+  subdivisions: number = 3
+): TrajectoryPoint[] {
+  if (pts.length < 3) return pts;
+
+  const result: TrajectoryPoint[] = [];
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+
+    for (let s = 0; s < subdivisions; s++) {
+      if (i > 0 && s === 0) continue;
+      const t = s / subdivisions;
+      const t2 = t * t;
+      const t3 = t2 * t;
+
+      const x =
+        0.5 *
+        (2 * p1.x +
+          (-p0.x + p2.x) * t +
+          (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+          (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+
+      const y =
+        0.5 *
+        (2 * p1.y +
+          (-p0.y + p2.y) * t +
+          (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+          (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+
+      const timeSec = p1.timeSec + (p2.timeSec - p1.timeSec) * t;
+
+      result.push({
+        x: Math.round(x * 10000) / 10000,
+        y: Math.round(y * 10000) / 10000,
+        timeSec: Math.round(timeSec * 1000) / 1000,
+      });
+    }
+  }
+
+  result.push(pts[pts.length - 1]);
+  return result;
+}
+
+// ----------------------------------------------------------------------------
+// 5. ECHTE FEINGRANULARE WURFTRAJEKTORIE (FOLGT 100% DEM ECHTEN ARM!)
+// ----------------------------------------------------------------------------
+// Rekonstruiert aus den echten abgetasteten Video-Frames die wahre Bewegungskurve
+// des Handgelenks vom Ausholen (Drawback) über den Apex bis zum Release!
+// KEINE künstlichen Kreisbögen! 100% authentische Spieler-Biomechanik.
 export function buildAnatomicalArmTrajectory(
   throwFrames: ScannedFrame[],
   dims: { width: number; height: number },
@@ -204,17 +254,39 @@ export function buildAnatomicalArmTrajectory(
   releaseFrame: ScannedFrame;
   followThroughFrame: ScannedFrame;
 } {
-  const aspect = dims.width / (dims.height || 1);
   const dirSign = handedness === 'right' ? 1 : -1;
 
-  // 1. Finde Drawback-Frame (Tiefstes Ausholen: Hand am nächsten am Kopf/Schulter & kleinster Ellenbogenwinkel)
+  if (!throwFrames || throwFrames.length === 0) {
+    const dummy: ScannedFrame = {
+      timeSec: 0,
+      pose: {
+        head: { x: 0.5, y: 0.2 },
+        shoulder: { x: 0.45, y: 0.35 },
+        elbow: { x: 0.55, y: 0.38 },
+        wrist: { x: 0.62, y: 0.3 },
+        hip: { x: 0.45, y: 0.6 },
+      },
+      elbowAngle: 90,
+      deltaAngle: 0,
+      deltaElbowY_mm: 0,
+      deltaShoulder_mm: 0,
+    };
+    return {
+      points: [],
+      drawbackFrame: dummy,
+      releaseFrame: dummy,
+      followThroughFrame: dummy,
+    };
+  }
+
+  // 1. Finde Drawback-Frame (Tiefster Rückzug / Umkehrpunkt zum Gesicht)
   let drawbackIdx = 0;
   let bestDrawbackScore = Infinity;
+  const maxSearchIdx = Math.max(1, Math.floor(throwFrames.length * 0.75));
 
-  // Wir suchen das Aushol-Minimum in den ersten 75% des Wurffensters
-  const maxSearchIdx = Math.max(1, Math.floor(throwFrames.length * 0.78));
   for (let i = 0; i < maxSearchIdx; i++) {
     const f = throwFrames[i];
+    // Hand am weitesten hinten Richtung Schulter/Kopf + kleinster Ellenbogenwinkel
     const wristBackScore = f.elbowAngle + dirSign * (f.pose.wrist.x - f.pose.elbow.x) * 220;
     if (wristBackScore < bestDrawbackScore) {
       bestDrawbackScore = wristBackScore;
@@ -223,7 +295,7 @@ export function buildAnatomicalArmTrajectory(
   }
   const drawbackFrame = throwFrames[drawbackIdx] || throwFrames[0];
 
-  // 2. Finde Follow-Through / Maximale Vorwärtsstreckung NACH dem Drawback
+  // 2. Finde Follow-Through / maximale Vorwärtsstreckung NACH dem Drawback
   let followIdx = Math.min(throwFrames.length - 1, drawbackIdx + 1);
   let bestForwardScore = -Infinity;
   for (let i = drawbackIdx + 1; i < throwFrames.length; i++) {
@@ -236,166 +308,64 @@ export function buildAnatomicalArmTrajectory(
   }
   const followThroughFrame = throwFrames[followIdx] || throwFrames[throwFrames.length - 1];
 
-  // 3. Finde Release-Frame ZWISCHEN Drawback und Follow-Through (strikt nach Drawback!)
+  // 3. Finde Release-Frame (Apex der Handbeschleunigung zwischen Drawback & Follow-Through)
   let releaseIdx = followIdx;
   let bestReleaseDiff = Infinity;
   for (let i = drawbackIdx + 1; i <= followIdx; i++) {
     const f = throwFrames[i];
-    const diff = Math.abs(f.elbowAngle - 118);
-    if (diff < bestReleaseDiff && f.elbowAngle > drawbackFrame.elbowAngle + 12) {
+    const diff = Math.abs(f.elbowAngle - 116);
+    if (diff < bestReleaseDiff && f.elbowAngle > drawbackFrame.elbowAngle + 10) {
       bestReleaseDiff = diff;
       releaseIdx = i;
     }
   }
   const releaseFrame = throwFrames[releaseIdx] || followThroughFrame;
 
-  // 4. Extrahiere alle echten Stützframes vom Ausholen (drawbackIdx) bis zum Vorwärtsschwung
-  const targetEndIdx = Math.max(releaseIdx, Math.min(followIdx, drawbackIdx + 3));
-  const activeSlice = throwFrames.slice(drawbackIdx, targetEndIdx + 1);
+  // 4. ECHTE FEINGRANULARE HANDGELENKS-TRAJEKTORIE:
+  // Wir erfassen die organische Bewegung der Hand ab Beginn des Ausholens (Set-Point)
+  // über den tiefsten Rückzugspunkt bis zum Release-Apex und Durchschwung!
+  const lookbackSteps = Math.min(10, Math.floor(throwFrames.length * 0.15));
+  const startIdx = Math.max(0, drawbackIdx - lookbackSteps);
+  const endIdx = Math.min(throwFrames.length - 1, followIdx + 2);
+  const activeFrames = throwFrames.slice(startIdx, endIdx + 1);
 
-  const wStart = drawbackFrame.pose.wrist;
-  const wEnd = activeSlice[activeSlice.length - 1]?.pose.wrist || releaseFrame.pose.wrist;
-  const realForwardSpan = Math.hypot(wEnd.x - wStart.x, wEnd.y - wStart.y);
-  const forwardDeltaX = dirSign * (wEnd.x - wStart.x);
+  // Echte Handgelenkspositionen extrahieren
+  const rawPts: TrajectoryPoint[] = activeFrames.map((f) => ({
+    x: f.pose.wrist.x,
+    y: f.pose.wrist.y,
+    timeSec: f.timeSec,
+  }));
 
-  // Prüfe die Winkelrotation um den Ellenbogen vom Start zum Ende
-  const exStart = drawbackFrame.pose.elbow.x;
-  const eyStart = drawbackFrame.pose.elbow.y;
-  const startAngleDeg =
-    (Math.atan2(wStart.y - eyStart, (wStart.x - exStart) * aspect) * 180) / Math.PI;
-  const exEnd = releaseFrame.pose.elbow.x;
-  const eyEnd = releaseFrame.pose.elbow.y;
-  const endAngleDeg =
-    (Math.atan2(wEnd.y - eyEnd, (wEnd.x - exEnd) * aspect) * 180) / Math.PI;
-
-  // Ein echter Dartwurf rotiert im Uhrzeigersinn nach vorn (Winkel nimmt bei Rechtshändern um mind. +22° zu)
-  const validForwardRotation = dirSign * (endAngleDeg - startAngleDeg) > 22;
-
-  // 5. Kontinuierliche Unterarm-Pendel-Interpolation entlang der echten Gelenkpunkte:
-  if (
-    activeSlice.length >= 2 &&
-    realForwardSpan > 0.04 &&
-    forwardDeltaX > 0.03 &&
-    validForwardRotation
-  ) {
-    const densePoints: TrajectoryPoint[] = [];
-
-    for (let i = 0; i < activeSlice.length - 1; i++) {
-      const fA = activeSlice[i];
-      const fB = activeSlice[i + 1];
-
-      const exA = fA.pose.elbow.x;
-      const eyA = fA.pose.elbow.y;
-      const dxA = (fA.pose.wrist.x - exA) * aspect;
-      const dyA = fA.pose.wrist.y - eyA;
-      const rA = Math.hypot(dxA, dyA) || 0.11;
-      const angA = Math.atan2(dyA, dxA);
-
-      const exB = fB.pose.elbow.x;
-      const eyB = fB.pose.elbow.y;
-      const dxB = (fB.pose.wrist.x - exB) * aspect;
-      const dyB = fB.pose.wrist.y - eyB;
-      const rB = Math.hypot(dxB, dyB) || 0.11;
-      let angB = Math.atan2(dyB, dxB);
-
-      while (angB - angA > Math.PI) angB -= Math.PI * 2;
-      while (angB - angA < -Math.PI) angB += Math.PI * 2;
-
-      const subSteps = Math.max(4, Math.ceil(18 / Math.max(1, activeSlice.length - 1)));
-      for (let s = 0; s < subSteps; s++) {
-        if (i > 0 && s === 0) continue;
-        const tFrac = s / (subSteps - 1);
-        const curEx = exA + (exB - exA) * tFrac;
-        const curEy = eyA + (eyB - eyA) * tFrac;
-        const curR = rA + (rB - rA) * tFrac;
-        const curAng = angA + (angB - angA) * tFrac;
-
-        const wx = curEx + (curR * Math.cos(curAng)) / aspect;
-        const wy = curEy + curR * Math.sin(curAng);
-        const tSec = fA.timeSec + (fB.timeSec - fA.timeSec) * tFrac;
-
-        densePoints.push({
-          x: Math.round(wx * 10000) / 10000,
-          y: Math.round(wy * 10000) / 10000,
-          timeSec: Math.round(tSec * 1000) / 1000,
+  // Glättung & Entprellung einzelner Tracking-Ausreißer
+  const cleanedPts: TrajectoryPoint[] = [];
+  for (let i = 0; i < rawPts.length; i++) {
+    const cur = rawPts[i];
+    if (i > 0 && i < rawPts.length - 1) {
+      const prev = rawPts[i - 1];
+      const next = rawPts[i + 1];
+      const jump1 = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+      const jump2 = Math.hypot(next.x - cur.x, next.y - cur.y);
+      const smoothDist = Math.hypot(next.x - prev.x, next.y - prev.y);
+      if (jump1 > 0.055 && jump2 > 0.055 && smoothDist < 0.045) {
+        cleanedPts.push({
+          x: (prev.x + next.x) / 2,
+          y: (prev.y + next.y) / 2,
+          timeSec: cur.timeSec,
         });
+        continue;
       }
     }
-
-    return {
-      points: smoothTrajectory1Euro(densePoints),
-      drawbackFrame,
-      releaseFrame,
-      followThroughFrame,
-    };
+    cleanedPts.push(cur);
   }
 
-  // Anatomische Unterarm-Pendelrotation um den ECHTEN erkannten Ellenbogen (ex, ey) und durch das
-  // ECHTE erkannte Handgelenk (wrist) des Spielers:
-  // Die Kurve läuft vom Ausholen (Drawback nahe Gesicht, ~ -110°) exakt durch den erkannten
-  // Handgelenks-Punkt im Kreisbogen nach vorn-rechts zum Release-Apex (~ -16° Richtung Board)!
-  const refPose = releaseFrame.pose || drawbackFrame.pose;
-  const ex = refPose.elbow.x;
-  const ey = refPose.elbow.y;
-  const dx0 = (refPose.wrist.x - ex) * aspect;
-  const dy0 = refPose.wrist.y - ey;
-  const forearmRadius = Math.max(0.085, Math.min(0.175, Math.hypot(dx0, dy0) || 0.115));
+  // 1-Euro adaptive Filterung gegen hochfrequenten Kamerasensor-Jitter
+  const smoothed = smoothTrajectory1Euro(cleanedPts);
 
-  const wristAngleRad = Math.atan2(dy0, dx0);
-  const wristAngleDeg = (wristAngleRad * 180) / Math.PI;
-
-  // Individuelle Wurf-Charakteristik pro Dart (minimale natürliche Winkel- & Radius-Signatur)
-  const dartStartDeltaRad = (throwIndex - 1) * ((4.5 * Math.PI) / 180);
-  const dartEndDeltaRad = (throwIndex - 1) * ((3.2 * Math.PI) / 180);
-  const dartRadiusScale = 1 + (throwIndex - 1) * 0.028;
-
-  let startAng: number;
-  let endAng: number;
-
-  if (dirSign > 0) {
-    // Rechtshänder (wirft nach rechts):
-    // Wenn Handgelenk noch oben im Set-Point/Drawback steht (z.B. -130° bis -40°),
-    // startet der Bogen beim Ausholen (links vom Punkt), läuft DURCH das Handgelenk und schwingt nach rechts (-15°) zum Release!
-    if (wristAngleDeg < -38) {
-      startAng = Math.min((-108 * Math.PI) / 180, wristAngleRad - (22 * Math.PI) / 180) + dartStartDeltaRad;
-      endAng = (-15 * Math.PI) / 180 + dartEndDeltaRad;
-    } else {
-      // Wenn der Arm im Bild bereits nach rechts ausgestreckt ist (> -38°),
-      // startet der Bogen beim Ausholen (-108°) und endet exakt im ausgestreckten Handgelenk!
-      startAng = (-108 * Math.PI) / 180 + dartStartDeltaRad;
-      endAng = Math.max((-22 * Math.PI) / 180, Math.min((8 * Math.PI) / 180, wristAngleRad)) + dartEndDeltaRad;
-    }
-  } else {
-    // Linkshänder (wirft nach links):
-    startAng = (-72 * Math.PI) / 180 - dartStartDeltaRad;
-    endAng = (-165 * Math.PI) / 180 - dartEndDeltaRad;
-  }
-
-  const numPts = 18;
-  const arcPts: TrajectoryPoint[] = [];
-  for (let i = 0; i < numPts; i++) {
-    const prog = i / (numPts - 1);
-    const ang = startAng + (endAng - startAng) * prog;
-    // Unterarm-Radius bleibt anatomisch konstant um das Ellenbogengelenk
-    const r = forearmRadius * dartRadiusScale;
-    // Minimale natürliche Vorwärtsbewegung des Ellenbogens beim Release
-    const curEx = ex + dirSign * Math.pow(prog, 1.5) * 0.01;
-    const curEy = ey;
-
-    const wx = curEx + (r * Math.cos(ang)) / aspect;
-    const wy = curEy + r * Math.sin(ang);
-
-    arcPts.push({
-      x: Math.round(wx * 10000) / 10000,
-      y: Math.round(wy * 10000) / 10000,
-      timeSec:
-        drawbackFrame.timeSec +
-        Math.max(0.18, followThroughFrame.timeSec - drawbackFrame.timeSec) * prog,
-    });
-  }
+  // Feingranulare Catmull-Rom Spline-Interpolation für ultra-flüssige, edle Linienführung
+  const splinePts = interpolateCatmullRomSpline(smoothed, 3);
 
   return {
-    points: smoothTrajectory1Euro(arcPts),
+    points: splinePts,
     drawbackFrame,
     releaseFrame,
     followThroughFrame,
@@ -405,9 +375,6 @@ export function buildAnatomicalArmTrajectory(
 // ----------------------------------------------------------------------------
 // 5b. GARANTIERTE ANKERUNG AN DIE AKTUELLE ECHTE SPIELER-POSE IM BILD
 // ----------------------------------------------------------------------------
-// Stellt sicher, dass die 3 Wurfkurven niemals im Leeren schweben, falls der
-// Spieler zu Beginn des Videos noch nicht am Oche stand oder der Nutzer
-// die Gelenkpunkte per Touch ("Bild vermessen" / Drag) nachjustiert.
 export function anchorTrajectoriesToPose(
   pose: PoseKeypoints,
   trajectories: ThrowTrajectory[],
@@ -417,38 +384,7 @@ export function anchorTrajectoriesToPose(
   isSlowMo: boolean,
   forceReanchor: boolean = false
 ): ThrowTrajectory[] {
-  const dummyFrame: ScannedFrame = {
-    timeSec: 0,
-    pose,
-    elbowAngle: calculateElbowAngle(pose, dims),
-    deltaAngle: 0,
-    deltaElbowY_mm: -3.2,
-    deltaShoulder_mm: 4.1,
-  };
-
-  return [0, 1, 2].map((idx) => {
-    const existing = trajectories[idx];
-    if (!forceReanchor && existing && existing.points.length >= 4) {
-      // Prüfe, ob die bestehende Kurve anatomisch zum sichtbaren Ellenbogen passt
-      const midPt = existing.points[Math.floor(existing.points.length / 2)];
-      const distToElbow = Math.hypot(midPt.x - pose.elbow.x, midPt.y - pose.elbow.y);
-      if (distToElbow > 0.04 && distToElbow < 0.24) {
-        return existing;
-      }
-    }
-
-    const built = buildAnatomicalArmTrajectory([dummyFrame], dims, handedness, idx);
-    const kin = computeThrowKinematics(built.points, dims, mmPerPx, isSlowMo);
-    return {
-      id: idx + 1,
-      points: built.points,
-      releaseSpeedKmh: kin.releaseSpeedKmh,
-      launchAngleDeg: kin.launchAngleDeg,
-      elbowDropMm: existing?.elbowDropMm ?? -3.2,
-      drawbackTimeSec: existing?.drawbackTimeSec ?? 0,
-      releaseTimeSec: existing?.releaseTimeSec ?? 0.25,
-    };
-  });
+  return trajectories;
 }
 
 // ----------------------------------------------------------------------------

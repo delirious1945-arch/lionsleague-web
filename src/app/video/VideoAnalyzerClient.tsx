@@ -505,7 +505,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     for (let throwIdx = 0; throwIdx < throwIntervals.length; throwIdx++) {
       const th = throwIntervals[throwIdx];
-      const numSteps = isSlowMo ? 24 : 16;
+      const numSteps = isSlowMo ? 65 : 45;
       const stepSec = Math.max(0.03, (th.endSec - th.startSec) / numSteps);
 
       const scannedFrames: ScannedFrame[] = [];
@@ -792,7 +792,22 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const color = colors[(tr.id - 1) % colors.length];
 
         ctx.strokeStyle = color;
-        ctx.lineWidth = 2 * scale; // Filigrane 2px Laser-Linie
+        // 1. Soft Glow (Leuchtkontur im Hintergrund)
+        ctx.globalAlpha = 0.22;
+        ctx.lineWidth = 4.2 * scale;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x * w, pts[0].y * h);
+        for (let i = 1; i < pts.length - 1; i++) {
+          const xc = ((pts[i].x + pts[i + 1].x) / 2) * w;
+          const yc = ((pts[i].y + pts[i + 1].y) / 2) * h;
+          ctx.quadraticCurveTo(pts[i].x * w, pts[i].y * h, xc, yc);
+        }
+        ctx.lineTo(pts[pts.length - 1].x * w, pts[pts.length - 1].y * h);
+        ctx.stroke();
+
+        // 2. Feingranulare Laser-Kernlinie
+        ctx.globalAlpha = 0.95;
+        ctx.lineWidth = 1.8 * scale;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
@@ -806,6 +821,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const last = pts[pts.length - 1];
         ctx.lineTo(last.x * w, last.y * h);
         ctx.stroke();
+
+        ctx.globalAlpha = 1.0;
 
         // Startpunkt (Drawback)
         const first = pts[0];
