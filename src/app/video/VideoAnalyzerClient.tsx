@@ -17,7 +17,6 @@ import {
   Gauge,
   Crosshair,
   Target,
-  Move,
   RotateCcw,
   AlertTriangle,
   Sliders,
@@ -128,7 +127,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [showTrajectory, setShowTrajectory] = useState<boolean>(true);
   const [showPlumbLine, setShowPlumbLine] = useState<boolean>(true);
   const [showFootTriangle, setShowFootTriangle] = useState<boolean>(false);
-  const [draggingJoint, setDraggingJoint] = useState<keyof PoseKeypoints | null>(null);
 
   // Gespeicherte Sessions des Spielers (On-Device Verlauf gem. §10.3 AGENTS.md)
   const [savedSessions, setSavedSessions] = useState<SavedBiomechanicsSession[]>([]);
@@ -635,12 +633,16 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   // Dynamischer Zoom-Mittelpunkt: Zentriert den Oberkörper-Zoom exakt auf Schulter/Ellenbogen des erkannten Spielers!
   // Dadurch wird auch bei kleineren Spielern/Kindern niemals über den Kopf ins Leere gezoomt!
   const dynamicZoomOrigin = useMemo(() => {
-    const p = currentPose || baselinePose;
-    if (!p) return '52% 46%';
-    const cx = Math.round(Math.max(25, Math.min(75, ((p.shoulder.x + p.elbow.x) / 2) * 100)));
-    const cy = Math.round(Math.max(28, Math.min(72, p.shoulder.y * 100)));
+    const p = baselinePose || currentPose;
+    if (!p) return '52% 42%';
+    // Horizontal: Mitte zwischen Schulter und Wurfhand (inkl. Wurfbahn nach vorn)
+    const cxRaw = (p.shoulder.x + p.elbow.x + p.wrist.x) / 3;
+    // Vertikal: Mitte zwischen Kopf und Hüfte (Oberkörper komplett im Bild)
+    const cyRaw = (p.head.y + p.shoulder.y + p.hip.y) / 3;
+    const cx = Math.round(Math.max(15, Math.min(85, cxRaw * 100)));
+    const cy = Math.round(Math.max(15, Math.min(85, cyRaw * 100)));
     return `${cx}% ${cy}%`;
-  }, [currentPose, baselinePose]);
+  }, [baselinePose, currentPose]);
 
   // Aktive Kinematik-Kennzahlen für das Diagnose-Cockpit
   const activeMetrics = useMemo(() => {
@@ -974,10 +976,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ];
 
       joints.forEach((j) => {
-        const isSelected = draggingJoint === j.key;
-        ctx.fillStyle = isSelected ? '#f59e0b' : j.color;
+        ctx.fillStyle = j.color;
         ctx.beginPath();
-        ctx.arc(j.x, j.y, (isSelected ? 6.5 : 3.2) * scale, 0, Math.PI * 2);
+        ctx.arc(j.x, j.y, 3.2 * scale, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.lineWidth = 1.1 * scale;
@@ -1011,7 +1012,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     baselinePose,
     showGhostBaseline,
     calcElbowAngle,
-    draggingJoint,
     showTrajectory,
     showPlumbLine,
     showFootTriangle,
@@ -1077,101 +1077,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     try {
       localStorage.setItem(`lions_biomechanics_${user.name}`, JSON.stringify(updated));
     } catch {}
-  };
-
-  // Interaktives Verschieben der Gelenkpunkte
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!currentPose || !showOverlay) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-
-    const keys: (keyof PoseKeypoints)[] = ['wrist', 'elbow', 'shoulder', 'head', 'hip'];
-    let closestKey: keyof PoseKeypoints | null = null;
-    let minDist = 0.065;
-
-    keys.forEach((k) => {
-      const pt = currentPose[k];
-      if (!pt || typeof pt === 'boolean') return;
-      const d = Math.hypot(pt.x - x, pt.y - y);
-      if (d < minDist) {
-        minDist = d;
-        closestKey = k;
-      }
-    });
-
-    if (closestKey) {
-      setDraggingJoint(closestKey);
-      e.currentTarget.setPointerCapture(e.pointerId);
-    }
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!draggingJoint || !currentPose) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.max(0.02, Math.min(0.98, (e.clientX - rect.left) / rect.width));
-    const y = Math.max(0.02, Math.min(0.98, (e.clientY - rect.top) / rect.height));
-
-    const updatedPose: PoseKeypoints = {
-      ...currentPose,
-      [draggingJoint]: { x, y },
-      isRealDetection: true,
-    };
-
-    lastValidPoseRef.current = updatedPose;
-    setCurrentPose(updatedPose);
-
-    if (draggingJoint === 'elbow' || draggingJoint === 'wrist' || draggingJoint === 'shoulder') {
-      const mmPerPx = getMmPerPx(baselinePose || updatedPose, videoDims);
-      setTrajectories((prev) =>
-        anchorTrajectoriesToPose(
-          updatedPose,
-          prev,
-          videoDims,
-          handedness,
-          mmPerPx,
-          (duration || 0) > 40,
-          true
-        )
-      );
-    }
-
-    if (!snapshots || activePhase === 'baseline') {
-      setBaselinePose(updatedPose);
-    }
-
-    if (snapshots && baselinePose) {
-      const baseRef = activePhase === 'baseline' ? updatedPose : baselinePose;
-      const dev = calcDeviations(updatedPose, baseRef);
-      setSnapshots((prev) =>
-        prev
-          ? {
-              ...prev,
-              [activePhase]: {
-                ...prev[activePhase],
-                pose: updatedPose,
-                elbowAngle: dev.elbowAngle,
-                deltaAngle: activePhase === 'baseline' ? 0 : dev.deltaAngle,
-                deltaElbowY_mm: activePhase === 'baseline' ? 0 : dev.deltaElbowY_mm,
-                deltaShoulder_mm: activePhase === 'baseline' ? 0 : dev.deltaShoulder_mm,
-              },
-            }
-          : null
-      );
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (draggingJoint) {
-      setDraggingJoint(null);
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {}
-    }
   };
 
   const togglePlayPause = () => {
@@ -1421,7 +1326,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               >
                 <div
                   style={{
-                    transform: zoomMode === 'upper_body' ? 'scale(1.52)' : 'scale(1)',
+                    transform: zoomMode === 'upper_body' ? 'scale(2.15)' : 'scale(1)',
                     transformOrigin: dynamicZoomOrigin,
                   }}
                   className="w-full h-full relative transition-transform duration-300 ease-out"
@@ -1527,12 +1432,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     ref={canvasRef}
                     width={videoDims.width}
                     height={videoDims.height}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    className={`absolute inset-0 w-full h-full touch-none ${
-                      showOverlay && currentPose ? 'cursor-grab active:cursor-grabbing' : 'pointer-events-none'
-                    }`}
+                    className="absolute inset-0 w-full h-full pointer-events-none"
                   />
                 </div>
               </div>
@@ -1992,11 +1892,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     <Crosshair className="w-3.5 h-3.5" />
                     <span>Aktuelles Bild als Nullpunkt setzen</span>
                   </button>
-
-                  <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
-                    <Move className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Tipp: Gelenkpunkte im Bild lassen sich per Touch/Maus feinjustieren.</span>
-                  </p>
                 </div>
               )}
             </div>
