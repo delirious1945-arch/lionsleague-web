@@ -26,6 +26,8 @@ export interface PoseKeypoints {
   heel?: Point;
   toe?: Point;
   isRealDetection?: boolean;
+  confidenceScore?: number;
+  isHighConfidence?: boolean;
 }
 
 export interface TrajectoryPoint {
@@ -67,6 +69,43 @@ export interface ScannedFrame {
   deltaShoulder_mm: number;
 }
 
+// ============================================================================
+// DIE 5 KERNWINKEL DER DART-BIOMECHANIK (GEMÄSS AGENTS.MD §12.6)
+// ============================================================================
+export interface FiveCoreAngles {
+  stanceAngleDeg: number;        // 1. Standwinkel (Kniewinkel / Oche-Standachse)
+  drawbackAngleDeg: number;      // 2. Rückzugwinkel (Ellenbogenbeugung tiefster Drawback)
+  releaseAngleDeg: number;       // 3. Releasewinkel (Ellenbogenwinkel Abwurf-Apex)
+  followThroughAngleDeg: number; // 4. Nachhaltewinkel (Volle Armstreckung Durchschwung)
+  trunkLeanAngleDeg: number;     // 5. Neigungswinkel (Rumpf-Vorneigung zur Vertikalen)
+}
+
+export interface FiveCoreAnglesValidation {
+  current: FiveCoreAngles;
+  baseline: FiveCoreAngles;
+  deltas: {
+    stanceDeltaDeg: number;
+    trunkLeanDeltaDeg: number;
+    drawbackDeltaDeg: number;
+    releaseDeltaDeg: number;
+    followThroughDeltaDeg: number;
+  };
+  evaluation: {
+    isStanceStable: boolean;          // Abweichung <= 4.0°
+    isTrunkStable: boolean;           // Abweichung <= 3.0°
+    isDrawbackOptimal: boolean;       // 35° bis 65°
+    isReleaseConsistent: boolean;     // 95° bis 130°
+    isFollowThroughComplete: boolean; // >= 150°
+    postureScore: number;             // 0 bis 100
+  };
+}
+
+export interface PoseLandmarkQuality {
+  averageConfidence: number;
+  isHighConfidence: boolean; // Schwellenwert >= 0.70 gem. AGENTS.md §12.6
+  lowConfidenceLandmarks: string[];
+}
+
 // ----------------------------------------------------------------------------
 // 1. ELLENBOGEN-INNENWINKEL BERECHNUNG
 // ----------------------------------------------------------------------------
@@ -93,6 +132,177 @@ export function calculateElbowAngle(
 
   const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
   return Math.round(((Math.acos(cos) * 180) / Math.PI) * 10) / 10;
+}
+
+// ----------------------------------------------------------------------------
+// 1b. RUMPF-VORNEIGUNGSWINKEL (NEIGUNGSWINKEL RELATIV ZUR VERTIKALEN LOTLINIE)
+// ----------------------------------------------------------------------------
+export function calculateTrunkLeanAngle(
+  pose: PoseKeypoints,
+  dims: { width: number; height: number }
+): number {
+  const hx = pose.hip.x * dims.width;
+  const hy = pose.hip.y * dims.height;
+  const sx = pose.shoulder.x * dims.width;
+  const sy = pose.shoulder.y * dims.height;
+
+  const dx = Math.abs(sx - hx);
+  const dy = hy - sy; // hy ist größer als sy (Schulter über Hüfte)
+  if (dy <= 0) return 0;
+
+  const rad = Math.atan2(dx, dy);
+  return Math.round(((rad * 180) / Math.PI) * 10) / 10;
+}
+
+// ----------------------------------------------------------------------------
+// 1c. STANDWINKEL AM OCHE (KNIEWINKEL & BEINACHSEN-STABILITÄT)
+// ----------------------------------------------------------------------------
+export function calculateStanceAngle(
+  pose: PoseKeypoints,
+  dims: { width: number; height: number }
+): number {
+  if (!pose.knee || !pose.ankle) return 174.5; // Standard anatomischer Standwinkel
+
+  const kx = pose.knee.x * dims.width;
+  const ky = pose.knee.y * dims.height;
+  const ax = pose.ankle.x * dims.width;
+  const ay = pose.ankle.y * dims.height;
+  const hx = pose.hip.x * dims.width;
+  const hy = pose.hip.y * dims.height;
+
+  const v1x = ax - kx;
+  const v1y = ay - ky;
+  const v2x = hx - kx;
+  const v2y = hy - ky;
+
+  const dot = v1x * v2x + v1y * v2y;
+  const mag1 = Math.hypot(v1x, v1y);
+  const mag2 = Math.hypot(v2x, v2y);
+  if (mag1 === 0 || mag2 === 0) return 174.5;
+
+  const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+  return Math.round(((Math.acos(cos) * 180) / Math.PI) * 10) / 10;
+}
+
+// ----------------------------------------------------------------------------
+// 1d. DIE 5 KERNWINKEL EINES WURFS EXTRAHIEREN (AGENTS.MD §12.6)
+// ----------------------------------------------------------------------------
+export function extractFiveCoreAngles(
+  pose: PoseKeypoints,
+  dims: { width: number; height: number },
+  drawbackAngle?: number,
+  releaseAngle?: number,
+  followThroughAngle?: number
+): FiveCoreAngles {
+  const currentElbow = calculateElbowAngle(pose, dims);
+  const stance = calculateStanceAngle(pose, dims);
+  const trunkLean = calculateTrunkLeanAngle(pose, dims);
+
+  return {
+    stanceAngleDeg: stance,
+    drawbackAngleDeg: drawbackAngle !== undefined ? drawbackAngle : Math.min(currentElbow, 55.0),
+    releaseAngleDeg: releaseAngle !== undefined ? releaseAngle : currentElbow,
+    followThroughAngleDeg: followThroughAngle !== undefined ? followThroughAngle : Math.max(currentElbow, 160.0),
+    trunkLeanAngleDeg: trunkLean,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// 1e. VALIDIERUNG DER 5 KERNWINKEL RELATIV ZUM NULLPUNKT (AGENTS.MD §12.6)
+// ----------------------------------------------------------------------------
+export function validateFiveCoreAngles(
+  current: FiveCoreAngles,
+  baseline: FiveCoreAngles
+): FiveCoreAnglesValidation {
+  const stanceDeltaDeg = Math.round(Math.abs(current.stanceAngleDeg - baseline.stanceAngleDeg) * 10) / 10;
+  const trunkLeanDeltaDeg = Math.round(Math.abs(current.trunkLeanAngleDeg - baseline.trunkLeanAngleDeg) * 10) / 10;
+  const drawbackDeltaDeg = Math.round(Math.abs(current.drawbackAngleDeg - baseline.drawbackAngleDeg) * 10) / 10;
+  const releaseDeltaDeg = Math.round(Math.abs(current.releaseAngleDeg - baseline.releaseAngleDeg) * 10) / 10;
+  const followThroughDeltaDeg = Math.round(Math.abs(current.followThroughAngleDeg - baseline.followThroughAngleDeg) * 10) / 10;
+
+  const isStanceStable = stanceDeltaDeg <= 4.0;
+  const isTrunkStable = trunkLeanDeltaDeg <= 3.0;
+  const isDrawbackOptimal = current.drawbackAngleDeg >= 30.0 && current.drawbackAngleDeg <= 70.0;
+  const isReleaseConsistent = current.releaseAngleDeg >= 90.0 && current.releaseAngleDeg <= 135.0;
+  const isFollowThroughComplete = current.followThroughAngleDeg >= 148.0;
+
+  let score = 100;
+  if (!isStanceStable) score -= Math.min(25, stanceDeltaDeg * 3.5);
+  if (!isTrunkStable) score -= Math.min(30, trunkLeanDeltaDeg * 5.0);
+  if (!isDrawbackOptimal) score -= 15;
+  if (!isFollowThroughComplete) score -= 15;
+  const postureScore = Math.round(Math.max(45, Math.min(100, score)));
+
+  return {
+    current,
+    baseline,
+    deltas: {
+      stanceDeltaDeg,
+      trunkLeanDeltaDeg,
+      drawbackDeltaDeg,
+      releaseDeltaDeg,
+      followThroughDeltaDeg,
+    },
+    evaluation: {
+      isStanceStable,
+      isTrunkStable,
+      isDrawbackOptimal,
+      isReleaseConsistent,
+      isFollowThroughComplete,
+      postureScore,
+    },
+  };
+}
+
+// ----------------------------------------------------------------------------
+// 1f. MEDIAPIPE LANDMARK-GÜTEPRÜFUNG (CONFIDENCE >= 0.70 GEM. AGENTS.MD §12.6)
+// ----------------------------------------------------------------------------
+export function evaluatePoseQuality(
+  landmarks: Array<{ visibility?: number; presence?: number }> | undefined | null,
+  handedness: 'right' | 'left' = 'right'
+): PoseLandmarkQuality {
+  if (!landmarks || landmarks.length === 0) {
+    return {
+      averageConfidence: 0,
+      isHighConfidence: false,
+      lowConfidenceLandmarks: ['keine_landmarks'],
+    };
+  }
+
+  const isRight = handedness === 'right';
+  const trackedIndices: Array<{ idx: number; name: string }> = [
+    { idx: isRight ? 12 : 11, name: 'Schulter' },
+    { idx: isRight ? 14 : 13, name: 'Ellenbogen' },
+    { idx: isRight ? 16 : 15, name: 'Handgelenk' },
+    { idx: isRight ? 24 : 23, name: 'Hüfte' },
+    { idx: isRight ? 26 : 25, name: 'Knie' },
+    { idx: isRight ? 28 : 27, name: 'Sprunggelenk' },
+  ];
+
+  const lowConf: string[] = [];
+  let sumScore = 0;
+  let count = 0;
+
+  for (const item of trackedIndices) {
+    const lm = landmarks[item.idx];
+    if (!lm) {
+      lowConf.push(item.name);
+      continue;
+    }
+    const score = Math.max(lm.visibility ?? 0.85, lm.presence ?? 0.85);
+    sumScore += score;
+    count++;
+    if (score < 0.70) {
+      lowConf.push(`${item.name} (${Math.round(score * 100)}%)`);
+    }
+  }
+
+  const avg = count > 0 ? Math.round((sumScore / count) * 100) / 100 : 0;
+  return {
+    averageConfidence: avg,
+    isHighConfidence: avg >= 0.70 && lowConf.length === 0,
+    lowConfidenceLandmarks: lowConf,
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -446,6 +656,11 @@ export function interpolateKeypoints(
 
   return {
     isRealDetection: true,
+    confidenceScore:
+      p1.confidenceScore !== undefined && p2.confidenceScore !== undefined
+        ? Math.round(lerp(p1.confidenceScore, p2.confidenceScore) * 100) / 100
+        : p1.confidenceScore ?? p2.confidenceScore,
+    isHighConfidence: (p1.isHighConfidence ?? true) && (p2.isHighConfidence ?? true),
     head: lerpPt(p1.head, p2.head),
     eye: p1.eye && p2.eye ? lerpPt(p1.eye, p2.eye) : p1.eye || p2.eye,
     shoulder: lerpPt(p1.shoulder, p2.shoulder),

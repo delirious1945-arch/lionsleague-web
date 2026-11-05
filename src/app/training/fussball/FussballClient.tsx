@@ -1059,7 +1059,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                   if (shot) {
                     if (shot.type === 'goal') badgeColor = 'bg-emerald-600 text-white border-emerald-400 font-bold';
                     else if (shot.type === 'bull_hit') badgeColor = 'bg-sky-600 text-white border-sky-400 font-bold';
-                    else badgeColor = 'bg-slate-700 text-slate-300 border-white/10';
+                    else badgeColor = 'bg-rose-950/80 text-rose-300 border-rose-600/40 font-bold';
                   } else if (isCurrent) {
                     badgeColor = 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-400/50 scale-105';
                   }
@@ -1116,6 +1116,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                         <button
                           type="button"
                           onClick={() => recordDartAction('goal')}
+                          data-ui-id="FUSSBALL.MATCH.GOAL_HIT_BTN"
                           className="py-6 rounded-2xl bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 border-2 border-emerald-400 text-white font-black text-xl flex flex-col items-center justify-center gap-1 shadow-xl shadow-emerald-900/40 active:scale-95 transition-all cursor-pointer"
                         >
                           <span className="text-3xl">⚽</span>
@@ -1128,11 +1129,12 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                         <button
                           type="button"
                           onClick={() => recordDartAction('goal_miss')}
-                          className="py-6 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 border border-slate-600 text-slate-300 font-bold text-lg flex flex-col items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                          data-ui-id="FUSSBALL.MATCH.GOAL_MISS_BTN"
+                          className="py-6 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/50 hover:to-zinc-900 active:scale-95 border-2 border-zinc-700 hover:border-red-600/70 text-zinc-300 hover:text-red-300 font-bold text-lg flex flex-col items-center justify-center gap-1 shadow-xl shadow-red-950/20 transition-all cursor-pointer group"
                         >
-                          <span className="text-2xl">❌</span>
-                          <span>Daneben</span>
-                          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
+                          <span className="text-2xl group-hover:scale-110 transition-transform">❌</span>
+                          <span className="group-hover:text-red-300 transition-colors">Daneben</span>
+                          <span className="text-[10px] text-zinc-400 group-hover:text-red-400/80 uppercase tracking-widest font-semibold">
                             Ballbesitz bleibt erhalten
                           </span>
                         </button>
@@ -1143,6 +1145,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                         <button
                           type="button"
                           onClick={() => recordDartAction('bull_hit')}
+                          data-ui-id="FUSSBALL.MATCH.BULL_HIT_BTN"
                           className="py-6 rounded-2xl bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 hover:from-sky-500 hover:to-indigo-600 border-2 border-sky-400 text-white font-black text-xl flex flex-col items-center justify-center gap-1 shadow-xl shadow-sky-900/40 active:scale-95 transition-all cursor-pointer"
                         >
                           <span className="text-3xl">🎯</span>
@@ -1155,11 +1158,12 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                         <button
                           type="button"
                           onClick={() => recordDartAction('bull_miss')}
-                          className="py-6 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 border border-slate-600 text-slate-300 font-bold text-lg flex flex-col items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                          data-ui-id="FUSSBALL.MATCH.BULL_MISS_BTN"
+                          className="py-6 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/50 hover:to-zinc-900 active:scale-95 border-2 border-zinc-700 hover:border-red-600/70 text-zinc-300 hover:text-red-300 font-bold text-lg flex flex-col items-center justify-center gap-1 shadow-xl shadow-red-950/20 transition-all cursor-pointer group"
                         >
-                          <span className="text-2xl">❌</span>
-                          <span>Kein Bull</span>
-                          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
+                          <span className="text-2xl group-hover:scale-110 transition-transform">❌</span>
+                          <span className="group-hover:text-red-300 transition-colors">Kein Bull</span>
+                          <span className="text-[10px] text-zinc-400 group-hover:text-red-400/80 uppercase tracking-widest font-semibold">
                             Balleroberung verfehlt
                           </span>
                         </button>

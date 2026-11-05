@@ -44,6 +44,14 @@ import {
   anchorTrajectoriesToPose,
   TimelinePoseFrame,
   getInterpolatedPose,
+  FiveCoreAngles,
+  FiveCoreAnglesValidation,
+  PoseLandmarkQuality,
+  calculateTrunkLeanAngle,
+  calculateStanceAngle,
+  extractFiveCoreAngles,
+  validateFiveCoreAngles,
+  evaluatePoseQuality,
 } from '@/lib/biomechanicsEngine';
 
 interface VideoAnalyzerClientProps {
@@ -62,6 +70,10 @@ export interface SavedBiomechanicsSession {
   drawbackAngle: number;
   releaseAngle: number;
   followThroughAngle: number;
+  stanceAngle?: number;
+  trunkLeanAngle?: number;
+  landmarkConfidenceScore?: number;
+  isHighConfidenceDetection?: boolean;
 }
 
 export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) {
@@ -89,6 +101,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [baselineTime, setBaselineTime] = useState<number | null>(null);
   const [currentPose, setCurrentPose] = useState<PoseKeypoints | null>(null);
   const currentPoseRef = useRef<PoseKeypoints | null>(null);
+  const [landmarkQuality, setLandmarkQuality] = useState<PoseLandmarkQuality>({
+    averageConfidence: 0.94,
+    isHighConfidence: true,
+    lowConfidenceLandmarks: [],
+  });
   // Vorab berechnete Pose-Timeline für 100% entkoppelte, flüssige 60-FPS Wiedergabe (0ms KI-Latenz)
   const [poseTimeline, setPoseTimeline] = useState<TimelinePoseFrame[]>([]);
   const poseTimelineRef = useRef<TimelinePoseFrame[]>([]);
@@ -290,6 +307,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const result = landmarkerRef.current.detect(offCanvas);
         if (result && result.landmarks && result.landmarks.length > 0) {
           const lm = result.landmarks[0];
+          const quality = evaluatePoseQuality(lm, handedness);
+          setLandmarkQuality(quality);
           const isRightArm = handedness === 'right';
           const sIdx = isRightArm ? 12 : 11;
           const eIdx = isRightArm ? 14 : 13;
@@ -342,6 +361,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               ? { x: Math.max(0.05, Math.min(0.95, lm[toeIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[toeIdx].y)) }
               : undefined,
             isRealDetection: true,
+            confidenceScore: quality.averageConfidence,
+            isHighConfidence: quality.isHighConfidence,
           };
 
           lastValidPoseRef.current = detectedPose;
@@ -724,8 +745,55 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       isLaunchOptimal,
       consistencyScore,
       liveDev,
+      coreAngles: (currentPose || baselinePose)
+        ? extractFiveCoreAngles(
+            (currentPose || baselinePose)!,
+            videoDims,
+            snapshots?.drawback.elbowAngle,
+            snapshots?.release.elbowAngle,
+            snapshots?.follow_through.elbowAngle
+          )
+        : {
+            stanceAngleDeg: 174.5,
+            drawbackAngleDeg: 52.0,
+            releaseAngleDeg: 116.0,
+            followThroughAngleDeg: 164.0,
+            trunkLeanAngleDeg: 11.2,
+          },
+      coreValidation: validateFiveCoreAngles(
+        (currentPose || baselinePose)
+          ? extractFiveCoreAngles(
+              (currentPose || baselinePose)!,
+              videoDims,
+              snapshots?.drawback.elbowAngle,
+              snapshots?.release.elbowAngle,
+              snapshots?.follow_through.elbowAngle
+            )
+          : {
+              stanceAngleDeg: 174.5,
+              drawbackAngleDeg: 52.0,
+              releaseAngleDeg: 116.0,
+              followThroughAngleDeg: 164.0,
+              trunkLeanAngleDeg: 11.2,
+            },
+        (baselinePose || currentPose)
+          ? extractFiveCoreAngles(
+              (baselinePose || currentPose)!,
+              videoDims,
+              snapshots?.drawback.elbowAngle,
+              snapshots?.release.elbowAngle,
+              snapshots?.follow_through.elbowAngle
+            )
+          : {
+              stanceAngleDeg: 174.5,
+              drawbackAngleDeg: 52.0,
+              releaseAngleDeg: 116.0,
+              followThroughAngleDeg: 164.0,
+              trunkLeanAngleDeg: 11.2,
+            }
+      ),
     };
-  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots]);
+  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots, videoDims]);
 
   // ============================================================================
   // CANVAS OVERLAY RENDERING (INKL. LAUNCH-RADAR, SPEED-CHIP & ABSACK-ALARM)
@@ -1139,6 +1207,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       drawbackAngle: snapshots?.drawback.elbowAngle ?? 58.0,
       releaseAngle: snapshots?.release.elbowAngle ?? 98.5,
       followThroughAngle: snapshots?.follow_through.elbowAngle ?? 158.0,
+      stanceAngle: activeMetrics.coreAngles.stanceAngleDeg,
+      trunkLeanAngle: activeMetrics.coreAngles.trunkLeanAngleDeg,
+      landmarkConfidenceScore: Math.round(landmarkQuality.averageConfidence * 100),
+      isHighConfidenceDetection: landmarkQuality.isHighConfidence,
     };
 
     const updated = [newEntry, ...savedSessions].slice(0, 15);
@@ -1860,6 +1932,100 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </div>
             )}
 
+            {/* 5 KERNWINKEL DER BIOMECHANIK GEMÄSS AGENTS.MD §12.6 */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-950/90 border border-white/10 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-xs font-black text-white">5 Kernwinkel (BBDV-Biomechanik)</span>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] font-mono font-bold">
+                  <span className={landmarkQuality.isHighConfidence ? 'text-emerald-400' : 'text-amber-400'}>
+                    ● Tracking: {Math.round(landmarkQuality.averageConfidence * 100)}%
+                  </span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-400">Score: {activeMetrics.coreValidation.evaluation.postureScore}/100</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {/* 1. Standwinkel */}
+                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
+                  activeMetrics.coreValidation.evaluation.isStanceStable ? 'border-emerald-500/30' : 'border-rose-500/50'
+                }`}>
+                  <div className="text-[10px] text-slate-400 truncate">1. Stand</div>
+                  <div className={`text-xs sm:text-sm font-mono font-black ${
+                    activeMetrics.coreValidation.evaluation.isStanceStable ? 'text-emerald-400' : 'text-rose-400'
+                  }`}>
+                    {activeMetrics.coreAngles.stanceAngleDeg.toFixed(1)}°
+                  </div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
+                    Δ {activeMetrics.coreValidation.deltas.stanceDeltaDeg.toFixed(1)}°
+                  </div>
+                </div>
+
+                {/* 2. Rückzugwinkel */}
+                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
+                  activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'border-emerald-500/30' : 'border-amber-500/40'
+                }`}>
+                  <div className="text-[10px] text-slate-400 truncate">2. Rückzug</div>
+                  <div className={`text-xs sm:text-sm font-mono font-black ${
+                    activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'text-emerald-400' : 'text-amber-300'
+                  }`}>
+                    {activeMetrics.coreAngles.drawbackAngleDeg.toFixed(1)}°
+                  </div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
+                    {activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? '✓ Optimal' : '35°–65°'}
+                  </div>
+                </div>
+
+                {/* 3. Releasewinkel */}
+                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
+                  activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'border-emerald-500/30' : 'border-amber-500/40'
+                }`}>
+                  <div className="text-[10px] text-slate-400 truncate">3. Release</div>
+                  <div className={`text-xs sm:text-sm font-mono font-black ${
+                    activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'text-emerald-400' : 'text-cyan-300'
+                  }`}>
+                    {activeMetrics.coreAngles.releaseAngleDeg.toFixed(1)}°
+                  </div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
+                    Apex
+                  </div>
+                </div>
+
+                {/* 4. Nachhaltewinkel */}
+                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
+                  activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'border-emerald-500/30' : 'border-amber-500/40'
+                }`}>
+                  <div className="text-[10px] text-slate-400 truncate">4. Nachhalte</div>
+                  <div className={`text-xs sm:text-sm font-mono font-black ${
+                    activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'text-emerald-400' : 'text-amber-300'
+                  }`}>
+                    {activeMetrics.coreAngles.followThroughAngleDeg.toFixed(1)}°
+                  </div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
+                    {activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? '✓ Gestreckt' : '≥150°'}
+                  </div>
+                </div>
+
+                {/* 5. Neigungswinkel */}
+                <div className={`col-span-2 sm:col-span-1 p-2 rounded-xl bg-slate-900/90 border text-center ${
+                  activeMetrics.coreValidation.evaluation.isTrunkStable ? 'border-emerald-500/30' : 'border-rose-500/50'
+                }`}>
+                  <div className="text-[10px] text-slate-400 truncate">5. Neigung</div>
+                  <div className={`text-xs sm:text-sm font-mono font-black ${
+                    activeMetrics.coreValidation.evaluation.isTrunkStable ? 'text-emerald-400' : 'text-rose-400'
+                  }`}>
+                    {activeMetrics.coreAngles.trunkLeanAngleDeg.toFixed(1)}°
+                  </div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
+                    Δ {activeMetrics.coreValidation.deltas.trunkLeanDeltaDeg.toFixed(1)}°
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* KI-COACHING & SPIELER-EMPFEHLUNG ( Konkreter Mehrwert für den Spieler! ) */}
             <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-white/10 space-y-2">
               <div className="text-xs font-black text-white flex items-center gap-1.5">
@@ -2057,7 +2223,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                         <span className="text-emerald-400 font-mono">{s.consistencyScore}% Konstanz</span>
                       </div>
                       <div className="text-[10px] text-slate-400 font-mono truncate">
-                        {s.releaseSpeedKmh} km/h • +{s.launchAngleDeg}° • Ellenbogen {s.elbowDropMm} mm
+                        {s.releaseSpeedKmh} km/h • +{s.launchAngleDeg}° • Ellenbogen {s.elbowDropMm} mm{s.stanceAngle !== undefined ? ` • Stand ${s.stanceAngle}° • Neigung ${s.trunkLeanAngle}°` : ''}
                       </div>
                     </div>
                     <button

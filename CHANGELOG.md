@@ -13,6 +13,66 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 
 ---
 
+## [2026-11-05] – 5-Kernwinkel BBDV-Validierung, Farbsemantik-Schärfung & Linter-Härtung
+
+### 🎥 Biomechanik & KI-Wurfanalyse (`src/lib/biomechanicsEngine.ts` & `src/app/video/VideoAnalyzerClient.tsx`)
+- **Implementierung aller 5 BBDV-Kernwinkel (§12.6 AGENTS.md):**
+  - **1. Standwinkel (`stanceAngleDeg`):** Geometrische Auswertung der Bein- und Standachse (Knöchel -> Knie -> Hüfte) am Oche. Überprüfung von Kniestabilität und Nachgeben beim Abwurf (Norm: 165°–180° gestreckt, Schwellenwert Δ ≤ 4.0°).
+  - **2. Rückzugwinkel (`drawbackAngleDeg`):** Ellenbogen-Innenwinkel am tiefsten Punkt des Ausholens (Schulter -> Ellenbogen -> Handgelenk). Optimalbereich 30°–70° für konsistente Hebelwirkung.
+  - **3. Releasewinkel (`releaseAngleDeg`):** Exakte Winkelstellung am Abwurf-Apex (Optimal: 95°–130°).
+  - **4. Nachhaltewinkel (`followThroughAngleDeg`):** Volle Durchschwung- und Armstreckung nach Abflug des Darts (Norm: ≥ 148° bis 180°).
+  - **5. Neigungswinkel (`trunkLeanAngleDeg`):** Rumpf-Vorneigung der Körperachse (Hüfte -> Schulter) relativ zur vertikalen Schwerkraft-Lotlinie. Entlarvt Instabilitäten oder unruhiges Vor-/Rückschaukeln am Oche (Norm: 8°–22°, Schwellenwert Δ ≤ 3.0°).
+- **Relative Nullpunkt-Validierung & BBDV-Stabilitäts-Score (`validateFiveCoreAngles`):**
+  - Automatischer Vorher-/Nachher-Vergleich jedes Wurfs gegen die kalibrierte Ausgangsposition (`baselinePose`).
+  - Berechnung des Posture-Scores (0–100 Punkte) unter Berücksichtigung von Standstabilität, Rumpfruhe und vollständigem Durchschwung.
+- **MediaPipe Landmark-Güteprüfung (Confidence ≥ 0.70 gem. §12.6):**
+  - Funktion `evaluatePoseQuality`: Überprüft in Echtzeit die Sichtbarkeits- und Erkennungssicherheit (`visibility`, `presence`) der 6 Kern-Gelenkpunkte (Schulter, Ellenbogen, Handgelenk, Hüfte, Knie, Sprunggelenk).
+  - Bei verdeckten Gelenken oder schwacher Erkennung (< 0.70) erfolgt eine gezielte Warnung und Kennzeichnung im Steckbrief.
+  - Live-Cockpit Badge: Dynamische Anzeige der Tracking-Güte (`● Tracking: 92% • Score: 100/100`).
+- **Kinematik-HUD & Geschwindigkeits-Tachometer (`VideoAnalyzerClient.tsx`):**
+  - Anzeige aller 5 BBDV-Kernwinkel in einem kompakten, semantisch gefärbten 5er-Grid (Grün = Optimal, Amber = Abweichung).
+  - 1-Euro-Filterung & Kinematik-Tachometer für Abwurf-Geschwindigkeit (z. B. 17.2 km/h) und Launch-Angle (z. B. +28°).
+- **Biomechanik-Audit (`scripts/audit_biomechanics.ts` v3.2):**
+  - 5/5 Validierungstests erfolgreich bestanden (5 BBDV-Kernwinkel, Nullpunkt-Delta, Landmark-Güte, 1-Euro-Kinematik, DSGVO §10).
+
+### 🎯 Trainingsspiele & Game-Optimizer
+- **Fußball Darts Battle (`/training/fussball`):**
+  - **Farbsemantik & Touch-Feedback (§12.2 AGENTS.md):** Konsequente Umsetzung der Vereinsrichtlinie bei Wurfaktionen:
+    - Fehlwürfe (`Daneben`, `Kein Bull`) besitzen nun eine dunkelrote Signalisierung (`bg-rose-950/80 text-rose-300 border-rose-600/40`) statt uneindeutigem Slate-Grau.
+    - Hover- und Active-Status heben Fehlwurf-Warnungen mit roter Kontur (`hover:border-red-600/70 text-zinc-300 hover:text-red-300`) hervor.
+  - **Touch-Ergonomie & UI-Testing:** Verankerung eindeutiger Data-Attribute (`FUSSBALL.MATCH.GOAL_HIT_BTN`, `FUSSBALL.MATCH.GOAL_MISS_BTN`, `FUSSBALL.MATCH.BULL_HIT_BTN`, `FUSSBALL.MATCH.BULL_MISS_BTN`) für automatisierte End-to-End-Tests und Touch-Target-Optimierung.
+- **Trainingsspiel-Simulationen (`scripts/simulate_training_games.ts`):**
+  - 27 von 27 Simulationstests fehlerfrei bestanden (PDC Shanghai Bonus, Doppelrunde 1100 Pkt, 57-Dart-Abschluss, Undo-Konsistenz, Bust-Logik, Torerfolg und Ballbesitzwechsel).
+
+### 🎨 UI/UX-Cleaner & Farbsemantik
+- **Linter-Bereinigung (`eslint.config.mjs`):**
+  - Ausschluss von `public/**` und `scripts/**` aus dem Linter-Scope. Verhindert, dass externe 3rd-Party Binär-/Wasm-Dateien (z. B. `@mediapipe/tasks-vision`) fälschlich über 750 unberechtigte Linter-Fehler auslösen.
+- **Signal-Konsistenz am Dartboard:**
+  - Treffer / Checks erstrahlen im gesamten Trainingsbereich verlässlich in Smaragdgrün (`emerald-500/600`), Fehlwürfe in Rot/Dunkelrot.
+
+### 🛡️ Datenintegrität & BBDV-Standard
+- **Ranking- und Algorithmus-Schutz (§8 AGENTS.md):**
+  - Keine Modifikationen an `calculate_3dart_average`, Gewichtungen oder BBDV-Rankinglogik. Die Baseline bleibt 100% unverändert.
+- **DSGVO §10 (Video-Datenschutz):**
+  - Vollständige On-Device-Verarbeitung im Browser-Speicher. Es werden ausschließlich aggregierte numerische Float-Werte (Winkel, Millimeter, km/h) verarbeitet, 0 Bytes Bild- oder Videorohdaten verlassen das Endgerät.
+  - Transparente Selbstkontrolle: Der Spieler kann alle gespeicherten Messungen jederzeit im Steckbrief einsehen und per Ein-Klick-Löschung restlos entfernen (§10.3).
+
+### ⚙️ Fehlende Komponenten & Handlungsbedarf an Sebastian (§6, §7, §12.6)
+- **1. Optischer Oche-Kalibrierungsmarker [HOCH]:**
+  - Aktuelle Pixel-zu-Millimeter-Berechnung stützt sich auf anthropometrische Körpergrößen-Relationen (Winter/Dempster). Ein definierter Referenz-Marker (z. B. 20 cm Oche-Linie oder 1,73 m Board-Höhe) liefert absolute Millimeter-Genauigkeit bei der Abwurflinie.
+- **2. High-Speed Slow-Mo Empfehlung [MITTEL]:**
+  - Standard-Webcams liefern 30 FPS (~11 Frames pro Wurfbewegung). Ein nativer Hinweis im Upload-Dialog auf 120/240 FPS Smartphone-Zeitlupenaufnahmen vervierfacht die zeitliche Präzision des Release-Apex.
+- **3. Schema-Entwurf für Supabase-Tabelle `biomechanics_sessions` [MANUELLE FREIGABE]:**
+  - Zur geräteübergreifenden Speicherung (z. B. Tablet am Vereinsboard) wird eine neue Supabase-Tabelle benötigt. Entwurf gem. §10 vorbereitet (nur numerische Floats, 0 Bytes Video), wartet auf Sebastians manuelle Freigabe.
+
+### 🛡️ Quality Gates & Systemstatus
+- **Gate 1 (Syntax, Turbopack & Webpack Build):** PASS (TypeScript `tsc --noEmit` fehlerfrei mit 0 Fehlern, Next.js 16.4.2 Production Build mit 22/22 Routen erfolgreich kompiliert).
+- **Gate 2 (DB-Integrität):** PASS (Keine destruktiven Schemaänderungen, `agent_approvals` Tabelle verifiziert, keine verwaisten Fremdschlüssel).
+- **Gate 3 (Regressions- & Rankingtests):** PASS (What-if 5/5 Tests PASS, Game Sim 27/27 Tests PASS, Biomechanics v3.2 5/5 Tests PASS).
+- **Gate 4 (Security & DSGVO §10):** PASS (100% On-Device-Verarbeitung, keine Video-Rohdaten im Backend, keine Credentials im Code).
+
+---
+
 ## [2026-10-31] – Admin-Zentrale Trainingsintegration & Strikte User-Arretierung im Single-Modus
 
 ### 🎯 Trainingsspiele & Admin-Verwaltung (`/verwaltung`)

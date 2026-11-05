@@ -1,0 +1,29 @@
+{
+  "audit_timestamp": "2026-10-31T11:00:00Z",
+  "video_metadata": {
+    "width": 464,
+    "height": 832,
+    "fps": 58.0,
+    "duration_s": 162.41
+  },
+  "zoom_evaluation": {
+    "status": "PASS",
+    "zoom_ratio": 1.72,
+    "crop_box": [
+      107,
+      41,
+      376,
+      524
+    ]
+  },
+  "jitter_analysis": {
+    "raw_px": 2.33,
+    "smoothed_px": 10.81,
+    "reduction_pct": -364.1
+  },
+  "release_metrics": {
+    "peak_velocity_frame": 19,
+    "launch_angle_deg": 156.4
+  },
+  "consistency_score": 94.8
+}
