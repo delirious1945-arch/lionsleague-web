@@ -514,7 +514,7 @@ export function buildAnatomicalArmTrajectory(
   throwFrames: ScannedFrame[],
   dims: { width: number; height: number },
   handedness: 'right' | 'left' = 'right',
-  _throwIndex: number = 0
+  throwIndex: number = 0
 ): {
   points: TrajectoryPoint[];
   drawbackFrame: ScannedFrame;
@@ -522,6 +522,7 @@ export function buildAnatomicalArmTrajectory(
   followThroughFrame: ScannedFrame;
 } {
   const dirSign = handedness === 'right' ? 1 : -1;
+  void throwIndex;
 
   if (!throwFrames || throwFrames.length === 0) {
     const dummy: ScannedFrame = {
@@ -589,7 +590,7 @@ export function buildAnatomicalArmTrajectory(
     const dt = Math.max(0.005, Math.abs(curF.timeSec - prevF.timeSec));
     const dx = dirSign * (curF.pose.wrist.x - prevF.pose.wrist.x) * dims.width;
     const dy = (curF.pose.wrist.y - prevF.pose.wrist.y) * dims.height;
-    const forwardSpeedPxPerSec = Math.max(0, dx) / dt;
+    const forwardSpeedPxPerSec = Math.hypot(Math.max(0, dx), Math.abs(dy) * 0.4) / dt;
 
     // Anatomischer Plausibilitätsfaktor (Gauß-Filter um den optimalen Release-Bereich 95°–125°)
     const angleClamped = Math.max(70, Math.min(150, curF.elbowAngle));
@@ -669,8 +670,11 @@ export function anchorTrajectoriesToPose(
   _handedness: 'right' | 'left',
   _mmPerPx: number,
   _isSlowMo: boolean,
-  _forceReanchor: boolean = false
+  forceReanchor: boolean = false
 ): ThrowTrajectory[] {
+  if (forceReanchor && trajectories.length > 0) {
+    return [...trajectories];
+  }
   return trajectories;
 }
 

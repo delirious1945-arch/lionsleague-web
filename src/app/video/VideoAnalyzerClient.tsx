@@ -1793,25 +1793,25 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     onClick={togglePlayPause}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs hover:bg-emerald-400 transition-all cursor-pointer"
+                    className="min-h-[52px] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs hover:bg-emerald-400 transition-all cursor-pointer shadow-md"
                   >
-                    {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                     <span>{isPlaying ? 'Pause' : 'Abspielen'}</span>
                   </button>
 
                   <button
                     onClick={() => stepFrame(-0.04)}
-                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer"
+                    className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer"
                     title="Einzelbild zurück"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => stepFrame(0.04)}
-                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer"
+                    className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer"
                     title="Einzelbild vor"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-5 h-5" />
                   </button>
 
                   <button
@@ -1850,14 +1850,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                       setShowOverlay(true);
                       setShowTrajectory(true);
                     }}
-                    className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold cursor-pointer flex items-center gap-1"
+                    className="min-h-[52px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 border border-cyan-500/30 text-xs font-bold cursor-pointer flex items-center gap-1.5"
                     title="Punkte auf diesem Standbild neu platzieren"
                   >
-                    <Crosshair className="w-3.5 h-3.5" />
+                    <Crosshair className="w-4 h-4" />
                     <span>Bild vermessen</span>
                   </button>
 
-                  <div className="flex items-center gap-0.5 bg-slate-950 p-1 rounded-xl border border-white/5">
+                  <div className="min-h-[52px] flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-white/5">
                     {[0.25, 0.5, 1.0].map((rate) => (
                       <button
                         key={rate}
@@ -1865,7 +1865,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           setPlaybackRate(rate);
                           if (videoRef.current) videoRef.current.playbackRate = rate;
                         }}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer ${
+                        className={`min-h-[36px] px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
                           playbackRate === rate
                             ? 'bg-emerald-500 text-slate-950'
                             : 'text-slate-400 hover:text-white'
@@ -1880,9 +1880,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={handleDownloadAnalysisImage}
-                    className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 text-[11px] font-bold cursor-pointer"
+                    className="min-h-[52px] px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 text-xs font-bold cursor-pointer flex items-center gap-1"
                   >
-                    💾 PNG
+                    <Save className="w-3.5 h-3.5" />
+                    <span>PNG</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1893,10 +1894,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                         { id: 3, points: [], releaseSpeedKmh: 21.6, launchAngleDeg: 14.9, elbowDropMm: -2.8 },
                       ]);
                     }}
-                    className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 cursor-pointer"
+                    className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 cursor-pointer"
                     title="Kurven zurücksetzen"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -2074,7 +2075,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     <button
                       key={key}
                       onClick={() => handleSelectPhase(key)}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`min-h-[52px] p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
                         isActive
                           ? 'bg-emerald-500/20 border-emerald-400'
                           : 'bg-slate-950/70 hover:bg-slate-800 border-white/5'
@@ -2124,11 +2125,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
                 {/* 2. Rückzugwinkel */}
                 <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'border-emerald-500/30' : 'border-amber-500/40'
+                  activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'border-emerald-500/30' : 'border-rose-500/50'
                 }`}>
                   <div className="text-[10px] text-slate-400 truncate">2. Rückzug</div>
                   <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'text-emerald-400' : 'text-amber-300'
+                    activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'text-emerald-400' : 'text-rose-400'
                   }`}>
                     {activeMetrics.coreAngles.drawbackAngleDeg.toFixed(1)}°
                   </div>
@@ -2139,11 +2140,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
                 {/* 3. Releasewinkel */}
                 <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'border-emerald-500/30' : 'border-amber-500/40'
+                  activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'border-emerald-500/30' : 'border-rose-500/50'
                 }`}>
                   <div className="text-[10px] text-slate-400 truncate">3. Release</div>
                   <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'text-emerald-400' : 'text-cyan-300'
+                    activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'text-emerald-400' : 'text-rose-400'
                   }`}>
                     {activeMetrics.coreAngles.releaseAngleDeg.toFixed(1)}°
                   </div>
@@ -2154,11 +2155,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
                 {/* 4. Nachhaltewinkel */}
                 <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'border-emerald-500/30' : 'border-amber-500/40'
+                  activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'border-emerald-500/30' : 'border-rose-500/50'
                 }`}>
                   <div className="text-[10px] text-slate-400 truncate">4. Nachhalte</div>
                   <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'text-emerald-400' : 'text-amber-300'
+                    activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'text-emerald-400' : 'text-rose-400'
                   }`}>
                     {activeMetrics.coreAngles.followThroughAngleDeg.toFixed(1)}°
                   </div>
@@ -2233,7 +2234,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             {/* SPEICHERN IM SPIELER-STECKBRIEF */}
             <button
               onClick={handleSaveSessionToProfile}
-              className="w-full py-2.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+              className="w-full min-h-[52px] py-3.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
             >
               {isSaved ? (
                 <>
@@ -2374,6 +2375,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     </div>
                   )}
 
+                  {/* Maßstabsanzeige in mm/px */}
+                  <div className="p-2.5 rounded-xl bg-slate-900/90 border border-emerald-500/20 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Aktiver Kalibrierungs-Maßstab:</span>
+                    <span className="font-mono font-black text-emerald-400">
+                      {getMmPerPx(baselinePose || currentPose, videoDims).toFixed(3)} mm / px
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-1.5 pt-1">
                     <button
                       onClick={() => setShowTrajectory(!showTrajectory)}
@@ -2428,9 +2437,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                       setShowOverlay(true);
                       setStatusMessage('✓ Aktuelles Standbild als neuer Nullpunkt kalibriert.');
                     }}
-                    className="w-full py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full min-h-[52px] py-3 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 border border-cyan-500/30 text-xs font-bold cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <Crosshair className="w-3.5 h-3.5" />
+                    <Crosshair className="w-4 h-4" />
                     <span>Aktuelles Bild als Nullpunkt setzen</span>
                   </button>
                 </div>

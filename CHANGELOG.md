@@ -23,14 +23,17 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
   - Berechnung des räumlichen Streuradius (in mm) aller drei Release-Punkte einer Aufnahme am Abwurf-Apex.
   - Ermittlung der Geschwindigkeits-Standardabweichung ($\sigma_v$ in km/h) und Launch-Angle-Varianz ($\sigma_\theta$ in °).
   - Automatisches Gruppenbildungs-Rating: *EXZELLENT* (Streuradius $\le 14$ mm, PDC/Bundesliga-Niveau), *STABIL* (14–28 mm) und *VERBESSERBAR* (> 28 mm).
-  - Neuer Live-KPI-Chip im Analyse-Cockpit: Zeigt Release-Streuung direkt unter den 2x2 Kennzahlen an.
+  - Neuer Live-KPI-Chip im Analyse-Cockpit: Zeigt Release-Streuung direkt unter den 2x2 Kennzahlen an und sichert die Werte im Spielerprofil.
 - **BBDV-Maßstabs-Kalibrierung (`calculateMmPerPxWithReference`):**
   - Erweiterung des anthropometrischen Modells (Körpergröße nach Winter/Dempster) um einen optischen BBDV-Referenzmodus.
-  - Optionale Kalibrierung gegen die offizielle BBDV-Boardhöhe (1,73 m = 1730 mm Boden bis Bullseye) für absolute Sub-Millimeter-Präzision am Oche.
-  - Schnellumschalter in den einklappbaren Experten-Einstellungen integriert.
-- **Intelligente High-Speed Slow-Mo Erkennung & FPS-Leitfaden:**
-  - Automatisches Slow-Mo-Tagging bei Videos mit gedehnter Zeitachse (> 40s) mit 8-facher Abtastungsdichte.
+  - Optionale Kalibrierung gegen die offizielle BBDV-Boardhöhe (1,73 m = 1730 mm Boden bis Bullseye) sowie 20 cm Oche-Linie für absolute Sub-Millimeter-Präzision am Oche.
+  - Interaktive Pixel-Eingabefelder (`boardRefPixels`, `ocheRefPixels`) in den einklappbaren Experten-Einstellungen integriert.
+- **Intelligente High-Speed Slow-Mo Erkennung & Interaktiver FPS-Umschalter:**
+  - Manueller und automatischer Umschalter (`Auto`, `Slow-Mo 120/240 FPS`, `30 FPS Standard`) im Video-Header.
   - Dezent im Header platzierter Leitfaden-Badge mit Pro-Tipp für 120/240 FPS Smartphone-Zeitlupenaufnahmen zur optimalen zeitlichen Apex-Auflösung.
+- **React 19 & Next.js 16.4 Linter-Härtung (0 Fehler, 0 Warnungen):**
+  - Behebung des React 19 `react-hooks/set-state-in-effect` Fehlers in `VideoAnalyzerClient.tsx` durch entkoppelte Initialisierung.
+  - Beseitigung aller ungenutzten Importe und Variablen in `VideoAnalyzerClient.tsx` und `biomechanicsEngine.ts`.
 - **Erweiterter Biomechanik-Audit (`scripts/audit_biomechanics.ts` v3.3):**
   - 9/9 Validierungstests erfolgreich bestanden (Vektorgeometrie, Standwinkel 180°, Rumpflotlinie, 5 BBDV-Kernwinkel, Landmark-Güte Confidence $\ge 0.70$, Anthropometrische & Boardhöhen-Kalibrierung, Kinematischer Geschwindigkeits-Apex, 3-Dart-Streuungsellipse, DSGVO §10).
 
