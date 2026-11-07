@@ -28,7 +28,7 @@ import {
 import { UserSession } from '@/app/actions';
 import type { PoseLandmarker as PoseLandmarkerType } from '@mediapipe/tasks-vision';
 import {
-  Point,
+
   PoseKeypoints,
   TrajectoryPoint,
   ThrowTrajectory,
@@ -44,14 +44,19 @@ import {
   anchorTrajectoriesToPose,
   TimelinePoseFrame,
   getInterpolatedPose,
-  FiveCoreAngles,
-  FiveCoreAnglesValidation,
+
+
   PoseLandmarkQuality,
-  calculateTrunkLeanAngle,
-  calculateStanceAngle,
+
+
   extractFiveCoreAngles,
   validateFiveCoreAngles,
   evaluatePoseQuality,
+  calculateThreeDartDispersion,
+  calculateMmPerPxWithReference,
+  BBDV_STANDARDS,
+
+  CalibrationMethod,
 } from '@/lib/biomechanicsEngine';
 
 interface VideoAnalyzerClientProps {
@@ -74,6 +79,12 @@ export interface SavedBiomechanicsSession {
   trunkLeanAngle?: number;
   landmarkConfidenceScore?: number;
   isHighConfidenceDetection?: boolean;
+  releaseDispersionMm?: number;
+  speedStdDevKmh?: number;
+  launchAngleStdDevDeg?: number;
+  dispersionRating?: 'EXZELLENT' | 'STABIL' | 'VERBESSERBAR';
+  calibrationMethod?: string;
+  videoMode?: string;
 }
 
 export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) {
@@ -95,10 +106,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [playerHeightCm, setPlayerHeightCm] = useState<number>(180);
   const [handedness, setHandedness] = useState<'right' | 'left'>('right');
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [calibrationMethod, setCalibrationMethod] = useState<CalibrationMethod>('anthropometric');
+  const [boardRefPixels, setBoardRefPixels] = useState<number>(1380);
+  const [ocheRefPixels, setOcheRefPixels] = useState<number>(160);
+  const [videoMode, setVideoMode] = useState<'auto' | 'slowmo' | 'realtime'>('auto');
 
   // Nullpunkt (Baseline) & Aktuelle Pose
   const [baselinePose, setBaselinePose] = useState<PoseKeypoints | null>(null);
-  const [baselineTime, setBaselineTime] = useState<number | null>(null);
+  const baselineTimeRef = useRef<number | null>(null);
   const [currentPose, setCurrentPose] = useState<PoseKeypoints | null>(null);
   const currentPoseRef = useRef<PoseKeypoints | null>(null);
   const [landmarkQuality, setLandmarkQuality] = useState<PoseLandmarkQuality>({
@@ -107,7 +122,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     lowConfidenceLandmarks: [],
   });
   // Vorab berechnete Pose-Timeline für 100% entkoppelte, flüssige 60-FPS Wiedergabe (0ms KI-Latenz)
-  const [poseTimeline, setPoseTimeline] = useState<TimelinePoseFrame[]>([]);
+
   const poseTimelineRef = useRef<TimelinePoseFrame[]>([]);
   const lastValidPoseRef = useRef<PoseKeypoints | null>(null);
 
@@ -164,12 +179,15 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
   // Gespeicherte Sessions aus LocalStorage laden
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(`lions_biomechanics_${user.name}`);
-      if (raw) {
-        setSavedSessions(JSON.parse(raw));
-      }
-    } catch {}
+    const timer = setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(`lions_biomechanics_${user.name}`);
+        if (raw) {
+          setSavedSessions(JSON.parse(raw));
+        }
+      } catch {}
+    }, 0);
+    return () => clearTimeout(timer);
   }, [user.name]);
 
   const stopCameraStream = useCallback(() => {
@@ -188,16 +206,47 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
   // Maßstab mmPerPx über Engine-Modul
   const getMmPerPx = useCallback(
-    (base: PoseKeypoints | null, dims = videoDims): number =>
-      calculateMmPerPx(base, dims, playerHeightCm),
-    [videoDims, playerHeightCm]
+    (base: PoseKeypoints | null, dims = videoDims): number => {
+      if (calibrationMethod === 'board_height') {
+        const px = boardRefPixels > 50 ? boardRefPixels : Math.round(dims.height * 0.72);
+        return calculateMmPerPxWithReference(base, dims, playerHeightCm, {
+          method: 'board_height',
+          referenceDistanceMm: BBDV_STANDARDS.BULLSEYE_HEIGHT_MM,
+          referencePixelLength: px,
+        });
+      }
+      if (calibrationMethod === 'oche_marker') {
+        const px = ocheRefPixels > 20 ? ocheRefPixels : 160;
+        return calculateMmPerPxWithReference(base, dims, playerHeightCm, {
+          method: 'oche_marker',
+          referenceDistanceMm: BBDV_STANDARDS.OCHE_WIDTH_MIN_MM,
+          referencePixelLength: px,
+        });
+      }
+      return calculateMmPerPx(base, dims, playerHeightCm);
+    },
+    [videoDims, playerHeightCm, calibrationMethod, boardRefPixels, ocheRefPixels]
   );
 
   // Millimeter-Abweichungen über Engine-Modul
   const calcDeviations = useCallback(
     (pose: PoseKeypoints, base: PoseKeypoints, dims = videoDims) =>
-      calculatePoseDeviations(pose, base, dims, playerHeightCm),
-    [videoDims, playerHeightCm]
+      calculatePoseDeviations(pose, base, dims, playerHeightCm, {
+        method: calibrationMethod,
+        referenceDistanceMm:
+          calibrationMethod === 'board_height'
+            ? BBDV_STANDARDS.BULLSEYE_HEIGHT_MM
+            : calibrationMethod === 'oche_marker'
+            ? BBDV_STANDARDS.OCHE_WIDTH_MIN_MM
+            : undefined,
+        referencePixelLength:
+          calibrationMethod === 'board_height'
+            ? boardRefPixels
+            : calibrationMethod === 'oche_marker'
+            ? ocheRefPixels
+            : undefined,
+      }),
+    [videoDims, playerHeightCm, calibrationMethod, boardRefPixels, ocheRefPixels]
   );
 
   // Robuste MediaPipe Initialisierung mit automatischem GPU -> CPU Fallback für iOS Safari!
@@ -392,7 +441,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setBaselinePose(null);
     setCurrentPose(null);
     currentPoseRef.current = null;
-    setPoseTimeline([]);
     poseTimelineRef.current = [];
     lastValidPoseRef.current = null;
     setSnapshots(null);
@@ -417,6 +465,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const w = video.videoWidth || 1080;
     const h = video.videoHeight || 1920;
     setVideoDims({ width: w, height: h });
+    setBoardRefPixels(Math.round(h * 0.72));
     setDuration(video.duration || 0);
     video.playbackRate = playbackRate;
     if (video.currentTime === 0) {
@@ -461,7 +510,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     } catch {}
 
     const vidDuration = video.duration || 10;
-    const isSlowMo = vidDuration > 40;
+    const isSlowMo =
+      videoMode === 'slowmo'
+        ? true
+        : videoMode === 'realtime'
+        ? false
+        : vidDuration > 32;
 
     // 3. Zuverlässiges Seek mit echtem Frame-Flush (iOS WebKit braucht ~35ms nach 'seeked' für drawImage!)
     const seekTo = (t: number) =>
@@ -500,7 +554,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const initialDetected = detectPoseOnCurrentFrame();
     const base = baselinePose?.isRealDetection ? baselinePose : initialDetected;
     setBaselinePose(base);
-    setBaselineTime(throwIntervals[0].startSec);
+    baselineTimeRef.current = throwIntervals[0].startSec;
 
     const mmPerPx = getMmPerPx(base, videoDims);
     const newTrajectories: ThrowTrajectory[] = [];
@@ -640,7 +694,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     });
     masterTimeline.sort((a, b) => a.timeSec - b.timeSec);
     poseTimelineRef.current = masterTimeline;
-    setPoseTimeline(masterTimeline);
 
     currentPoseRef.current = finalActivePose;
     setCurrentPose(finalActivePose);
@@ -736,6 +789,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         )
       : 94.8;
 
+    const currentMmPerPx = getMmPerPx(baselinePose || currentPose, videoDims);
+    const dispersion = calculateThreeDartDispersion(trajectories, videoDims, currentMmPerPx);
+
     return {
       speedKmh,
       launchAngle,
@@ -744,6 +800,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       isElbowDropping,
       isLaunchOptimal,
       consistencyScore,
+      dispersion,
       liveDev,
       coreAngles: (currentPose || baselinePose)
         ? extractFiveCoreAngles(
@@ -793,7 +850,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             }
       ),
     };
-  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots, videoDims]);
+  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots, videoDims, getMmPerPx]);
 
   // ============================================================================
   // CANVAS OVERLAY RENDERING (INKL. LAUNCH-RADAR, SPEED-CHIP & ABSACK-ALARM)
@@ -1211,6 +1268,16 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       trunkLeanAngle: activeMetrics.coreAngles.trunkLeanAngleDeg,
       landmarkConfidenceScore: Math.round(landmarkQuality.averageConfidence * 100),
       isHighConfidenceDetection: landmarkQuality.isHighConfidence,
+      releaseDispersionMm: activeMetrics.dispersion.releaseDispersionMm,
+      speedStdDevKmh: activeMetrics.dispersion.speedStdDevKmh,
+      launchAngleStdDevDeg: activeMetrics.dispersion.launchAngleStdDevDeg,
+      dispersionRating: activeMetrics.dispersion.dispersionRating,
+      calibrationMethod: calibrationMethod,
+      videoMode:
+        videoMode === 'slowmo' ||
+        (videoMode === 'auto' && (videoRef.current?.duration ?? 0) > 32)
+          ? 'Slow-Motion'
+          : 'Echtzeit',
     };
 
     const updated = [newEntry, ...savedSessions].slice(0, 15);
@@ -1316,7 +1383,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <span>KI-Wurfstilanalyse</span>
               </h1>
               <span className="text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
-                PRO ENGINE 3.1
+                PRO ENGINE 3.3
               </span>
             </div>
           </div>
@@ -1337,6 +1404,42 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             <span>Auto-Trigger: {autoTriggerEnabled ? 'AN' : 'AUS'}</span>
           </button>
 
+          <div className="inline-flex items-center rounded-xl bg-slate-900 border border-white/10 p-0.5 text-[11px]">
+            <button
+              onClick={() => setVideoMode('auto')}
+              className={`px-2 py-0.5 rounded-lg font-bold cursor-pointer transition-all ${
+                videoMode === 'auto'
+                  ? 'bg-emerald-500 text-slate-950 font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Erkennt Slow-Mo automatisch anhand der Video-Laufzeit"
+            >
+              Auto
+            </button>
+            <button
+              onClick={() => setVideoMode('slowmo')}
+              className={`px-2 py-0.5 rounded-lg font-bold cursor-pointer transition-all ${
+                videoMode === 'slowmo'
+                  ? 'bg-amber-400 text-slate-950 font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Slow-Mo Modus (120/240 FPS Zeitlupe)"
+            >
+              Slow-Mo
+            </button>
+            <button
+              onClick={() => setVideoMode('realtime')}
+              className={`px-2 py-0.5 rounded-lg font-bold cursor-pointer transition-all ${
+                videoMode === 'realtime'
+                  ? 'bg-cyan-400 text-slate-950 font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Echtzeit-Modus (30 FPS Standard)"
+            >
+              30 FPS
+            </button>
+          </div>
+
           <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/5 text-slate-300 border border-white/10 text-[11px] font-bold">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>100% On-Device</span>
@@ -1346,17 +1449,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
       {/* 2. HAUPT-WORKFLOW: 1. Video laden -> 2. 3-Dart-Analyse starten */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
-        <label className="md:col-span-4 flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/85 hover:bg-slate-800/90 border border-white/10 cursor-pointer transition-all shadow-md">
+        <label className="md:col-span-4 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl bg-slate-900/85 hover:bg-slate-800/90 border border-white/10 cursor-pointer transition-all shadow-md">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center shrink-0">
-              <Upload className="w-4 h-4 text-cyan-400" />
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center shrink-0">
+              <Upload className="w-5 h-5 text-cyan-400" />
             </div>
             <div className="min-w-0">
               <div className="text-xs font-black text-white truncate">
                 {hasUploadedVideo ? '1. Anderes Video wählen' : '1. Wurf-Video auswählen'}
               </div>
               <p className="text-[11px] text-slate-400 truncate">
-                {hasUploadedVideo ? 'Aufnahme bereit' : 'Smartphone 9:16 oder 16:9'}
+                {hasUploadedVideo ? 'Aufnahme bereit · 100% On-Device' : '💡 Empfohlen: 60/120/240 FPS Slow-Mo'}
               </p>
             </div>
           </div>
@@ -1366,7 +1469,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         <button
           onClick={handleRunBiomechanicsAnalysis}
           disabled={!hasUploadedVideo || isScanning}
-          className={`md:col-span-8 flex items-center justify-between p-3.5 rounded-2xl border transition-all shadow-lg text-left ${
+          className={`md:col-span-8 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-lg text-left ${
             !hasUploadedVideo
               ? 'bg-slate-900/40 border-white/5 opacity-50 cursor-not-allowed'
               : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 border-emerald-300 hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-[0.99] cursor-pointer'
@@ -1480,20 +1583,40 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           {/* Video-Rahmen */}
           <div className="w-full rounded-3xl bg-slate-950 border-2 border-emerald-500/20 shadow-2xl p-2 flex flex-col items-center justify-center min-h-[340px] overflow-hidden">
             {!hasUploadedVideo ? (
-              <label className="flex flex-col items-center justify-center gap-3 py-14 px-4 text-center cursor-pointer group">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform shadow-lg">
-                  <Upload className="w-7 h-7" />
+              <div className="flex flex-col items-center justify-center py-8 px-4 text-center max-w-md mx-auto w-full">
+                <label className="flex flex-col items-center justify-center gap-3 py-6 px-6 w-full rounded-2xl border-2 border-dashed border-emerald-500/30 hover:border-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer group transition-all shadow-inner">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform shadow-lg">
+                    <Upload className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <p className="text-sm sm:text-base font-black text-white group-hover:text-emerald-300 transition-colors">
+                      Wurf-Video hier auswählen
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                      Smartphone-Video (Hochformat 9:16 oder Querformat 16:9). 100% On-Device & DSGVO-konform.
+                    </p>
+                  </div>
+                  <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
+                </label>
+
+                {/* High-Speed Slow-Mo Empfehlung gem. Biomechanik-Leitplanken */}
+                <div className="mt-4 w-full p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900/90 to-emerald-950/40 border border-cyan-400/30 text-left shadow-md flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center shrink-0 mt-0.5">
+                    <Zap className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
+                      <span>⚡ High-Speed Slow-Mo Empfehlung</span>
+                      <span className="px-1.5 py-0.5 rounded-md bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[10px] font-mono font-bold">
+                        60 / 120 / 240 FPS
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      Für <strong className="text-emerald-300">4x höhere Release-Apex-Präzision</strong>: Nimm deine 3 Darts mit der Smartphone-Zeitlupenfunktion (120 oder 240 FPS) von der Seite auf. Bei 30 FPS vergeht der Release oft zwischen zwei Frames – 120+ FPS erfassen die Abflugdynamik und den exakten Apex auf die Millisekunde genau.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm sm:text-base font-black text-white group-hover:text-emerald-400 transition-colors">
-                    Wurf-Video hier auswählen
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                    Der Oberkörper-Zoom zentriert sich automatisch auf Schulter & Wurfarm. Alle Daten bleiben zu 100% auf deinem Gerät.
-                  </p>
-                </div>
-                <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
-              </label>
+              </div>
             ) : (
               <div
                 style={{ aspectRatio: `${videoDims.width} / ${videoDims.height}` }}
@@ -1801,9 +1924,20 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   Kern-Kennzahlen für {user.name} • 1-Euro-Glättung aktiv
                 </p>
               </div>
-              <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-mono text-xs font-black">
-                {activeMetrics.consistencyScore}% Konstanz
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-mono text-xs font-black">
+                  {activeMetrics.consistencyScore}% Konstanz
+                </span>
+                <span className={`px-2 py-1 rounded-xl border text-[11px] font-mono font-bold ${
+                  activeMetrics.dispersion.dispersionRating === 'EXZELLENT'
+                    ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300'
+                    : activeMetrics.dispersion.dispersionRating === 'STABIL'
+                    ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-300'
+                    : 'bg-amber-500/15 border-amber-400/40 text-amber-300'
+                }`}>
+                  Ø Streuung: {activeMetrics.dispersion.releaseDispersionMm} mm
+                </span>
+              </div>
             </div>
 
             {/* 2x2 KPI-Kacheln (Grün = Optimal/Stabil, Rot = Warnung gem. §12.2 AGENTS.md) */}
@@ -1903,6 +2037,30 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     ? '✓ Ruhige Körperachse'
                     : '⚠️ Vorneigung am Oche'}
                 </div>
+              </div>
+            </div>
+
+            {/* 3-DART RELEASE-STREUUNGSELLIPSE (BBDV-GRUPPIERUNG) */}
+            <div className="p-3 rounded-2xl bg-slate-950/90 border border-emerald-500/20 flex items-center justify-between gap-3 shadow-inner">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shrink-0">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] text-slate-400">3-Dart Release-Streuung</div>
+                  <div className="text-sm font-black font-mono text-white flex items-center gap-2">
+                    <span className={activeMetrics.dispersion.releaseDispersionMm <= 14 ? 'text-emerald-400' : 'text-amber-400'}>
+                      {activeMetrics.dispersion.releaseDispersionMm > 0 ? `${activeMetrics.dispersion.releaseDispersionMm} mm` : 'Wird vermessen...'}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 font-sans font-bold">
+                      {activeMetrics.dispersion.dispersionRating}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right text-[10px] text-slate-400 font-mono">
+                <div>Speed Δ {activeMetrics.dispersion.speedStdDevKmh} km/h</div>
+                <div>Winkel Δ {activeMetrics.dispersion.launchAngleStdDevDeg}°</div>
               </div>
             </div>
 
@@ -2042,6 +2200,16 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   </span>
                 </li>
                 <li className="flex items-start gap-1.5">
+                  <span className={activeMetrics.dispersion.dispersionRating === 'EXZELLENT' ? 'text-emerald-400 font-black' : activeMetrics.dispersion.dispersionRating === 'STABIL' ? 'text-cyan-400 font-black' : 'text-amber-400 font-black'}>
+                    •
+                  </span>
+                  <span>
+                    <strong>3-Dart Streuung ({activeMetrics.dispersion.dispersionRating}):</strong> Apex-Streuradius{' '}
+                    <strong className="text-white">{activeMetrics.dispersion.releaseDispersionMm} mm</strong> mit Tempo-Varianz von{' '}
+                    <strong className="text-white">±{activeMetrics.dispersion.speedStdDevKmh} km/h</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-1.5">
                   <span className={activeMetrics.isElbowDropping ? 'text-rose-400 font-black' : 'text-emerald-400 font-black'}>
                     •
                   </span>
@@ -2138,6 +2306,74 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     </div>
                   </div>
 
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-300 font-bold">Kalibrierung:</span>
+                    <div className="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-xl border border-white/10">
+                      <button
+                        onClick={() => setCalibrationMethod('anthropometric')}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
+                          calibrationMethod === 'anthropometric'
+                            ? 'bg-emerald-500 text-slate-950 font-black'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                        title="Anthropometrisch nach Dempster/Winter (Körpergröße)"
+                      >
+                        Körper
+                      </button>
+                      <button
+                        onClick={() => setCalibrationMethod('board_height')}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
+                          calibrationMethod === 'board_height'
+                            ? 'bg-emerald-500 text-slate-950 font-black'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                        title="BBDV Boardhöhe 1,73 m"
+                      >
+                        Board 1,73m
+                      </button>
+                      <button
+                        onClick={() => setCalibrationMethod('oche_marker')}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
+                          calibrationMethod === 'oche_marker'
+                            ? 'bg-emerald-500 text-slate-950 font-black'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                        title="Oche-Markierung 20 cm"
+                      >
+                        Oche 20cm
+                      </button>
+                    </div>
+                  </div>
+
+                  {calibrationMethod === 'board_height' && (
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900/80 border border-white/5">
+                      <span className="text-[11px] text-slate-300">Board-Höhe Pixel (1,73m):</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          value={boardRefPixels}
+                          onChange={(e) => setBoardRefPixels(Math.max(200, Number(e.target.value) || 1380))}
+                          className="w-16 px-1.5 py-0.5 rounded bg-slate-950 border border-white/15 text-emerald-400 font-mono text-center text-xs"
+                        />
+                        <span className="text-[10px] text-slate-400">px</span>
+                      </div>
+                    </div>
+                  )}
+                  {calibrationMethod === 'oche_marker' && (
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900/80 border border-white/5">
+                      <span className="text-[11px] text-slate-300">Oche-Linie Pixel (20cm):</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          value={ocheRefPixels}
+                          onChange={(e) => setOcheRefPixels(Math.max(40, Number(e.target.value) || 160))}
+                          className="w-16 px-1.5 py-0.5 rounded bg-slate-950 border border-white/15 text-emerald-400 font-mono text-center text-xs"
+                        />
+                        <span className="text-[10px] text-slate-400">px</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-1.5 pt-1">
                     <button
                       onClick={() => setShowTrajectory(!showTrajectory)}
@@ -2223,7 +2459,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                         <span className="text-emerald-400 font-mono">{s.consistencyScore}% Konstanz</span>
                       </div>
                       <div className="text-[10px] text-slate-400 font-mono truncate">
-                        {s.releaseSpeedKmh} km/h • +{s.launchAngleDeg}° • Ellenbogen {s.elbowDropMm} mm{s.stanceAngle !== undefined ? ` • Stand ${s.stanceAngle}° • Neigung ${s.trunkLeanAngle}°` : ''}
+                        {s.releaseSpeedKmh} km/h • +{s.launchAngleDeg}° • Ellenbogen {s.elbowDropMm} mm{s.releaseDispersionMm !== undefined ? ` • Streuung ${s.releaseDispersionMm} mm` : ''}{s.stanceAngle !== undefined ? ` • Stand ${s.stanceAngle}° • Neigung ${s.trunkLeanAngle}°` : ''}
                       </div>
                     </div>
                     <button

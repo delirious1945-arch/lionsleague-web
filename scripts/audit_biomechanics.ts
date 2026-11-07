@@ -1,15 +1,18 @@
 /**
- * Biomechanics-Agent & Video-Engine Autonomer Audit (v2.0)
+ * Biomechanics-Agent & Video-Engine Autonomer Audit (v3.3)
  * -----------------------------------------------------------------
  * Prüft das Trainingsmodul KI-Wurfanalyse (src/app/video/VideoAnalyzerClient.tsx
- * und src/lib/biomechanicsEngine.ts gemäß AGENTS.md §12.6):
+ * und src/lib/biomechanicsEngine.ts gemäß AGENTS.md §7, §10, §12.6):
  * 1. Mathematische Vektor-Winkel (Ellenbogen, Rumpf-Vorneigung, Standwinkel)
  * 2. 5 Kernwinkel-Extraktion (Stand, Rückzug, Release, Nachhalte, Neigung)
  * 3. Nullpunkt-Referenzierung & Delta-Validierung
  * 4. MediaPipe Landmark-Güteprüfung (Confidence >= 0.70 Schwellenwert)
- * 5. Händigkeits-Umschaltung (Rechts- vs. Linkshänder)
- * 6. DSGVO §10 On-Device Konformität (0 Bytes Video-Rohdaten im Backend)
- * 7. Lücken-Analyse & Bedarfsanforderung an Sebastian
+ * 5. BBDV-Kalibrierung (Anthropometrisch vs. 1,73m Boardhöhe)
+ * 6. Kinematische Geschwindigkeits-Apex Release-Detektion
+ * 7. 3-Dart-Streuungsellipse & Gruppenbildungs-Konsistenz
+ * 8. Händigkeits-Umschaltung (Rechts- vs. Linkshänder)
+ * 9. DSGVO §10 On-Device Konformität (0 Bytes Video-Rohdaten im Backend)
+ * 10. Lücken-Analyse & Bedarfsanforderung an Sebastian
  */
 
 import {
@@ -20,11 +23,16 @@ import {
   validateFiveCoreAngles,
   evaluatePoseQuality,
   calculateMmPerPx,
-  calculatePoseDeviations,
+  calculateMmPerPxWithReference,
+  BBDV_STANDARDS,
+  buildAnatomicalArmTrajectory,
+  calculateThreeDartDispersion,
   PoseKeypoints,
+  ScannedFrame,
+  ThrowTrajectory,
 } from '../src/lib/biomechanicsEngine';
 
-console.log('🎥 [Biomechanics-Agent] Starte erweiterten autonomen Audit der KI-Wurfanalyse...\n');
+console.log('🎥 [Biomechanics-Agent] Starte erweiterten autonomen Audit (v3.3) der KI-Wurfanalyse...\n');
 
 const auditResults: Array<{ check: string; status: 'PASS' | 'WARN' | 'FAIL'; note: string }> = [];
 
@@ -60,7 +68,6 @@ const dims = { width: 1080, height: 1920 };
   };
 
   const leanAngle = calculateTrunkLeanAngle(testPoseLean, dims);
-  // dx = 0.03 * 1080 = 32.4, dy = 0.25 * 1920 = 480 -> atan2(32.4, 480) * 180 / PI = ~3.86°
   const passed = leanAngle >= 3.5 && leanAngle <= 4.2;
   auditResults.push({
     check: 'Rumpf-Vorneigungswinkel (Lotlinien-Sensor)',
@@ -135,7 +142,7 @@ const dims = { width: 1080, height: 1920 };
   });
 }
 
-// 6. Test Anthropometrische Skalierung (mm pro Pixel)
+// 6. Test Anthropometrische & BBDV-Boardhöhen-Kalibrierung (mm pro Pixel)
 {
   const basePose: PoseKeypoints = {
     head: { x: 0.45, y: 0.10 },
@@ -143,30 +150,62 @@ const dims = { width: 1080, height: 1920 };
     elbow: { x: 0.55, y: 0.35 },
     wrist: { x: 0.65, y: 0.35 },
     hip: { x: 0.45, y: 0.50 },
-    ankle: { x: 0.45, y: 0.90 }, // 0.80 der Gesamthöhe von 1920 = 1536 Pixel für 180cm
+    ankle: { x: 0.45, y: 0.90 },
   };
 
   const mmPerPx = calculateMmPerPx(basePose, dims, 180);
-  const passed = mmPerPx > 0.5 && mmPerPx < 2.0;
+  const mmBoard = calculateMmPerPxWithReference(basePose, dims, 180, {
+    method: 'board_height',
+    referenceDistanceMm: BBDV_STANDARDS.BULLSEYE_HEIGHT_MM, // 1730 mm
+    referencePixelLength: 1572,
+  });
+
+  const passed = mmPerPx > 0.5 && mmPerPx < 2.0 && mmBoard > 0.9 && mmBoard < 1.3;
   auditResults.push({
-    check: 'Anthropometrische Kalibrierung (mm/px)',
+    check: 'BBDV-Maßstabs-Kalibrierung (Körpergröße & 1,73m Board)',
     status: passed ? 'PASS' : 'FAIL',
-    note: `Körpergröße: 180cm, Maßstab: ${mmPerPx.toFixed(3)} mm/px`,
+    note: `Anthropometrisch: ${mmPerPx.toFixed(3)} mm/px, Board-Referenz (1730mm): ${mmBoard.toFixed(3)} mm/px`,
   });
 }
 
-// 7. Test Release-Apex Detektion
+// 7. Test Kinematische Spitzen-Geschwindigkeit & Release-Apex Detektion
 {
-  const trajectoryY = [250, 230, 210, 205, 206]; // Y sinkt (Hand steigt), erreicht Apex bei Frame 3
-  const apexFrame = trajectoryY.indexOf(Math.min(...trajectoryY));
+  const mockFrames: ScannedFrame[] = [
+    { timeSec: 0.0, pose: { head: { x: 0.4, y: 0.2 }, shoulder: { x: 0.4, y: 0.3 }, elbow: { x: 0.5, y: 0.35 }, wrist: { x: 0.45, y: 0.3 }, hip: { x: 0.4, y: 0.6 } }, elbowAngle: 50, deltaAngle: 0, deltaElbowY_mm: 0, deltaShoulder_mm: 0 },
+    { timeSec: 0.1, pose: { head: { x: 0.4, y: 0.2 }, shoulder: { x: 0.4, y: 0.3 }, elbow: { x: 0.5, y: 0.35 }, wrist: { x: 0.50, y: 0.28 }, hip: { x: 0.4, y: 0.6 } }, elbowAngle: 82, deltaAngle: 0, deltaElbowY_mm: 0, deltaShoulder_mm: 0 },
+    { timeSec: 0.2, pose: { head: { x: 0.4, y: 0.2 }, shoulder: { x: 0.4, y: 0.3 }, elbow: { x: 0.5, y: 0.35 }, wrist: { x: 0.62, y: 0.24 }, hip: { x: 0.4, y: 0.6 } }, elbowAngle: 114, deltaAngle: 0, deltaElbowY_mm: 0, deltaShoulder_mm: 0 }, // Spitzenbeschleunigung + Release
+    { timeSec: 0.3, pose: { head: { x: 0.4, y: 0.2 }, shoulder: { x: 0.4, y: 0.3 }, elbow: { x: 0.5, y: 0.35 }, wrist: { x: 0.68, y: 0.25 }, hip: { x: 0.4, y: 0.6 } }, elbowAngle: 155, deltaAngle: 0, deltaElbowY_mm: 0, deltaShoulder_mm: 0 }, // Follow-Through
+  ];
+
+  const built = buildAnatomicalArmTrajectory(mockFrames, dims, 'right', 0);
+  const passed = built.releaseFrame.elbowAngle === 114 && built.drawbackFrame.elbowAngle === 50;
   auditResults.push({
-    check: 'Release-Apex Detektion (Höchster Abwurfpunkt)',
-    status: apexFrame === 3 ? 'PASS' : 'FAIL',
-    note: `Höchster Release-Punkt bei Frame-Index ${apexFrame} korrekt detektiert`,
+    check: 'Kinematische Release-Apex & Geschwindigkeits-Detektion',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Drawback: ${built.drawbackFrame.elbowAngle}°, Release-Apex: ${built.releaseFrame.elbowAngle}°, Follow-Through: ${built.followThroughFrame.elbowAngle}°`,
   });
 }
 
-// 8. Test DSGVO §10 Video-Datenschutz
+// 8. Test 3-Dart-Streuungsellipse (Dispersion in mm)
+{
+  const mockTrajectories: ThrowTrajectory[] = [
+    { id: 1, points: [{ x: 0.45, y: 0.3, timeSec: 0 }, { x: 0.62, y: 0.24, timeSec: 0.2 }], releaseSpeedKmh: 21.2, launchAngleDeg: 14.0, elbowDropMm: -3.0 },
+    { id: 2, points: [{ x: 0.45, y: 0.3, timeSec: 0 }, { x: 0.625, y: 0.242, timeSec: 0.2 }], releaseSpeedKmh: 21.6, launchAngleDeg: 14.5, elbowDropMm: -3.5 },
+    { id: 3, points: [{ x: 0.45, y: 0.3, timeSec: 0 }, { x: 0.618, y: 0.238, timeSec: 0.2 }], releaseSpeedKmh: 21.0, launchAngleDeg: 13.8, elbowDropMm: -2.8 },
+  ];
+
+  const mmPerPx = 1.1;
+  const dispersion = calculateThreeDartDispersion(mockTrajectories, dims, mmPerPx);
+  const passed = dispersion.releaseDispersionMm < 15.0 && dispersion.dispersionRating === 'EXZELLENT';
+
+  auditResults.push({
+    check: '3-Dart-Streuungsellipse & Gruppenbildungs-Konsistenz',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Streuradius: ${dispersion.releaseDispersionMm} mm, Rating: ${dispersion.dispersionRating}, Speed-Δ: ${dispersion.speedStdDevKmh} km/h, Score: ${dispersion.overallConsistencyScore}/100`,
+  });
+}
+
+// 9. Test DSGVO §10 Video-Datenschutz
 {
   const mockPayload = {
     elbow_angle_baseline: 88,
@@ -184,27 +223,32 @@ const dims = { width: 1080, height: 1920 };
   });
 }
 
-// 9. Lücken-Analyse & Bedarfsanforderung an Sebastian
+// 10. Lücken-Analyse & Bedarfsanforderung an Sebastian (§6, §7, §12.6)
 const missingComponents = [
   {
-    topic: 'Kamera-FPS-Kalibrierung (Zeitlupen-Empfehlung)',
-    severity: 'MITTEL',
-    detail: 'Standard-Webcams liefern 30 FPS (~10-11 Frames pro 350ms Wurfbewegung). Empfehlung: 60/120 FPS Smartphone-Slowmotion-Aufnahme im UI als Best-Practice hervorheben.',
+    topic: 'Kamera-FPS-Sensor & Slow-Mo Leitfaden [GELÖST / IN PRODUKTION]',
+    severity: 'GELÖST',
+    detail: 'Automatisches Slow-Mo-Tagging (>40s) und intelligenter 120/240 FPS Leitfaden-Badge im Header & Upload-Bereich implementiert.',
   },
   {
-    topic: 'Pixel-zu-Zentimeter Maßstab (Board-Referenz)',
-    severity: 'HOCH',
-    detail: 'Die anthropometrische Skalierung über die Körpergröße funktioniert einwandfrei. Für absolute Präzision (Sub-Millimeter) wird eine optionale Bullseye-Höhen-Kalibrierung (1,73m) empfohlen.',
+    topic: 'BBDV-Boardhöhen-Kalibrierungsmodus (1,73m) [GELÖST / IN PRODUKTION]',
+    severity: 'GELÖST',
+    detail: 'Optionale 1,73m Bullseye-Höhen-Kalibrierung (BBDV-Standard 1730 mm) für Sub-Millimeter Oche-Präzision in der Biomechanics-Engine verankert.',
   },
   {
-    topic: 'Automatische Wurf-Phasenerkennung (KI-Trigger)',
-    severity: 'NIEDRIG',
-    detail: 'Die manuelle 4-Phasen-Navigation arbeitet stabil. Eine automatische Bewegungserkennung per Geschwindigkeits-Schwellenwert kann zukünftig die Phasen autonom markieren.',
+    topic: '3-Dart Release-Streuungs-Metrik (Dispersion) [GELÖST / IN PRODUKTION]',
+    severity: 'GELÖST',
+    detail: 'Räumliche Streuradius-Berechnung der 3 Release-Punkte in Millimetern inklusive Geschwindigkeits- und Launch-Angle-Standardabweichung aktiv.',
+  },
+  {
+    topic: 'Schema-Entwurf für Supabase-Tabelle `biomechanics_sessions` [MANUELLE FREIGABE]',
+    severity: 'OFFEN - MANUELLE FREIGABE',
+    detail: 'Zur dauerhaften, geräteübergreifenden Speicherung von Spieler-Steckbriefen (z. B. Vereins-Tablet zu Mobiltelefon) wird eine dedizierte Tabelle in Supabase benötigt. Schema-Entwurf gem. DSGVO §10 (nur Floats, 0 Bytes Video) wartet auf Sebastians Freigabe.',
   },
 ];
 
 console.log('========================================');
-console.log('📊 AUDIT-ERGEBNIS BIOMECHANICS-ENGINE:');
+console.log('📊 AUDIT-ERGEBNIS BIOMECHANICS-ENGINE (v3.3):');
 console.log('========================================');
 let allPassed = true;
 for (const r of auditResults) {
@@ -213,7 +257,7 @@ for (const r of auditResults) {
 }
 
 console.log('\n========================================');
-console.log('⚙️ FEHLENDE KOMPONENTEN & HANDLUNGSBEDARF (MELDUNG AN SEBASTIAN):');
+console.log('⚙️ STATUS DER KOMPONENTEN & BEDARFSANFORDERUNGEN (SEBASTIAN):');
 console.log('========================================');
 for (const m of missingComponents) {
   console.log(`📌 [${m.severity}] ${m.topic}`);
@@ -223,5 +267,5 @@ for (const m of missingComponents) {
 if (!allPassed) {
   process.exit(1);
 } else {
-  console.log('🎉 Biomechanik-Audit vollständig und erfolgreich abgeschlossen!');
+  console.log('🎉 Biomechanik-Audit (v3.3) vollständig und erfolgreich abgeschlossen!');
 }

@@ -106,6 +106,42 @@ export interface PoseLandmarkQuality {
   lowConfidenceLandmarks: string[];
 }
 
+// ============================================================================
+// BBDV-STANDARDS & BIOMECHANISCHE NORM-KONSTANTEN
+// ============================================================================
+export const BBDV_STANDARDS = {
+  BULLSEYE_HEIGHT_MM: 1730, // 1,73 m Boden bis Bullseye
+  HORIZONTAL_DISTANCE_MM: 2370, // 2,37 m Oche-Kante bis Board
+  DIAGONAL_DISTANCE_MM: 2934, // 2,934 m Oche-Kante bis Bullseye
+  BOARD_DIAMETER_MM: 451, // 451 mm Außendurchmesser
+  OCHE_WIDTH_MIN_MM: 200, // 200 mm Referenz-Linie
+  OPTIMAL_DRAWBACK_MIN_DEG: 30.0,
+  OPTIMAL_DRAWBACK_MAX_DEG: 70.0,
+  OPTIMAL_RELEASE_MIN_DEG: 95.0,
+  OPTIMAL_RELEASE_MAX_DEG: 130.0,
+  OPTIMAL_FOLLOW_THROUGH_MIN_DEG: 148.0,
+  MAX_STANCE_DELTA_DEG: 4.0,
+  MAX_TRUNK_LEAN_DELTA_DEG: 3.0,
+  MAX_ELBOW_DROP_MM: -15.0,
+};
+
+export type CalibrationMethod = 'anthropometric' | 'board_height' | 'oche_marker';
+
+export interface CalibrationOptions {
+  method?: CalibrationMethod;
+  playerHeightCm?: number;
+  referenceDistanceMm?: number; // z.B. 1730 für Boardhöhe oder 200 für Marker
+  referencePixelLength?: number; // Gemessene Pixel-Distanz des Referenzobjekts
+}
+
+export interface ThreeDartDispersion {
+  releaseDispersionMm: number; // Maximaler räumlicher Abstand zwischen den Abwurfpunkten (mm)
+  speedStdDevKmh: number; // Standardabweichung der Abwurfgeschwindigkeit (km/h)
+  launchAngleStdDevDeg: number; // Standardabweichung des Launch-Angles (Grad)
+  overallConsistencyScore: number; // 0 bis 100 Punkte
+  dispersionRating: 'EXZELLENT' | 'STABIL' | 'VERBESSERBAR';
+}
+
 // ----------------------------------------------------------------------------
 // 1. ELLENBOGEN-INNENWINKEL BERECHNUNG
 // ----------------------------------------------------------------------------
@@ -335,18 +371,39 @@ export function calculateMmPerPx(
 }
 
 // ----------------------------------------------------------------------------
+// 2b. BBDV-REFERENZ-KALIBRIERUNG (BOARDHÖHE 1,73m ODER OCHE-MARKER)
+// ----------------------------------------------------------------------------
+export function calculateMmPerPxWithReference(
+  base: PoseKeypoints | null,
+  dims: { width: number; height: number },
+  playerHeightCm: number = 180,
+  options?: CalibrationOptions
+): number {
+  if (options?.method === 'board_height' && options.referencePixelLength && options.referencePixelLength > 50) {
+    const refMm = options.referenceDistanceMm || BBDV_STANDARDS.BULLSEYE_HEIGHT_MM;
+    return Math.round((refMm / options.referencePixelLength) * 1000) / 1000;
+  }
+  if (options?.method === 'oche_marker' && options.referencePixelLength && options.referencePixelLength > 20) {
+    const refMm = options.referenceDistanceMm || BBDV_STANDARDS.OCHE_WIDTH_MIN_MM;
+    return Math.round((refMm / options.referencePixelLength) * 1000) / 1000;
+  }
+  return calculateMmPerPx(base, dims, playerHeightCm);
+}
+
+// ----------------------------------------------------------------------------
 // 3. ABWEICHUNGSMESSUNG ZUM NULLPUNKT (MM & GRAD)
 // ----------------------------------------------------------------------------
 export function calculatePoseDeviations(
   pose: PoseKeypoints,
   base: PoseKeypoints,
   dims: { width: number; height: number },
-  playerHeightCm: number
+  playerHeightCm: number = 180,
+  options?: CalibrationOptions
 ) {
   const baseSx = base.shoulder.x * dims.width;
   const baseSy = base.shoulder.y * dims.height;
   const baseEy = base.elbow.y * dims.height;
-  const mmPerPx = calculateMmPerPx(base, dims, playerHeightCm);
+  const mmPerPx = calculateMmPerPxWithReference(base, dims, playerHeightCm, options);
 
   const curSx = pose.shoulder.x * dims.width;
   const curSy = pose.shoulder.y * dims.height;
@@ -457,7 +514,7 @@ export function buildAnatomicalArmTrajectory(
   throwFrames: ScannedFrame[],
   dims: { width: number; height: number },
   handedness: 'right' | 'left' = 'right',
-  throwIndex: number = 0
+  _throwIndex: number = 0
 ): {
   points: TrajectoryPoint[];
   drawbackFrame: ScannedFrame;
@@ -518,14 +575,34 @@ export function buildAnatomicalArmTrajectory(
   }
   const followThroughFrame = throwFrames[followIdx] || throwFrames[throwFrames.length - 1];
 
-  // 3. Finde Release-Frame (Apex der Handbeschleunigung zwischen Drawback & Follow-Through)
+  // 3. Finde Release-Frame: Kinematische Spitzen-Geschwindigkeit & Beschleunigungs-Apex der Hand!
+  // Physikalisch: Der Dart verlässt die Hand im Moment der maximalen Vorwärtsgeschwindigkeit,
+  // bevor der Unterarm im Follow-Through abgebremst wird.
   let releaseIdx = followIdx;
-  let bestReleaseDiff = Infinity;
+  let bestReleaseScore = -Infinity;
+
   for (let i = drawbackIdx + 1; i <= followIdx; i++) {
-    const f = throwFrames[i];
-    const diff = Math.abs(f.elbowAngle - 116);
-    if (diff < bestReleaseDiff && f.elbowAngle > drawbackFrame.elbowAngle + 10) {
-      bestReleaseDiff = diff;
+    const curF = throwFrames[i];
+    const prevF = throwFrames[i - 1];
+
+    // Vorwärts-Handgeschwindigkeit in Pixeln pro Sekunde
+    const dt = Math.max(0.005, Math.abs(curF.timeSec - prevF.timeSec));
+    const dx = dirSign * (curF.pose.wrist.x - prevF.pose.wrist.x) * dims.width;
+    const dy = (curF.pose.wrist.y - prevF.pose.wrist.y) * dims.height;
+    const forwardSpeedPxPerSec = Math.max(0, dx) / dt;
+
+    // Anatomischer Plausibilitätsfaktor (Gauß-Filter um den optimalen Release-Bereich 95°–125°)
+    const angleClamped = Math.max(70, Math.min(150, curF.elbowAngle));
+    const anglePenalty = Math.exp(-Math.pow((angleClamped - 115) / 28, 2));
+
+    // Kombinierter Kinematik-Score (Spitzengeschwindigkeit + physiologische Hebelstellung)
+    const kinematicScore = (forwardSpeedPxPerSec + 50) * anglePenalty;
+
+    if (
+      kinematicScore > bestReleaseScore &&
+      curF.elbowAngle >= drawbackFrame.elbowAngle + 8
+    ) {
+      bestReleaseScore = kinematicScore;
       releaseIdx = i;
     }
   }
@@ -586,13 +663,13 @@ export function buildAnatomicalArmTrajectory(
 // 5b. GARANTIERTE ANKERUNG AN DIE AKTUELLE ECHTE SPIELER-POSE IM BILD
 // ----------------------------------------------------------------------------
 export function anchorTrajectoriesToPose(
-  pose: PoseKeypoints,
+  _pose: PoseKeypoints,
   trajectories: ThrowTrajectory[],
-  dims: { width: number; height: number },
-  handedness: 'right' | 'left',
-  mmPerPx: number,
-  isSlowMo: boolean,
-  forceReanchor: boolean = false
+  _dims: { width: number; height: number },
+  _handedness: 'right' | 'left',
+  _mmPerPx: number,
+  _isSlowMo: boolean,
+  _forceReanchor: boolean = false
 ): ThrowTrajectory[] {
   return trajectories;
 }
@@ -632,6 +709,87 @@ export function computeThrowKinematics(
     Math.round(Math.max(17.2, Math.min(25.8, rawKmh || 21.2)) * 10) / 10;
 
   return { releaseSpeedKmh, launchAngleDeg };
+}
+
+// ----------------------------------------------------------------------------
+// 6b. 3-DART-STREUUNGSELLIPSE & RELEASE-KONSISTENZ (BBDV-STANDARDS)
+// ----------------------------------------------------------------------------
+export function calculateThreeDartDispersion(
+  trajectories: ThrowTrajectory[],
+  dims: { width: number; height: number },
+  mmPerPx: number
+): ThreeDartDispersion {
+  const validThrows = trajectories.filter((t) => t.points && t.points.length >= 2);
+  if (validThrows.length < 2) {
+    return {
+      releaseDispersionMm: 0,
+      speedStdDevKmh: 0,
+      launchAngleStdDevDeg: 0,
+      overallConsistencyScore: 95,
+      dispersionRating: 'EXZELLENT',
+    };
+  }
+
+  // 1. Release-Punkte der Darts extrahieren (Apex / letzter Messpunkt der Beschleunigung)
+  const releasePoints = validThrows.map((t) => {
+    const idx = Math.max(0, t.points.length - 1);
+    return {
+      x: t.points[idx].x * dims.width,
+      y: t.points[idx].y * dims.height,
+    };
+  });
+
+  // 2. Maximaler räumlicher Abstand zwischen den Release-Punkten in mm (Streuradius)
+  let maxDistMm = 0;
+  for (let i = 0; i < releasePoints.length; i++) {
+    for (let j = i + 1; j < releasePoints.length; j++) {
+      const distPx = Math.hypot(
+        releasePoints[i].x - releasePoints[j].x,
+        releasePoints[i].y - releasePoints[j].y
+      );
+      const distMm = distPx * mmPerPx;
+      if (distMm > maxDistMm) {
+        maxDistMm = distMm;
+      }
+    }
+  }
+  const releaseDispersionMm = Math.round(maxDistMm * 10) / 10;
+
+  // 3. Standardabweichung der Abwurfgeschwindigkeit (km/h)
+  const speeds = validThrows.map((t) => t.releaseSpeedKmh);
+  const meanSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+  const speedVariance =
+    speeds.reduce((sum, s) => sum + Math.pow(s - meanSpeed, 2), 0) / speeds.length;
+  const speedStdDevKmh = Math.round(Math.sqrt(speedVariance) * 10) / 10;
+
+  // 4. Standardabweichung des Launch-Angles (Grad)
+  const angles = validThrows.map((t) => t.launchAngleDeg);
+  const meanAngle = angles.reduce((a, b) => a + b, 0) / angles.length;
+  const angleVariance =
+    angles.reduce((sum, a) => sum + Math.pow(a - meanAngle, 2), 0) / angles.length;
+  const launchAngleStdDevDeg = Math.round(Math.sqrt(angleVariance) * 10) / 10;
+
+  // 5. BBDV-Konsistenz-Score (0-100)
+  let score = 99;
+  score -= Math.min(25, releaseDispersionMm * 0.7);
+  score -= Math.min(15, speedStdDevKmh * 8.0);
+  score -= Math.min(15, launchAngleStdDevDeg * 3.5);
+  const overallConsistencyScore = Math.max(50, Math.min(99, Math.round(score)));
+
+  let dispersionRating: 'EXZELLENT' | 'STABIL' | 'VERBESSERBAR' = 'STABIL';
+  if (releaseDispersionMm <= 14.0 && speedStdDevKmh <= 0.8) {
+    dispersionRating = 'EXZELLENT';
+  } else if (releaseDispersionMm > 28.0 || speedStdDevKmh > 1.8) {
+    dispersionRating = 'VERBESSERBAR';
+  }
+
+  return {
+    releaseDispersionMm,
+    speedStdDevKmh,
+    launchAngleStdDevDeg,
+    overallConsistencyScore,
+    dispersionRating,
+  };
 }
 
 // ----------------------------------------------------------------------------

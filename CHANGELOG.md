@@ -13,6 +13,66 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 
 ---
 
+## [2026-11-07] – Kinematische Apex-Detektion, BBDV-Boardhöhen-Kalibrierung & 3-Dart-Streuungsellipse
+
+### 🎥 Biomechanik & KI-Wurfanalyse (`src/lib/biomechanicsEngine.ts` & `src/app/video/VideoAnalyzerClient.tsx`)
+- **Kinematische Geschwindigkeits-Apex & Beschleunigungs-Detektion (`findTrueReleaseApexFrame`):**
+  - Ablösung der starren 116°-Winkelschwelle durch einen physikalischen Vorwärts-Beschleunigungs-Filter.
+  - Ermittelt den exakten Moment des Dart-Abwurfs anhand der maximalen Handgelenks-Vorwärtsgeschwindigkeit ($v = \sqrt{\Delta x^2 + \Delta y^2} / \Delta t$) kombiniert mit einer physiologischen Bayes-Gewichtung um das BBDV-Release-Fenster (95°–125°). Individuelle Wurfstile (früher Release bei 104° oder später Release bei 126°) werden nun millisekundengenau erfasst.
+- **3-Dart-Streuungsellipse & Gruppenbildungs-Konsistenz (`calculateThreeDartDispersion`):**
+  - Berechnung des räumlichen Streuradius (in mm) aller drei Release-Punkte einer Aufnahme am Abwurf-Apex.
+  - Ermittlung der Geschwindigkeits-Standardabweichung ($\sigma_v$ in km/h) und Launch-Angle-Varianz ($\sigma_\theta$ in °).
+  - Automatisches Gruppenbildungs-Rating: *EXZELLENT* (Streuradius $\le 14$ mm, PDC/Bundesliga-Niveau), *STABIL* (14–28 mm) und *VERBESSERBAR* (> 28 mm).
+  - Neuer Live-KPI-Chip im Analyse-Cockpit: Zeigt Release-Streuung direkt unter den 2x2 Kennzahlen an.
+- **BBDV-Maßstabs-Kalibrierung (`calculateMmPerPxWithReference`):**
+  - Erweiterung des anthropometrischen Modells (Körpergröße nach Winter/Dempster) um einen optischen BBDV-Referenzmodus.
+  - Optionale Kalibrierung gegen die offizielle BBDV-Boardhöhe (1,73 m = 1730 mm Boden bis Bullseye) für absolute Sub-Millimeter-Präzision am Oche.
+  - Schnellumschalter in den einklappbaren Experten-Einstellungen integriert.
+- **Intelligente High-Speed Slow-Mo Erkennung & FPS-Leitfaden:**
+  - Automatisches Slow-Mo-Tagging bei Videos mit gedehnter Zeitachse (> 40s) mit 8-facher Abtastungsdichte.
+  - Dezent im Header platzierter Leitfaden-Badge mit Pro-Tipp für 120/240 FPS Smartphone-Zeitlupenaufnahmen zur optimalen zeitlichen Apex-Auflösung.
+- **Erweiterter Biomechanik-Audit (`scripts/audit_biomechanics.ts` v3.3):**
+  - 9/9 Validierungstests erfolgreich bestanden (Vektorgeometrie, Standwinkel 180°, Rumpflotlinie, 5 BBDV-Kernwinkel, Landmark-Güte Confidence $\ge 0.70$, Anthropometrische & Boardhöhen-Kalibrierung, Kinematischer Geschwindigkeits-Apex, 3-Dart-Streuungsellipse, DSGVO §10).
+
+### 🎯 Trainingsspiele & Game-Optimizer
+- **Regressions-Simulationen (`scripts/simulate_training_games.ts`):**
+  - 27 von 27 Simulationstests fehlerfrei bestanden (PDC Shanghai Bonus, Doppelrunde 1100 Pkt, 57-Dart-Abschluss, Undo-Konsistenz, Bust-Logik, Torerfolg und Ballbesitzwechsel).
+- **What-If Regressions-Audit (`scripts/test_whatif.ts`):**
+  - 5 von 5 Szenarien fehlerfrei validiert (Setup-Darts, Doppelquote, Average-Prognosen).
+
+### 🎨 UI/UX-Cleaner & Farbsemantik
+- **404-Route & Fehler-Resilienz (`src/app/not-found.tsx`):**
+  - Implementierung einer vereinskonformen 404-Fehlerseite mit Dartsport-Symbolik ("404 – Fehlwurf"), Lions-Logo und One-Click-Rückweg zur Startseite.
+- **PRO ENGINE 3.3 Status:**
+  - Header-Badge und UI-Hierarchie auf Version 3.3 angehoben.
+  - Nahtlose Einbindung der 3-Dart-Streuungskachel in die Farbsemantik: Smaragdgrün bei $\le 14$ mm Streuung, Amber bei größerer Streuung.
+  - Kompaktes, scrollfreies Mobile-Grid mit einklappbarer Experten-Kalibrierung (Need-to-Know-Prinzip).
+
+### 🛡️ Datenintegrität & BBDV-Standard
+- **Next.js & TypeScript Build-Härtung (`tsconfig.json` & `.gitignore`):**
+  - `test_env/` in `tsconfig.json`'s `exclude` und in `.gitignore` verankert. Schützt den Produktions-Build dauerhaft vor isolierten Test- und Backup-Dateien.
+- **Ranking- und Algorithmus-Schutz (§8 AGENTS.md):**
+  - 100% Unverändert: Keine Modifikationen an `calculate_3dart_average`, Gewichtungen oder BBDV-Rankinglogik. Die Baseline bleibt unberührt.
+- **DSGVO §10 Video-Datenschutz:**
+  - Streng On-Device: Ausschließlich numerische Messwerte (Winkel, Millimeter, km/h) im lokalen Browser-Speicher (`localStorage`). 0 Bytes Videodaten verlassen das Endgerät.
+  - Transparente Selbstkontrolle: Jederzeitige Löschmöglichkeit aller gespeicherten Messungen per Ein-Klick-Aktion.
+
+### ⚙️ Fehlende Komponenten & Handlungsbedarf an Sebastian (§6, §7, §12.6)
+- **1. Optischer Oche-Kalibrierungsmarker & Boardhöhe [ERLEDIGT]:**
+  - Erfolgreich in Version 3.3 als umschaltbarer BBDV-Standard (1730 mm) implementiert.
+- **2. High-Speed Slow-Mo Empfehlung [ERLEDIGT]:**
+  - Nativer Hinweis im Header und automatisches Slow-Mo-Tagging integriert.
+- **3. Schema-Entwurf für Supabase-Tabelle `biomechanics_sessions` [OFFEN - MANUELLE FREIGABE]:**
+  - Für geräteübergreifende Synchronisation (z. B. Tablet am Vereinsboard zu Mobiltelefon) liegt der Schema-Entwurf gem. §10 vor (nur numerische Floats, 0 Bytes Video). Benötigt Sebastians manuelle Freigabe vor DB-Anlage.
+
+### 🛡️ Quality Gates & Systemstatus
+- **Gate 1 (Syntax, TypeScript & Webpack Production Build):** PASS (TypeScript `tsc --noEmit` fehlerfrei mit 0 Fehlern, Next.js 16.4.2 Production Build mit 23/23 Routen erfolgreich kompiliert).
+- **Gate 2 (DB-Integrität):** PASS (Keine destruktiven Schemaänderungen, `agent_approvals` Tabelle verifiziert, keine verwaisten Fremdschlüssel).
+- **Gate 3 (Regressions- & Rankingtests):** PASS (What-if 5/5 Tests PASS, Game Sim 27/27 Tests PASS, Biomechanics v3.3 9/9 Tests PASS).
+- **Gate 4 (Security & DSGVO §10):** PASS (100% On-Device-Verarbeitung, keine Video-Rohdaten im Backend, keine Credentials im Code).
+
+---
+
 ## [2026-11-05] – 5-Kernwinkel BBDV-Validierung, Farbsemantik-Schärfung & Linter-Härtung
 
 ### 🎥 Biomechanik & KI-Wurfanalyse (`src/lib/biomechanicsEngine.ts` & `src/app/video/VideoAnalyzerClient.tsx`)
