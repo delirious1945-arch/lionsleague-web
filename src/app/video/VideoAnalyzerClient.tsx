@@ -1405,7 +1405,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           ctx.fill();
         });
 
-        // 4. Die 7 virtuellen Biomechanik-Knoten (#33..#39)
+        // 4. Die 7 virtuellen Basis-Knoten (#33..#39)
         const synthList: Array<{ pt: { x: number; y: number }; label: string }> = [
           { pt: sn.dartGripPoint, label: 'P_Dart' },
           { pt: sn.supplyHandCenter, label: 'P_Supply' },
@@ -1424,6 +1424,26 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           ctx.arc(s.pt.x * w, s.pt.y * h, 3.2 * scale, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillText(s.label, s.pt.x * w + 5 * scale, s.pt.y * h + 3 * scale);
+        });
+
+        // 5. +30 Hochauflösende Sub-Punkte: Handgelenk (W1..W10), Arm (A1..A10), Ellenbogen (E1..E10)
+        rig.wristCluster10?.forEach((node) => {
+          ctx.fillStyle = '#22d3ee'; // Cyan für +10 Handgelenk-Punkte
+          ctx.beginPath();
+          ctx.arc(node.x * w, node.y * h, 2.3 * scale, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        rig.armCluster10?.forEach((node) => {
+          ctx.fillStyle = '#34d399'; // Smaragd für +10 Arm-Fachwerkpunkte
+          ctx.beginPath();
+          ctx.arc(node.x * w, node.y * h, 2.3 * scale, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        rig.elbowCluster10?.forEach((node) => {
+          ctx.fillStyle = '#fb923c'; // Orange/Gold für +10 Ellenbogen-Kapselpunkte
+          ctx.beginPath();
+          ctx.arc(node.x * w, node.y * h, 2.4 * scale, 0, Math.PI * 2);
+          ctx.fill();
         });
       }
     }
@@ -2782,9 +2802,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
                           : 'bg-white/5 text-slate-400 border-white/10'
                       }`}
-                      title="Blendet alle 40 Hintergrund-Messpunkte (33 MediaPipe + 7 virtuelle Knoten) als Röntgenblick ein"
+                      title="Blendet alle 70 Hintergrund-Messpunkte (33 MediaPipe + 7 Basis + je 10 an Handgelenk, Arm & Ellenbogen) als Röntgenblick ein"
                     >
-                      🔬 40-Punkte-Hintergrundnetz (Debug): {showHiddenRigDebug ? 'SICHTBAR' : 'IM HINTERGRUND'}
+                      🔬 70-Punkte-Hintergrundnetz (Debug): {showHiddenRigDebug ? 'SICHTBAR' : 'IM HINTERGRUND'}
                     </button>
                   </div>
 

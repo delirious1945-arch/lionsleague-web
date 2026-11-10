@@ -23,7 +23,13 @@ export interface RawLandmarkPoint {
   visibility?: number;
 }
 
-// 7 virtuelle biomechanische Stützknoten (Punkte #33 bis #39 -> Gesamt: 40-Punkte-Körpernetz)
+export interface SubClusterNode {
+  code: string; // z.B. W1..W10, A1..A10, E1..E10
+  label: string; // Anatomische Bezeichnung
+  x: number;
+  y: number;
+}
+
 export interface SyntheticBiomechanicalNodes {
   dartGripPoint: Point;      // #33 P_Dart: Gewichteter Schwerpunkt aus Daumen (22), Zeigefinger (20) & Handgelenk (16)
   supplyHandCenter: Point;   // #34 P_Supply: Schwerpunkt der Dart-Haltehand / Übergabehand (15, 17, 19, 21)
@@ -35,13 +41,16 @@ export interface SyntheticBiomechanicalNodes {
 }
 
 export interface HiddenBiomechanicalRig {
-  rawLandmarks: RawLandmarkPoint[]; // Alle 33 nativen MediaPipe-Punkte (0..32)
-  syntheticNodes: SyntheticBiomechanicalNodes; // + 7 virtuelle Stützknoten = 40 Punkte
-  wristSnapAngleDeg: number; // Handgelenks-Kippwinkel (Unterarm 14->16 zu Fingerachse 16->33)
-  handoverDistanceNorm: number; // Normalisierter Abstand zwischen Wurfhand (#33) und Haltehand (#34)
-  isBimanualHandover: boolean; // True wenn Wurfhand & Haltehand auf Hüfthöhe den Dart übergeben
-  upperArmLengthNorm: number; // Aktuelle normalisierte Oberarmlänge (12 <-> 14)
-  forearmLengthNorm: number; // Aktuelle normalisierte Unterarmlänge (14 <-> 16)
+  rawLandmarks: RawLandmarkPoint[];        // Alle 33 nativen MediaPipe-Punkte (0..32)
+  syntheticNodes: SyntheticBiomechanicalNodes; // + 7 virtuelle Basis-Stützknoten (#33..#39)
+  wristCluster10: SubClusterNode[];        // + 10 hochauflösende Handgelenk- & Handwurzel-Punkte (W1..W10)
+  armCluster10: SubClusterNode[];          // + 10 hochauflösende Oberarm- & Unterarm-Fachwerkpunkte (A1..A10)
+  elbowCluster10: SubClusterNode[];        // + 10 hochauflösende Ellenbogen-Gelenkkapsel-Punkte (E1..E10) -> Gesamt: 70 Punkte!
+  wristSnapAngleDeg: number;               // Handgelenks-Kippwinkel (Unterarm 14->16 zu Fingerachse 16->33)
+  handoverDistanceNorm: number;            // Normalisierter Abstand zwischen Wurfhand (#33) und Haltehand (#34)
+  isBimanualHandover: boolean;             // True wenn Wurfhand & Haltehand auf Hüfthöhe den Dart übergeben
+  upperArmLengthNorm: number;              // Aktuelle normalisierte Oberarmlänge (12 <-> 14)
+  forearmLengthNorm: number;               // Aktuelle normalisierte Unterarmlänge (14 <-> 16)
 }
 
 export interface PoseKeypoints {
@@ -534,6 +543,265 @@ export function buildHiddenBiomechanicalRig(
     y: clamp((elbowRaw.y + wristStabilized.y) * 0.5),
   };
 
+  // ============================================================================
+  // 3b. +30 HOCHAUFLÖSENDE SUB-PUNKTE FÜR HANDGELENK (+10), ARM (+10) & ELLENBOGEN (+10)
+  // ============================================================================
+  // Richtungs- und Normalenvektoren für anatomische Querschnitts-Geometrie:
+  const uaDx = elbowRaw.x - shoulderThrow.x;
+  const uaDy = elbowRaw.y - shoulderThrow.y;
+  const uaLen = Math.hypot(uaDx, uaDy) || 0.12;
+  const uaUx = uaDx / uaLen;
+  const uaUy = uaDy / uaLen;
+
+  const faDx = wristStabilized.x - elbowRaw.x;
+  const faDy = wristStabilized.y - elbowRaw.y;
+  const faLen = Math.hypot(faDx, faDy) || 0.11;
+  const faUx = faDx / faLen;
+  const faUy = faDy / faLen;
+
+  // Winkelhalbierende in die Ellenbeuge (Fossa cubitalis)
+  let bisInX = -uaUx + faUx;
+  let bisInY = -uaUy + faUy;
+  const bisMag = Math.hypot(bisInX, bisInY);
+  if (bisMag > 0.001) {
+    bisInX /= bisMag;
+    bisInY /= bisMag;
+  } else {
+    bisInX = 0;
+    bisInY = -1;
+  }
+
+  // Normalenvektoren konsequent zur Beugeseite (Bizeps / Radius / Daumen) ausrichten
+  let uaNx = -uaUy;
+  let uaNy = uaUx;
+  if (uaNx * bisInX + uaNy * bisInY < 0) {
+    uaNx = -uaNx;
+    uaNy = -uaNy;
+  }
+
+  let faNx = -faUy;
+  let faNy = faUx;
+  if (faNx * bisInX + faNy * bisInY < 0) {
+    faNx = -faNx;
+    faNy = -faNy;
+  }
+
+  // A) BEREICH 1: +10 PUNKTE AM HANDGELENK & HANDWURZEL-KOMPLEX (W1..W10)
+  const wristRadius = Math.max(0.012, faLen * 0.11);
+  const wristCluster10: SubClusterNode[] = [
+    {
+      code: 'W1',
+      label: 'Radiocarpal (Speichenpol)',
+      x: clamp(wristRaw.x * 0.75 + thumbThrow.x * 0.25 + faNx * wristRadius * 0.6),
+      y: clamp(wristRaw.y * 0.75 + thumbThrow.y * 0.25 + faNy * wristRadius * 0.6),
+    },
+    {
+      code: 'W2',
+      label: 'Ulnocarpal (Ellenpol)',
+      x: clamp(wristRaw.x * 0.75 + pinkyThrow.x * 0.25 - faNx * wristRadius * 0.6),
+      y: clamp(wristRaw.y * 0.75 + pinkyThrow.y * 0.25 - faNy * wristRadius * 0.6),
+    },
+    {
+      code: 'W3',
+      label: 'Carpal-Zentrum (Handwurzel)',
+      x: clamp(wristRaw.x * 0.65 + (thumbThrow.x + indexThrow.x + pinkyThrow.x) * (0.35 / 3)),
+      y: clamp(wristRaw.y * 0.65 + (thumbThrow.y + indexThrow.y + pinkyThrow.y) * (0.35 / 3)),
+    },
+    {
+      code: 'W4',
+      label: 'CMC-1 (Daumenwurzel-Gelenk)',
+      x: clamp(wristRaw.x * 0.45 + thumbThrow.x * 0.55),
+      y: clamp(wristRaw.y * 0.45 + thumbThrow.y * 0.55),
+    },
+    {
+      code: 'W5',
+      label: 'MCP-2 (Zeigefinger-Basis)',
+      x: clamp(wristRaw.x * 0.35 + indexThrow.x * 0.65),
+      y: clamp(wristRaw.y * 0.35 + indexThrow.y * 0.65),
+    },
+    {
+      code: 'W6',
+      label: 'MCP-5 (Kleinfinger-Basis)',
+      x: clamp(wristRaw.x * 0.35 + pinkyThrow.x * 0.65),
+      y: clamp(wristRaw.y * 0.35 + pinkyThrow.y * 0.65),
+    },
+    {
+      code: 'W7',
+      label: 'Dorsal-Platte (Handrücken)',
+      x: clamp((wristRaw.x + indexThrow.x + pinkyThrow.x) / 3),
+      y: clamp((wristRaw.y + indexThrow.y + pinkyThrow.y) / 3),
+    },
+    {
+      code: 'W8',
+      label: 'Pinch-Gabel (Daumen-Zeigefinger)',
+      x: clamp((indexThrow.x + thumbThrow.x) * 0.5),
+      y: clamp((indexThrow.y + thumbThrow.y) * 0.5),
+    },
+    {
+      code: 'W9',
+      label: 'Distaler Dart-Release-Pol',
+      x: clamp(dartGripPoint.x + (dartGripPoint.x - wristRaw.x) * 0.38),
+      y: clamp(dartGripPoint.y + (dartGripPoint.y - wristRaw.y) * 0.38),
+    },
+    {
+      code: 'W10',
+      label: 'Palmar-Flexionspol (Beugesehne)',
+      x: clamp(wristRaw.x - faUx * wristRadius * 0.7 - faNx * wristRadius * 0.5),
+      y: clamp(wristRaw.y - faUy * wristRadius * 0.7 - faNy * wristRadius * 0.5),
+    },
+  ];
+
+  // B) BEREICH 2: +10 PUNKTE AM ARM (OBERARM A1..A5 & UNTERARM A6..A10 FACHWERK)
+  const armThickness = Math.max(0.015, uaLen * 0.14);
+  const forearmThickness = Math.max(0.012, faLen * 0.12);
+  const armCluster10: SubClusterNode[] = [
+    {
+      code: 'A1',
+      label: 'Humerus-Kopf / Deltoideus (20%)',
+      x: clamp(shoulderThrow.x + uaDx * 0.20),
+      y: clamp(shoulderThrow.y + uaDy * 0.20),
+    },
+    {
+      code: 'A2',
+      label: 'Bizeps-Pol (Oberarm ventral)',
+      x: clamp(shoulderThrow.x + uaDx * 0.45 + uaNx * armThickness),
+      y: clamp(shoulderThrow.y + uaDy * 0.45 + uaNy * armThickness),
+    },
+    {
+      code: 'A3',
+      label: 'Trizeps-Pol (Oberarm dorsal)',
+      x: clamp(shoulderThrow.x + uaDx * 0.45 - uaNx * armThickness),
+      y: clamp(shoulderThrow.y + uaDy * 0.45 - uaNy * armThickness),
+    },
+    {
+      code: 'A4',
+      label: 'Humerus-Schaftmitte (50%)',
+      x: clamp(shoulderThrow.x + uaDx * 0.50),
+      y: clamp(shoulderThrow.y + uaDy * 0.50),
+    },
+    {
+      code: 'A5',
+      label: 'Distaler Humerus-Schaft (80%)',
+      x: clamp(shoulderThrow.x + uaDx * 0.80),
+      y: clamp(shoulderThrow.y + uaDy * 0.80),
+    },
+    {
+      code: 'A6',
+      label: 'Proximaler Radius/Ulna (25%)',
+      x: clamp(elbowRaw.x + faDx * 0.25),
+      y: clamp(elbowRaw.y + faDy * 0.25),
+    },
+    {
+      code: 'A7',
+      label: 'Brachioradialis (Unterarm oben)',
+      x: clamp(elbowRaw.x + faDx * 0.42 + faNx * forearmThickness),
+      y: clamp(elbowRaw.y + faDy * 0.42 + faNy * forearmThickness),
+    },
+    {
+      code: 'A8',
+      label: 'Flexoren-Bauch (Unterarm unten)',
+      x: clamp(elbowRaw.x + faDx * 0.42 - faNx * forearmThickness),
+      y: clamp(elbowRaw.y + faDy * 0.42 - faNy * forearmThickness),
+    },
+    {
+      code: 'A9',
+      label: 'Unterarm-Schaftmitte (62%)',
+      x: clamp(elbowRaw.x + faDx * 0.62),
+      y: clamp(elbowRaw.y + faDy * 0.62),
+    },
+    {
+      code: 'A10',
+      label: 'Distaler Radius/Ulna-Schaft (84%)',
+      x: clamp(elbowRaw.x + faDx * 0.84),
+      y: clamp(elbowRaw.y + faDy * 0.84),
+    },
+  ];
+
+  // C) BEREICH 3: +10 PUNKTE AM ELLENBOGEN-GELENKKOMPLEX (E1..E10)
+  const elbowRadius = Math.max(0.014, ((uaLen + faLen) * 0.5) * 0.12);
+
+  const e1Olecranon: Point = {
+    x: clamp(elbowRaw.x - bisInX * elbowRadius * 1.15),
+    y: clamp(elbowRaw.y - bisInY * elbowRadius * 1.15),
+  };
+  const e2FossaCubitalis: Point = {
+    x: clamp(elbowRaw.x + bisInX * elbowRadius * 0.95),
+    y: clamp(elbowRaw.y + bisInY * elbowRadius * 0.95),
+  };
+  const e3EpicondyleLat: Point = {
+    x: clamp(elbowRaw.x - uaUx * elbowRadius * 0.45 + uaNx * elbowRadius * 0.75),
+    y: clamp(elbowRaw.y - uaUy * elbowRadius * 0.45 + uaNy * elbowRadius * 0.75),
+  };
+  const e4EpicondyleMed: Point = {
+    x: clamp(elbowRaw.x - uaUx * elbowRadius * 0.45 - uaNx * elbowRadius * 0.75),
+    y: clamp(elbowRaw.y - uaUy * elbowRadius * 0.45 - uaNy * elbowRadius * 0.75),
+  };
+  const e5Capitulum: Point = {
+    x: clamp(shoulderThrow.x + uaDx * 0.90),
+    y: clamp(shoulderThrow.y + uaDy * 0.90),
+  };
+  const e6RadialHead: Point = {
+    x: clamp(elbowRaw.x + faDx * 0.12 + faNx * elbowRadius * 0.55),
+    y: clamp(elbowRaw.y + faDy * 0.12 + faNy * elbowRadius * 0.55),
+  };
+  const e7CoronoidUlna: Point = {
+    x: clamp(elbowRaw.x + faDx * 0.12 - faNx * elbowRadius * 0.55),
+    y: clamp(elbowRaw.y + faDy * 0.12 - faNy * elbowRadius * 0.55),
+  };
+  const e8TricepsInsertion: Point = {
+    x: clamp(shoulderThrow.x + uaDx * 0.92 - bisInX * elbowRadius * 0.75),
+    y: clamp(shoulderThrow.y + uaDy * 0.92 - bisInY * elbowRadius * 0.75),
+  };
+  const e9BicepsInsertion: Point = {
+    x: clamp(elbowRaw.x + faDx * 0.15 + bisInX * elbowRadius * 0.70),
+    y: clamp(elbowRaw.y + faDy * 0.15 + bisInY * elbowRadius * 0.70),
+  };
+  // E10: Hochpräziser Drehachsen-Schwerpunkt aus allen Ellenbogen-Kapselpunkten
+  const e10HingeCenter: Point = {
+    x: clamp(
+      (elbowRaw.x * 2 +
+        e1Olecranon.x +
+        e2FossaCubitalis.x +
+        e3EpicondyleLat.x +
+        e4EpicondyleMed.x +
+        e5Capitulum.x +
+        e6RadialHead.x +
+        e7CoronoidUlna.x) /
+        9
+    ),
+    y: clamp(
+      (elbowRaw.y * 2 +
+        e1Olecranon.y +
+        e2FossaCubitalis.y +
+        e3EpicondyleLat.y +
+        e4EpicondyleMed.y +
+        e5Capitulum.y +
+        e6RadialHead.y +
+        e7CoronoidUlna.y) /
+        9
+    ),
+  };
+
+  const elbowCluster10: SubClusterNode[] = [
+    { code: 'E1', label: 'Olecranon (Ellenbogenspitze)', x: e1Olecranon.x, y: e1Olecranon.y },
+    { code: 'E2', label: 'Fossa Cubitalis (Ellenbeuge)', x: e2FossaCubitalis.x, y: e2FossaCubitalis.y },
+    { code: 'E3', label: 'Epicondylus Lat. (Außenknorren)', x: e3EpicondyleLat.x, y: e3EpicondyleLat.y },
+    { code: 'E4', label: 'Epicondylus Med. (Innenknorren)', x: e4EpicondyleMed.x, y: e4EpicondyleMed.y },
+    { code: 'E5', label: 'Capitulum Humeri (Gelenkrolle)', x: e5Capitulum.x, y: e5Capitulum.y },
+    { code: 'E6', label: 'Radiusköpfchen (Speichenpol)', x: e6RadialHead.x, y: e6RadialHead.y },
+    { code: 'E7', label: 'Ulna-Krone (Ellengelenk)', x: e7CoronoidUlna.x, y: e7CoronoidUlna.y },
+    { code: 'E8', label: 'Trizeps-Sehnenansatz', x: e8TricepsInsertion.x, y: e8TricepsInsertion.y },
+    { code: 'E9', label: 'Bizeps-Sehnenansatz', x: e9BicepsInsertion.x, y: e9BicepsInsertion.y },
+    { code: 'E10', label: 'Drehachsen-Schwerpunkt (Hinge)', x: e10HingeCenter.x, y: e10HingeCenter.y },
+  ];
+
+  // Verfeinere den Handgelenk- und Ellenbogen-Hauptpunkt über den jeweiligen 10-Punkte-Cluster-Schwerpunkt!
+  wristStabilized = {
+    x: clamp(wristStabilized.x * 0.65 + (wristCluster10[0].x + wristCluster10[1].x + wristCluster10[2].x) * (0.35 / 3)),
+    y: clamp(wristStabilized.y * 0.65 + (wristCluster10[0].y + wristCluster10[1].y + wristCluster10[2].y) * (0.35 / 3)),
+  };
+  const elbowStabilized: Point = e10HingeCenter;
+
   // Handgelenks-Kippwinkel (Wrist-Snap-Winkel zwischen Unterarm 14->16 und Handachse 16->33)
   const faVx = wristStabilized.x - elbowRaw.x;
   const faVy = wristStabilized.y - elbowRaw.y;
@@ -590,7 +858,7 @@ export function buildHiddenBiomechanicalRig(
     head,
     eye,
     shoulder: shoulderThrow,
-    elbow: elbowRaw,
+    elbow: elbowStabilized,
     wrist: wristStabilized,
     hip: hipThrow,
     knee: rawLandmarks[kIdx] ? getPt(kIdx) : undefined,
@@ -609,6 +877,9 @@ export function buildHiddenBiomechanicalRig(
         thoraxT8,
         forearmPivotAnchor,
       },
+      wristCluster10,
+      armCluster10,
+      elbowCluster10,
       wristSnapAngleDeg,
       handoverDistanceNorm,
       isBimanualHandover,
