@@ -777,19 +777,19 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setShowOverlay(true);
   };
 
-  // Dynamischer Zoom-Mittelpunkt: Zentriert den Oberkörper-Zoom exakt auf Schulter/Ellenbogen des erkannten Spielers!
-  // Dadurch wird auch bei kleineren Spielern/Kindern niemals über den Kopf ins Leere gezoomt!
+  // Statischer Zoom-Mittelpunkt: Orientiert sich fest am Rumpf/Schulter des Spielers (ohne bewegte Hand!),
+  // damit das Bild während der Wurfbewegung und bei der Wiedergabe absolut stabil steht und niemals driftet!
   const dynamicZoomOrigin = useMemo(() => {
-    const p = baselinePose || currentPose;
-    if (!p) return '52% 42%';
-    // Horizontal: Mitte zwischen Schulter und Wurfhand (inkl. Wurfbahn nach vorn)
-    const cxRaw = (p.shoulder.x + p.elbow.x + p.wrist.x) / 3;
-    // Vertikal: Mitte zwischen Kopf und Hüfte (Oberkörper komplett im Bild)
-    const cyRaw = (p.head.y + p.shoulder.y + p.hip.y) / 3;
-    const cx = Math.round(Math.max(15, Math.min(85, cxRaw * 100)));
-    const cy = Math.round(Math.max(15, Math.min(85, cyRaw * 100)));
-    return `${cx}% ${cy}%`;
-  }, [baselinePose, currentPose]);
+    const p = baselinePose || snapshots?.baseline?.pose;
+    if (p) {
+      const cxRaw = (p.shoulder.x + p.elbow.x) / 2;
+      const cyRaw = (p.head.y + p.shoulder.y + p.hip.y) / 3;
+      const cx = Math.round(Math.max(15, Math.min(85, cxRaw * 100)));
+      const cy = Math.round(Math.max(15, Math.min(85, cyRaw * 100)));
+      return `${cx}% ${cy}%`;
+    }
+    return '52% 42%';
+  }, [baselinePose, snapshots]);
 
   // Aktive Kinematik-Kennzahlen für das Diagnose-Cockpit
   const activeMetrics = useMemo(() => {
@@ -966,20 +966,19 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const color = colors[(tr.id - 1) % colors.length];
 
         ctx.strokeStyle = color;
-        // 1. Soft Glow (Leuchtkontur im Hintergrund)
-        ctx.globalAlpha = 0.22;
-        ctx.lineWidth = 4.2 * scale;
+        // 1. Soft Glow (Leuchtkontur im Hintergrund - exakt auf den Handgelenkspunkten)
+        ctx.globalAlpha = 0.25;
+        ctx.lineWidth = 3.8 * scale;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.beginPath();
         ctx.moveTo(pts[0].x * w, pts[0].y * h);
-        for (let i = 1; i < pts.length - 1; i++) {
-          const xc = ((pts[i].x + pts[i + 1].x) / 2) * w;
-          const yc = ((pts[i].y + pts[i + 1].y) / 2) * h;
-          ctx.quadraticCurveTo(pts[i].x * w, pts[i].y * h, xc, yc);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x * w, pts[i].y * h);
         }
-        ctx.lineTo(pts[pts.length - 1].x * w, pts[pts.length - 1].y * h);
         ctx.stroke();
 
-        // 2. Feingranulare Laser-Kernlinie
+        // 2. Feingranulare Laser-Kernlinie (direkt von Punkt zu Punkt ohne Eckenbeschneidung)
         ctx.globalAlpha = 0.95;
         ctx.lineWidth = 1.8 * scale;
         ctx.lineCap = 'round';
@@ -987,13 +986,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
         ctx.beginPath();
         ctx.moveTo(pts[0].x * w, pts[0].y * h);
-        for (let i = 1; i < pts.length - 1; i++) {
-          const xc = ((pts[i].x + pts[i + 1].x) / 2) * w;
-          const yc = ((pts[i].y + pts[i + 1].y) / 2) * h;
-          ctx.quadraticCurveTo(pts[i].x * w, pts[i].y * h, xc, yc);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x * w, pts[i].y * h);
         }
-        const last = pts[pts.length - 1];
-        ctx.lineTo(last.x * w, last.y * h);
         ctx.stroke();
 
         ctx.globalAlpha = 1.0;
@@ -1006,6 +1001,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ctx.fill();
 
         // Release-Punkt (Apex)
+        const last = pts[pts.length - 1];
         const rx = tr.releasePoint ? tr.releasePoint.x * w : last.x * w;
         const ry = tr.releasePoint ? tr.releasePoint.y * h : last.y * h;
         ctx.fillStyle = color;
@@ -1805,7 +1801,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     transform: zoomMode === 'upper_body' ? 'scale(2.85)' : 'scale(1)',
                     transformOrigin: dynamicZoomOrigin,
                   }}
-                  className="w-full h-full relative transition-transform duration-300 ease-out"
+                  className="w-full h-full relative"
                 >
                   <video
                     ref={videoRef}
@@ -1859,74 +1855,52 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           const curWrist = detected.wrist;
 
                           if (autoTriggerEnabled) {
-                          const st = autoTriggerStateRef.current;
-                          if (curAngle < st.minElbowAngle) {
-                            st.minElbowAngle = curAngle;
-                          }
-                          if (!st.inDrawback && curAngle < 85) {
-                            st.inDrawback = true;
-                            st.bufferPts = [{ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime }];
-                          } else if (st.inDrawback) {
-                            st.bufferPts.push({ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime });
-                            if (curAngle > 105 && st.bufferPts.length >= 3) {
-                              const smoothed = smoothTrajectory1Euro(st.bufferPts.slice(-20));
+                            const st = autoTriggerStateRef.current;
+                            if (curAngle < st.minElbowAngle) {
+                              st.minElbowAngle = curAngle;
+                            }
+                            // Wurf-Beginn: Ausholen registrieren
+                            if (!st.inDrawback && curAngle < 85) {
+                              st.inDrawback = true;
+                              st.bufferPts = [{ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime }];
+                            } else if (st.inDrawback) {
+                              // Alle Handgelenkspositionen 1:1 unverändert anhängen (ohne Glättung, ohne Abschneiden!)
+                              const lastPt = st.bufferPts[st.bufferPts.length - 1];
+                              if (!lastPt || Math.hypot(lastPt.x - curWrist.x, lastPt.y - curWrist.y) > 0.002) {
+                                st.bufferPts.push({ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime });
+                              }
+
+                              const slot = st.currentDartSlot % 3;
                               const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
                               const kin = computeThrowKinematics(
-                                smoothed,
+                                st.bufferPts,
                                 videoDims,
                                 mmPerPx,
                                 (vid.duration || 0) > 40
                               );
-                              const slot = st.currentDartSlot % 3;
+
+                              // Komplette Original-Punkte live im Canvas sichtbar halten
                               setTrajectories((prev) => {
                                 const next = [...prev];
                                 next[slot] = {
                                   id: slot + 1,
-                                  points: smoothed,
+                                  points: [...st.bufferPts],
                                   releaseSpeedKmh: kin.releaseSpeedKmh,
                                   launchAngleDeg: kin.launchAngleDeg,
                                   elbowDropMm: activeMetrics.elbowDropMm,
                                 };
                                 return next;
                               });
-                              st.currentDartSlot = (st.currentDartSlot + 1) % 3;
-                              st.inDrawback = false;
-                              st.bufferPts = [];
-                              st.minElbowAngle = 180;
+
+                              // Wurf abgeschlossen (Arm nach vorne durchgestreckt) -> Kurve bleibt dauerhaft fixiert!
+                              if (curAngle > 115 && st.bufferPts.length >= 6) {
+                                st.inDrawback = false;
+                                st.currentDartSlot = (st.currentDartSlot + 1) % 3;
+                                st.bufferPts = [];
+                                st.minElbowAngle = 180;
+                              }
                             }
                           }
-                        }
-
-                        // Kontinuierliches Live-Arm-Folgen im gewählten Slot
-                        const currentSlot = activeThrowIdx >= 0 && activeThrowIdx < 3 ? activeThrowIdx : 0;
-                        setTrajectories((prev) => {
-                          const curList = prev[currentSlot]?.points || [];
-                          const lastPt = curList[curList.length - 1];
-                          if (!lastPt || Math.hypot(lastPt.x - curWrist.x, lastPt.y - curWrist.y) > 0.004) {
-                            const rawNext = [
-                              ...curList,
-                              { x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime },
-                            ].slice(-28);
-                            const smoothed = smoothTrajectory1Euro(rawNext);
-                            const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
-                            const kin = computeThrowKinematics(
-                              smoothed,
-                              videoDims,
-                              mmPerPx,
-                              (vid.duration || 0) > 40
-                            );
-                            const next = [...prev];
-                            next[currentSlot] = {
-                              ...next[currentSlot],
-                              id: currentSlot + 1,
-                              points: smoothed,
-                              releaseSpeedKmh: kin.releaseSpeedKmh,
-                              launchAngleDeg: kin.launchAngleDeg,
-                            };
-                            return next;
-                          }
-                          return prev;
-                        });
                         }
                       }
                     }}

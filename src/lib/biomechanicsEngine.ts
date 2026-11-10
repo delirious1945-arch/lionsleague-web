@@ -616,51 +616,24 @@ export function buildAnatomicalArmTrajectory(
   }
   const releaseFrame = throwFrames[releaseIdx] || followThroughFrame;
 
-  // 4. ECHTE FEINGRANULARE HANDGELENKS-TRAJEKTORIE:
-  // Wir erfassen die organische Bewegung der Hand ab Beginn des Ausholens (Set-Point)
-  // über den tiefsten Rückzugspunkt bis zum Release-Apex und Durchschwung!
+  // 4. ECHTE UNVERÄNDERTE HANDGELENKS-TRAJEKTORIE:
+  // Wir erfassen die 100% authentische Bewegung des Handgelenkspunkts
+  // vom Ausholen (Drawback) über die Beschleunigung bis zum Release und Durchschwung.
+  // Keine künstliche Glättung, keine Verformung, kein Versatz – exakte Messpunkte!
   const lookbackSteps = Math.min(10, Math.floor(throwFrames.length * 0.15));
   const startIdx = Math.max(0, drawbackIdx - lookbackSteps);
   const endIdx = Math.min(throwFrames.length - 1, followIdx + 2);
   const activeFrames = throwFrames.slice(startIdx, endIdx + 1);
 
-  // Echte Handgelenkspositionen extrahieren
-  const rawPts: TrajectoryPoint[] = activeFrames.map((f) => ({
+  // Echte Handgelenkspositionen 1:1 direkt aus den Video-Frames extrahieren
+  const wristPts: TrajectoryPoint[] = activeFrames.map((f) => ({
     x: f.pose.wrist.x,
     y: f.pose.wrist.y,
     timeSec: f.timeSec,
   }));
 
-  // Glättung & Entprellung einzelner Tracking-Ausreißer
-  const cleanedPts: TrajectoryPoint[] = [];
-  for (let i = 0; i < rawPts.length; i++) {
-    const cur = rawPts[i];
-    if (i > 0 && i < rawPts.length - 1) {
-      const prev = rawPts[i - 1];
-      const next = rawPts[i + 1];
-      const jump1 = Math.hypot(cur.x - prev.x, cur.y - prev.y);
-      const jump2 = Math.hypot(next.x - cur.x, next.y - cur.y);
-      const smoothDist = Math.hypot(next.x - prev.x, next.y - prev.y);
-      if (jump1 > 0.055 && jump2 > 0.055 && smoothDist < 0.045) {
-        cleanedPts.push({
-          x: (prev.x + next.x) / 2,
-          y: (prev.y + next.y) / 2,
-          timeSec: cur.timeSec,
-        });
-        continue;
-      }
-    }
-    cleanedPts.push(cur);
-  }
-
-  // 1-Euro adaptive Filterung gegen hochfrequenten Kamerasensor-Jitter
-  const smoothed = smoothTrajectory1Euro(cleanedPts);
-
-  // Feingranulare Catmull-Rom Spline-Interpolation für ultra-flüssige, edle Linienführung
-  const splinePts = interpolateCatmullRomSpline(smoothed, 3);
-
   return {
-    points: splinePts,
+    points: wristPts,
     drawbackFrame,
     releaseFrame,
     followThroughFrame,
