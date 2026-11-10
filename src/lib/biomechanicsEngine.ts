@@ -196,12 +196,36 @@ export function calculateElbowAngle(
   pose: PoseKeypoints,
   dims: { width: number; height: number }
 ): number {
-  const sx = pose.shoulder.x * dims.width;
-  const sy = pose.shoulder.y * dims.height;
-  const ex = pose.elbow.x * dims.width;
-  const ey = pose.elbow.y * dims.height;
-  const wx = pose.wrist.x * dims.width;
-  const wy = pose.wrist.y * dims.height;
+  let sx = pose.shoulder.x * dims.width;
+  let sy = pose.shoulder.y * dims.height;
+  let ex = pose.elbow.x * dims.width;
+  let ey = pose.elbow.y * dims.height;
+  let wx = pose.wrist.x * dims.width;
+  let wy = pose.wrist.y * dims.height;
+
+  // Falls das 70-Punkte-Hintergrundnetz aktiv ist: Nutze die Mehrpunkt-Knochenachsen
+  // (Humerus-Schaft A1/A4/A5, Drehachse E10 und Unterarm-Schaft A6/A9/A10 + Carpal-Zentrum W3)
+  const rig = pose.hiddenRig;
+  if (rig && rig.armCluster10.length >= 10 && rig.elbowCluster10.length >= 10 && rig.wristCluster10.length >= 3) {
+    const a1 = rig.armCluster10[0];
+    const a4 = rig.armCluster10[3];
+    const a9 = rig.armCluster10[8];
+    const a10 = rig.armCluster10[9];
+    const e10 = rig.elbowCluster10[9];
+    const w3 = rig.wristCluster10[2];
+
+    const proxUx = (pose.shoulder.x * 0.5 + a1.x * 0.3 + a4.x * 0.2) * dims.width;
+    const proxUy = (pose.shoulder.y * 0.5 + a1.y * 0.3 + a4.y * 0.2) * dims.height;
+    const distFx = (pose.wrist.x * 0.5 + w3.x * 0.25 + a10.x * 0.15 + a9.x * 0.1) * dims.width;
+    const distFy = (pose.wrist.y * 0.5 + w3.y * 0.25 + a10.y * 0.15 + a9.y * 0.1) * dims.height;
+
+    sx = sx * 0.65 + proxUx * 0.35;
+    sy = sy * 0.65 + proxUy * 0.35;
+    ex = ex * 0.5 + e10.x * dims.width * 0.5;
+    ey = ey * 0.5 + e10.y * dims.height * 0.5;
+    wx = wx * 0.65 + distFx * 0.35;
+    wy = wy * 0.65 + distFy * 0.35;
+  }
 
   const v1x = sx - ex;
   const v1y = sy - ey;
@@ -224,10 +248,19 @@ export function calculateTrunkLeanAngle(
   pose: PoseKeypoints,
   dims: { width: number; height: number }
 ): number {
-  const hx = pose.hip.x * dims.width;
-  const hy = pose.hip.y * dims.height;
-  const sx = pose.shoulder.x * dims.width;
-  const sy = pose.shoulder.y * dims.height;
+  let hx = pose.hip.x * dims.width;
+  let hy = pose.hip.y * dims.height;
+  let sx = pose.shoulder.x * dims.width;
+  let sy = pose.shoulder.y * dims.height;
+
+  // Nutze die virtuelle Wirbelsäule (#36 C7 -> #37 Pelvis CoM), um Schulter-Rotation herauszufiltern
+  if (pose.hiddenRig?.syntheticNodes) {
+    const { neckC7, pelvisCoM } = pose.hiddenRig.syntheticNodes;
+    sx = (sx * 0.55 + neckC7.x * dims.width * 0.45);
+    sy = (sy * 0.55 + neckC7.y * dims.height * 0.45);
+    hx = (hx * 0.55 + pelvisCoM.x * dims.width * 0.45);
+    hy = (hy * 0.55 + pelvisCoM.y * dims.height * 0.45);
+  }
 
   const dx = Math.abs(sx - hx);
   const dy = hy - sy; // hy ist größer als sy (Schulter über Hüfte)
@@ -431,7 +464,8 @@ const BLAZEPOSE_GERMAN_NAMES: Record<number, string> = {
 export function buildHiddenBiomechanicalRig(
   landmarks: Array<{ x: number; y: number; z?: number; visibility?: number; presence?: number }>,
   handedness: 'right' | 'left' = 'right',
-  referenceBoneLengths?: { upperArmNorm: number; forearmNorm: number } | null
+  referenceBoneLengths?: { upperArmNorm: number; forearmNorm: number } | null,
+  dims: { width: number; height: number } = { width: 1080, height: 1920 }
 ): PoseKeypoints {
   const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
   const isRight = handedness === 'right';
@@ -505,12 +539,17 @@ export function buildHiddenBiomechanicalRig(
     y: clamp(0.45 * indexThrow.y + 0.40 * thumbThrow.y + 0.15 * wristRaw.y),
   };
 
-  // Stabilisiertes Handgelenk aus dem 4-Punkte-Handpolygon (verhindert Einzelpunkt-Ausreißer bei Motion-Blur)
-  const palmAnchorX = (pinkyThrow.x + indexThrow.x + thumbThrow.x) / 3;
-  const palmAnchorY = (pinkyThrow.y + indexThrow.y + thumbThrow.y) / 3;
+  // Konfidenz-gewichteter Handflächen-Anker aus dem 4-Punkte-Handpolygon (verhindert Ausreißer bei Teilverdeckung)
+  const wPinky = Math.max(0.15, rawLandmarks[pinkyThrowIdx]?.visibility ?? 0.85);
+  const wIndex = Math.max(0.15, rawLandmarks[indexThrowIdx]?.visibility ?? 0.85);
+  const wThumb = Math.max(0.15, rawLandmarks[thumbThrowIdx]?.visibility ?? 0.85);
+  const wSum = wPinky + wIndex + wThumb;
+
+  const palmAnchorX = (pinkyThrow.x * wPinky + indexThrow.x * wIndex + thumbThrow.x * wThumb) / wSum;
+  const palmAnchorY = (pinkyThrow.y * wPinky + indexThrow.y * wIndex + thumbThrow.y * wThumb) / wSum;
   let wristStabilized: Point = {
-    x: clamp(wristRaw.x * 0.78 + palmAnchorX * 0.22),
-    y: clamp(wristRaw.y * 0.78 + palmAnchorY * 0.22),
+    x: clamp(wristRaw.x * 0.76 + palmAnchorX * 0.24),
+    y: clamp(wristRaw.y * 0.76 + palmAnchorY * 0.24),
   };
 
   const upperArmLengthNorm = Math.hypot(elbowRaw.x - shoulderThrow.x, elbowRaw.y - shoulderThrow.y);
@@ -545,33 +584,66 @@ export function buildHiddenBiomechanicalRig(
 
   // ============================================================================
   // 3b. +30 HOCHAUFLÖSENDE SUB-PUNKTE FÜR HANDGELENK (+10), ARM (+10) & ELLENBOGEN (+10)
+  //     MIT ISOTROPER SEITENVERHÄLTNIS-KORREKTUR & BEUGEWINKEL-ADAPTIVER GELENKKAPSEL
   // ============================================================================
-  // Richtungs- und Normalenvektoren für anatomische Querschnitts-Geometrie:
-  const uaDx = elbowRaw.x - shoulderThrow.x;
-  const uaDy = elbowRaw.y - shoulderThrow.y;
-  const uaLen = Math.hypot(uaDx, uaDy) || 0.12;
-  const uaUx = uaDx / uaLen;
-  const uaUy = uaDy / uaLen;
+  const refScale = Math.max(dims.width || 1080, dims.height || 1920);
+  const scaleX = (dims.width || 1080) / refScale;
+  const scaleY = (dims.height || 1920) / refScale;
 
-  const faDx = wristStabilized.x - elbowRaw.x;
-  const faDy = wristStabilized.y - elbowRaw.y;
-  const faLen = Math.hypot(faDx, faDy) || 0.11;
-  const faUx = faDx / faLen;
-  const faUy = faDy / faLen;
+  // Isotropische Koordinaten (echte metrische Proportionen unabhängig von 9:16 oder 16:9)
+  const sIsoX = shoulderThrow.x * scaleX;
+  const sIsoY = shoulderThrow.y * scaleY;
+  const eIsoX = elbowRaw.x * scaleX;
+  const eIsoY = elbowRaw.y * scaleY;
+  const wIsoX = wristStabilized.x * scaleX;
+  const wIsoY = wristStabilized.y * scaleY;
+  const wRawIsoX = wristRaw.x * scaleX;
+  const wRawIsoY = wristRaw.y * scaleY;
+  const thumbIsoX = thumbThrow.x * scaleX;
+  const thumbIsoY = thumbThrow.y * scaleY;
+  const indexIsoX = indexThrow.x * scaleX;
+  const indexIsoY = indexThrow.y * scaleY;
+  const pinkyIsoX = pinkyThrow.x * scaleX;
+  const pinkyIsoY = pinkyThrow.y * scaleY;
+  const palmIsoX = palmAnchorX * scaleX;
+  const palmIsoY = palmAnchorY * scaleY;
+  const dartIsoX = dartGripPoint.x * scaleX;
+  const dartIsoY = dartGripPoint.y * scaleY;
 
-  // Winkelhalbierende in die Ellenbeuge (Fossa cubitalis)
+  const uaIsoDx = eIsoX - sIsoX;
+  const uaIsoDy = eIsoY - sIsoY;
+  const uaLenIso = Math.hypot(uaIsoDx, uaIsoDy) || 0.08;
+  const uaUx = uaIsoDx / uaLenIso;
+  const uaUy = uaIsoDy / uaLenIso;
+
+  const faIsoDx = wIsoX - eIsoX;
+  const faIsoDy = wIsoY - eIsoY;
+  const faLenIso = Math.hypot(faIsoDx, faIsoDy) || 0.075;
+  const faUx = faIsoDx / faLenIso;
+  const faUy = faIsoDy / faLenIso;
+
+  // Beugewinkel-Faktor für das Olecranon (E1 gleitet bei Streckung anatomisch in die Fossa olecrani)
+  const cosElbow = Math.max(-1, Math.min(1, -uaUx * faUx - uaUy * faUy));
+  const flexionRad = Math.PI - Math.acos(cosElbow);
+  const flexFactor = Math.max(0.48, Math.min(1.05, 0.48 + 0.52 * Math.sin(flexionRad * 0.65)));
+
+  // Winkelhalbierende in die Ellenbeuge (Fossa cubitalis) im isotropen Raum
   let bisInX = -uaUx + faUx;
   let bisInY = -uaUy + faUy;
   const bisMag = Math.hypot(bisInX, bisInY);
-  if (bisMag > 0.001) {
+  if (bisMag > 0.08) {
     bisInX /= bisMag;
     bisInY /= bisMag;
   } else {
-    bisInX = 0;
-    bisInY = -1;
+    bisInX = -uaUy;
+    bisInY = uaUx;
+    if (bisInY > 0) {
+      bisInX = -bisInX;
+      bisInY = -bisInY;
+    }
   }
 
-  // Normalenvektoren konsequent zur Beugeseite (Bizeps / Radius / Daumen) ausrichten
+  // Normalenvektoren im isotropen Raum konsequent zur Beugeseite (Bizeps / Radius / Daumen) ausrichten
   let uaNx = -uaUy;
   let uaNy = uaUx;
   if (uaNx * bisInX + uaNy * bisInY < 0) {
@@ -586,176 +658,140 @@ export function buildHiddenBiomechanicalRig(
     faNy = -faNy;
   }
 
+  // Handgelenks-Normalenvektor (orientiert an Daumen-Kleinfinger-Spreizung)
+  const tpDx = thumbIsoX - pinkyIsoX;
+  const tpDy = thumbIsoY - pinkyIsoY;
+  const tpMag = Math.hypot(tpDx, tpDy);
+  let wNx = faNx;
+  let wNy = faNy;
+  if (tpMag > 0.008 && wNx * tpDx + wNy * tpDy < 0) {
+    wNx = -wNx;
+    wNy = -wNy;
+  }
+
+  const toNormPt = (isoX: number, isoY: number): Point => ({
+    x: clamp(isoX / scaleX),
+    y: clamp(isoY / scaleY),
+  });
+
   // A) BEREICH 1: +10 PUNKTE AM HANDGELENK & HANDWURZEL-KOMPLEX (W1..W10)
-  const wristRadius = Math.max(0.012, faLen * 0.11);
+  const wristRadIso = Math.max(0.008, faLenIso * 0.072);
+  const w1Pt = toNormPt(
+    0.78 * wRawIsoX + 0.22 * thumbIsoX + wNx * wristRadIso * 0.58,
+    0.78 * wRawIsoY + 0.22 * thumbIsoY + wNy * wristRadIso * 0.58
+  );
+  const w2Pt = toNormPt(
+    0.78 * wRawIsoX + 0.22 * pinkyIsoX - wNx * wristRadIso * 0.58,
+    0.78 * wRawIsoY + 0.22 * pinkyIsoY - wNy * wristRadIso * 0.58
+  );
+  const w3Pt = toNormPt(0.66 * wRawIsoX + 0.34 * palmIsoX, 0.66 * wRawIsoY + 0.34 * palmIsoY);
+  const w4Pt = toNormPt(0.46 * wRawIsoX + 0.54 * thumbIsoX, 0.46 * wRawIsoY + 0.54 * thumbIsoY);
+  const w5Pt = toNormPt(0.34 * wRawIsoX + 0.66 * indexIsoX, 0.34 * wRawIsoY + 0.66 * indexIsoY);
+  const w6Pt = toNormPt(0.36 * wRawIsoX + 0.64 * pinkyIsoX, 0.36 * wRawIsoY + 0.64 * pinkyIsoY);
+  const w7Pt = toNormPt(
+    (wRawIsoX + indexIsoX + pinkyIsoX) / 3 + wNx * wristRadIso * 0.20,
+    (wRawIsoY + indexIsoY + pinkyIsoY) / 3 + wNy * wristRadIso * 0.20
+  );
+  const w8Pt = toNormPt(0.52 * indexIsoX + 0.48 * thumbIsoX, 0.52 * indexIsoY + 0.48 * thumbIsoY);
+  const w9Pt = toNormPt(
+    dartIsoX + (dartIsoX - wRawIsoX) * 0.36,
+    dartIsoY + (dartIsoY - wRawIsoY) * 0.36
+  );
+  const w10Pt = toNormPt(
+    wRawIsoX - faUx * wristRadIso * 0.55 - wNx * wristRadIso * 0.42,
+    wRawIsoY - faUy * wristRadIso * 0.55 - wNy * wristRadIso * 0.42
+  );
+
   const wristCluster10: SubClusterNode[] = [
-    {
-      code: 'W1',
-      label: 'Radiocarpal (Speichenpol)',
-      x: clamp(wristRaw.x * 0.75 + thumbThrow.x * 0.25 + faNx * wristRadius * 0.6),
-      y: clamp(wristRaw.y * 0.75 + thumbThrow.y * 0.25 + faNy * wristRadius * 0.6),
-    },
-    {
-      code: 'W2',
-      label: 'Ulnocarpal (Ellenpol)',
-      x: clamp(wristRaw.x * 0.75 + pinkyThrow.x * 0.25 - faNx * wristRadius * 0.6),
-      y: clamp(wristRaw.y * 0.75 + pinkyThrow.y * 0.25 - faNy * wristRadius * 0.6),
-    },
-    {
-      code: 'W3',
-      label: 'Carpal-Zentrum (Handwurzel)',
-      x: clamp(wristRaw.x * 0.65 + (thumbThrow.x + indexThrow.x + pinkyThrow.x) * (0.35 / 3)),
-      y: clamp(wristRaw.y * 0.65 + (thumbThrow.y + indexThrow.y + pinkyThrow.y) * (0.35 / 3)),
-    },
-    {
-      code: 'W4',
-      label: 'CMC-1 (Daumenwurzel-Gelenk)',
-      x: clamp(wristRaw.x * 0.45 + thumbThrow.x * 0.55),
-      y: clamp(wristRaw.y * 0.45 + thumbThrow.y * 0.55),
-    },
-    {
-      code: 'W5',
-      label: 'MCP-2 (Zeigefinger-Basis)',
-      x: clamp(wristRaw.x * 0.35 + indexThrow.x * 0.65),
-      y: clamp(wristRaw.y * 0.35 + indexThrow.y * 0.65),
-    },
-    {
-      code: 'W6',
-      label: 'MCP-5 (Kleinfinger-Basis)',
-      x: clamp(wristRaw.x * 0.35 + pinkyThrow.x * 0.65),
-      y: clamp(wristRaw.y * 0.35 + pinkyThrow.y * 0.65),
-    },
-    {
-      code: 'W7',
-      label: 'Dorsal-Platte (Handrücken)',
-      x: clamp((wristRaw.x + indexThrow.x + pinkyThrow.x) / 3),
-      y: clamp((wristRaw.y + indexThrow.y + pinkyThrow.y) / 3),
-    },
-    {
-      code: 'W8',
-      label: 'Pinch-Gabel (Daumen-Zeigefinger)',
-      x: clamp((indexThrow.x + thumbThrow.x) * 0.5),
-      y: clamp((indexThrow.y + thumbThrow.y) * 0.5),
-    },
-    {
-      code: 'W9',
-      label: 'Distaler Dart-Release-Pol',
-      x: clamp(dartGripPoint.x + (dartGripPoint.x - wristRaw.x) * 0.38),
-      y: clamp(dartGripPoint.y + (dartGripPoint.y - wristRaw.y) * 0.38),
-    },
-    {
-      code: 'W10',
-      label: 'Palmar-Flexionspol (Beugesehne)',
-      x: clamp(wristRaw.x - faUx * wristRadius * 0.7 - faNx * wristRadius * 0.5),
-      y: clamp(wristRaw.y - faUy * wristRadius * 0.7 - faNy * wristRadius * 0.5),
-    },
+    { code: 'W1', label: 'Radiocarpal (Speichenpol)', x: w1Pt.x, y: w1Pt.y },
+    { code: 'W2', label: 'Ulnocarpal (Ellenpol)', x: w2Pt.x, y: w2Pt.y },
+    { code: 'W3', label: 'Carpal-Zentrum (Handwurzel)', x: w3Pt.x, y: w3Pt.y },
+    { code: 'W4', label: 'CMC-1 (Daumenwurzel-Gelenk)', x: w4Pt.x, y: w4Pt.y },
+    { code: 'W5', label: 'MCP-2 (Zeigefinger-Basis)', x: w5Pt.x, y: w5Pt.y },
+    { code: 'W6', label: 'MCP-5 (Kleinfinger-Basis)', x: w6Pt.x, y: w6Pt.y },
+    { code: 'W7', label: 'Dorsal-Platte (Handrücken)', x: w7Pt.x, y: w7Pt.y },
+    { code: 'W8', label: 'Pinch-Gabel (Daumen-Zeigefinger)', x: w8Pt.x, y: w8Pt.y },
+    { code: 'W9', label: 'Distaler Dart-Release-Pol', x: w9Pt.x, y: w9Pt.y },
+    { code: 'W10', label: 'Palmar-Flexionspol (Beugesehne)', x: w10Pt.x, y: w10Pt.y },
   ];
 
-  // B) BEREICH 2: +10 PUNKTE AM ARM (OBERARM A1..A5 & UNTERARM A6..A10 FACHWERK)
-  const armThickness = Math.max(0.015, uaLen * 0.14);
-  const forearmThickness = Math.max(0.012, faLen * 0.12);
+  // B) BEREICH 2: +10 PUNKTE AM ARM (KONTURTREUES OBERARM- & UNTERARM-FACHWERK A1..A10)
+  const armThickIso = Math.max(0.009, uaLenIso * 0.095);
+  const faThickIso = Math.max(0.007, faLenIso * 0.080);
+
+  const a1Pt = toNormPt(sIsoX + uaIsoDx * 0.20, sIsoY + uaIsoDy * 0.20);
+  const a2Pt = toNormPt(
+    sIsoX + uaIsoDx * 0.46 + uaNx * armThickIso,
+    sIsoY + uaIsoDy * 0.46 + uaNy * armThickIso
+  );
+  const a3Pt = toNormPt(
+    sIsoX + uaIsoDx * 0.42 - uaNx * armThickIso,
+    sIsoY + uaIsoDy * 0.42 - uaNy * armThickIso
+  );
+  const a4Pt = toNormPt(sIsoX + uaIsoDx * 0.52, sIsoY + uaIsoDy * 0.52);
+  const a5Pt = toNormPt(sIsoX + uaIsoDx * 0.76, sIsoY + uaIsoDy * 0.76);
+  const a6Pt = toNormPt(eIsoX + faIsoDx * 0.22, eIsoY + faIsoDy * 0.22);
+  const a7Pt = toNormPt(
+    eIsoX + faIsoDx * 0.38 + faNx * faThickIso,
+    eIsoY + faIsoDy * 0.38 + faNy * faThickIso
+  );
+  const a8Pt = toNormPt(
+    eIsoX + faIsoDx * 0.38 - faNx * faThickIso * 0.92,
+    eIsoY + faIsoDy * 0.38 - faNy * faThickIso * 0.92
+  );
+  const a9Pt = toNormPt(eIsoX + faIsoDx * 0.60, eIsoY + faIsoDy * 0.60);
+  const a10Pt = toNormPt(eIsoX + faIsoDx * 0.82, eIsoY + faIsoDy * 0.82);
+
   const armCluster10: SubClusterNode[] = [
-    {
-      code: 'A1',
-      label: 'Humerus-Kopf / Deltoideus (20%)',
-      x: clamp(shoulderThrow.x + uaDx * 0.20),
-      y: clamp(shoulderThrow.y + uaDy * 0.20),
-    },
-    {
-      code: 'A2',
-      label: 'Bizeps-Pol (Oberarm ventral)',
-      x: clamp(shoulderThrow.x + uaDx * 0.45 + uaNx * armThickness),
-      y: clamp(shoulderThrow.y + uaDy * 0.45 + uaNy * armThickness),
-    },
-    {
-      code: 'A3',
-      label: 'Trizeps-Pol (Oberarm dorsal)',
-      x: clamp(shoulderThrow.x + uaDx * 0.45 - uaNx * armThickness),
-      y: clamp(shoulderThrow.y + uaDy * 0.45 - uaNy * armThickness),
-    },
-    {
-      code: 'A4',
-      label: 'Humerus-Schaftmitte (50%)',
-      x: clamp(shoulderThrow.x + uaDx * 0.50),
-      y: clamp(shoulderThrow.y + uaDy * 0.50),
-    },
-    {
-      code: 'A5',
-      label: 'Distaler Humerus-Schaft (80%)',
-      x: clamp(shoulderThrow.x + uaDx * 0.80),
-      y: clamp(shoulderThrow.y + uaDy * 0.80),
-    },
-    {
-      code: 'A6',
-      label: 'Proximaler Radius/Ulna (25%)',
-      x: clamp(elbowRaw.x + faDx * 0.25),
-      y: clamp(elbowRaw.y + faDy * 0.25),
-    },
-    {
-      code: 'A7',
-      label: 'Brachioradialis (Unterarm oben)',
-      x: clamp(elbowRaw.x + faDx * 0.42 + faNx * forearmThickness),
-      y: clamp(elbowRaw.y + faDy * 0.42 + faNy * forearmThickness),
-    },
-    {
-      code: 'A8',
-      label: 'Flexoren-Bauch (Unterarm unten)',
-      x: clamp(elbowRaw.x + faDx * 0.42 - faNx * forearmThickness),
-      y: clamp(elbowRaw.y + faDy * 0.42 - faNy * forearmThickness),
-    },
-    {
-      code: 'A9',
-      label: 'Unterarm-Schaftmitte (62%)',
-      x: clamp(elbowRaw.x + faDx * 0.62),
-      y: clamp(elbowRaw.y + faDy * 0.62),
-    },
-    {
-      code: 'A10',
-      label: 'Distaler Radius/Ulna-Schaft (84%)',
-      x: clamp(elbowRaw.x + faDx * 0.84),
-      y: clamp(elbowRaw.y + faDy * 0.84),
-    },
+    { code: 'A1', label: 'Humerus-Kopf / Deltoideus (20%)', x: a1Pt.x, y: a1Pt.y },
+    { code: 'A2', label: 'Bizeps-Pol (Oberarm ventral)', x: a2Pt.x, y: a2Pt.y },
+    { code: 'A3', label: 'Trizeps-Pol (Oberarm dorsal)', x: a3Pt.x, y: a3Pt.y },
+    { code: 'A4', label: 'Humerus-Schaftmitte (52%)', x: a4Pt.x, y: a4Pt.y },
+    { code: 'A5', label: 'Distaler Humerus-Schaft (76%)', x: a5Pt.x, y: a5Pt.y },
+    { code: 'A6', label: 'Proximaler Radius/Ulna (22%)', x: a6Pt.x, y: a6Pt.y },
+    { code: 'A7', label: 'Brachioradialis (Unterarm oben)', x: a7Pt.x, y: a7Pt.y },
+    { code: 'A8', label: 'Flexoren-Bauch (Unterarm unten)', x: a8Pt.x, y: a8Pt.y },
+    { code: 'A9', label: 'Unterarm-Schaftmitte (60%)', x: a9Pt.x, y: a9Pt.y },
+    { code: 'A10', label: 'Distaler Radius/Ulna-Schaft (82%)', x: a10Pt.x, y: a10Pt.y },
   ];
 
   // C) BEREICH 3: +10 PUNKTE AM ELLENBOGEN-GELENKKOMPLEX (E1..E10)
-  const elbowRadius = Math.max(0.014, ((uaLen + faLen) * 0.5) * 0.12);
+  const elbowRadIso = Math.max(0.008, ((uaLenIso + faLenIso) * 0.5) * 0.076);
 
-  const e1Olecranon: Point = {
-    x: clamp(elbowRaw.x - bisInX * elbowRadius * 1.15),
-    y: clamp(elbowRaw.y - bisInY * elbowRadius * 1.15),
-  };
-  const e2FossaCubitalis: Point = {
-    x: clamp(elbowRaw.x + bisInX * elbowRadius * 0.95),
-    y: clamp(elbowRaw.y + bisInY * elbowRadius * 0.95),
-  };
-  const e3EpicondyleLat: Point = {
-    x: clamp(elbowRaw.x - uaUx * elbowRadius * 0.45 + uaNx * elbowRadius * 0.75),
-    y: clamp(elbowRaw.y - uaUy * elbowRadius * 0.45 + uaNy * elbowRadius * 0.75),
-  };
-  const e4EpicondyleMed: Point = {
-    x: clamp(elbowRaw.x - uaUx * elbowRadius * 0.45 - uaNx * elbowRadius * 0.75),
-    y: clamp(elbowRaw.y - uaUy * elbowRadius * 0.45 - uaNy * elbowRadius * 0.75),
-  };
-  const e5Capitulum: Point = {
-    x: clamp(shoulderThrow.x + uaDx * 0.90),
-    y: clamp(shoulderThrow.y + uaDy * 0.90),
-  };
-  const e6RadialHead: Point = {
-    x: clamp(elbowRaw.x + faDx * 0.12 + faNx * elbowRadius * 0.55),
-    y: clamp(elbowRaw.y + faDy * 0.12 + faNy * elbowRadius * 0.55),
-  };
-  const e7CoronoidUlna: Point = {
-    x: clamp(elbowRaw.x + faDx * 0.12 - faNx * elbowRadius * 0.55),
-    y: clamp(elbowRaw.y + faDy * 0.12 - faNy * elbowRadius * 0.55),
-  };
-  const e8TricepsInsertion: Point = {
-    x: clamp(shoulderThrow.x + uaDx * 0.92 - bisInX * elbowRadius * 0.75),
-    y: clamp(shoulderThrow.y + uaDy * 0.92 - bisInY * elbowRadius * 0.75),
-  };
-  const e9BicepsInsertion: Point = {
-    x: clamp(elbowRaw.x + faDx * 0.15 + bisInX * elbowRadius * 0.70),
-    y: clamp(elbowRaw.y + faDy * 0.15 + bisInY * elbowRadius * 0.70),
-  };
+  const e1Olecranon = toNormPt(
+    eIsoX - bisInX * elbowRadIso * 1.05 * flexFactor,
+    eIsoY - bisInY * elbowRadIso * 1.05 * flexFactor
+  );
+  const e2FossaCubitalis = toNormPt(
+    eIsoX + bisInX * elbowRadIso * 0.85 * flexFactor,
+    eIsoY + bisInY * elbowRadIso * 0.85 * flexFactor
+  );
+  const e3EpicondyleLat = toNormPt(
+    eIsoX - uaUx * elbowRadIso * 0.38 + uaNx * elbowRadIso * 0.65,
+    eIsoY - uaUy * elbowRadIso * 0.38 + uaNy * elbowRadIso * 0.65
+  );
+  const e4EpicondyleMed = toNormPt(
+    eIsoX - uaUx * elbowRadIso * 0.38 - uaNx * elbowRadIso * 0.65,
+    eIsoY - uaUy * elbowRadIso * 0.38 - uaNy * elbowRadIso * 0.65
+  );
+  const e5Capitulum = toNormPt(sIsoX + uaIsoDx * 0.90, sIsoY + uaIsoDy * 0.90);
+  const e6RadialHead = toNormPt(
+    eIsoX + faIsoDx * 0.12 + faNx * elbowRadIso * 0.52,
+    eIsoY + faIsoDy * 0.12 + faNy * elbowRadIso * 0.52
+  );
+  const e7CoronoidUlna = toNormPt(
+    eIsoX + faIsoDx * 0.12 - faNx * elbowRadIso * 0.52,
+    eIsoY + faIsoDy * 0.12 - faNy * elbowRadIso * 0.52
+  );
+  const e8TricepsInsertion = toNormPt(
+    sIsoX + uaIsoDx * 0.92 - bisInX * elbowRadIso * 0.68 * flexFactor,
+    sIsoY + uaIsoDy * 0.92 - bisInY * elbowRadIso * 0.68 * flexFactor
+  );
+  const e9BicepsInsertion = toNormPt(
+    eIsoX + faIsoDx * 0.14 + bisInX * elbowRadIso * 0.62 * flexFactor,
+    eIsoY + faIsoDy * 0.14 + bisInY * elbowRadIso * 0.62 * flexFactor
+  );
+
   // E10: Hochpräziser Drehachsen-Schwerpunkt aus allen Ellenbogen-Kapselpunkten
   const e10HingeCenter: Point = {
     x: clamp(
@@ -795,10 +831,13 @@ export function buildHiddenBiomechanicalRig(
     { code: 'E10', label: 'Drehachsen-Schwerpunkt (Hinge)', x: e10HingeCenter.x, y: e10HingeCenter.y },
   ];
 
-  // Verfeinere den Handgelenk- und Ellenbogen-Hauptpunkt über den jeweiligen 10-Punkte-Cluster-Schwerpunkt!
+  // Verfeinere den Handgelenk-Hauptpunkt über das 4-Punkte-Handwurzel-Viereck (W1, W2, W3, W10)
+  // und den Ellenbogen-Hauptpunkt über das kapselstabilisierte Hinge-Center (E10)!
+  const carpalQuadX = (w1Pt.x + w2Pt.x + w3Pt.x + w10Pt.x) * 0.25;
+  const carpalQuadY = (w1Pt.y + w2Pt.y + w3Pt.y + w10Pt.y) * 0.25;
   wristStabilized = {
-    x: clamp(wristStabilized.x * 0.65 + (wristCluster10[0].x + wristCluster10[1].x + wristCluster10[2].x) * (0.35 / 3)),
-    y: clamp(wristStabilized.y * 0.65 + (wristCluster10[0].y + wristCluster10[1].y + wristCluster10[2].y) * (0.35 / 3)),
+    x: clamp(wristStabilized.x * 0.60 + carpalQuadX * 0.40),
+    y: clamp(wristStabilized.y * 0.60 + carpalQuadY * 0.40),
   };
   const elbowStabilized: Point = e10HingeCenter;
 
@@ -1104,7 +1143,7 @@ export function buildAnatomicalArmTrajectory(
   // damit die tiefe Hüft-Übergabeposition am Anfang nicht mit dem Drawback am Gesicht verwechselt wird.
   let drawbackIdx = Math.floor(throwFrames.length * 0.5);
   let bestDrawbackScore = Infinity;
-  const minSearchIdx = Math.max(1, Math.floor(throwFrames.length * 0.20));
+  const minSearchIdx = throwFrames.length > 10 ? Math.max(1, Math.floor(throwFrames.length * 0.18)) : 0;
   const maxSearchIdx = Math.max(minSearchIdx + 1, Math.floor(throwFrames.length * 0.88));
 
   for (let i = minSearchIdx; i <= maxSearchIdx && i < throwFrames.length; i++) {
@@ -1490,7 +1529,80 @@ export function interpolateKeypoints(
       p1.supplyWrist && p2.supplyWrist
         ? lerpPt(p1.supplyWrist, p2.supplyWrist)
         : p1.supplyWrist || p2.supplyWrist,
-    hiddenRig: a < 0.5 ? p1.hiddenRig || p2.hiddenRig : p2.hiddenRig || p1.hiddenRig,
+    hiddenRig:
+      p1.hiddenRig && p2.hiddenRig
+        ? {
+            rawLandmarks: p1.hiddenRig.rawLandmarks.map((lm1, idx) => {
+              const lm2 = p2.hiddenRig?.rawLandmarks[idx];
+              if (!lm2) return lm1;
+              return {
+                ...lm1,
+                x: lerp(lm1.x, lm2.x),
+                y: lerp(lm1.y, lm2.y),
+                visibility: lerp(lm1.visibility ?? 0.85, lm2.visibility ?? 0.85),
+              };
+            }),
+            syntheticNodes: {
+              dartGripPoint: lerpPt(
+                p1.hiddenRig.syntheticNodes.dartGripPoint,
+                p2.hiddenRig.syntheticNodes.dartGripPoint
+              ),
+              supplyHandCenter: lerpPt(
+                p1.hiddenRig.syntheticNodes.supplyHandCenter,
+                p2.hiddenRig.syntheticNodes.supplyHandCenter
+              ),
+              handoverPoint: lerpPt(
+                p1.hiddenRig.syntheticNodes.handoverPoint,
+                p2.hiddenRig.syntheticNodes.handoverPoint
+              ),
+              neckC7: lerpPt(
+                p1.hiddenRig.syntheticNodes.neckC7,
+                p2.hiddenRig.syntheticNodes.neckC7
+              ),
+              pelvisCoM: lerpPt(
+                p1.hiddenRig.syntheticNodes.pelvisCoM,
+                p2.hiddenRig.syntheticNodes.pelvisCoM
+              ),
+              thoraxT8: lerpPt(
+                p1.hiddenRig.syntheticNodes.thoraxT8,
+                p2.hiddenRig.syntheticNodes.thoraxT8
+              ),
+              forearmPivotAnchor: lerpPt(
+                p1.hiddenRig.syntheticNodes.forearmPivotAnchor,
+                p2.hiddenRig.syntheticNodes.forearmPivotAnchor
+              ),
+            },
+            wristCluster10: p1.hiddenRig.wristCluster10.map((n1, idx) => {
+              const n2 = p2.hiddenRig?.wristCluster10[idx];
+              return n2 ? { ...n1, x: lerp(n1.x, n2.x), y: lerp(n1.y, n2.y) } : n1;
+            }),
+            armCluster10: p1.hiddenRig.armCluster10.map((n1, idx) => {
+              const n2 = p2.hiddenRig?.armCluster10[idx];
+              return n2 ? { ...n1, x: lerp(n1.x, n2.x), y: lerp(n1.y, n2.y) } : n1;
+            }),
+            elbowCluster10: p1.hiddenRig.elbowCluster10.map((n1, idx) => {
+              const n2 = p2.hiddenRig?.elbowCluster10[idx];
+              return n2 ? { ...n1, x: lerp(n1.x, n2.x), y: lerp(n1.y, n2.y) } : n1;
+            }),
+            wristSnapAngleDeg:
+              Math.round(lerp(p1.hiddenRig.wristSnapAngleDeg, p2.hiddenRig.wristSnapAngleDeg) * 10) /
+              10,
+            handoverDistanceNorm:
+              Math.round(
+                lerp(p1.hiddenRig.handoverDistanceNorm, p2.hiddenRig.handoverDistanceNorm) * 1000
+              ) / 1000,
+            isBimanualHandover:
+              a < 0.5 ? p1.hiddenRig.isBimanualHandover : p2.hiddenRig.isBimanualHandover,
+            upperArmLengthNorm: lerp(
+              p1.hiddenRig.upperArmLengthNorm,
+              p2.hiddenRig.upperArmLengthNorm
+            ),
+            forearmLengthNorm: lerp(
+              p1.hiddenRig.forearmLengthNorm,
+              p2.hiddenRig.forearmLengthNorm
+            ),
+          }
+        : p1.hiddenRig || p2.hiddenRig,
   };
 }
 

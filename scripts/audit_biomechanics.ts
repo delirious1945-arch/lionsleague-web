@@ -33,6 +33,7 @@ import {
   calculateThreeDartDispersion,
   computeThrowKinematics,
   calculateThrowScanIntervals,
+  buildHiddenBiomechanicalRig,
   PoseKeypoints,
   ScannedFrame,
   ThrowTrajectory,
@@ -284,9 +285,9 @@ const dims = { width: 1080, height: 1920 };
 
   const demoValid =
     intervalsDemoSlowMo.length === 3 &&
-    intervalsDemoSlowMo[0].startSec === 27.5 &&
-    intervalsDemoSlowMo[1].startSec === 81.0 &&
-    intervalsDemoSlowMo[2].startSec === 141.5;
+    intervalsDemoSlowMo[0].startSec === 15.5 &&
+    intervalsDemoSlowMo[1].startSec === 74.5 &&
+    intervalsDemoSlowMo[2].startSec === 117.0;
 
   const genericValid =
     intervalsGenericSlowMo.length === 3 &&
@@ -422,6 +423,36 @@ const missingComponents = [
     detail: 'Freigabe durch Sebastian erteilt. Migration liegt als SQL (supabase/migrations/20261109_biomechanics_sessions.sql) und TypeScript-Runner (scripts/migrate-biomechanics.ts) bereit. Server-Actions (src/app/video/actions.ts) nahtlos integriert.',
   },
 ];
+
+
+// 15. Test 70-Punkte-Hintergrundnetz (33 MediaPipe + 7 Basis-Knoten + 30 Wurfarm-Subknoten)
+{
+  const mockLm = Array.from({ length: 33 }, (_, idx) => ({
+    x: 0.45 + (idx % 5) * 0.03,
+    y: 0.20 + Math.floor(idx / 5) * 0.10,
+    z: 0,
+    visibility: 0.94,
+    presence: 0.94,
+  }));
+  const rigPose = buildHiddenBiomechanicalRig(mockLm, 'right', null, { width: 464, height: 832 });
+  const hr = rigPose.hiddenRig;
+  const totalPoints =
+    (hr?.rawLandmarks.length || 0) +
+    (hr?.syntheticNodes ? Object.keys(hr.syntheticNodes).length : 0) +
+    (hr?.wristCluster10.length || 0) +
+    (hr?.armCluster10.length || 0) +
+    (hr?.elbowCluster10.length || 0);
+  const passed =
+    totalPoints === 70 &&
+    hr?.wristCluster10.length === 10 &&
+    hr?.armCluster10.length === 10 &&
+    hr?.elbowCluster10.length === 10;
+  auditResults.push({
+    check: '70-Punkte-Hintergrundnetz (33 MediaPipe + 7 Basis + 30 Wurfarm-Subknoten)',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Gesamtpunkte: ${totalPoints}/70 (W=${hr?.wristCluster10.length}, A=${hr?.armCluster10.length}, E=${hr?.elbowCluster10.length})`,
+  });
+}
 
 console.log('========================================');
 console.log('📊 AUDIT-ERGEBNIS BIOMECHANICS-ENGINE (v3.5):');

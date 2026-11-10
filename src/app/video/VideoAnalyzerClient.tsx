@@ -413,7 +413,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           const detectedPose = buildHiddenBiomechanicalRig(
             lm,
             handedness,
-            referenceBoneLengthsRef.current
+            referenceBoneLengthsRef.current,
+            { width: w, height: h }
           );
 
           // Referenz-Knochenlängen am ersten stabilen Frame verankern
