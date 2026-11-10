@@ -26,6 +26,9 @@ import {
   TrendingUp,
   Download,
   Printer,
+  Mic,
+  Volume2,
+  Camera,
 } from 'lucide-react';
 import { UserSession } from '@/app/actions';
 import {
@@ -63,6 +66,13 @@ import {
   BBDV_STANDARDS,
   calculateThrowScanIntervals,
   CalibrationMethod,
+  evaluateFramingAndPosition,
+  createInitialLiveThrowCounter,
+  updateLiveThrowCounter,
+  FramingCheckResult,
+  CaptureSessionMode,
+  DEFAULT_CAPTURE_CONFIG,
+  LiveThrowCounterState,
 } from '@/lib/biomechanicsEngine';
 
 interface VideoAnalyzerClientProps {
@@ -153,6 +163,36 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
   // 5. AUTO-TRIGGER (Freihändige Wurf-Erkennung ab Hüfthöhe)
   const [autoTriggerEnabled, setAutoTriggerEnabled] = useState<boolean>(true);
+
+  // 6. KI-SPRACHSTEUERUNG, LIVE-KAMERA ("POSITION I.O."), 5s-COUNTDOWN & AUTO-STOPP NACH 3 DARTS
+  const [isLiveCameraActive, setIsLiveCameraActive] = useState<boolean>(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
+  const [voiceControlEnabled, setVoiceControlEnabled] = useState<boolean>(true);
+  const [isListeningVoice, setIsListeningVoice] = useState<boolean>(false);
+  const [lastHeardCommand, setLastHeardCommand] = useState<string>('');
+  const [framingCheck, setFramingCheck] = useState<FramingCheckResult | null>(null);
+  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
+  const [isLiveRecording, setIsLiveRecording] = useState<boolean>(false);
+  const [liveRecordingElapsedSec, setLiveRecordingElapsedSec] = useState<number>(0);
+  const [liveThrowCounter, setLiveThrowCounter] = useState<LiveThrowCounterState>(() =>
+    createInitialLiveThrowCounter()
+  );
+  const [captureSessionMode, setCaptureSessionMode] =
+    useState<CaptureSessionMode>('single_visit_3_darts');
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef< unknown >(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStartTimestampRef = useRef<number>(0);
+  const liveThrowCounterRef = useRef<LiveThrowCounterState>(createInitialLiveThrowCounter());
+  const positionIoStreakRef = useRef<number>(0);
+  const hasAnnouncedPositionIoRef = useRef<boolean>(false);
+  const lastVoiceFeedbackTimestampRef = useRef<number>(0);
+  const autoAnalyzeAfterRecordRef = useRef<boolean>(false);
+  const isLiveRecordingRef = useRef<boolean>(false);
+  const isCountingDownRef = useRef<boolean>(false);
   const isScanningRef = useRef<boolean>(false);
   const autoTriggerStateRef = useRef<{
     inDrawback: boolean;
@@ -229,12 +269,113 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     };
   }, [user.name]);
 
+  // Akustische Signaltöne über Web Audio API (aus 3 Metern am Oche klar hörbar)
+  const playCoachTone = useCallback(
+    (type: 'position_io' | 'countdown_tick' | 'countdown_go' | 'dart_detected' | 'finish') => {
+      if (typeof window === 'undefined') return;
+      try {
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new AudioCtx();
+        }
+        const ctx = audioCtxRef.current;
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+
+        const playNote = (freq: number, startOffset: number, dur: number, gainVal: number = 0.22) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type === 'countdown_go' ? 'triangle' : 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
+          gain.gain.setValueAtTime(gainVal, ctx.currentTime + startOffset);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startOffset + dur);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + startOffset);
+          osc.stop(ctx.currentTime + startOffset + dur);
+        };
+
+        if (type === 'position_io') {
+          // Heller Zweiklang ("Ding-Dong") für Position i.O.
+          playNote(587.33, 0, 0.16, 0.25);
+          playNote(880.0, 0.16, 0.28, 0.28);
+        } else if (type === 'countdown_tick') {
+          // Klarer Sport-Countdown-Piepton (5 - 4 - 3 - 2 - 1)
+          playNote(659.25, 0, 0.14, 0.26);
+        } else if (type === 'countdown_go') {
+          // Hoher Start-Ton ("LOS!")
+          playNote(1046.5, 0, 0.42, 0.34);
+        } else if (type === 'dart_detected') {
+          // Kurzer Bestätigungs-Ping pro geworfenem Dart (1/3, 2/3, 3/3)
+          playNote(783.99, 0, 0.12, 0.22);
+        } else if (type === 'finish') {
+          // Dreiklang bei erfolgreichem Auto-Stopp nach 3 Darts
+          playNote(523.25, 0, 0.14, 0.25);
+          playNote(659.25, 0.14, 0.14, 0.25);
+          playNote(1046.5, 0.28, 0.32, 0.30);
+        }
+      } catch {}
+    },
+    []
+  );
+
+  // Deutsche Sprachausgabe (Text-to-Speech) für freihändiges Coaching am Oche
+  const speakCoachMessage = useCallback(
+    (text: string, priority: boolean = false) => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      if (!voiceControlEnabled && !priority) return;
+      try {
+        if (priority) {
+          window.speechSynthesis.cancel();
+        } else if (window.speechSynthesis.speaking) {
+          return;
+        }
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'de-DE';
+        utter.rate = 1.06;
+        utter.pitch = 1.0;
+        window.speechSynthesis.speak(utter);
+        lastVoiceFeedbackTimestampRef.current = Date.now();
+      } catch {}
+    },
+    [voiceControlEnabled]
+  );
+
   const stopCameraStream = useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    isCountingDownRef.current = false;
+    setCountdownRemaining(null);
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
+    }
+    isLiveRecordingRef.current = false;
+    setIsLiveRecording(false);
+
+    if (speechRecognitionRef.current) {
+      try {
+        (speechRecognitionRef.current as { onend: null; stop: () => void }).onend = null;
+        (speechRecognitionRef.current as { stop: () => void }).stop();
+      } catch {}
+      speechRecognitionRef.current = null;
+    }
+    setIsListeningVoice(false);
+
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach((track) => track.stop());
       videoRef.current.srcObject = null;
     }
+    setIsLiveCameraActive(false);
   }, []);
 
   // Ellenbogen-Innenwinkel über Engine-Modul
@@ -507,7 +648,412 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         setBaselinePose(detected);
       }
     }
+    // Falls das Video gerade per Sprachsteuerung & 3-Dart-Auto-Stopp aufgenommen wurde:
+    // Direkt im Anschluss vollautomatisch die 70-Punkte-Analyse starten!
+    if (autoAnalyzeAfterRecordRef.current && !isLiveCameraActive) {
+      autoAnalyzeAfterRecordRef.current = false;
+      setTimeout(() => {
+        handleRunBiomechanicsAnalysis();
+      }, 280);
+    }
   };
+
+  // Stoppt die laufende Live-Aufnahme (automatisch nach 3 Darts oder per Sprachbefehl "Stopp")
+  const handleStopLiveRecording = useCallback(
+    (reason: 'auto_3_darts' | 'voice_stop' | 'manual_stop' = 'auto_3_darts') => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      isCountingDownRef.current = false;
+      setCountdownRemaining(null);
+
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        playCoachTone('finish');
+        if (reason === 'auto_3_darts') {
+          speakCoachMessage(
+            'Drei Darts erkannt! Aufnahme beendet. Ich berechne jetzt deine Wurfanalyse.',
+            true
+          );
+        } else {
+          speakCoachMessage('Aufnahme gestoppt. Ich starte jetzt die Wurfanalyse.', true);
+        }
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {}
+      }
+      isLiveRecordingRef.current = false;
+      setIsLiveRecording(false);
+    },
+    [playCoachTone, speakCoachMessage]
+  );
+
+  // Startet die eigentliche Videoaufzeichnung nach Ablauf des 5-Sekunden-Countdowns
+  const beginMediaRecordingNow = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !video.srcObject) return;
+    const stream = video.srcObject as MediaStream;
+
+    recordedChunksRef.current = [];
+    const initialCounter = createInitialLiveThrowCounter();
+    liveThrowCounterRef.current = initialCounter;
+    setLiveThrowCounter(initialCounter);
+    recordingStartTimestampRef.current = performance.now();
+    setLiveRecordingElapsedSec(0);
+
+    let mimeType = 'video/webm;codecs=vp9';
+    if (typeof MediaRecorder !== 'undefined') {
+      if (MediaRecorder.isTypeSupported('video/mp4')) {
+        mimeType = 'video/mp4';
+      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+        mimeType = 'video/webm;codecs=vp8';
+      } else if (MediaRecorder.isTypeSupported('video/webm')) {
+        mimeType = 'video/webm';
+      } else {
+        mimeType = '';
+      }
+    }
+
+    try {
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          recordedChunksRef.current.push(ev.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blobType = mimeType || 'video/webm';
+        const blob = new Blob(recordedChunksRef.current, { type: blobType });
+        stopCameraStream();
+
+        if (blob.size > 0) {
+          if (videoSrc) {
+            URL.revokeObjectURL(videoSrc);
+          }
+          const url = URL.createObjectURL(blob);
+          autoAnalyzeAfterRecordRef.current = true;
+          setZoomMode('upper_body');
+          setVideoSrc(url);
+          setHasUploadedVideo(true);
+          setStatusMessage(
+            '✓ 3-Dart-Aufnahme abgeschlossen! Starte automatische 70-Punkte-Wurfanalyse...'
+          );
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(250);
+      isLiveRecordingRef.current = true;
+      setIsLiveRecording(true);
+      setStatusMessage(
+        captureSessionMode === 'single_visit_3_darts'
+          ? '🔴 AUFNAHME LÄUFT: Wirf jetzt deine 3 Darts (Auto-Stopp nach Dart 3 aktiv)!'
+          : '🔴 LEG-AUFNAHME LÄUFT: Multi-Visit-Erkennung aktiv (Sage „Stopp“ zum Beenden).'
+      );
+    } catch (err) {
+      console.error('MediaRecorder Fehler:', err);
+      setStatusMessage('Hinweis: Videoaufnahme konnte auf diesem Gerät nicht gestartet werden.');
+    }
+  }, [captureSessionMode, stopCameraStream, videoSrc]);
+
+  // Startet den 5-Sekunden-Countdown ("5 - 4 - 3 - 2 - 1 - Los!") per Sprachbefehl "Start" oder Button
+  const triggerFiveSecondCountdown = useCallback(() => {
+    if (isCountingDownRef.current || isLiveRecordingRef.current) return;
+    isCountingDownRef.current = true;
+    let remaining = DEFAULT_CAPTURE_CONFIG.countdownSeconds; // 5 Sekunden
+    setCountdownRemaining(remaining);
+
+    const germanNumbers: Record<number, string> = {
+      5: 'Fünf',
+      4: 'Vier',
+      3: 'Drei',
+      2: 'Zwei',
+      1: 'Eins',
+    };
+
+    playCoachTone('countdown_tick');
+    speakCoachMessage(germanNumbers[remaining] || String(remaining), true);
+    setStatusMessage(`⏱️ Countdown läuft: Noch ${remaining} Sekunden bis Aufnahmestart...`);
+
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+
+    countdownTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining > 0) {
+        setCountdownRemaining(remaining);
+        playCoachTone('countdown_tick');
+        speakCoachMessage(germanNumbers[remaining] || String(remaining), true);
+        setStatusMessage(`⏱️ Countdown läuft: Noch ${remaining} Sekunden...`);
+      } else {
+        if (countdownTimerRef.current) {
+          clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+        }
+        isCountingDownRef.current = false;
+        setCountdownRemaining(0);
+        playCoachTone('countdown_go');
+        speakCoachMessage('Los! Wirf deine drei Darts.', true);
+        beginMediaRecordingNow();
+        setTimeout(() => {
+          setCountdownRemaining(null);
+        }, 900);
+      }
+    }, 1000);
+  }, [beginMediaRecordingNow, playCoachTone, speakCoachMessage]);
+
+  // Startet die kontinuierliche deutsche Spracherkennung (Web Speech API)
+  const startVoiceCommandListener = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const SpeechRec =
+      (window as unknown as { SpeechRecognition?: new () => unknown }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => unknown })
+        .webkitSpeechRecognition;
+    if (!SpeechRec) {
+      setIsListeningVoice(false);
+      return;
+    }
+
+    if (speechRecognitionRef.current) {
+      try {
+        (speechRecognitionRef.current as { stop: () => void }).stop();
+      } catch {}
+    }
+
+    try {
+      const recognition = new SpeechRec() as {
+        lang: string;
+        continuous: boolean;
+        interimResults: boolean;
+        onresult: ((event: { resultIndex: number; results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
+        onerror: (() => void) | null;
+        onend: (() => void) | null;
+        start: () => void;
+        stop: () => void;
+      };
+      recognition.lang = 'de-DE';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript.toLowerCase().trim() + ' ';
+        }
+        const cleaned = transcript.trim();
+        if (!cleaned) return;
+        setLastHeardCommand(cleaned);
+
+        // 1. Sprachbefehl: "Start" / "Aufnahme" / "Los" -> 5-Sekunden-Countdown starten
+        if (
+          !isLiveRecordingRef.current &&
+          !isCountingDownRef.current &&
+          (/(start|starten|aufnahme|los|bereit|countdown)/i.test(cleaned))
+        ) {
+          triggerFiveSecondCountdown();
+          return;
+        }
+
+        // 2. Sprachbefehl: "Stopp" / "Fertig" / "Analyse" -> Aufnahme beenden & auswerten
+        if (
+          isLiveRecordingRef.current &&
+          (/(stopp|stop|fertig|ende|analyse|auswerten)/i.test(cleaned))
+        ) {
+          handleStopLiveRecording('voice_stop');
+          return;
+        }
+
+        // 3. Sprachbefehl: "Position" / "Position i.O." / "Check" / "Stehe ich gut" -> Sofortige Ansage
+        if (/(position|check|bild|stehe|gut|ok|okay)/i.test(cleaned)) {
+          const currentPoseNow = currentPoseRef.current;
+          const check = evaluateFramingAndPosition(currentPoseNow, handedness);
+          setFramingCheck(check);
+          if (check.isPositionIO) {
+            playCoachTone('position_io');
+          }
+          speakCoachMessage(check.voicePrompt, true);
+        }
+      };
+
+      recognition.onerror = () => {};
+      recognition.onend = () => {
+        // Automatisch weiterhören, solange die Live-Kamera aktiv ist
+        if (speechRecognitionRef.current === recognition) {
+          try {
+            recognition.start();
+          } catch {}
+        }
+      };
+
+      recognition.start();
+      speechRecognitionRef.current = recognition;
+      setIsListeningVoice(true);
+    } catch {
+      setIsListeningVoice(false);
+    }
+  }, [handedness, handleStopLiveRecording, playCoachTone, speakCoachMessage, triggerFiveSecondCountdown]);
+
+  // Öffnet die Live-Kamera inkl. Positions-Prüfer ("Position i.O.") & Sprachsteuerung
+  const handleStartLiveVoiceCoach = useCallback(
+    async (preferredFacing: 'environment' | 'user' = cameraFacingMode) => {
+      stopCameraStream();
+      await ensureLandmarker();
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: preferredFacing,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 60 },
+          },
+          audio: false,
+        });
+
+        setCameraFacingMode(preferredFacing);
+        setIsLiveCameraActive(true);
+        setHasUploadedVideo(true);
+        setIsAnalysisLocked(false);
+        setZoomMode('full'); // Volles Kamerabild für die Positionierung am Oche
+        positionIoStreakRef.current = 0;
+        hasAnnouncedPositionIoRef.current = false;
+        const resetCounter = createInitialLiveThrowCounter();
+        liveThrowCounterRef.current = resetCounter;
+        setLiveThrowCounter(resetCounter);
+
+        setTimeout(async () => {
+          const video = videoRef.current;
+          if (video) {
+            video.srcObject = stream;
+            video.muted = true;
+            try {
+              await video.play();
+            } catch {}
+          }
+        }, 60);
+
+        if (voiceControlEnabled) {
+          startVoiceCommandListener();
+        }
+
+        speakCoachMessage(
+          'Kamera-Assistent aktiv. Stelle dich ans Oche. Ich melde mich automatisch mit Position in Ordnung, sobald du komplett im Blick bist.',
+          true
+        );
+        setStatusMessage(
+          '🎙️ Live-Kamera & Sprachsteuerung aktiv: Stelle dich ans Oche. Bei „Position i.O.“ einfach „Start“ rufen (5s Countdown + Auto-Stopp nach 3 Darts)!'
+        );
+      } catch (err) {
+        console.error('Kamera-Zugriff nicht möglich:', err);
+        setStatusMessage(
+          '⚠️ Kamera konnte nicht geöffnet werden. Bitte Kamera-Berechtigung im Browser erlauben.'
+        );
+      }
+    },
+    [
+      cameraFacingMode,
+      ensureLandmarker,
+      speakCoachMessage,
+      startVoiceCommandListener,
+      stopCameraStream,
+      voiceControlEnabled,
+    ]
+  );
+
+  // Echtzeit-Schleife während Live-Kamera: Prüft 4x/Sekunde "Position i.O." & zählt im Aufnahmemodus die 3 Darts!
+  useEffect(() => {
+    if (!isLiveCameraActive) return;
+
+    const interval = setInterval(() => {
+      const detected = detectPoseOnCurrentFrame();
+      currentPoseRef.current = detected;
+      setCurrentPose(detected);
+
+      const check = evaluateFramingAndPosition(detected, handedness);
+      setFramingCheck(check);
+
+      // A) WÄHREND DER POSITIONIERUNG (Vor dem Countdown):
+      if (!isLiveRecordingRef.current && !isCountingDownRef.current) {
+        if (check.isPositionIO) {
+          positionIoStreakRef.current += 1;
+          // Sobald der Spieler ~1 Sekunde stabil perfekt im Bild steht -> Automatisch "Position i.O." melden!
+          if (positionIoStreakRef.current >= 4 && !hasAnnouncedPositionIoRef.current) {
+            hasAnnouncedPositionIoRef.current = true;
+            playCoachTone('position_io');
+            speakCoachMessage(
+              'Position in Ordnung! Alle 70 Punkte im Blick. Sage Start für den 5-Sekunden-Countdown.',
+              true
+            );
+          }
+        } else {
+          positionIoStreakRef.current = 0;
+          if (check.status === 'missing') {
+            hasAnnouncedPositionIoRef.current = false;
+          }
+          // Gezielte Sprach-Korrektur alle 6.5 Sekunden, falls der Spieler angeschnitten im Bild steht
+          const now = Date.now();
+          if (
+            check.status === 'adjust' &&
+            now - lastVoiceFeedbackTimestampRef.current > 6500
+          ) {
+            speakCoachMessage(check.voicePrompt, false);
+          }
+        }
+      }
+
+      // B) WÄHREND DER LAUFENDEN VIDEOAUFNAHME: Live-3-Dart-Zähler & Auto-Stopp!
+      if (isLiveRecordingRef.current) {
+        const elapsed = (performance.now() - recordingStartTimestampRef.current) / 1000;
+        setLiveRecordingElapsedSec(Math.round(elapsed * 10) / 10);
+
+        const { nextState, justDetectedDartNumber } = updateLiveThrowCounter(
+          liveThrowCounterRef.current,
+          detected,
+          videoDims,
+          elapsed,
+          {
+            ...DEFAULT_CAPTURE_CONFIG,
+            mode: captureSessionMode,
+          }
+        );
+
+        liveThrowCounterRef.current = nextState;
+        setLiveThrowCounter(nextState);
+
+        if (justDetectedDartNumber !== null) {
+          playCoachTone('dart_detected');
+          if (justDetectedDartNumber < 3 || captureSessionMode === 'full_leg_multi_visit') {
+            speakCoachMessage(`Dart ${justDetectedDartNumber}`, true);
+          }
+        }
+
+        // Automatischer Stopp nach 3 Darts (+ 1.2s Nachlauf für kompletten Follow-Through)
+        // oder Sicherheits-Timeout nach 35s im 3-Dart-Modus
+        if (
+          nextState.shouldAutoStop ||
+          (captureSessionMode === 'single_visit_3_darts' && elapsed >= 35.0)
+        ) {
+          handleStopLiveRecording('auto_3_darts');
+        }
+      }
+    }, 240);
+
+    return () => clearInterval(interval);
+  }, [
+    captureSessionMode,
+    detectPoseOnCurrentFrame,
+    handedness,
+    handleStopLiveRecording,
+    isLiveCameraActive,
+    playCoachTone,
+    speakCoachMessage,
+    videoDims,
+  ]);
 
   // ============================================================================
   // HAUPT-AKTION: AUTOMATISCHE 3-DART KINEMATIK- & WURFANALYSE (iOS-SICHER!)
@@ -1779,19 +2325,19 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         </div>
       </div>
 
-      {/* 2. HAUPT-WORKFLOW: 1. Video laden -> 2. 3-Dart-Analyse starten */}
+      {/* 2. HAUPT-WORKFLOW: 1a. Video laden | 1b. Live-Kamera & Sprach-Coach | 2. 3-Dart-Analyse starten */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
-        <label className="md:col-span-4 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl bg-slate-900/85 hover:bg-slate-800/90 border border-white/10 cursor-pointer transition-all shadow-md">
-          <div className="flex items-center gap-3 min-w-0">
+        <label className="md:col-span-3 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl bg-slate-900/85 hover:bg-slate-800/90 border border-white/10 cursor-pointer transition-all shadow-md">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center shrink-0">
               <Upload className="w-5 h-5 text-cyan-400" />
             </div>
             <div className="min-w-0">
               <div className="text-xs font-black text-white truncate">
-                {hasUploadedVideo ? '1. Anderes Video wählen' : '1. Wurf-Video auswählen'}
+                {hasUploadedVideo && !isLiveCameraActive ? '1a. Anderes Video' : '1a. Video-Datei'}
               </div>
               <p className="text-[11px] text-slate-400 truncate">
-                {hasUploadedVideo ? 'Aufnahme bereit · 100% On-Device' : '💡 Empfohlen: 60/120/240 FPS Slow-Mo'}
+                Aus Galerie laden
               </p>
             </div>
           </div>
@@ -1799,9 +2345,45 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         </label>
 
         <button
+          type="button"
+          onClick={() =>
+            isLiveCameraActive ? stopCameraStream() : handleStartLiveVoiceCoach(cameraFacingMode)
+          }
+          className={`md:col-span-4 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-md cursor-pointer text-left ${
+            isLiveCameraActive
+              ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.25)]'
+              : 'bg-slate-900/85 hover:bg-slate-800/90 border-emerald-500/30 text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                isLiveCameraActive
+                  ? 'bg-emerald-500 text-slate-950 border-emerald-300 animate-pulse'
+                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
+              }`}
+            >
+              <Mic className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-black text-white flex items-center gap-1.5 truncate">
+                <span>
+                  {isLiveCameraActive
+                    ? '🎙️ Sprach-Coach aktiv (Beenden)'
+                    : '1b. 🎙️ Kamera & Sprach-Start'}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-300/90 truncate">
+                „Position i.O.“ · „Start“ (5s) · Auto-Stopp (3 Darts)
+              </p>
+            </div>
+          </div>
+        </button>
+
+        <button
           onClick={handleRunBiomechanicsAnalysis}
-          disabled={!hasUploadedVideo || isScanning}
-          className={`md:col-span-8 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-lg text-left ${
+          disabled={!hasUploadedVideo || isScanning || isLiveCameraActive}
+          className={`md:col-span-5 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-lg text-left ${
             !hasUploadedVideo
               ? 'bg-slate-900/40 border-white/5 opacity-50 cursor-not-allowed'
               : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 border-emerald-300 hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-[0.99] cursor-pointer'
@@ -2102,6 +2684,158 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     className="absolute inset-0 w-full h-full pointer-events-none"
                   />
                 </div>
+
+                {/* 3-METER FERN-AMPEL & SPRACH-COACH OVERLAY IM LIVE-KAMERA-MODUS */}
+                {isLiveCameraActive && (
+                  <div
+                    className={`absolute inset-0 pointer-events-none rounded-2xl border-[6px] transition-all duration-300 flex flex-col justify-between p-3 ${
+                      isLiveRecording
+                        ? 'border-rose-500 shadow-[inset_0_0_35px_rgba(244,63,94,0.45)]'
+                        : framingCheck?.isPositionIO
+                        ? 'border-emerald-400 shadow-[inset_0_0_40px_rgba(16,185,129,0.45)]'
+                        : framingCheck?.status === 'adjust'
+                        ? 'border-amber-400 shadow-[inset_0_0_35px_rgba(251,191,36,0.35)]'
+                        : 'border-rose-500/80 shadow-[inset_0_0_30px_rgba(244,63,94,0.3)]'
+                    }`}
+                  >
+                    {/* OBERES FERN-BANNER (Aus 3 Metern am Oche lesbar!) */}
+                    <div className="flex flex-col gap-2 pointer-events-auto">
+                      <div
+                        className={`w-full px-3.5 py-2.5 rounded-xl backdrop-blur-md border text-center shadow-xl ${
+                          isLiveRecording
+                            ? 'bg-rose-950/90 border-rose-400 text-white'
+                            : framingCheck?.isPositionIO
+                            ? 'bg-emerald-950/90 border-emerald-400 text-emerald-200'
+                            : framingCheck?.status === 'adjust'
+                            ? 'bg-amber-950/90 border-amber-400 text-amber-200'
+                            : 'bg-slate-950/90 border-rose-500/50 text-rose-200'
+                        }`}
+                      >
+                        <div className="text-sm sm:text-base font-black tracking-wide uppercase">
+                          {isLiveRecording
+                            ? `🔴 AUFNAHME LÄUFT (${liveRecordingElapsedSec.toFixed(1)}s) · DART ${liveThrowCounter.completedDartsInVisit} / 3`
+                            : framingCheck?.shortBadge || 'PRÜFE POSITION AM OCHE...'}
+                        </div>
+                        <div className="text-[11px] sm:text-xs font-semibold opacity-95 mt-0.5">
+                          {isLiveRecording
+                            ? captureSessionMode === 'single_visit_3_darts'
+                              ? 'Automatischer Stopp direkt nach deinem 3. Dart (oder rufe „Stopp“)'
+                              : `Ganzes-Leg-Modus aktiv · Gesamt-Darts: ${liveThrowCounter.totalCompletedDartsInLeg}`
+                            : framingCheck?.voicePrompt ||
+                              'Stelle dich seitlich ans Oche. Sage „Position“ oder „Start“.'}
+                        </div>
+                      </div>
+
+                      {/* Kompakte Steuer-Pills für Kamera-Wechsel, Sprach-Befehle & Leg-Vorbereitung */}
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 bg-slate-950/85 border border-white/15 px-2.5 py-1.5 rounded-xl backdrop-blur-md">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300">
+                          <Volume2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate max-w-[200px]">
+                            {lastHeardCommand
+                              ? `Gehört: „${lastHeardCommand}“`
+                              : isListeningVoice
+                              ? 'Hört zu: „Position“, „Start“, „Stopp“'
+                              : 'Sprach-Tipps aktiv'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCaptureSessionMode((m) =>
+                                m === 'single_visit_3_darts'
+                                  ? 'full_leg_multi_visit'
+                                  : 'single_visit_3_darts'
+                              )
+                            }
+                            className={`px-2 py-1 rounded-lg text-[10px] font-black border cursor-pointer ${
+                              captureSessionMode === 'single_visit_3_darts'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                            }`}
+                            title="Umschalten zwischen 3-Dart-Auto-Stopp und vorbereitetem Ganzes-Leg-Modus"
+                          >
+                            {captureSessionMode === 'single_visit_3_darts'
+                              ? '🎯 Stopp: Nach 3 Darts'
+                              : '🏁 Ganzes Leg (Multi-Visit)'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleStartLiveVoiceCoach(
+                                cameraFacingMode === 'environment' ? 'user' : 'environment'
+                              )
+                            }
+                            className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold border border-white/15 cursor-pointer flex items-center gap-1"
+                          >
+                            <Camera className="w-3 h-3" />
+                            <span>{cameraFacingMode === 'environment' ? 'Rück' : 'Front'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* RIESIGER 5-SEKUNDEN-COUNTDOWN IN DER BILDMITTE (5 - 4 - 3 - 2 - 1 - LOS!) */}
+                    {countdownRemaining !== null && (
+                      <div className="my-auto flex flex-col items-center justify-center">
+                        <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-slate-950/90 border-4 border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.75)] flex flex-col items-center justify-center animate-pulse">
+                          <span className="text-5xl sm:text-6xl font-black text-emerald-300 font-mono">
+                            {countdownRemaining === 0 ? 'LOS!' : countdownRemaining}
+                          </span>
+                          <span className="text-[11px] font-bold text-white uppercase tracking-widest mt-1">
+                            {countdownRemaining === 0 ? 'Wirf 3 Darts' : 'Sekunden'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* UNTERE LEISTE IM LIVE-MODUS: 3-DART-FORTSCHRITT & DIREKT-START/STOPP-BUTTON */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/90 border border-white/15 p-2.5 rounded-xl backdrop-blur-md pointer-events-auto">
+                      <div className="flex items-center gap-1.5">
+                        {[1, 2, 3].map((dNum) => {
+                          const done = liveThrowCounter.completedDartsInVisit >= dNum;
+                          return (
+                            <div
+                              key={dNum}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-black border transition-all ${
+                                done
+                                  ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
+                                  : 'bg-slate-900 text-slate-400 border-white/10'
+                              }`}
+                            >
+                              Dart {dNum} {done ? '✓' : ''}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {!isLiveRecording ? (
+                          <button
+                            type="button"
+                            onClick={triggerFiveSecondCountdown}
+                            disabled={countdownRemaining !== null}
+                            className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                          >
+                            {countdownRemaining !== null
+                              ? `Countdown (${countdownRemaining}s)...`
+                              : '▶️ 5s-Countdown starten („Start“)'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleStopLiveRecording('manual_stop')}
+                            className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-black text-xs cursor-pointer shadow-lg"
+                          >
+                            ⏹️ Jetzt stoppen & analysieren („Stopp“)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

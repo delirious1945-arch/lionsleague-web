@@ -1696,3 +1696,331 @@ export function calculateThrowScanIntervals(
   ];
 }
 
+
+
+// ============================================================================
+// 9. ECHTZEIT-POSITIONS-PRÜFER ("POSITION I.O."), LIVE-3-DART-AUTO-STOPP
+//    & ZUKUNFTSSICHERE MULTI-VISIT / GANZES-LEG ARCHITEKTUR
+// ============================================================================
+
+export type CaptureSessionMode = 'single_visit_3_darts' | 'full_leg_multi_visit';
+
+export interface CaptureTargetConfig {
+  mode: CaptureSessionMode;
+  countdownSeconds: number; // Standard: 5 Sekunden ("5 - 4 - 3 - 2 - 1 - Los!")
+  targetDartsPerVisit: number; // Standard: 3 Darts pro Aufnahme
+  targetVisits: number; // 1 = Einzelaufnahme (3 Darts), >1 = Ganzes Leg (Multi-Visit)
+  autoStopAfterTargetDarts: boolean; // Automatischer Stopp nach 3 Darts
+  postThrowTailSeconds: number; // Nachlaufzeit nach Dart 3 für kompletten Follow-Through (1.2s)
+}
+
+export const DEFAULT_CAPTURE_CONFIG: CaptureTargetConfig = {
+  mode: 'single_visit_3_darts',
+  countdownSeconds: 5,
+  targetDartsPerVisit: 3,
+  targetVisits: 1,
+  autoStopAfterTargetDarts: true,
+  postThrowTailSeconds: 1.2,
+};
+
+export interface FramingCheckResult {
+  status: 'optimal' | 'adjust' | 'missing';
+  isPositionIO: boolean;
+  shortBadge: string;
+  voicePrompt: string;
+  confidencePct: number;
+  checks: {
+    headVisible: boolean;
+    armVisible: boolean;
+    hipVisible: boolean;
+    forwardClearanceOk: boolean;
+    verticalFramingOk: boolean;
+  };
+}
+
+/**
+ * Prüft im Live-Kamera-Sucher anhand des 70-Punkte-Skeletts, ob der Spieler
+ * optimal im Bild steht ("Position i.O.") oder gibt konkrete gesprochene
+ * Korrekturanweisungen für 2–3 Meter Entfernung am Oche.
+ */
+export function evaluateFramingAndPosition(
+  pose: PoseKeypoints | null | undefined,
+  handedness: 'right' | 'left' = 'right'
+): FramingCheckResult {
+  if (!pose || !pose.isRealDetection || (pose.confidenceScore ?? 0) < 0.55) {
+    return {
+      status: 'missing',
+      isPositionIO: false,
+      shortBadge: 'KEIN SPIELER IM BILD',
+      voicePrompt: 'Noch kein Spieler erkannt. Bitte stelle dich seitlich ans Oche ins Kamerabild.',
+      confidencePct: Math.round((pose?.confidenceScore ?? 0) * 100),
+      checks: {
+        headVisible: false,
+        armVisible: false,
+        hipVisible: false,
+        forwardClearanceOk: false,
+        verticalFramingOk: false,
+      },
+    };
+  }
+
+  const confPct = Math.round((pose.confidenceScore ?? 0.85) * 100);
+  const isRight = handedness === 'right';
+
+  // 1. Vertikale Sichtbarkeit: Kopf oben + Hüfte/Übergabepunkt unten im Bild?
+  const headVisible = pose.head.y >= 0.05 && pose.head.y <= 0.65 && pose.head.x >= 0.06 && pose.head.x <= 0.94;
+  const hipVisible = pose.hip.y >= 0.35 && pose.hip.y <= 0.93 && pose.hip.x >= 0.06 && pose.hip.x <= 0.94;
+  const verticalFramingOk = headVisible && hipVisible && pose.hip.y - pose.head.y >= 0.22;
+
+  // 2. Wurfarm-Sichtbarkeit (Schulter, Ellenbogen, Handgelenk)
+  const armVisible =
+    pose.shoulder.x >= 0.06 &&
+    pose.shoulder.x <= 0.94 &&
+    pose.elbow.x >= 0.05 &&
+    pose.elbow.x <= 0.95 &&
+    pose.wrist.x >= 0.04 &&
+    pose.wrist.x <= 0.96 &&
+    confPct >= 70;
+
+  // 3. Platzreserve nach vorne in Wurfrichtung (damit der ausgestreckte Arm beim Follow-Through im Bild bleibt)
+  const forwardSpace = isRight ? 1.0 - pose.shoulder.x : pose.shoulder.x;
+  const backSpace = isRight ? pose.shoulder.x : 1.0 - pose.shoulder.x;
+  const forwardClearanceOk = forwardSpace >= 0.32 && backSpace >= 0.12;
+
+  if (!headVisible && pose.head.y < 0.06) {
+    return {
+      status: 'adjust',
+      isPositionIO: false,
+      shortBadge: 'KOPF ABGESCHNITTEN · ZU NAH',
+      voicePrompt: 'Dein Kopf ist oben am Bildrand abgeschnitten. Bitte einen halben Schritt zurücktreten.',
+      confidencePct: confPct,
+      checks: { headVisible, armVisible, hipVisible, forwardClearanceOk, verticalFramingOk },
+    };
+  }
+
+  if (!hipVisible || pose.hip.y > 0.93) {
+    return {
+      status: 'adjust',
+      isPositionIO: false,
+      shortBadge: 'HÜFTE / ÜBERGABEPUNKT NICHT IM BILD',
+      voicePrompt: 'Deine Hüfte für den Übergabepunkt ist unten nicht im Bild. Bitte Kamera leicht tiefer neigen oder etwas zurücktreten.',
+      confidencePct: confPct,
+      checks: { headVisible, armVisible, hipVisible, forwardClearanceOk, verticalFramingOk },
+    };
+  }
+
+  if (forwardSpace < 0.32) {
+    return {
+      status: 'adjust',
+      isPositionIO: false,
+      shortBadge: 'MEHR PLATZ IN WURFRICHTUNG NÖTIG',
+      voicePrompt: 'Vor deinem Wurfarm ist zu wenig Platz im Bild. Bitte einen halben Schritt zurück vom Oche-Rand im Kamerabild.',
+      confidencePct: confPct,
+      checks: { headVisible, armVisible, hipVisible, forwardClearanceOk, verticalFramingOk },
+    };
+  }
+
+  if (backSpace < 0.12) {
+    return {
+      status: 'adjust',
+      isPositionIO: false,
+      shortBadge: 'ZU WEIT AM HINTEREN BILDRAND',
+      voicePrompt: 'Du stehst zu weit am hinteren Bildrand. Bitte einen kleinen Schritt nach vorne ins Bild rücken.',
+      confidencePct: confPct,
+      checks: { headVisible, armVisible, hipVisible, forwardClearanceOk, verticalFramingOk },
+    };
+  }
+
+  if (!armVisible) {
+    return {
+      status: 'adjust',
+      isPositionIO: false,
+      shortBadge: 'WURFARM NOCH UNKLAR',
+      voicePrompt: 'Dein Wurfarm ist noch nicht vollständig frei sichtbar. Bitte frei seitlich zur Kamera stellen.',
+      confidencePct: confPct,
+      checks: { headVisible, armVisible, hipVisible, forwardClearanceOk, verticalFramingOk },
+    };
+  }
+
+  return {
+    status: 'optimal',
+    isPositionIO: true,
+    shortBadge: 'POSITION I.O. · ALLE 70 PUNKTE IM BLICK',
+    voicePrompt: 'Position in Ordnung! Alles perfekt im Blick. Sage Start für den 5-Sekunden-Countdown.',
+    confidencePct: confPct,
+    checks: {
+      headVisible: true,
+      armVisible: true,
+      hipVisible: true,
+      forwardClearanceOk: true,
+      verticalFramingOk: true,
+    },
+  };
+}
+
+// ----------------------------------------------------------------------------
+// 9b. ECHTZEIT-WURFZÄHLER FÜR AUTOMATISCHEN STOPP NACH 3 DARTS (ODER MULTI-VISIT LEG)
+// ----------------------------------------------------------------------------
+export interface LiveThrowCounterState {
+  completedDartsInVisit: number;
+  totalCompletedDartsInLeg: number;
+  currentVisitIndex: number;
+  isCockedInDrawback: boolean;
+  minElbowAngleInDrawback: number;
+  lastThrowTimestampSec: number;
+  dartTimestampsSec: number[];
+  shouldAutoStop: boolean;
+}
+
+export function createInitialLiveThrowCounter(): LiveThrowCounterState {
+  return {
+    completedDartsInVisit: 0,
+    totalCompletedDartsInLeg: 0,
+    currentVisitIndex: 1,
+    isCockedInDrawback: false,
+    minElbowAngleInDrawback: 180,
+    lastThrowTimestampSec: -10,
+    dartTimestampsSec: [],
+    shouldAutoStop: false,
+  };
+}
+
+export function updateLiveThrowCounter(
+  state: LiveThrowCounterState,
+  pose: PoseKeypoints,
+  dims: { width: number; height: number },
+  elapsedRecordingSec: number,
+  config: CaptureTargetConfig = DEFAULT_CAPTURE_CONFIG
+): { nextState: LiveThrowCounterState; justDetectedDartNumber: number | null } {
+  const next: LiveThrowCounterState = {
+    ...state,
+    dartTimestampsSec: [...state.dartTimestampsSec],
+  };
+  let justDetectedDartNumber: number | null = null;
+
+  if (!pose.isRealDetection || (pose.confidenceScore ?? 0) < 0.58) {
+    // Prüfe trotzdem, ob der Nachlauf nach dem 3. Dart bereits abgelaufen ist
+    if (
+      config.autoStopAfterTargetDarts &&
+      config.mode === 'single_visit_3_darts' &&
+      next.completedDartsInVisit >= config.targetDartsPerVisit &&
+      elapsedRecordingSec - next.lastThrowTimestampSec >= config.postThrowTailSeconds
+    ) {
+      next.shouldAutoStop = true;
+    }
+    return { nextState: next, justDetectedDartNumber };
+  }
+
+  const elbowAngle = calculateElbowAngle(pose, dims);
+  const timeSinceLastDart = elapsedRecordingSec - next.lastThrowTimestampSec;
+
+  // 1. Aushol-Detektion (Drawback / Set-Point oben am Kopf/Schulter):
+  // Hand ist auf/über Ellenbogenhöhe und der Ellenbogen ist gebeugt (< 102 Grad)
+  const isHandElevated = pose.wrist.y <= pose.elbow.y + 0.07;
+  if (timeSinceLastDart >= 1.15 && isHandElevated && elbowAngle <= 102) {
+    next.isCockedInDrawback = true;
+    if (elbowAngle < next.minElbowAngleInDrawback) {
+      next.minElbowAngleInDrawback = elbowAngle;
+    }
+  }
+
+  // 2. Abwurf- & Follow-Through-Detektion:
+  // Aus der geladenen Drawback-Position streckt sich der Arm signifikant nach vorne (>= +26 Grad & >= 116 Grad)
+  if (
+    next.isCockedInDrawback &&
+    timeSinceLastDart >= 1.35 &&
+    elbowAngle >= Math.max(116, next.minElbowAngleInDrawback + 26)
+  ) {
+    next.completedDartsInVisit += 1;
+    next.totalCompletedDartsInLeg += 1;
+    next.lastThrowTimestampSec = elapsedRecordingSec;
+    next.dartTimestampsSec.push(Math.round(elapsedRecordingSec * 100) / 100);
+    next.isCockedInDrawback = false;
+    next.minElbowAngleInDrawback = 180;
+    justDetectedDartNumber = next.completedDartsInVisit;
+  }
+
+  // 3. Auto-Stopp-Prüfung nach Erreichen der 3 Darts + Nachlaufzeit (1.2s für vollen Follow-Through)
+  if (
+    config.autoStopAfterTargetDarts &&
+    config.mode === 'single_visit_3_darts' &&
+    next.completedDartsInVisit >= config.targetDartsPerVisit &&
+    elapsedRecordingSec - next.lastThrowTimestampSec >= config.postThrowTailSeconds
+  ) {
+    next.shouldAutoStop = true;
+  }
+
+  return { nextState: next, justDetectedDartNumber };
+}
+
+// ----------------------------------------------------------------------------
+// 9c. VORBEREITETE GANZES-LEG (MULTI-VISIT) SEGMENTIERUNGS-ARCHITEKTUR
+// ----------------------------------------------------------------------------
+export interface VisitBiomechanicsBlock {
+  visitNumber: number; // 1..N Aufnahmen im Leg
+  startSec: number;
+  endSec: number;
+  trajectories: ThrowTrajectory[];
+  dispersion: ThreeDartDispersion;
+  avgElbowDropMm: number;
+  consistencyScore: number;
+}
+
+export interface LegBiomechanicsSession {
+  sessionId: string;
+  mode: CaptureSessionMode;
+  totalVisits: number;
+  totalDartsAnalyzed: number;
+  visits: VisitBiomechanicsBlock[];
+  // Ermüdungs- & Druck-Metriken über ein gesamtes Leg (First-9 vs. Checkout-Phase)
+  firstThreeVisitsScore: number;
+  lateLegVisitsScore: number;
+  fatigueElbowDropDeltaMm: number;
+}
+
+/**
+ * Erkennt in einer längeren Leg-Aufnahme automatisch die aktiven Oche-Präsenzphasen
+ * (Visit 1, Visit 2, ... Visit N) und blendet Leerlauf-Phasen (Gang zum Board / Warten) aus.
+ * Dadurch skaliert die Engine künftig nahtlos von 3 Darts (1 Visit) auf ein ganzes Leg (z.B. 15-24 Darts).
+ */
+export function segmentMultiVisitLegStreams(
+  presenceTimeline: Array<{ timeSec: number; isPlayerAtOche: boolean }>,
+  minVisitDurationSec: number = 4.5
+): Array<{ visitNumber: number; startSec: number; endSec: number }> {
+  const visits: Array<{ visitNumber: number; startSec: number; endSec: number }> = [];
+  if (!presenceTimeline || presenceTimeline.length === 0) return visits;
+
+  let inVisit = false;
+  let currentStart = 0;
+
+  for (let i = 0; i < presenceTimeline.length; i++) {
+    const sample = presenceTimeline[i];
+    if (sample.isPlayerAtOche && !inVisit) {
+      inVisit = true;
+      currentStart = sample.timeSec;
+    } else if (!sample.isPlayerAtOche && inVisit) {
+      const duration = sample.timeSec - currentStart;
+      if (duration >= minVisitDurationSec) {
+        visits.push({
+          visitNumber: visits.length + 1,
+          startSec: Math.round(currentStart * 10) / 10,
+          endSec: Math.round(sample.timeSec * 10) / 10,
+        });
+      }
+      inVisit = false;
+    }
+  }
+
+  if (inVisit) {
+    const lastSec = presenceTimeline[presenceTimeline.length - 1].timeSec;
+    if (lastSec - currentStart >= minVisitDurationSec) {
+      visits.push({
+        visitNumber: visits.length + 1,
+        startSec: Math.round(currentStart * 10) / 10,
+        endSec: Math.round(lastSec * 10) / 10,
+      });
+    }
+  }
+
+  return visits;
+}

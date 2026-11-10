@@ -34,6 +34,10 @@ import {
   computeThrowKinematics,
   calculateThrowScanIntervals,
   buildHiddenBiomechanicalRig,
+  evaluateFramingAndPosition,
+  createInitialLiveThrowCounter,
+  updateLiveThrowCounter,
+  segmentMultiVisitLegStreams,
   PoseKeypoints,
   ScannedFrame,
   ThrowTrajectory,
@@ -424,6 +428,54 @@ const missingComponents = [
   },
 ];
 
+
+
+// 16. Test Sprach-Coach ("Position i.O."), 5s-Countdown, 3-Dart-Auto-Stopp & Ganzes-Leg-Segmentierung
+{
+  const optimalPose: PoseKeypoints = {
+    head: { x: 0.42, y: 0.22 },
+    shoulder: { x: 0.42, y: 0.36 },
+    elbow: { x: 0.52, y: 0.38 },
+    wrist: { x: 0.60, y: 0.34 },
+    hip: { x: 0.42, y: 0.66 },
+    isRealDetection: true,
+    confidenceScore: 0.92,
+  };
+  const framing = evaluateFramingAndPosition(optimalPose, 'right');
+
+  // Simuliere 3 Darts im Live-Recorder + 1.3s Nachlaufzeit -> Auto-Stopp muss auslösen!
+  let counter = createInitialLiveThrowCounter();
+  const cockedPose: PoseKeypoints = { ...optimalPose, wrist: { x: 0.44, y: 0.32 } }; // ~55° Drawback
+  const releasePose: PoseKeypoints = { ...optimalPose, wrist: { x: 0.66, y: 0.36 } }; // ~165° Release
+
+  for (let d = 0; d < 3; d++) {
+    const tBase = d * 3.0 + 1.5;
+    counter = updateLiveThrowCounter(counter, cockedPose, dims, tBase).nextState;
+    counter = updateLiveThrowCounter(counter, releasePose, dims, tBase + 1.5).nextState;
+  }
+  const afterTail = updateLiveThrowCounter(counter, releasePose, dims, 11.0).nextState;
+
+  // Simuliere Ganzes-Leg-Segmentierung (2 Visits am Oche + Gang zum Board dazwischen)
+  const legVisits = segmentMultiVisitLegStreams([
+    { timeSec: 0, isPlayerAtOche: true },
+    { timeSec: 6.5, isPlayerAtOche: true },
+    { timeSec: 7.0, isPlayerAtOche: false },
+    { timeSec: 14.0, isPlayerAtOche: true },
+    { timeSec: 21.0, isPlayerAtOche: false },
+  ]);
+
+  const passed =
+    framing.isPositionIO &&
+    afterTail.completedDartsInVisit === 3 &&
+    afterTail.shouldAutoStop &&
+    legVisits.length === 2;
+
+  auditResults.push({
+    check: 'Sprach-Coach („Position i.O.“), 3-Dart-Auto-Stopp & Ganzes-Leg-Architektur',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Framing=${framing.status} | Darts=${afterTail.completedDartsInVisit}/3 (AutoStop=${afterTail.shouldAutoStop}) | Leg-Visits=${legVisits.length}`,
+  });
+}
 
 // 15. Test 70-Punkte-Hintergrundnetz (33 MediaPipe + 7 Basis-Knoten + 30 Wurfarm-Subknoten)
 {
