@@ -622,24 +622,31 @@ export async function processSpieltagImport(
   const existingBeforeCount = Number(existingCountRows[0]?.cnt || 0);
 
   // 3. Bestehende Matches dieses Teams an diesem Tag löschen (Deduplizierung)
+  // WICHTIG: Saubere Löschung sowohl mit exaktem event_name als auch mit altem/generischem Format
   await sql`
     DELETE FROM analytics_visits
     WHERE leg_id IN (
       SELECT l.id FROM analytics_legs l
       JOIN analytics_matches m ON l.match_id = m.id
-      WHERE m.match_date = ${matchdayDate} AND m.season = ${season} AND m.event_name = ${eventName}
+      WHERE m.match_date = ${matchdayDate} 
+        AND m.season = ${season} 
+        AND (m.event_name = ${eventName} OR m.event_name = 'Lions League' OR m.event_name ILIKE ${`%(${team})%`})
     )
   `;
   await sql`
     DELETE FROM analytics_legs
     WHERE match_id IN (
       SELECT id FROM analytics_matches
-      WHERE match_date = ${matchdayDate} AND season = ${season} AND event_name = ${eventName}
+      WHERE match_date = ${matchdayDate} 
+        AND season = ${season} 
+        AND (event_name = ${eventName} OR event_name = 'Lions League' OR event_name ILIKE ${`%(${team})%`})
     )
   `;
   await sql`
     DELETE FROM analytics_matches
-    WHERE match_date = ${matchdayDate} AND season = ${season} AND event_name = ${eventName}
+    WHERE match_date = ${matchdayDate} 
+      AND season = ${season} 
+      AND (event_name = ${eventName} OR event_name = 'Lions League' OR event_name ILIKE ${`%(${team})%`})
   `;
 
   if (syncLeague) {
@@ -848,9 +855,23 @@ export async function processSpieltagImport(
 
         const isPlayerA =
           vPlayer === homePlayer.toLowerCase() ||
-          vPlayer.includes(homePlayer.split(' ')[0].toLowerCase());
+          (homePlayer.length > 2 && vPlayer.includes(homePlayer.toLowerCase())) ||
+          (homePlayer.split(' ')[0].length > 2 && vPlayer.split(' ')[0] === homePlayer.split(' ')[0].toLowerCase());
 
-        const vPid = isPlayerA ? pAId : pBId;
+        let vPid = 0;
+        if (isDouble) {
+          // Im Doppel: prüfe ob Spieler zu Team A (dA1, dA2) oder Team B (dB1, dB2) gehört
+          const matchA1 = dA1Id > 0 && (vPlayer === playerRows.find(p => Number(p.id) === dA1Id)?.name?.toLowerCase() || vPlayer.includes(playerRows.find(p => Number(p.id) === dA1Id)?.name?.split(' ')[0]?.toLowerCase() || ''));
+          const matchA2 = dA2Id > 0 && (vPlayer === playerRows.find(p => Number(p.id) === dA2Id)?.name?.toLowerCase() || vPlayer.includes(playerRows.find(p => Number(p.id) === dA2Id)?.name?.split(' ')[0]?.toLowerCase() || ''));
+          if (matchA1) vPid = dA1Id;
+          else if (matchA2) vPid = dA2Id;
+          else if (isPlayerA) vPid = dA1Id || pAId;
+          else vPid = dB1Id || pBId;
+        } else {
+          // Im Einzel: IMMER strikt zwischen pAId und pBId unterscheiden
+          vPid = isPlayerA ? pAId : pBId;
+        }
+
         if (isPlayerA) visitsA.push(score);
         else visitsB.push(score);
 
@@ -1213,6 +1234,59 @@ export async function processSpieltagImport(
         }
       }
     }
+  }
+
+  // 7. AUTOMATISCHER INTEGRITÄTS-CHECK & KORREKTUR
+  // Stellt sicher, dass keine doppelten Legs oder verwaiste/falsche Visits entstehen
+  try {
+    // 7a. Doppelte Legs deduplizieren (falls CSV mehrfache Legs für selbes Match enthielt)
+    await sql`
+      DELETE FROM analytics_visits
+      WHERE leg_id IN (
+        SELECT l.id
+        FROM analytics_legs l
+        JOIN (
+          SELECT match_id, leg_num, MIN(id) as keep_id
+          FROM analytics_legs
+          WHERE match_id IN (SELECT id FROM analytics_matches WHERE match_date = ${matchdayDate} AND season = ${season})
+          GROUP BY match_id, leg_num
+          HAVING count(*) > 1
+        ) dup ON l.match_id = dup.match_id AND l.leg_num = dup.leg_num AND l.id > dup.keep_id
+      )
+    `;
+    await sql`
+      DELETE FROM analytics_legs
+      WHERE id IN (
+        SELECT l.id
+        FROM analytics_legs l
+        JOIN (
+          SELECT match_id, leg_num, MIN(id) as keep_id
+          FROM analytics_legs
+          WHERE match_id IN (SELECT id FROM analytics_matches WHERE match_date = ${matchdayDate} AND season = ${season})
+          GROUP BY match_id, leg_num
+          HAVING count(*) > 1
+        ) dup ON l.match_id = dup.match_id AND l.leg_num = dup.leg_num AND l.id > dup.keep_id
+      )
+    `;
+
+    // 7b. Falsche Zuordnungen in Einzelmatches prüfen & säubern
+    // (Falls ein Visit fälschlicherweise eine player_id erhalten hat, die gar nicht an dem Match teilnimmt)
+    await sql`
+      UPDATE analytics_visits v
+      SET player_id = 0
+      FROM analytics_legs l
+      JOIN analytics_matches m ON l.match_id = m.id
+      WHERE v.leg_id = l.id
+        AND m.match_date = ${matchdayDate}
+        AND m.season = ${season}
+        AND m.player_a_name NOT LIKE '%&%'
+        AND m.player_b_name NOT LIKE '%&%'
+        AND v.player_id > 0
+        AND v.player_id != m.player_a_id
+        AND v.player_id != m.player_b_id
+    `;
+  } catch (checkErr) {
+    console.warn('Integritäts-Check Warnung:', checkErr);
   }
 
   const updatedCount = Math.min(countMatches, existingBeforeCount);
