@@ -152,15 +152,20 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [viewMode, setViewMode] = useState<'video' | 'isolated'>('video');
   const [zoomMode, setZoomMode] = useState<'upper_body' | 'full'>('upper_body');
 
-  // 5. AUTO-TRIGGER (Freihändige Wurf-Erkennung)
+  // 5. AUTO-TRIGGER (Freihändige Wurf-Erkennung ab Hüfthöhe)
   const [autoTriggerEnabled, setAutoTriggerEnabled] = useState<boolean>(true);
+  const isScanningRef = useRef<boolean>(false);
   const autoTriggerStateRef = useRef<{
     inDrawback: boolean;
+    hasReachedDrawback: boolean;
+    prevWristY: number;
     currentDartSlot: number;
     bufferPts: TrajectoryPoint[];
     minElbowAngle: number;
   }>({
     inDrawback: false,
+    hasReachedDrawback: false,
+    prevWristY: 0,
     currentDartSlot: 0,
     bufferPts: [],
     minElbowAngle: 180,
@@ -480,8 +485,15 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setSnapshots(null);
     setIsPlaying(false);
     setIsAnalysisLocked(false);
+    setTrajectories([
+      { id: 1, points: [], releaseSpeedKmh: 21.4, launchAngleDeg: 14.2, elbowDropMm: -3.2 },
+      { id: 2, points: [], releaseSpeedKmh: 21.1, launchAngleDeg: 13.8, elbowDropMm: -4.1 },
+      { id: 3, points: [], releaseSpeedKmh: 21.6, launchAngleDeg: 14.9, elbowDropMm: -2.8 },
+    ]);
     autoTriggerStateRef.current = {
       inDrawback: false,
+      hasReachedDrawback: false,
+      prevWristY: 0,
       currentDartSlot: 0,
       bufferPts: [],
       minElbowAngle: 180,
@@ -529,14 +541,21 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     video.pause();
     setIsPlaying(false);
     setIsScanning(true);
+    isScanningRef.current = true;
     setScanProgress(5);
     setStatusMessage('Initialisiere KI-Landmarker & iOS Video-Decoder...');
+
+    // Während der Analyse noch keine Kurven anzeigen
+    setTrajectories([
+      { id: 1, points: [], releaseSpeedKmh: 21.4, launchAngleDeg: 14.2, elbowDropMm: -3.2 },
+      { id: 2, points: [], releaseSpeedKmh: 21.1, launchAngleDeg: 13.8, elbowDropMm: -4.1 },
+      { id: 3, points: [], releaseSpeedKmh: 21.6, launchAngleDeg: 14.9, elbowDropMm: -2.8 },
+    ]);
 
     // 1. Sicherstellen, dass MediaPipe geladen ist
     await ensureLandmarker();
 
     // 2. WICHTIG FÜR iOS SAFARI: Hardware-Frame-Decoder im User-Click-Handler aufwecken!
-    // Ohne kurzes play()/pause() bleibt video.readyState auf iOS Safari bei < 2 und liefert kein Bild!
     try {
       video.muted = true;
       await video.play();
@@ -551,7 +570,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ? false
         : vidDuration > 32;
 
-    // 3. Zuverlässiges Seek mit echtem Frame-Flush (iOS WebKit braucht ~35ms nach 'seeked' für drawImage!)
+    // 3. Zuverlässiges Seek mit echtem Frame-Flush
     const seekTo = (t: number) =>
       new Promise<void>((resolve) => {
         let resolved = false;
@@ -559,21 +578,20 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           if (!resolved) {
             resolved = true;
             video.removeEventListener('seeked', onSeeked);
-            // Warte 1 Animation-Frame + 25ms, damit der Video-Frame-Buffer garantiert auf dem Canvas liegt
             requestAnimationFrame(() => {
-              setTimeout(resolve, 25);
+              setTimeout(resolve, 18);
             });
           }
         };
         const onSeeked = () => finish();
         video.addEventListener('seeked', onSeeked);
         video.currentTime = Math.max(0.02, Math.min(vidDuration - 0.02, t));
-        setTimeout(finish, 420); // Großzügiges Timeout für iOS Hardware-Seeks
+        setTimeout(finish, 400);
       });
 
     const throwIntervals = calculateThrowScanIntervals(vidDuration, isSlowMo);
 
-    // 4. Ausgangsposition / Nullpunkt auf echtem Frame ermitteln
+    // 4. Ausgangsposition / Nullpunkt am Übergabepunkt von Dart 1 ermitteln
     await seekTo(throwIntervals[0].startSec);
     const initialDetected = detectPoseOnCurrentFrame();
     const base = baselinePose?.isRealDetection ? baselinePose : initialDetected;
@@ -585,22 +603,29 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     const masterTimeline: TimelinePoseFrame[] = [];
 
     // Nullpunkt am Videoanfang verankern
+    await seekTo(0.1);
+    const startVideoPose = detectPoseOnCurrentFrame();
     masterTimeline.push({
       timeSec: 0,
-      pose: base,
+      pose: startVideoPose.isRealDetection ? startVideoPose : base,
     });
-    if (throwIntervals[0].startSec > 0.5) {
-      masterTimeline.push({
-        timeSec: Math.max(0.1, throwIntervals[0].startSec - 0.5),
-        pose: base,
-      });
+
+    // Einige Stützframes vor Dart 1 für flüssiges Skelett-Tracking vor dem ersten Wurf
+    if (throwIntervals[0].startSec > 2.0) {
+      const preSteps = 3;
+      for (let s = 1; s <= preSteps; s++) {
+        const tPre = (throwIntervals[0].startSec * s) / (preSteps + 1);
+        await seekTo(tPre);
+        const pPre = detectPoseOnCurrentFrame();
+        masterTimeline.push({ timeSec: tPre, pose: pPre });
+      }
     }
 
     let dart1Snapshots: Record<PhaseKey, PhaseSnapshot> | null = null;
-    let bestDisplayTime = throwIntervals[0].startSec;
-    let bestDisplayPose: PoseKeypoints = initialDetected;
 
-    setStatusMessage('Vermesse echte Arm-Rotationskurven für Dart 1, Dart 2 und Dart 3...');
+    setStatusMessage(
+      'Vermesse komplette Handgelenk-Kurven ab Hüfthöhe (Übergabepunkt) für Dart 1, Dart 2 und Dart 3...'
+    );
 
     for (let throwIdx = 0; throwIdx < throwIntervals.length; throwIdx++) {
       const th = throwIntervals[throwIdx];
@@ -636,14 +661,30 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         setScanProgress(overallProgress);
       }
 
-      // Berechne die anatomische Unterarm-Pendel-Trajektorie über das dedizierte Engine-Modul!
+      // Zwischen-Frames in der Pause bis zum nächsten Dart scannen (nur für flüssige Skelett-Rückführung zur Hüfte, OHNE Linien-Aufzeichnung!)
+      if (throwIdx < throwIntervals.length - 1) {
+        const nextStart = throwIntervals[throwIdx + 1].startSec;
+        const gapDur = nextStart - th.endSec;
+        if (gapDur > 1.0) {
+          const gapSteps = 4;
+          for (let g = 1; g <= gapSteps; g++) {
+            const tGap = th.endSec + (gapDur * g) / (gapSteps + 1);
+            await seekTo(tGap);
+            const pGap = detectPoseOnCurrentFrame();
+            masterTimeline.push({ timeSec: tGap, pose: pGap });
+          }
+        }
+      }
+
+      // Berechne die durchgehende, ungeglättete Handgelenks-Trajektorie vom Übergabepunkt (Hüfthöhe) bis Follow-Through!
       const built = buildAnatomicalArmTrajectory(scannedFrames, videoDims, handedness, throwIdx);
       const kin = computeThrowKinematics(
         built.points,
         videoDims,
         mmPerPx,
         isSlowMo,
-        slowMoFps === 120 ? 4.0 : 8.0
+        slowMoFps === 120 ? 4.0 : 8.0,
+        built.releaseFrame.timeSec
       );
       const worstElbowDrop = Math.min(
         built.drawbackFrame.deltaElbowY_mm,
@@ -673,13 +714,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       });
 
       if (throwIdx === 0) {
-        bestDisplayTime = built.releaseFrame.timeSec;
-        bestDisplayPose = built.releaseFrame.pose;
         dart1Snapshots = {
           baseline: {
             key: 'baseline',
-            title: '1. Nullpunkt',
-            subtitle: 'Ausgangshaltung',
+            title: '1. Übergabepunkt',
+            subtitle: 'Start ab Hüfthöhe',
             timeSec: scannedFrames[0].timeSec,
             pose: scannedFrames[0].pose,
             elbowAngle: scannedFrames[0].elbowAngle,
@@ -724,42 +763,38 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       }
     }
 
-    // 5. Springe auf das finale Release-Bild und führe eine finale Echtbild-Vermessung durch,
-    // damit Skelett und Trajektorien zu 100% deckungsgleich auf dem sichtbaren Standbild sitzen!
-    setActivePhase('release');
-    await seekTo(bestDisplayTime);
-    const liveFinalPose = detectPoseOnCurrentFrame();
-    const finalActivePose = liveFinalPose.isRealDetection ? liveFinalPose : bestDisplayPose;
+    // 5. Nach Abschluss der Analyse zurück zum Video-Anfang (0.1s) springen:
+    // Auf dem Standbild sind noch KEINE Kurven sichtbar – sie werden erst beim Abspielen
+    // synchron mit der Bewegung des Arms ab Hüfthöhe eingezeichnet!
+    setActivePhase('baseline');
+    await seekTo(0.1);
+    const initialPoseAtZero = detectPoseOnCurrentFrame();
+    const readyPose = initialPoseAtZero.isRealDetection ? initialPoseAtZero : base;
     masterTimeline.push({
       timeSec: vidDuration,
-      pose: finalActivePose,
+      pose: masterTimeline[masterTimeline.length - 1]?.pose || readyPose,
     });
     masterTimeline.sort((a, b) => a.timeSec - b.timeSec);
     poseTimelineRef.current = masterTimeline;
 
-    currentPoseRef.current = finalActivePose;
-    setCurrentPose(finalActivePose);
+    currentPoseRef.current = readyPose;
+    setCurrentPose(readyPose);
+    setCurrentTime(0.1);
 
-    // Die 3 ermittelten Original-Wurfkurven direkt und unverfälscht fixieren
+    // Die 3 ermittelten Original-Wurfkurven hinterlegen (werden beim Abspielen zeitgesteuert gezeichnet)
     setTrajectories(newTrajectories);
     setIsAnalysisLocked(true);
     setActiveThrowIdx(-1);
     if (dart1Snapshots) {
-      setSnapshots({
-        ...dart1Snapshots,
-        release: {
-          ...dart1Snapshots.release,
-          pose: finalActivePose,
-          elbowAngle: calcElbowAngle(finalActivePose),
-        },
-      });
+      setSnapshots(dart1Snapshots);
     }
     setShowOverlay(true);
     setShowTrajectory(true);
+    isScanningRef.current = false;
     setIsScanning(false);
 
     setStatusMessage(
-      '✓ Alle 3 Darts vermessen! Die Wurfbahnen folgen exakt der Unterarm-Rotation vom Ausholen bis zum Release.'
+      '✓ Analyse bereit! Drücke jetzt auf „Abspielen“, damit die Wurfkurven live ab dem Übergabepunkt (Hüfthöhe) mit der Bewegung des Arms eingezeichnet werden.'
     );
   };
 
@@ -777,18 +812,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setShowOverlay(true);
   };
 
-  // Statischer Zoom-Mittelpunkt: Orientiert sich fest am Rumpf/Schulter des Spielers (ohne bewegte Hand!),
-  // damit das Bild während der Wurfbewegung und bei der Wiedergabe absolut stabil steht und niemals driftet!
+  // Statischer Zoom-Mittelpunkt: Orientiert sich fest am Rumpf/Hüfte-zu-Kopf-Bereich (inkl. Übergabepunkt auf Hüfthöhe!),
+  // damit das Bild während der gesamten Wurfbewegung ab Hüfthöhe absolut stabil steht und niemals driftet!
   const dynamicZoomOrigin = useMemo(() => {
     const p = baselinePose || snapshots?.baseline?.pose;
     if (p) {
       const cxRaw = (p.shoulder.x + p.elbow.x) / 2;
-      const cyRaw = (p.head.y + p.shoulder.y + p.hip.y) / 3;
+      const cyRaw = (p.head.y * 0.85 + p.shoulder.y + p.hip.y * 1.15) / 3;
       const cx = Math.round(Math.max(15, Math.min(85, cxRaw * 100)));
       const cy = Math.round(Math.max(15, Math.min(85, cyRaw * 100)));
       return `${cx}% ${cy}%`;
     }
-    return '52% 42%';
+    return '52% 45%';
   }, [baselinePose, snapshots]);
 
   // Aktive Kinematik-Kennzahlen für das Diagnose-Cockpit
@@ -943,10 +978,13 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
       ctx.font = `${Math.round(9 * scale)}px sans-serif`;
       ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
-      ctx.fillText('D1 (Blau) | D2 (Cyan) | D3 (Violett) • 1-Euro-Filter aktiv', 14 * scale, 38 * scale);
+      ctx.fillText('D1 (Blau) | D2 (Cyan) | D3 (Violett) • 1:1 Original-Spur ab Hüfthöhe', 14 * scale, 38 * scale);
     }
 
-    // 1. FILIGRANE 2PX TRAJEKTORIEN + LAUNCH-ANGLE-VEKTOR & SPEED-BADGE
+    const activePoseForOverlay = poseOverride || currentPoseRef.current || currentPose;
+    const vidTime = videoRef.current ? videoRef.current.currentTime : currentTime;
+
+    // 1. UNGEGLÄTTETE 1:1 HANDGELENK-TRAJEKTORIEN AB HÜFTHÖHE (ZEITSYNCHRON BEIM ABSPIELEN)
     if (showTrajectory) {
       const throwsToRender =
         activeThrowIdx === -1
@@ -960,13 +998,43 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ];
 
       throwsToRender.forEach((tr, idx) => {
-        const pts = tr.points;
+        const fullPts = tr.points;
+        if (fullPts.length < 2) return;
+
+        // Beim analysierten Video werden die Kurven erst beim Abspielen synchron mit der Armbewegung eingezeichnet!
+        let pts: TrajectoryPoint[];
+        if (isAnalysisLocked) {
+          const filtered = fullPts.filter((pt) => pt.timeSec <= vidTime + 0.025);
+          const firstTime = fullPts[0].timeSec;
+          const lastTime = fullPts[fullPts.length - 1].timeSec;
+          if (
+            vidTime >= firstTime &&
+            vidTime <= lastTime &&
+            activePoseForOverlay &&
+            filtered.length >= 1
+          ) {
+            pts = [
+              ...filtered,
+              {
+                x: activePoseForOverlay.wrist.x,
+                y: activePoseForOverlay.wrist.y,
+                timeSec: vidTime,
+              },
+            ];
+          } else {
+            pts = filtered;
+          }
+        } else {
+          pts = fullPts;
+        }
+
+        // Solange der Spieler diesen Dart noch nicht am Übergabepunkt (Hüfthöhe) aufgenommen hat: Noch keine Kurve zeigen!
         if (pts.length < 2) return;
 
         const color = colors[(tr.id - 1) % colors.length];
 
         ctx.strokeStyle = color;
-        // 1. Soft Glow (Leuchtkontur im Hintergrund - exakt auf den Handgelenkspunkten)
+        // 1. Soft Glow (Leuchtkontur im Hintergrund - exakt 1:1 auf den Handgelenkspunkten ohne Glättung)
         ctx.globalAlpha = 0.25;
         ctx.lineWidth = 3.8 * scale;
         ctx.lineCap = 'round';
@@ -978,7 +1046,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         }
         ctx.stroke();
 
-        // 2. Feingranulare Laser-Kernlinie (direkt von Punkt zu Punkt ohne Eckenbeschneidung)
+        // 2. Feingranulare Laser-Kernlinie (1:1 jede Bewegung des Handgelenks ohne Glättung)
         ctx.globalAlpha = 0.95;
         ctx.lineWidth = 1.8 * scale;
         ctx.lineCap = 'round';
@@ -993,64 +1061,84 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
         ctx.globalAlpha = 1.0;
 
-        // Startpunkt (Drawback)
+        // Startpunkt am Übergabepunkt (Hüfthöhe)
         const first = pts[0];
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(first.x * w, first.y * h, 2.5 * scale, 0, Math.PI * 2);
+        ctx.arc(first.x * w, first.y * h, 3.0 * scale, 0, Math.PI * 2);
         ctx.fill();
 
-        // Release-Punkt (Apex)
-        const last = pts[pts.length - 1];
-        const rx = tr.releasePoint ? tr.releasePoint.x * w : last.x * w;
-        const ry = tr.releasePoint ? tr.releasePoint.y * h : last.y * h;
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(rx, ry, 3.8 * scale, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.3 * scale;
-        ctx.stroke();
+        const releaseSec = tr.releaseTimeSec ?? fullPts[fullPts.length - 1].timeSec;
+        const hasReachedRelease = !isAnalysisLocked || vidTime >= releaseSec;
 
-        // LAUNCH-ANGLE-RADAR: Feiner Tangential-Pfeil am Release für den ersten/aktiven Wurf
-        if (idx === 0) {
-          const deg = tr.launchAngleDeg ?? 14.2;
-          const rad = (-deg * Math.PI) / 180;
-          const arrowLen = 26 * scale;
-          const ax = rx + Math.cos(rad) * arrowLen;
-          const ay = ry + Math.sin(rad) * arrowLen;
-
-          ctx.strokeStyle = 'rgba(16, 185, 129, 0.85)';
-          ctx.lineWidth = 1.6 * scale;
-          ctx.setLineDash([3 * scale, 2 * scale]);
+        if (!hasReachedRelease) {
+          // Aktuelle Handgelenks-Spitze während des Hochführens / Ausholens markieren
+          const tip = pts[pts.length - 1];
+          ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.moveTo(rx, ry);
-          ctx.lineTo(ax, ay);
+          ctx.arc(tip.x * w, tip.y * h, 3.4 * scale, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.2 * scale;
           ctx.stroke();
-          ctx.setLineDash([]);
-        }
+        } else {
+          // Release-Punkt (Apex) + Launch-Vektor + Badge erst anzeigen, sobald der Abwurf erfolgt ist
+          const last = fullPts[fullPts.length - 1];
+          const rx = tr.releasePoint ? tr.releasePoint.x * w : last.x * w;
+          const ry = tr.releasePoint ? tr.releasePoint.y * h : last.y * h;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(rx, ry, 3.8 * scale, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.3 * scale;
+          ctx.stroke();
 
-        // Dezenter Mini-Badge (D1, D2, D3 + Speed beim Einzelwurf)
-        const badgeLabel =
-          throwsToRender.length === 1 && tr.releaseSpeedKmh
-            ? `D${tr.id} • ${tr.releaseSpeedKmh} km/h • ${tr.launchAngleDeg ?? 14}°`
-            : `D${tr.id}`;
-        ctx.font = `bold ${Math.round(9.5 * scale)}px sans-serif`;
-        const tw = ctx.measureText(badgeLabel).width;
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-        ctx.beginPath();
-        ctx.roundRect(rx + 6 * scale, ry - 8 * scale, tw + 8 * scale, 14 * scale, 4 * scale);
-        ctx.fill();
-        ctx.fillStyle = color;
-        ctx.fillText(badgeLabel, rx + 10 * scale, ry + 2.5 * scale);
+          // LAUNCH-ANGLE-RADAR: Feiner Tangential-Pfeil am Release für den ersten/aktiven Wurf
+          if (idx === 0) {
+            const deg = tr.launchAngleDeg ?? 14.2;
+            const rad = (-deg * Math.PI) / 180;
+            const arrowLen = 26 * scale;
+            const ax = rx + Math.cos(rad) * arrowLen;
+            const ay = ry + Math.sin(rad) * arrowLen;
+
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.85)';
+            ctx.lineWidth = 1.6 * scale;
+            ctx.setLineDash([3 * scale, 2 * scale]);
+            ctx.beginPath();
+            ctx.moveTo(rx, ry);
+            ctx.lineTo(ax, ay);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+
+          // Dezenter Mini-Badge (D1, D2, D3 + Speed beim Einzelwurf)
+          const badgeLabel =
+            throwsToRender.length === 1 && tr.releaseSpeedKmh
+              ? `D${tr.id} • ${tr.releaseSpeedKmh} km/h • ${tr.launchAngleDeg ?? 14}°`
+              : `D${tr.id}`;
+          ctx.font = `bold ${Math.round(9.5 * scale)}px sans-serif`;
+          const tw = ctx.measureText(badgeLabel).width;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+          ctx.beginPath();
+          ctx.roundRect(rx + 6 * scale, ry - 8 * scale, tw + 8 * scale, 14 * scale, 4 * scale);
+          ctx.fill();
+          ctx.fillStyle = color;
+          ctx.fillText(badgeLabel, rx + 10 * scale, ry + 2.5 * scale);
+        }
       });
 
-      // VISUELLE 3-DART RELEASE-STREUUNGSELLIPSE (BBDV-CLUSTER)
+      // VISUELLE 3-DART RELEASE-STREUUNGSELLIPSE (BBDV-CLUSTER): Erst anzeigen, sobald mind. 2 Darts abgeworfen wurden
+      const completedReleases = throwsToRender.filter((tr) => {
+        const relSec = tr.releaseTimeSec ?? tr.points[tr.points.length - 1]?.timeSec ?? 0;
+        return !isAnalysisLocked || vidTime >= relSec;
+      });
+
       if (
-        throwsToRender.length > 1 &&
+        completedReleases.length > 1 &&
         activeMetrics.dispersion.releaseDispersionMm > 0
       ) {
-        const releasePts = throwsToRender.map((tr) => {
+        const releasePts = completedReleases.map((tr) => {
           const pt = tr.releasePoint || (tr.points.length > 0 ? tr.points[tr.points.length - 1] : { x: 0.5, y: 0.3 });
           return { x: pt.x * w, y: pt.y * h };
         });
@@ -1305,6 +1393,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     showFootTriangle,
     trajectories,
     activeThrowIdx,
+    isAnalysisLocked,
+    currentTime,
     activeMetrics.isElbowDropping,
     activeMetrics.dispersion.dispersionRating,
     activeMetrics.dispersion.releaseDispersionMm,
@@ -1798,7 +1888,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               >
                 <div
                   style={{
-                    transform: zoomMode === 'upper_body' ? 'scale(2.85)' : 'scale(1)',
+                    transform: zoomMode === 'upper_body' ? 'scale(2.15)' : 'scale(1)',
                     transformOrigin: dynamicZoomOrigin,
                   }}
                   className="w-full h-full relative"
@@ -1830,6 +1920,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                       }
                     }}
                     onTimeUpdate={() => {
+                      if (isScanningRef.current) return;
                       const vid = videoRef.current;
                       if (!vid) return;
                       if (poseTimelineRef.current.length > 0) {
@@ -1843,43 +1934,60 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
                       setCurrentTime(vid.currentTime);
 
-                      // LIVE-TRACKING & AUTO-TRIGGER WÄHREND DER WIEDERGABE
+                      // LIVE-TRACKING & AUTO-TRIGGER WÄHREND DER WIEDERGABE (VOM ÜBERGABEPUNKT AB HÜFTHÖHE)
                       if (isPlaying || Math.abs(vid.playbackRate) > 0) {
                         const detected = detectPoseOnCurrentFrame();
                         currentPoseRef.current = detected;
                         setCurrentPose(detected);
 
-                        // Wenn bereits analysiert wurde, bleiben die 3 Kurven fest an ihrer Original-Position fixiert!
-                        if (!isAnalysisLocked) {
+                        if (!isAnalysisLocked && autoTriggerEnabled) {
                           const curAngle = calcElbowAngle(detected);
                           const curWrist = detected.wrist;
+                          const st = autoTriggerStateRef.current;
+                          const isAtHipLevel = curWrist.y >= detected.elbow.y + 0.01;
 
-                          if (autoTriggerEnabled) {
-                            const st = autoTriggerStateRef.current;
-                            if (curAngle < st.minElbowAngle) {
-                              st.minElbowAngle = curAngle;
-                            }
-                            // Wurf-Beginn: Ausholen registrieren
-                            if (!st.inDrawback && curAngle < 85) {
-                              st.inDrawback = true;
+                          if (curAngle < st.minElbowAngle) {
+                            st.minElbowAngle = curAngle;
+                          }
+
+                          // 1. Übergabepunkt unten auf Hüfthöhe: Solange die Hand unten an der Hüfte den neuen Dart greift,
+                          // wird der Startpunkt für den aktuellen Dart neu an der Hüfte gesetzt.
+                          if (!st.inDrawback && isAtHipLevel) {
+                            st.inDrawback = true;
+                            st.hasReachedDrawback = false;
+                            st.bufferPts = [{ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime }];
+                          } else if (st.inDrawback) {
+                            // Falls die Hand zu Beginn noch leicht Richtung Hüfte absinkt, Startpunkt am tiefsten Punkt nachführen
+                            if (
+                              !st.hasReachedDrawback &&
+                              st.bufferPts.length <= 4 &&
+                              isAtHipLevel &&
+                              curWrist.y >= st.prevWristY
+                            ) {
                               st.bufferPts = [{ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime }];
-                            } else if (st.inDrawback) {
-                              // Alle Handgelenkspositionen 1:1 unverändert anhängen (ohne Glättung, ohne Abschneiden!)
+                            } else {
+                              // Jede Bewegung vom Handgelenk ab dem Übergabepunkt (Hüfthöhe) 1:1 ohne Glättung aufzeichnen!
                               const lastPt = st.bufferPts[st.bufferPts.length - 1];
-                              if (!lastPt || Math.hypot(lastPt.x - curWrist.x, lastPt.y - curWrist.y) > 0.002) {
+                              if (!lastPt || Math.hypot(lastPt.x - curWrist.x, lastPt.y - curWrist.y) > 0.0015) {
                                 st.bufferPts.push({ x: curWrist.x, y: curWrist.y, timeSec: vid.currentTime });
                               }
+                            }
 
-                              const slot = st.currentDartSlot % 3;
-                              const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
-                              const kin = computeThrowKinematics(
-                                st.bufferPts,
-                                videoDims,
-                                mmPerPx,
-                                (vid.duration || 0) > 40
-                              );
+                            // Prüfen, ob der Arm bereits oben zum Gesicht ausgeholt hat (Drawback)
+                            if (curWrist.y <= detected.elbow.y + 0.04 && curAngle < 88) {
+                              st.hasReachedDrawback = true;
+                            }
 
-                              // Komplette Original-Punkte live im Canvas sichtbar halten
+                            const slot = st.currentDartSlot % 3;
+                            const mmPerPx = getMmPerPx(baselinePose || detected, videoDims);
+                            const kin = computeThrowKinematics(
+                              st.bufferPts,
+                              videoDims,
+                              mmPerPx,
+                              (vid.duration || 0) > 40
+                            );
+
+                            if (st.bufferPts.length >= 2) {
                               setTrajectories((prev) => {
                                 const next = [...prev];
                                 next[slot] = {
@@ -1891,16 +1999,25 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                                 };
                                 return next;
                               });
+                            }
 
-                              // Wurf abgeschlossen (Arm nach vorne durchgestreckt) -> Kurve bleibt dauerhaft fixiert!
-                              if (curAngle > 115 && st.bufferPts.length >= 6) {
-                                st.inDrawback = false;
-                                st.currentDartSlot = (st.currentDartSlot + 1) % 3;
-                                st.bufferPts = [];
-                                st.minElbowAngle = 180;
-                              }
+                            // Wurf abgeschlossen (Nach dem Ausholen komplett nach vorne durchgestreckt oder Arm sinkt nach Wurf wieder Richtung Hüfte):
+                            // Nächste Kurve beginnt wieder neu unten am Übergabepunkt, sobald der nächste Dart genommen wird!
+                            const isFollowThroughDone =
+                              st.hasReachedDrawback &&
+                              st.bufferPts.length >= 8 &&
+                              (curAngle >= 145 || curWrist.y > detected.elbow.y + 0.04);
+
+                            if (isFollowThroughDone) {
+                              st.inDrawback = false;
+                              st.hasReachedDrawback = false;
+                              st.currentDartSlot = (st.currentDartSlot + 1) % 3;
+                              st.bufferPts = [];
+                              st.minElbowAngle = 180;
                             }
                           }
+
+                          st.prevWristY = curWrist.y;
                         }
                       }
                     }}
@@ -2074,7 +2191,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   <span>Wurf-Steckbrief & Live-Telemetrie</span>
                 </h2>
                 <p className="text-[11px] text-slate-400">
-                  Kern-Kennzahlen für {user.name} • 1-Euro-Glättung aktiv
+                  Kern-Kennzahlen für {user.name} • 1:1 Handgelenk-Spur ab Hüfthöhe (ohne Glättung)
                 </p>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap justify-end">

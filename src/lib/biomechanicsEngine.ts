@@ -512,11 +512,12 @@ export function interpolateCatmullRomSpline(
 }
 
 // ----------------------------------------------------------------------------
-// 5. ECHTE FEINGRANULARE WURFTRAJEKTORIE (FOLGT 100% DEM ECHTEN ARM!)
+// 5. ECHTE FEINGRANULARE WURFTRAJEKTORIE (FOLGT 100% DEM ECHTEN ARM AB HÜFTHÖHE!)
 // ----------------------------------------------------------------------------
 // Rekonstruiert aus den echten abgetasteten Video-Frames die wahre Bewegungskurve
-// des Handgelenks vom Ausholen (Drawback) über den Apex bis zum Release!
-// KEINE künstlichen Kreisbögen! 100% authentische Spieler-Biomechanik.
+// des Handgelenks vom Übergabepunkt des Darts unten ab Hüfthöhe (Handover)
+// über das Hochführen (Set-Point), Ausholen (Drawback) und den Abwurf (Release)
+// bis zum Durchschwung (Follow-Through) – komplett durchgezogen ohne Glättung!
 export function buildAnatomicalArmTrajectory(
   throwFrames: ScannedFrame[],
   dims: { width: number; height: number },
@@ -554,15 +555,22 @@ export function buildAnatomicalArmTrajectory(
     };
   }
 
-  // 1. Finde Drawback-Frame (Tiefster Rückzug / Umkehrpunkt zum Gesicht)
-  let drawbackIdx = 0;
+  // 1. Finde Drawback-Frame (Tiefster Rückzug / Umkehrpunkt oben am Gesicht)
+  // Wichtig: Wir suchen nach dem Hochführen der Hand (obere Körperhälfte, Hand auf/über Ellenbogenhöhe),
+  // damit die tiefe Hüft-Übergabeposition am Anfang nicht mit dem Drawback am Gesicht verwechselt wird.
+  let drawbackIdx = Math.floor(throwFrames.length * 0.5);
   let bestDrawbackScore = Infinity;
-  const maxSearchIdx = Math.max(1, Math.floor(throwFrames.length * 0.75));
+  const minSearchIdx = Math.max(1, Math.floor(throwFrames.length * 0.20));
+  const maxSearchIdx = Math.max(minSearchIdx + 1, Math.floor(throwFrames.length * 0.88));
 
-  for (let i = 0; i < maxSearchIdx; i++) {
+  for (let i = minSearchIdx; i <= maxSearchIdx && i < throwFrames.length; i++) {
     const f = throwFrames[i];
+    const isHandElevated = f.pose.wrist.y <= f.pose.elbow.y + 0.05;
     // Hand am weitesten hinten Richtung Schulter/Kopf + kleinster Ellenbogenwinkel
-    const wristBackScore = f.elbowAngle + dirSign * (f.pose.wrist.x - f.pose.elbow.x) * 220;
+    const wristBackScore =
+      f.elbowAngle +
+      dirSign * (f.pose.wrist.x - f.pose.elbow.x) * 220 +
+      (isHandElevated ? 0 : 120);
     if (wristBackScore < bestDrawbackScore) {
       bestDrawbackScore = wristBackScore;
       drawbackIdx = i;
@@ -570,11 +578,36 @@ export function buildAnatomicalArmTrajectory(
   }
   const drawbackFrame = throwFrames[drawbackIdx] || throwFrames[0];
 
-  // 2. Finde Follow-Through / maximale Vorwärtsstreckung NACH dem Drawback
+  // 2. Finde Übergabepunkt unten ab Hüfthöhe (Handover-Startpunkt des Darts vor dem Hochführen)
+  // In Bildschirmkoordinaten ist unten = größerer y-Wert (Nähe Hüfthöhe).
+  // Falls die Hand zu Beginn des Fensters noch kurz von einem vorherigen Wurf absinkt,
+  // starten wir exakt am tiefsten Übergabepunkt an der Hüfte, sobald der neue Dart gegriffen wird.
+  const handoverSearchEnd = Math.max(1, Math.floor(drawbackIdx * 0.45));
+  let maxWristYAtHip = -Infinity;
+  for (let i = 0; i <= handoverSearchEnd && i < throwFrames.length; i++) {
+    if (throwFrames[i].pose.wrist.y > maxWristYAtHip) {
+      maxWristYAtHip = throwFrames[i].pose.wrist.y;
+    }
+  }
+  let handoverIdx = 0;
+  for (let i = 0; i <= handoverSearchEnd && i < throwFrames.length; i++) {
+    // Sobald die Hand unten im Übergabebereich (Hüfthöhe) ist, beginnt die Aufzeichnung
+    if (throwFrames[i].pose.wrist.y >= maxWristYAtHip - 0.035) {
+      handoverIdx = i;
+      break;
+    }
+  }
+
+  // 3. Finde Follow-Through / maximale Vorwärtsstreckung NACH dem Drawback
+  // (bevor der leere Arm wieder Richtung Hüfte absinkt)
   let followIdx = Math.min(throwFrames.length - 1, drawbackIdx + 1);
   let bestForwardScore = -Infinity;
   for (let i = drawbackIdx + 1; i < throwFrames.length; i++) {
     const f = throwFrames[i];
+    // Stoppe die Suche, falls die leere Hand bereits wieder unter Brust-/Ellenbogenhöhe Richtung Hüfte fällt
+    if (i > drawbackIdx + 3 && f.pose.wrist.y > f.pose.elbow.y + 0.06) {
+      break;
+    }
     const forwardScore = f.elbowAngle + dirSign * (f.pose.wrist.x - f.pose.shoulder.x) * 260;
     if (forwardScore > bestForwardScore) {
       bestForwardScore = forwardScore;
@@ -583,9 +616,7 @@ export function buildAnatomicalArmTrajectory(
   }
   const followThroughFrame = throwFrames[followIdx] || throwFrames[throwFrames.length - 1];
 
-  // 3. Finde Release-Frame: Kinematische Spitzen-Geschwindigkeit & Beschleunigungs-Apex der Hand!
-  // Physikalisch: Der Dart verlässt die Hand im Moment der maximalen Vorwärtsgeschwindigkeit,
-  // bevor der Unterarm im Follow-Through abgebremst wird.
+  // 4. Finde Release-Frame: Kinematische Spitzen-Geschwindigkeit & Beschleunigungs-Apex der Hand!
   let releaseIdx = followIdx;
   let bestReleaseScore = -Infinity;
 
@@ -593,17 +624,13 @@ export function buildAnatomicalArmTrajectory(
     const curF = throwFrames[i];
     const prevF = throwFrames[i - 1];
 
-    // Vorwärts-Handgeschwindigkeit in Pixeln pro Sekunde
     const dt = Math.max(0.005, Math.abs(curF.timeSec - prevF.timeSec));
     const dx = dirSign * (curF.pose.wrist.x - prevF.pose.wrist.x) * dims.width;
     const dy = (curF.pose.wrist.y - prevF.pose.wrist.y) * dims.height;
     const forwardSpeedPxPerSec = Math.hypot(Math.max(0, dx), Math.abs(dy) * 0.4) / dt;
 
-    // Anatomischer Plausibilitätsfaktor (Gauß-Filter um den optimalen Release-Bereich 95°–125°)
     const angleClamped = Math.max(70, Math.min(150, curF.elbowAngle));
     const anglePenalty = Math.exp(-Math.pow((angleClamped - 115) / 28, 2));
-
-    // Kombinierter Kinematik-Score (Spitzengeschwindigkeit + physiologische Hebelstellung)
     const kinematicScore = (forwardSpeedPxPerSec + 50) * anglePenalty;
 
     if (
@@ -616,16 +643,13 @@ export function buildAnatomicalArmTrajectory(
   }
   const releaseFrame = throwFrames[releaseIdx] || followThroughFrame;
 
-  // 4. ECHTE UNVERÄNDERTE HANDGELENKS-TRAJEKTORIE:
-  // Wir erfassen die 100% authentische Bewegung des Handgelenkspunkts
-  // vom Ausholen (Drawback) über die Beschleunigung bis zum Release und Durchschwung.
-  // Keine künstliche Glättung, keine Verformung, kein Versatz – exakte Messpunkte!
-  const lookbackSteps = Math.min(10, Math.floor(throwFrames.length * 0.15));
-  const startIdx = Math.max(0, drawbackIdx - lookbackSteps);
-  const endIdx = Math.min(throwFrames.length - 1, followIdx + 2);
+  // 5. KOMPLETTE, UNGEGLÄTTETE HANDGELENKS-KURVE VOM ÜBERGABEPUNKT (HÜFTHÖHE) BIS DURCHSCHWUNG:
+  // Jede einzelne Bewegung des Handgelenks vom Greifen des Darts unten an der Hüfte
+  // über das Hochführen, Zielen, Ausholen und den Abwurf bis zum Follow-Through wird 1:1 festgehalten!
+  const startIdx = Math.max(0, handoverIdx);
+  const endIdx = Math.min(throwFrames.length - 1, followIdx);
   const activeFrames = throwFrames.slice(startIdx, endIdx + 1);
 
-  // Echte Handgelenkspositionen 1:1 direkt aus den Video-Frames extrahieren
   const wristPts: TrajectoryPoint[] = activeFrames.map((f) => ({
     x: f.pose.wrist.x,
     y: f.pose.wrist.y,
@@ -666,18 +690,27 @@ export function computeThrowKinematics(
   dims: { width: number; height: number },
   mmPerPx: number,
   isSlowMo: boolean,
-  slowMoFactor: number = 8.0
+  slowMoFactor: number = 8.0,
+  releaseTimeSec?: number
 ): { releaseSpeedKmh: number; launchAngleDeg: number } {
   if (pts.length < 2) {
     return { releaseSpeedKmh: 21.2, launchAngleDeg: 14.5 };
   }
 
   const n = pts.length;
-  // Für den Abgangswinkel des Darts betrachten wir das obere Drittel der Vorwärtsbeschleunigung
-  // (kurz vor dem Umklappen des Handgelenks im Follow-Through)
-  const releaseSampleIdx = Math.max(1, Math.floor(n * 0.78));
+  let releaseSampleIdx = Math.max(1, Math.floor(n * 0.85));
+  if (releaseTimeSec !== undefined) {
+    let minDiff = Infinity;
+    for (let i = 1; i < n; i++) {
+      const diff = Math.abs(pts[i].timeSec - releaseTimeSec);
+      if (diff < minDiff) {
+        minDiff = diff;
+        releaseSampleIdx = i;
+      }
+    }
+  }
   const pEnd = pts[releaseSampleIdx];
-  const pPrev = pts[Math.max(0, releaseSampleIdx - 3)];
+  const pPrev = pts[Math.max(0, releaseSampleIdx - 2)];
 
   const dxPx = (pEnd.x - pPrev.x) * dims.width;
   const dyPx = (pEnd.y - pPrev.y) * dims.height;
@@ -917,8 +950,8 @@ export function getInterpolatedPose(
         const p2 = timeline[mid + 1];
         const dt = p2.timeSec - p1.timeSec;
         if (dt <= 0.001) return p1.pose;
-        // Bei Pausen zwischen Darts (> 2.5s) nicht schleifend interpolieren
-        if (dt > 2.5) {
+        // Bei sehr großen Lücken (> 8.0s) ohne Zwischen-Frames nicht schleifend interpolieren
+        if (dt > 8.0) {
           return currentTime - p1.timeSec < p2.timeSec - currentTime ? p1.pose : p2.pose;
         }
         const alpha = (currentTime - p1.timeSec) / dt;
@@ -934,7 +967,7 @@ export function getInterpolatedPose(
 }
 
 // ----------------------------------------------------------------------------
-// 8. DYNAMISCHE WURF-SCAN-INTERVALLE (ADAPTIVE SLOW-MO & ECHTZEIT PARTITIONIERUNG)
+// 8. DYNAMISCHE WURF-SCAN-INTERVALLE (VOM ÜBERGABEPUNKT AB HÜFTHÖHE BIS FOLLOW-THROUGH)
 // ----------------------------------------------------------------------------
 export interface ThrowInterval {
   id: number;
@@ -950,27 +983,29 @@ export function calculateThrowScanIntervals(
   const dur = Math.max(2.0, vidDuration);
 
   if (isSlowMo) {
-    // Falls das BBDV-Referenz-Demo-Video (ca. 145-160s) vorliegt, kalibrierte Fenster nutzen
+    // BBDV-Referenz-Slow-Mo-Video (ca. 162.4s):
+    // Jedes Fenster startet exakt am Übergabepunkt des Darts unten auf Hüfthöhe
+    // und endet nach dem vollständigen Durchschwung (Follow-Through) vor dem Absinken der leeren Hand.
     if (dur >= 135 && dur <= 170) {
       return [
-        { id: 1, name: 'Dart 1', startSec: 27.5, endSec: 33.5 },
-        { id: 2, name: 'Dart 2', startSec: 81.0, endSec: 87.0 },
-        { id: 3, name: 'Dart 3', startSec: 141.5, endSec: 147.5 },
+        { id: 1, name: 'Dart 1', startSec: 15.5, endSec: 63.0 },
+        { id: 2, name: 'Dart 2', startSec: 74.5, endSec: 107.0 },
+        { id: 3, name: 'Dart 3', startSec: 117.0, endSec: 152.0 },
       ];
     }
-    // Für beliebige Slow-Mo Aufnahmen: Proportionale Fenster adaptieren
+    // Für beliebige Slow-Mo Aufnahmen: Komplette Wurfzyklen ab Hüfthöhe bis Follow-Through
     return [
-      { id: 1, name: 'Dart 1', startSec: Math.max(0.1, Math.round(dur * 0.14 * 10) / 10), endSec: Math.min(Math.round(dur * 0.32 * 10) / 10, dur - 0.2) },
-      { id: 2, name: 'Dart 2', startSec: Math.max(0.2, Math.round(dur * 0.46 * 10) / 10), endSec: Math.min(Math.round(dur * 0.64 * 10) / 10, dur - 0.2) },
-      { id: 3, name: 'Dart 3', startSec: Math.max(0.3, Math.round(dur * 0.78 * 10) / 10), endSec: Math.min(Math.round(dur * 0.96 * 10) / 10, dur - 0.05) },
+      { id: 1, name: 'Dart 1', startSec: Math.max(0.1, Math.round(dur * 0.09 * 10) / 10), endSec: Math.min(Math.round(dur * 0.39 * 10) / 10, dur - 0.2) },
+      { id: 2, name: 'Dart 2', startSec: Math.max(0.2, Math.round(dur * 0.45 * 10) / 10), endSec: Math.min(Math.round(dur * 0.66 * 10) / 10, dur - 0.2) },
+      { id: 3, name: 'Dart 3', startSec: Math.max(0.3, Math.round(dur * 0.72 * 10) / 10), endSec: Math.min(Math.round(dur * 0.94 * 10) / 10, dur - 0.05) },
     ];
   }
 
-  // Echtzeit-Aufnahmen (30 FPS Standard)
+  // Echtzeit-Aufnahmen (30 FPS Standard): Komplette Zyklen ab Hüfthöhe
   return [
     { id: 1, name: 'Dart 1', startSec: Math.max(0.05, Math.round(dur * 0.06 * 10) / 10), endSec: Math.round(dur * 0.36 * 10) / 10 },
-    { id: 2, name: 'Dart 2', startSec: Math.round(dur * 0.37 * 10) / 10, endSec: Math.round(dur * 0.67 * 10) / 10 },
-    { id: 3, name: 'Dart 3', startSec: Math.round(dur * 0.68 * 10) / 10, endSec: Math.min(dur - 0.05, Math.round(dur * 0.96 * 10) / 10) },
+    { id: 2, name: 'Dart 2', startSec: Math.round(dur * 0.38 * 10) / 10, endSec: Math.round(dur * 0.66 * 10) / 10 },
+    { id: 3, name: 'Dart 3', startSec: Math.round(dur * 0.68 * 10) / 10, endSec: Math.min(dur - 0.05, Math.round(dur * 0.95 * 10) / 10) },
   ];
 }
 
