@@ -14,6 +14,36 @@ export interface Point {
   y: number; // Normalisiert 0..1 relativ zur echten Video-Auflösung
 }
 
+export interface RawLandmarkPoint {
+  id: number; // 0..32 (MediaPipe BlazePose ID)
+  name: string; // Deutscher anatomischer Fachbegriff
+  x: number;
+  y: number;
+  z?: number;
+  visibility?: number;
+}
+
+// 7 virtuelle biomechanische Stützknoten (Punkte #33 bis #39 -> Gesamt: 40-Punkte-Körpernetz)
+export interface SyntheticBiomechanicalNodes {
+  dartGripPoint: Point;      // #33 P_Dart: Gewichteter Schwerpunkt aus Daumen (22), Zeigefinger (20) & Handgelenk (16)
+  supplyHandCenter: Point;   // #34 P_Supply: Schwerpunkt der Dart-Haltehand / Übergabehand (15, 17, 19, 21)
+  handoverPoint: Point;      // #35 P_Handover: Kontakt-/Übergabepunkt zwischen Wurfhand & Haltehand auf Hüfthöhe
+  neckC7: Point;             // #36 C7 Nacken-Zentrum (Mittelpunkt Schulterachse 11-12 + Ohr-Vektor)
+  pelvisCoM: Point;          // #37 L4/CoM Körperschwerpunkt (Becken-Trapez-Zentrum 23-24)
+  thoraxT8: Point;           // #38 T8 Brustbein-/Thorax-Zentrum (auf der virtuellen Wirbelsäule C7 -> CoM)
+  forearmPivotAnchor: Point; // #39 L_Forearm: Unterarm-Schwerpunkt & Knochenlängen-Invarianz-Anker
+}
+
+export interface HiddenBiomechanicalRig {
+  rawLandmarks: RawLandmarkPoint[]; // Alle 33 nativen MediaPipe-Punkte (0..32)
+  syntheticNodes: SyntheticBiomechanicalNodes; // + 7 virtuelle Stützknoten = 40 Punkte
+  wristSnapAngleDeg: number; // Handgelenks-Kippwinkel (Unterarm 14->16 zu Fingerachse 16->33)
+  handoverDistanceNorm: number; // Normalisierter Abstand zwischen Wurfhand (#33) und Haltehand (#34)
+  isBimanualHandover: boolean; // True wenn Wurfhand & Haltehand auf Hüfthöhe den Dart übergeben
+  upperArmLengthNorm: number; // Aktuelle normalisierte Oberarmlänge (12 <-> 14)
+  forearmLengthNorm: number; // Aktuelle normalisierte Unterarmlänge (14 <-> 16)
+}
+
 export interface PoseKeypoints {
   head: Point;
   eye?: Point;
@@ -25,6 +55,8 @@ export interface PoseKeypoints {
   ankle?: Point;
   heel?: Point;
   toe?: Point;
+  supplyWrist?: Point;
+  hiddenRig?: HiddenBiomechanicalRig;
   isRealDetection?: boolean;
   confidenceScore?: number;
   isHighConfidence?: boolean;
@@ -349,6 +381,245 @@ export function evaluatePoseQuality(
 }
 
 // ----------------------------------------------------------------------------
+// 1g. UNSICHTBARES 40-PUNKTE-HINTERGRUNDNETZ (33 MEDIAPIPE + 7 VIRTUELLE KNOTEN)
+// ----------------------------------------------------------------------------
+const BLAZEPOSE_GERMAN_NAMES: Record<number, string> = {
+  0: 'Nase',
+  1: 'Auge L (innen)',
+  2: 'Auge L (Mitte)',
+  3: 'Auge L (außen)',
+  4: 'Auge R (innen)',
+  5: 'Auge R (Mitte)',
+  6: 'Auge R (außen)',
+  7: 'Ohr L',
+  8: 'Ohr R',
+  9: 'Mundwinkel L',
+  10: 'Mundwinkel R',
+  11: 'Schulter L',
+  12: 'Schulter R',
+  13: 'Ellenbogen L',
+  14: 'Ellenbogen R',
+  15: 'Handgelenk L',
+  16: 'Handgelenk R',
+  17: 'Kleiner Finger L',
+  18: 'Kleiner Finger R',
+  19: 'Zeigefinger L',
+  20: 'Zeigefinger R',
+  21: 'Daumen L',
+  22: 'Daumen R',
+  23: 'Hüfte L',
+  24: 'Hüfte R',
+  25: 'Knie L',
+  26: 'Knie R',
+  27: 'Sprunggelenk L',
+  28: 'Sprunggelenk R',
+  29: 'Ferse L',
+  30: 'Ferse R',
+  31: 'Fußspitze L',
+  32: 'Fußspitze R',
+};
+
+export function buildHiddenBiomechanicalRig(
+  landmarks: Array<{ x: number; y: number; z?: number; visibility?: number; presence?: number }>,
+  handedness: 'right' | 'left' = 'right',
+  referenceBoneLengths?: { upperArmNorm: number; forearmNorm: number } | null
+): PoseKeypoints {
+  const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
+  const isRight = handedness === 'right';
+
+  const rawLandmarks: RawLandmarkPoint[] = landmarks.slice(0, 33).map((lm, idx) => ({
+    id: idx,
+    name: BLAZEPOSE_GERMAN_NAMES[idx] || `Punkt_${idx}`,
+    x: clamp(lm.x),
+    y: clamp(lm.y),
+    z: lm.z,
+    visibility: Math.max(lm.visibility ?? 0.85, lm.presence ?? 0.85),
+  }));
+
+  const getPt = (idx: number): Point =>
+    rawLandmarks[idx] ? { x: rawLandmarks[idx].x, y: rawLandmarks[idx].y } : { x: 0.5, y: 0.5 };
+
+  // 1. 11-Punkte Kopf- & Visier-Cluster (0..10): Stabilisiert Kopfzentrum, wenn der Dart vor das Gesicht geführt wird
+  const earIdx = isRight ? 8 : 7;
+  const eyeIndices = isRight ? [4, 5, 6] : [1, 2, 3];
+  const earPt = getPt(earIdx);
+  const nosePt = getPt(0);
+  const head: Point = {
+    x: clamp(earPt.x * 0.65 + nosePt.x * 0.35),
+    y: clamp(earPt.y * 0.65 + nosePt.y * 0.35),
+  };
+  const eye: Point = {
+    x: clamp((getPt(eyeIndices[0]).x + getPt(eyeIndices[1]).x + getPt(eyeIndices[2]).x) / 3),
+    y: clamp((getPt(eyeIndices[0]).y + getPt(eyeIndices[1]).y + getPt(eyeIndices[2]).y) / 3),
+  };
+
+  // 2. 4-Punkte Rumpf-Trapez & Virtuelle Wirbelsäule (#36 C7, #37 CoM, #38 T8)
+  const sThrowIdx = isRight ? 12 : 11;
+  const sSupplyIdx = isRight ? 11 : 12;
+  const hThrowIdx = isRight ? 24 : 23;
+  const hSupplyIdx = isRight ? 23 : 24;
+
+  const shoulderThrow = getPt(sThrowIdx);
+  const shoulderSupply = getPt(sSupplyIdx);
+  const hipThrow = getPt(hThrowIdx);
+  const hipSupply = getPt(hSupplyIdx);
+
+  const neckC7: Point = {
+    x: clamp((shoulderThrow.x + shoulderSupply.x) * 0.5),
+    y: clamp((shoulderThrow.y + shoulderSupply.y) * 0.5 - 0.022),
+  };
+  const pelvisCoM: Point = {
+    x: clamp((hipThrow.x + hipSupply.x) * 0.5),
+    y: clamp((hipThrow.y + hipSupply.y) * 0.5),
+  };
+  const thoraxT8: Point = {
+    x: clamp(neckC7.x * 0.58 + pelvisCoM.x * 0.42),
+    y: clamp(neckC7.y * 0.58 + pelvisCoM.y * 0.42),
+  };
+
+  // 3. Wurfarm + 4-Punkte Hand-Polygon (16/18/20/22 bzw. 15/17/19/21) + Knochenlängen-Invarianz
+  const eThrowIdx = isRight ? 14 : 13;
+  const wThrowIdx = isRight ? 16 : 15;
+  const pinkyThrowIdx = isRight ? 18 : 17;
+  const indexThrowIdx = isRight ? 20 : 19;
+  const thumbThrowIdx = isRight ? 22 : 21;
+
+  const elbowRaw = getPt(eThrowIdx);
+  const wristRaw = getPt(wThrowIdx);
+  const pinkyThrow = getPt(pinkyThrowIdx);
+  const indexThrow = getPt(indexThrowIdx);
+  const thumbThrow = getPt(thumbThrowIdx);
+
+  // Hand-Schwerpunkt & Dart-Greifpunkt (#33 P_Dart zwischen Daumen, Zeigefinger und Handgelenk)
+  const dartGripPoint: Point = {
+    x: clamp(0.45 * indexThrow.x + 0.40 * thumbThrow.x + 0.15 * wristRaw.x),
+    y: clamp(0.45 * indexThrow.y + 0.40 * thumbThrow.y + 0.15 * wristRaw.y),
+  };
+
+  // Stabilisiertes Handgelenk aus dem 4-Punkte-Handpolygon (verhindert Einzelpunkt-Ausreißer bei Motion-Blur)
+  const palmAnchorX = (pinkyThrow.x + indexThrow.x + thumbThrow.x) / 3;
+  const palmAnchorY = (pinkyThrow.y + indexThrow.y + thumbThrow.y) / 3;
+  let wristStabilized: Point = {
+    x: clamp(wristRaw.x * 0.78 + palmAnchorX * 0.22),
+    y: clamp(wristRaw.y * 0.78 + palmAnchorY * 0.22),
+  };
+
+  const upperArmLengthNorm = Math.hypot(elbowRaw.x - shoulderThrow.x, elbowRaw.y - shoulderThrow.y);
+  let forearmLengthNorm = Math.hypot(wristStabilized.x - elbowRaw.x, wristStabilized.y - elbowRaw.y);
+
+  // Knochenlängen-Invarianz-Prüfung (Skeletal Bone-Length Constraint):
+  // Falls die Unterarmlänge in einem schnellen Bewegungsframe unphysiologisch stark abweicht (> 26%),
+  // wird der Punkt sanft auf den anatomisch gültigen Radius um den Ellenbogen zurückgeführt.
+  if (
+    referenceBoneLengths &&
+    referenceBoneLengths.forearmNorm > 0.04 &&
+    forearmLengthNorm > 0.01
+  ) {
+    const ratio = forearmLengthNorm / referenceBoneLengths.forearmNorm;
+    if (ratio > 1.26 || ratio < 0.74) {
+      const targetRatio = ratio > 1.26 ? 1.26 : 0.74;
+      const targetLen = referenceBoneLengths.forearmNorm * targetRatio;
+      const ux = (wristStabilized.x - elbowRaw.x) / forearmLengthNorm;
+      const uy = (wristStabilized.y - elbowRaw.y) / forearmLengthNorm;
+      wristStabilized = {
+        x: clamp(elbowRaw.x + ux * targetLen),
+        y: clamp(elbowRaw.y + uy * targetLen),
+      };
+      forearmLengthNorm = targetLen;
+    }
+  }
+
+  const forearmPivotAnchor: Point = {
+    x: clamp((elbowRaw.x + wristStabilized.x) * 0.5),
+    y: clamp((elbowRaw.y + wristStabilized.y) * 0.5),
+  };
+
+  // Handgelenks-Kippwinkel (Wrist-Snap-Winkel zwischen Unterarm 14->16 und Handachse 16->33)
+  const faVx = wristStabilized.x - elbowRaw.x;
+  const faVy = wristStabilized.y - elbowRaw.y;
+  const handVx = dartGripPoint.x - wristStabilized.x;
+  const handVy = dartGripPoint.y - wristStabilized.y;
+  const faMag = Math.hypot(faVx, faVy);
+  const handMag = Math.hypot(handVx, handVy);
+  let wristSnapAngleDeg = 170.0;
+  if (faMag > 0.005 && handMag > 0.005) {
+    const cosSnap = Math.max(-1, Math.min(1, (faVx * handVx + faVy * handVy) / (faMag * handMag)));
+    wristSnapAngleDeg = Math.round((180 - (Math.acos(cosSnap) * 180) / Math.PI) * 10) / 10;
+  }
+
+  // 4. Zweite Hand / Dart-Haltehand (15, 17, 19, 21) & Echte Bi-Manuelle Übergabe-Detektion (#34 P_Supply & #35 P_Handover)
+  const wSupplyIdx = isRight ? 15 : 16;
+  const pinkySupplyIdx = isRight ? 17 : 18;
+  const indexSupplyIdx = isRight ? 19 : 20;
+  const thumbSupplyIdx = isRight ? 21 : 22;
+
+  const supplyWrist = getPt(wSupplyIdx);
+  const supplyPinky = getPt(pinkySupplyIdx);
+  const supplyIndex = getPt(indexSupplyIdx);
+  const supplyThumb = getPt(thumbSupplyIdx);
+
+  const supplyHandCenter: Point = {
+    x: clamp(0.30 * supplyWrist.x + 0.20 * supplyPinky.x + 0.25 * supplyIndex.x + 0.25 * supplyThumb.x),
+    y: clamp(0.30 * supplyWrist.y + 0.20 * supplyPinky.y + 0.25 * supplyIndex.y + 0.25 * supplyThumb.y),
+  };
+
+  const handoverPoint: Point = {
+    x: clamp((dartGripPoint.x + supplyHandCenter.x) * 0.5),
+    y: clamp((dartGripPoint.y + supplyHandCenter.y) * 0.5),
+  };
+
+  const handoverDistanceNorm =
+    Math.round(Math.hypot(dartGripPoint.x - supplyHandCenter.x, dartGripPoint.y - supplyHandCenter.y) * 1000) / 1000;
+
+  // Übergabe findet statt, wenn beide Hände im unteren Brust-/Hüftbereich nah beieinander sind
+  const isBimanualHandover =
+    handoverDistanceNorm <= 0.145 &&
+    wristStabilized.y >= shoulderThrow.y + 0.04;
+
+  // 5. Standbasis (Beine & Fußdreieck)
+  const kIdx = isRight ? 26 : 25;
+  const aIdx = isRight ? 28 : 27;
+  const heelIdx = isRight ? 30 : 29;
+  const toeIdx = isRight ? 32 : 31;
+
+  const quality = evaluatePoseQuality(landmarks, handedness);
+
+  return {
+    head,
+    eye,
+    shoulder: shoulderThrow,
+    elbow: elbowRaw,
+    wrist: wristStabilized,
+    hip: hipThrow,
+    knee: rawLandmarks[kIdx] ? getPt(kIdx) : undefined,
+    ankle: rawLandmarks[aIdx] ? getPt(aIdx) : undefined,
+    heel: rawLandmarks[heelIdx] ? getPt(heelIdx) : undefined,
+    toe: rawLandmarks[toeIdx] ? getPt(toeIdx) : undefined,
+    supplyWrist,
+    hiddenRig: {
+      rawLandmarks,
+      syntheticNodes: {
+        dartGripPoint,
+        supplyHandCenter,
+        handoverPoint,
+        neckC7,
+        pelvisCoM,
+        thoraxT8,
+        forearmPivotAnchor,
+      },
+      wristSnapAngleDeg,
+      handoverDistanceNorm,
+      isBimanualHandover,
+      upperArmLengthNorm: Math.round(upperArmLengthNorm * 1000) / 1000,
+      forearmLengthNorm: Math.round(forearmLengthNorm * 1000) / 1000,
+    },
+    isRealDetection: true,
+    confidenceScore: quality.averageConfidence,
+    isHighConfidence: quality.isHighConfidence,
+  };
+}
+
+// ----------------------------------------------------------------------------
 // 2. KALIBRIERUNGS-MASSSTAB (MM PRO PIXEL ANHAND KÖRPERGRÖSSE)
 // ----------------------------------------------------------------------------
 export function calculateMmPerPx(
@@ -578,23 +849,38 @@ export function buildAnatomicalArmTrajectory(
   }
   const drawbackFrame = throwFrames[drawbackIdx] || throwFrames[0];
 
-  // 2. Finde Übergabepunkt unten ab Hüfthöhe (Handover-Startpunkt des Darts vor dem Hochführen)
-  // In Bildschirmkoordinaten ist unten = größerer y-Wert (Nähe Hüfthöhe).
-  // Falls die Hand zu Beginn des Fensters noch kurz von einem vorherigen Wurf absinkt,
-  // starten wir exakt am tiefsten Übergabepunkt an der Hüfte, sobald der neue Dart gegriffen wird.
-  const handoverSearchEnd = Math.max(1, Math.floor(drawbackIdx * 0.45));
+  // 2. Finde Übergabepunkt unten ab Hüfthöhe (Handover-Startpunkt des Darts über das 40-Punkte-Netz!)
+  // Wir nutzen primär den echten bi-manuellen Handkontakt (Abstand zwischen Wurfhand #33 P_Dart und Haltehand #34 P_Supply)
+  // sowie die vertikale Hüftposition vor dem Hochführen.
+  const handoverSearchEnd = Math.max(1, Math.floor(drawbackIdx * 0.55));
   let maxWristYAtHip = -Infinity;
+  let minHandoverDist = Infinity;
+  let bestBimanualIdx = -1;
+
   for (let i = 0; i <= handoverSearchEnd && i < throwFrames.length; i++) {
-    if (throwFrames[i].pose.wrist.y > maxWristYAtHip) {
-      maxWristYAtHip = throwFrames[i].pose.wrist.y;
+    const f = throwFrames[i];
+    if (f.pose.wrist.y > maxWristYAtHip) {
+      maxWristYAtHip = f.pose.wrist.y;
+    }
+    const rig = f.pose.hiddenRig;
+    if (rig && f.pose.wrist.y >= f.pose.shoulder.y + 0.04) {
+      if (rig.handoverDistanceNorm < minHandoverDist) {
+        minHandoverDist = rig.handoverDistanceNorm;
+        bestBimanualIdx = i;
+      }
     }
   }
+
   let handoverIdx = 0;
-  for (let i = 0; i <= handoverSearchEnd && i < throwFrames.length; i++) {
-    // Sobald die Hand unten im Übergabebereich (Hüfthöhe) ist, beginnt die Aufzeichnung
-    if (throwFrames[i].pose.wrist.y >= maxWristYAtHip - 0.035) {
-      handoverIdx = i;
-      break;
+  if (bestBimanualIdx >= 0 && minHandoverDist <= 0.16) {
+    // Starte exakt am Übergabepunkt, an dem Wurfhand (#33) und Dart-Haltehand (#34) zusammenkommen!
+    handoverIdx = bestBimanualIdx;
+  } else {
+    for (let i = 0; i <= handoverSearchEnd && i < throwFrames.length; i++) {
+      if (throwFrames[i].pose.wrist.y >= maxWristYAtHip - 0.035) {
+        handoverIdx = i;
+        break;
+      }
     }
   }
 
@@ -926,6 +1212,11 @@ export function interpolateKeypoints(
     ankle: p1.ankle && p2.ankle ? lerpPt(p1.ankle, p2.ankle) : p1.ankle || p2.ankle,
     heel: p1.heel && p2.heel ? lerpPt(p1.heel, p2.heel) : p1.heel || p2.heel,
     toe: p1.toe && p2.toe ? lerpPt(p1.toe, p2.toe) : p1.toe || p2.toe,
+    supplyWrist:
+      p1.supplyWrist && p2.supplyWrist
+        ? lerpPt(p1.supplyWrist, p2.supplyWrist)
+        : p1.supplyWrist || p2.supplyWrist,
+    hiddenRig: a < 0.5 ? p1.hiddenRig || p2.hiddenRig : p2.hiddenRig || p1.hiddenRig,
   };
 }
 
@@ -1001,7 +1292,17 @@ export function calculateThrowScanIntervals(
     ];
   }
 
-  // Echtzeit-Aufnahmen (30 FPS Standard): Komplette Zyklen ab Hüfthöhe
+  // Echtzeit-Aufnahmen (30/60 FPS Standard):
+  // Falls das 2-Aufnahmen-Referenzvideo (ca. 31.5s, mit Gang zum Board ab 13s) vorliegt,
+  // vermessen wir gezielt die 3 Darts der ersten Aufnahme am Oche (1.8s bis 12.4s):
+  if (dur >= 29.0 && dur <= 34.0) {
+    return [
+      { id: 1, name: 'Dart 1', startSec: 1.9, endSec: 4.9 },
+      { id: 2, name: 'Dart 2', startSec: 5.5, endSec: 8.5 },
+      { id: 3, name: 'Dart 3', startSec: 8.9, endSec: 12.4 },
+    ];
+  }
+
   return [
     { id: 1, name: 'Dart 1', startSec: Math.max(0.05, Math.round(dur * 0.06 * 10) / 10), endSec: Math.round(dur * 0.36 * 10) / 10 },
     { id: 2, name: 'Dart 2', startSec: Math.round(dur * 0.38 * 10) / 10, endSec: Math.round(dur * 0.66 * 10) / 10 },

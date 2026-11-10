@@ -35,7 +35,6 @@ import {
 } from './actions';
 import type { PoseLandmarker as PoseLandmarkerType } from '@mediapipe/tasks-vision';
 import {
-
   PoseKeypoints,
   TrajectoryPoint,
   ThrowTrajectory,
@@ -45,7 +44,7 @@ import {
   calculateElbowAngle,
   calculateMmPerPx,
   calculatePoseDeviations,
-  smoothTrajectory1Euro,
+  buildHiddenBiomechanicalRig,
   buildAnatomicalArmTrajectory,
   computeThrowKinematics,
   anchorTrajectoriesToPose,
@@ -288,7 +287,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     [videoDims, playerHeightCm, calibrationMethod, boardRefPixels, ocheRefPixels]
   );
 
-  // Robuste MediaPipe Initialisierung mit automatischem GPU -> CPU Fallback für iOS Safari!
+  // Robuste MediaPipe Initialisierung mit High-Precision Full-Modell (33+7 Punkte) & GPU -> CPU Fallback!
+  const referenceBoneLengthsRef = useRef<{ upperArmNorm: number; forearmNorm: number } | null>(null);
+
   const ensureLandmarker = useCallback(async (): Promise<PoseLandmarkerType | null> => {
     if (landmarkerRef.current) return landmarkerRef.current;
     if (landmarkerInitPromiseRef.current) return landmarkerInitPromiseRef.current;
@@ -306,29 +307,39 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         }
 
         let landmarker: PoseLandmarkerType | null = null;
-        try {
-          landmarker = await PoseLandmarker.createFromOptions(vision, {
-            baseOptions: {
-              modelAssetPath: '/models/pose_landmarker_lite.task',
-              delegate: 'GPU',
-            },
-            runningMode: 'IMAGE',
-            numPoses: 1,
-            minPoseDetectionConfidence: 0.35,
-            minPosePresenceConfidence: 0.35,
-          });
-        } catch {
-          // Fallback auf CPU-Delegate falls WebGL2 auf iOS Safari blockiert ist
-          landmarker = await PoseLandmarker.createFromOptions(vision, {
-            baseOptions: {
-              modelAssetPath: '/models/pose_landmarker_lite.task',
-              delegate: 'CPU',
-            },
-            runningMode: 'IMAGE',
-            numPoses: 1,
-            minPoseDetectionConfidence: 0.35,
-            minPosePresenceConfidence: 0.35,
-          });
+        const modelCandidates = [
+          '/models/pose_landmarker_full.task',
+          '/models/pose_landmarker_lite.task',
+        ];
+
+        for (const modelPath of modelCandidates) {
+          try {
+            landmarker = await PoseLandmarker.createFromOptions(vision, {
+              baseOptions: {
+                modelAssetPath: modelPath,
+                delegate: 'GPU',
+              },
+              runningMode: 'IMAGE',
+              numPoses: 1,
+              minPoseDetectionConfidence: 0.40,
+              minPosePresenceConfidence: 0.40,
+            });
+            if (landmarker) break;
+          } catch {
+            try {
+              landmarker = await PoseLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                  modelAssetPath: modelPath,
+                  delegate: 'CPU',
+                },
+                runningMode: 'IMAGE',
+                numPoses: 1,
+                minPoseDetectionConfidence: 0.40,
+                minPosePresenceConfidence: 0.40,
+              });
+              if (landmarker) break;
+            } catch {}
+          }
         }
 
         landmarkerRef.current = landmarker;
@@ -355,7 +366,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     };
   }, [ensureLandmarker, stopCameraStream]);
 
-  // Pose auf dem aktuellen Video-Frame erkennen (Überschreibt niemals eine echte Pose mit Fallback!)
+  // Pose über das unsichtbare 40-Punkte-Körpernetz (33 MediaPipe + 7 virtuelle Biomechanik-Knoten) berechnen
   const detectPoseOnCurrentFrame = useCallback((): PoseKeypoints => {
     const video = videoRef.current;
     const defaultFallback: PoseKeypoints = lastValidPoseRef.current || {
@@ -397,61 +408,25 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           const lm = result.landmarks[0];
           const quality = evaluatePoseQuality(lm, handedness);
           setLandmarkQuality(quality);
-          const isRightArm = handedness === 'right';
-          const sIdx = isRightArm ? 12 : 11;
-          const eIdx = isRightArm ? 14 : 13;
-          const wIdx = isRightArm ? 16 : 15;
-          const hIdx = isRightArm ? 24 : 23;
-          const kIdx = isRightArm ? 26 : 25;
-          const aIdx = isRightArm ? 28 : 27;
-          const earIdx = isRightArm ? 8 : 7;
-          const eyeIdx = isRightArm ? 2 : 5;
-          const headPt = lm[earIdx] || lm[0];
-          const eyePt = lm[eyeIdx] || headPt;
-          const heelIdx = isRightArm ? 30 : 29;
-          const toeIdx = isRightArm ? 32 : 31;
 
-          const detectedPose: PoseKeypoints = {
-            head: {
-              x: Math.max(0.05, Math.min(0.95, headPt.x)),
-              y: Math.max(0.05, Math.min(0.95, headPt.y)),
-            },
-            eye: {
-              x: Math.max(0.05, Math.min(0.95, eyePt.x)),
-              y: Math.max(0.05, Math.min(0.95, eyePt.y)),
-            },
-            shoulder: {
-              x: Math.max(0.05, Math.min(0.95, lm[sIdx].x)),
-              y: Math.max(0.05, Math.min(0.95, lm[sIdx].y)),
-            },
-            elbow: {
-              x: Math.max(0.05, Math.min(0.95, lm[eIdx].x)),
-              y: Math.max(0.05, Math.min(0.95, lm[eIdx].y)),
-            },
-            wrist: {
-              x: Math.max(0.05, Math.min(0.95, lm[wIdx].x)),
-              y: Math.max(0.05, Math.min(0.95, lm[wIdx].y)),
-            },
-            hip: {
-              x: Math.max(0.05, Math.min(0.95, lm[hIdx].x)),
-              y: Math.max(0.05, Math.min(0.95, lm[hIdx].y)),
-            },
-            knee: lm[kIdx]
-              ? { x: Math.max(0.05, Math.min(0.95, lm[kIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[kIdx].y)) }
-              : undefined,
-            ankle: lm[aIdx]
-              ? { x: Math.max(0.05, Math.min(0.95, lm[aIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[aIdx].y)) }
-              : undefined,
-            heel: lm[heelIdx]
-              ? { x: Math.max(0.05, Math.min(0.95, lm[heelIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[heelIdx].y)) }
-              : undefined,
-            toe: lm[toeIdx]
-              ? { x: Math.max(0.05, Math.min(0.95, lm[toeIdx].x)), y: Math.max(0.05, Math.min(0.95, lm[toeIdx].y)) }
-              : undefined,
-            isRealDetection: true,
-            confidenceScore: quality.averageConfidence,
-            isHighConfidence: quality.isHighConfidence,
-          };
+          const detectedPose = buildHiddenBiomechanicalRig(
+            lm,
+            handedness,
+            referenceBoneLengthsRef.current
+          );
+
+          // Referenz-Knochenlängen am ersten stabilen Frame verankern
+          if (
+            !referenceBoneLengthsRef.current &&
+            detectedPose.hiddenRig &&
+            detectedPose.isHighConfidence &&
+            detectedPose.hiddenRig.forearmLengthNorm > 0.05
+          ) {
+            referenceBoneLengthsRef.current = {
+              upperArmNorm: detectedPose.hiddenRig.upperArmLengthNorm,
+              forearmNorm: detectedPose.hiddenRig.forearmLengthNorm,
+            };
+          }
 
           lastValidPoseRef.current = detectedPose;
           return detectedPose;
@@ -482,6 +457,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     currentPoseRef.current = null;
     poseTimelineRef.current = [];
     lastValidPoseRef.current = null;
+    referenceBoneLengthsRef.current = null;
     setSnapshots(null);
     setIsPlaying(false);
     setIsAnalysisLocked(false);
@@ -1944,7 +1920,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           const curAngle = calcElbowAngle(detected);
                           const curWrist = detected.wrist;
                           const st = autoTriggerStateRef.current;
-                          const isAtHipLevel = curWrist.y >= detected.elbow.y + 0.01;
+                          const isBimanualHandover = detected.hiddenRig?.isBimanualHandover ?? false;
+                          const isAtHipLevel = isBimanualHandover || curWrist.y >= detected.elbow.y + 0.01;
 
                           if (curAngle < st.minElbowAngle) {
                             st.minElbowAngle = curAngle;
