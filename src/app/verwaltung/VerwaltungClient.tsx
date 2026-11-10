@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition, useMemo } from 'react';
+import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -15,12 +15,8 @@ import {
   ChevronUp,
   Target,
   Award,
-  Trophy,
   Users,
-  ArrowRight,
   ExternalLink,
-  BarChart3,
-  Sparkles,
 } from 'lucide-react';
 import { getPdcBadge, PART2_TARGETS } from '@/app/training/pdc-challenge/types';
 import AdminTrainingOverview from '@/components/AdminTrainingOverview';
@@ -33,6 +29,7 @@ export default function VerwaltungClient({
   trainingPdc = [],
   trainingFussball = [],
   trainingStellenChecken = [],
+  trainingBiomechanics = [],
   adminTrainingOverview,
 }: {
   matches: MatchRow[];
@@ -41,6 +38,7 @@ export default function VerwaltungClient({
   trainingPdc?: any[];
   trainingFussball?: any[];
   trainingStellenChecken?: any[];
+  trainingBiomechanics?: any[];
   adminTrainingOverview?: AdminTrainingOverviewData;
 }) {
   const searchParams = useSearchParams();
@@ -53,7 +51,7 @@ export default function VerwaltungClient({
 
   const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'training'>(defaultTab);
   const [trainingGameType, setTrainingGameType] = useState<
-    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken'
+    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'biomechanics'
   >('all');
   const [trainingPlayerFilter, setTrainingPlayerFilter] = useState<string>('all');
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
@@ -272,7 +270,7 @@ export default function VerwaltungClient({
               : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-transparent'
           }`}
         >
-          <span>📈</span> Trainingsleistungen ({trainingDoubles.length + trainingPdc.length})
+          <span>📈</span> Trainingsleistungen ({trainingDoubles.length + trainingPdc.length + trainingFussball.length + trainingStellenChecken.length + trainingBiomechanics.length})
         </button>
       </div>
 
@@ -455,6 +453,7 @@ export default function VerwaltungClient({
             ...trainingPdc.map((p: any) => p.player_name),
             ...trainingFussball.map((f: any) => f.player_name),
             ...trainingStellenChecken.map((s: any) => s.player_name),
+            ...trainingBiomechanics.map((b: any) => b.playerName),
           ].filter(Boolean))
         ).sort();
 
@@ -463,10 +462,17 @@ export default function VerwaltungClient({
           ...trainingPdc.map((p: any) => ({ ...p, gameType: 'pdc' })),
           ...trainingFussball.map((f: any) => ({ ...f, gameType: 'fussball' })),
           ...trainingStellenChecken.map((s: any) => ({ ...s, gameType: 'stellen_checken' })),
+          ...trainingBiomechanics.map((b: any) => ({
+            ...b,
+            gameType: 'biomechanics',
+            player_name: b.playerName,
+            training_date: b.dateStr,
+            created_at: b.createdAt || b.dateStr,
+          })),
         ].sort((a: any, b: any) => {
           const tA = new Date(a.created_at || a.training_date).getTime();
           const tB = new Date(b.created_at || b.training_date).getTime();
-          return tB - tA;
+          return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA);
         });
 
         const filteredSessions = combinedSessions.filter((s: any) => {
@@ -534,6 +540,13 @@ export default function VerwaltungClient({
                   <span>Stellen & Checken</span>
                   <ExternalLink size={12} />
                 </Link>
+                <Link
+                  href="/video"
+                  className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <span>🎥 KI-Wurfanalyse</span>
+                  <ExternalLink size={12} />
+                </Link>
               </div>
             </div>
 
@@ -560,7 +573,7 @@ export default function VerwaltungClient({
                   {combinedSessions.length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5">
-                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&C
+                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&C · {trainingBiomechanics.length} Video
                 </div>
               </div>
 
@@ -643,6 +656,16 @@ export default function VerwaltungClient({
                 >
                   Stellen & Checken ({trainingStellenChecken.length})
                 </button>
+                <button
+                  onClick={() => setTrainingGameType('biomechanics')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    trainingGameType === 'biomechanics'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  KI-Wurfanalyse ({trainingBiomechanics.length})
+                </button>
               </div>
 
               {/* Player Filter */}
@@ -682,6 +705,7 @@ export default function VerwaltungClient({
                   const isPdc = s.gameType === 'pdc';
                   const isFussball = s.gameType === 'fussball';
                   const isStellenChecken = s.gameType === 'stellen_checken';
+                  const isBiomechanics = s.gameType === 'biomechanics';
                   const isAborted = Boolean(s.is_aborted);
                   const sessionKey = s.session_id ? `${s.session_id}_${s.player_name}_${idx}` : `s_${idx}`;
                   const isExpanded = expandedTrainingKey === sessionKey;
@@ -721,7 +745,9 @@ export default function VerwaltungClient({
                                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                                 : isFussball
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                : isStellenChecken
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                             }`}
                           >
                             {isDq
@@ -730,7 +756,9 @@ export default function VerwaltungClient({
                               ? '🌟 PDC Challenge'
                               : isFussball
                               ? '⚽ Fußball Darts'
-                              : '🎯 Stellen & Checken'}
+                              : isStellenChecken
+                              ? '🎯 Stellen & Checken'
+                              : '🎥 KI-Wurfanalyse'}
                           </span>
                           <span className="font-bold text-white text-sm">{s.player_name}</span>
                           {s.opponent_name && (
@@ -796,6 +824,17 @@ export default function VerwaltungClient({
                               </span>
                               <div className="text-[10px] text-slate-400">
                                 {s.checks_count} / {s.total_rounds || 15} Checks ({((s.check_quote ?? 0) * 100).toFixed(1)}%)
+                              </div>
+                            </div>
+                          )}
+
+                          {isBiomechanics && (
+                            <div className="text-right">
+                              <span className="text-purple-300 font-black text-sm font-mono">
+                                {s.consistencyScore} / 100
+                              </span>
+                              <div className="text-[10px] text-slate-400">
+                                {s.releaseSpeedKmh} km/h · {s.dispersionRating || 'STABIL'}
                               </div>
                             </div>
                           )}
@@ -965,6 +1004,98 @@ export default function VerwaltungClient({
                               <div className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded-lg border border-white/5 flex items-center justify-between">
                                 <span>⚽ Modus: <strong>{s.is_computer ? `1 vs. Computer (${s.computer_level})` : `1 vs. 1 Duell gegen ${s.opponent_name}`}</strong></span>
                                 <span>Ziel: <strong>{s.target_goals} Tore</strong></span>
+                              </div>
+                            </div>
+                          )}
+
+                          {isBiomechanics && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between text-[11px] font-bold">
+                                <span className="text-purple-300 flex items-center gap-1.5">
+                                  <span>🎥</span> Biomechanische Wurfanalyse & 5 Kernwinkel:
+                                </span>
+                                <div className="flex items-center gap-2 text-[10px]">
+                                  <span className="bg-purple-950 border border-purple-500/40 text-purple-300 px-2 py-0.5 rounded-full font-bold">
+                                    Rating: {s.dispersionRating || 'STABIL'}
+                                  </span>
+                                  <span className="text-slate-400">
+                                    Modus: <strong className="text-purple-300">{s.videoMode || 'Slow-Mo'}</strong> ({s.calibrationMethod || 'anthropometrisch'})
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                                <div className="p-2.5 rounded-xl border bg-slate-950/70 border-white/10">
+                                  <div className="text-[10px] text-slate-400">Haltungs-Score</div>
+                                  <div className="text-base font-black text-emerald-400 font-mono mt-0.5">
+                                    {s.consistencyScore} / 100
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    Confidence: {s.landmarkConfidenceScore || 0}%
+                                  </div>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl border bg-slate-950/70 border-white/10">
+                                  <div className="text-[10px] text-slate-400">Release-Geschwindigkeit</div>
+                                  <div className="text-base font-black text-cyan-400 font-mono mt-0.5">
+                                    {s.releaseSpeedKmh} km/h
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    Apex Abwurf
+                                  </div>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl border bg-slate-950/70 border-white/10">
+                                  <div className="text-[10px] text-slate-400">Abwurfwinkel (Launch)</div>
+                                  <div className="text-base font-black text-amber-400 font-mono mt-0.5">
+                                    {s.launchAngleDeg}°
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    Radar-Vektor
+                                  </div>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl border bg-slate-950/70 border-white/10">
+                                  <div className="text-[10px] text-slate-400">3-Dart-Streuradius</div>
+                                  <div className="text-base font-black text-purple-400 font-mono mt-0.5">
+                                    {s.releaseDispersionMm !== undefined ? `${s.releaseDispersionMm} mm` : '-'}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    {s.dispersionRating || 'Ellipse'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="p-2.5 rounded-xl border bg-slate-950/50 border-white/10 text-xs">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                                  5 BBDV-Kernwinkel & Stabilität
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-[11px]">
+                                  <div className="p-1.5 rounded-lg bg-black/40 border border-white/5">
+                                    <span className="text-slate-400 block text-[10px]">Rückzug:</span>
+                                    <span className="font-mono font-bold text-white">{s.drawbackAngle}°</span>
+                                  </div>
+                                  <div className="p-1.5 rounded-lg bg-black/40 border border-white/5">
+                                    <span className="text-slate-400 block text-[10px]">Release:</span>
+                                    <span className="font-mono font-bold text-white">{s.releaseAngle}°</span>
+                                  </div>
+                                  <div className="p-1.5 rounded-lg bg-black/40 border border-white/5">
+                                    <span className="text-slate-400 block text-[10px]">Durchschwung:</span>
+                                    <span className="font-mono font-bold text-white">{s.followThroughAngle}°</span>
+                                  </div>
+                                  <div className="p-1.5 rounded-lg bg-black/40 border border-white/5">
+                                    <span className="text-slate-400 block text-[10px]">Stand:</span>
+                                    <span className="font-mono font-bold text-white">{s.stanceAngle !== undefined ? `${s.stanceAngle}°` : '180°'}</span>
+                                  </div>
+                                  <div className="p-1.5 rounded-lg bg-black/40 border border-white/5">
+                                    <span className="text-slate-400 block text-[10px]">Vorneigung:</span>
+                                    <span className="font-mono font-bold text-white">{s.trunkLeanAngle !== undefined ? `${s.trunkLeanAngle}°` : '-'}</span>
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+                                  <span>Ellenbogen-Drop: <strong className="text-white">{s.elbowDropMm} mm</strong> · Schulter-Drift: <strong className="text-white">{s.shoulderDriftMm} mm</strong></span>
+                                  <span className="text-emerald-400 font-semibold">100% DSGVO §10 On-Device</span>
+                                </div>
                               </div>
                             </div>
                           )}

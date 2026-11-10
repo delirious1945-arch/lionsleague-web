@@ -24,8 +24,15 @@ import {
   Zap,
   Compass,
   TrendingUp,
+  Download,
+  Printer,
 } from 'lucide-react';
 import { UserSession } from '@/app/actions';
+import {
+  saveBiomechanicsSessionAction,
+  getBiomechanicsHistoryAction,
+  deleteBiomechanicsSessionAction,
+} from './actions';
 import type { PoseLandmarker as PoseLandmarkerType } from '@mediapipe/tasks-vision';
 import {
 
@@ -55,7 +62,7 @@ import {
   calculateThreeDartDispersion,
   calculateMmPerPxWithReference,
   BBDV_STANDARDS,
-
+  calculateThrowScanIntervals,
   CalibrationMethod,
 } from '@/lib/biomechanicsEngine';
 
@@ -110,6 +117,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [boardRefPixels, setBoardRefPixels] = useState<number>(1380);
   const [ocheRefPixels, setOcheRefPixels] = useState<number>(160);
   const [videoMode, setVideoMode] = useState<'auto' | 'slowmo' | 'realtime'>('auto');
+  const [slowMoFps, setSlowMoFps] = useState<120 | 240>(240);
 
   // Nullpunkt (Baseline) & Aktuelle Pose
   const [baselinePose, setBaselinePose] = useState<PoseKeypoints | null>(null);
@@ -177,17 +185,43 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const landmarkerRef = useRef<PoseLandmarkerType | null>(null);
   const landmarkerInitPromiseRef = useRef<Promise<PoseLandmarkerType | null> | null>(null);
 
-  // Gespeicherte Sessions aus LocalStorage laden
+  // Gespeicherte Sessions aus LocalStorage laden & mit Supabase synchronisieren
   useEffect(() => {
+    let isMounted = true;
     const timer = setTimeout(() => {
       try {
         const raw = localStorage.getItem(`lions_biomechanics_${user.name}`);
-        if (raw) {
+        if (raw && isMounted) {
           setSavedSessions(JSON.parse(raw));
         }
       } catch {}
     }, 0);
-    return () => clearTimeout(timer);
+
+    // Optionale Cloud-Historie aus Supabase laden (falls Tabelle migriert ist)
+    getBiomechanicsHistoryAction(25)
+      .then((remoteSessions) => {
+        if (!isMounted || !remoteSessions || remoteSessions.length === 0) return;
+        setSavedSessions((local) => {
+          const map = new Map<string, SavedBiomechanicsSession>();
+          // Remote sessions einfügen
+          for (const s of remoteSessions as SavedBiomechanicsSession[]) {
+            map.set(s.id, s);
+          }
+          // Lokale Sessions einfügen (ohne Duplikate)
+          for (const s of local) {
+            if (!map.has(s.id)) {
+              map.set(s.id, s);
+            }
+          }
+          return Array.from(map.values()).slice(0, 20);
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, [user.name]);
 
   const stopCameraStream = useCallback(() => {
@@ -537,17 +571,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         setTimeout(finish, 420); // Großzügiges Timeout für iOS Hardware-Seeks
       });
 
-    const throwIntervals = isSlowMo
-      ? [
-          { id: 1, name: 'Dart 1', startSec: 27.5, endSec: 33.5 },
-          { id: 2, name: 'Dart 2', startSec: 81.0, endSec: 87.0 },
-          { id: 3, name: 'Dart 3', startSec: 141.5, endSec: 147.5 },
-        ]
-      : [
-          { id: 1, name: 'Dart 1', startSec: Math.max(0.05, vidDuration * 0.06), endSec: vidDuration * 0.36 },
-          { id: 2, name: 'Dart 2', startSec: vidDuration * 0.37, endSec: vidDuration * 0.67 },
-          { id: 3, name: 'Dart 3', startSec: vidDuration * 0.68, endSec: Math.min(vidDuration - 0.05, vidDuration * 0.96) },
-        ];
+    const throwIntervals = calculateThrowScanIntervals(vidDuration, isSlowMo);
 
     // 4. Ausgangsposition / Nullpunkt auf echtem Frame ermitteln
     await seekTo(throwIntervals[0].startSec);
@@ -614,7 +638,13 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
       // Berechne die anatomische Unterarm-Pendel-Trajektorie über das dedizierte Engine-Modul!
       const built = buildAnatomicalArmTrajectory(scannedFrames, videoDims, handedness, throwIdx);
-      const kin = computeThrowKinematics(built.points, videoDims, mmPerPx, isSlowMo);
+      const kin = computeThrowKinematics(
+        built.points,
+        videoDims,
+        mmPerPx,
+        isSlowMo,
+        slowMoFps === 120 ? 4.0 : 8.0
+      );
       const worstElbowDrop = Math.min(
         built.drawbackFrame.deltaElbowY_mm,
         built.releaseFrame.deltaElbowY_mm
@@ -628,6 +658,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         elbowDropMm: worstElbowDrop,
         drawbackTimeSec: built.drawbackFrame.timeSec,
         releaseTimeSec: built.releaseFrame.timeSec,
+        releasePoint: {
+          x: built.releaseFrame.pose.wrist.x,
+          y: built.releaseFrame.pose.wrist.y,
+        },
+        drawbackPoint: {
+          x: built.drawbackFrame.pose.wrist.x,
+          y: built.drawbackFrame.pose.wrist.y,
+        },
+        followThroughPoint: {
+          x: built.followThroughFrame.pose.wrist.x,
+          y: built.followThroughFrame.pose.wrist.y,
+        },
       });
 
       if (throwIdx === 0) {
@@ -789,8 +831,15 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         )
       : 94.8;
 
+    const isSlowMo = videoMode === 'slowmo' || (videoMode === 'auto' && duration > 40);
     const currentMmPerPx = getMmPerPx(baselinePose || currentPose, videoDims);
-    const dispersion = calculateThreeDartDispersion(trajectories, videoDims, currentMmPerPx);
+    const dispersion = calculateThreeDartDispersion(
+      trajectories,
+      videoDims,
+      currentMmPerPx,
+      isSlowMo,
+      slowMoFps === 120 ? 4.0 : 8.0
+    );
 
     return {
       speedKmh,
@@ -850,7 +899,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             }
       ),
     };
-  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots, videoDims, getMmPerPx]);
+  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots, videoDims, getMmPerPx, videoMode, duration, slowMoFps]);
 
   // ============================================================================
   // CANVAS OVERLAY RENDERING (INKL. LAUNCH-RADAR, SPEED-CHIP & ABSACK-ALARM)
@@ -957,11 +1006,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ctx.fill();
 
         // Release-Punkt (Apex)
-        const lx = last.x * w;
-        const ly = last.y * h;
+        const rx = tr.releasePoint ? tr.releasePoint.x * w : last.x * w;
+        const ry = tr.releasePoint ? tr.releasePoint.y * h : last.y * h;
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(lx, ly, 3.8 * scale, 0, Math.PI * 2);
+        ctx.arc(rx, ry, 3.8 * scale, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.3 * scale;
@@ -972,14 +1021,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           const deg = tr.launchAngleDeg ?? 14.2;
           const rad = (-deg * Math.PI) / 180;
           const arrowLen = 26 * scale;
-          const ax = lx + Math.cos(rad) * arrowLen;
-          const ay = ly + Math.sin(rad) * arrowLen;
+          const ax = rx + Math.cos(rad) * arrowLen;
+          const ay = ry + Math.sin(rad) * arrowLen;
 
           ctx.strokeStyle = 'rgba(16, 185, 129, 0.85)';
           ctx.lineWidth = 1.6 * scale;
           ctx.setLineDash([3 * scale, 2 * scale]);
           ctx.beginPath();
-          ctx.moveTo(lx, ly);
+          ctx.moveTo(rx, ry);
           ctx.lineTo(ax, ay);
           ctx.stroke();
           ctx.setLineDash([]);
@@ -994,11 +1043,81 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const tw = ctx.measureText(badgeLabel).width;
         ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
         ctx.beginPath();
-        ctx.roundRect(lx + 6 * scale, ly - 8 * scale, tw + 8 * scale, 14 * scale, 4 * scale);
+        ctx.roundRect(rx + 6 * scale, ry - 8 * scale, tw + 8 * scale, 14 * scale, 4 * scale);
         ctx.fill();
         ctx.fillStyle = color;
-        ctx.fillText(badgeLabel, lx + 10 * scale, ly + 2.5 * scale);
+        ctx.fillText(badgeLabel, rx + 10 * scale, ry + 2.5 * scale);
       });
+
+      // VISUELLE 3-DART RELEASE-STREUUNGSELLIPSE (BBDV-CLUSTER)
+      if (
+        throwsToRender.length > 1 &&
+        activeMetrics.dispersion.releaseDispersionMm > 0
+      ) {
+        const releasePts = throwsToRender.map((tr) => {
+          const pt = tr.releasePoint || (tr.points.length > 0 ? tr.points[tr.points.length - 1] : { x: 0.5, y: 0.3 });
+          return { x: pt.x * w, y: pt.y * h };
+        });
+
+        const meanX = releasePts.reduce((sum, p) => sum + p.x, 0) / releasePts.length;
+        const meanY = releasePts.reduce((sum, p) => sum + p.y, 0) / releasePts.length;
+        const currentMmPerPx = getMmPerPx(baselinePose || currentPose, videoDims);
+        const radiusPx = Math.max(
+          8 * scale,
+          ((activeMetrics.dispersion.releaseDispersionMm / (currentMmPerPx || 1.1)) / 2)
+        );
+
+        ctx.save();
+        // Zarter Glow-Hintergrund
+        ctx.fillStyle =
+          activeMetrics.dispersion.dispersionRating === 'EXZELLENT'
+            ? 'rgba(16, 185, 129, 0.10)'
+            : activeMetrics.dispersion.dispersionRating === 'STABIL'
+            ? 'rgba(6, 182, 212, 0.10)'
+            : 'rgba(245, 158, 11, 0.10)';
+        ctx.beginPath();
+        ctx.arc(meanX, meanY, radiusPx, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Feine gestrichelte Begrenzungskontur
+        ctx.strokeStyle =
+          activeMetrics.dispersion.dispersionRating === 'EXZELLENT'
+            ? 'rgba(52, 211, 153, 0.75)'
+            : activeMetrics.dispersion.dispersionRating === 'STABIL'
+            ? 'rgba(34, 211, 238, 0.75)'
+            : 'rgba(251, 191, 36, 0.75)';
+        ctx.lineWidth = 1.2 * scale;
+        ctx.setLineDash([3 * scale, 3 * scale]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Cluster-Mittelpunkt Fadenkreuz (Zentroid)
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.0 * scale;
+        ctx.beginPath();
+        ctx.moveTo(meanX - 4 * scale, meanY);
+        ctx.lineTo(meanX + 4 * scale, meanY);
+        ctx.moveTo(meanX, meanY - 4 * scale);
+        ctx.lineTo(meanX, meanY + 4 * scale);
+        ctx.stroke();
+
+        // Cluster-Label Badge: Ø <mm> mm
+        const clusterLabel = `Ø ${activeMetrics.dispersion.releaseDispersionMm} mm`;
+        ctx.font = `bold ${Math.round(8.5 * scale)}px sans-serif`;
+        const clw = ctx.measureText(clusterLabel).width;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+        ctx.beginPath();
+        ctx.roundRect(meanX - (clw + 8 * scale) / 2, meanY - radiusPx - 16 * scale, clw + 8 * scale, 13 * scale, 3 * scale);
+        ctx.fill();
+        ctx.fillStyle =
+          activeMetrics.dispersion.dispersionRating === 'EXZELLENT'
+            ? '#6ee7b7'
+            : activeMetrics.dispersion.dispersionRating === 'STABIL'
+            ? '#67e8f9'
+            : '#fde68a';
+        ctx.fillText(clusterLabel, meanX - clw / 2, meanY - radiusPx - 6.5 * scale);
+        ctx.restore();
+      }
     }
 
     if (!showOverlay) return;
@@ -1191,6 +1310,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     trajectories,
     activeThrowIdx,
     activeMetrics.isElbowDropping,
+    activeMetrics.dispersion.dispersionRating,
+    activeMetrics.dispersion.releaseDispersionMm,
+    getMmPerPx,
+    videoDims,
   ]);
 
   useEffect(() => {
@@ -1285,8 +1408,33 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     try {
       localStorage.setItem(`lions_biomechanics_${user.name}`, JSON.stringify(updated));
     } catch {}
+
+    // Optionale Speicherung in Supabase gem. §10 AGENTS.md (0 Bytes Video-Rohdaten)
+    saveBiomechanicsSessionAction({
+      player_id: user.id,
+      player_name: user.name,
+      consistency_score: newEntry.consistencyScore,
+      release_speed_kmh: newEntry.releaseSpeedKmh,
+      launch_angle_deg: newEntry.launchAngleDeg,
+      elbow_drop_mm: newEntry.elbowDropMm,
+      shoulder_drift_mm: newEntry.shoulderDriftMm,
+      drawback_angle_deg: newEntry.drawbackAngle,
+      release_angle_deg: newEntry.releaseAngle,
+      follow_through_angle_deg: newEntry.followThroughAngle,
+      stance_angle_deg: newEntry.stanceAngle,
+      trunk_lean_angle_deg: newEntry.trunkLeanAngle,
+      landmark_confidence_pct: newEntry.landmarkConfidenceScore,
+      is_high_confidence: newEntry.isHighConfidenceDetection,
+      release_dispersion_mm: newEntry.releaseDispersionMm,
+      speed_std_dev_kmh: newEntry.speedStdDevKmh,
+      launch_angle_std_dev_deg: newEntry.launchAngleStdDevDeg,
+      dispersion_rating: newEntry.dispersionRating,
+      calibration_method: newEntry.calibrationMethod,
+      video_mode: newEntry.videoMode,
+    }).catch(() => {});
+
     setIsSaved(true);
-    setStatusMessage('✓ Biomechanik-Steckbrief im Spielerprofil gespeichert!');
+    setStatusMessage('✓ Biomechanik-Steckbrief im Spielerprofil gespeichert (On-Device & Cloud-Sync)!');
     setTimeout(() => setIsSaved(false), 3500);
   };
 
@@ -1296,6 +1444,36 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     try {
       localStorage.setItem(`lions_biomechanics_${user.name}`, JSON.stringify(updated));
     } catch {}
+
+    // Optionale Löschung in Supabase (DSGVO §10.3)
+    deleteBiomechanicsSessionAction(id).catch(() => {});
+  };
+
+  const handleExportSessionJson = (session: SavedBiomechanicsSession) => {
+    try {
+      const dataStr =
+        'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(session, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute(
+        'download',
+        `biomechanik_${(session.playerName || 'spieler').replace(/\s+/g, '_')}_${session.dateStr.replace(/[:. ]/g, '-')}.json`
+      );
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setStatusMessage('✓ Biomechanik-Steckbrief erfolgreich als JSON exportiert!');
+    } catch (err) {
+      console.error('Export-Fehler:', err);
+    }
+  };
+
+  const handlePrintSession = () => {
+    try {
+      window.print();
+    } catch (err) {
+      console.error('Druck-Fehler:', err);
+    }
   };
 
   const togglePlayPause = () => {
@@ -1383,7 +1561,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <span>KI-Wurfstilanalyse</span>
               </h1>
               <span className="text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
-                PRO ENGINE 3.3
+                PRO ENGINE 3.5
               </span>
             </div>
           </div>
@@ -2062,6 +2240,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               <div className="text-right text-[10px] text-slate-400 font-mono">
                 <div>Speed Δ {activeMetrics.dispersion.speedStdDevKmh} km/h</div>
                 <div>Winkel Δ {activeMetrics.dispersion.launchAngleStdDevDeg}°</div>
+                {activeMetrics.dispersion.drawbackDispersionMm !== undefined && activeMetrics.dispersion.drawbackDispersionMm > 0 && (
+                  <div className="text-slate-400">Anker Δ {activeMetrics.dispersion.drawbackDispersionMm} mm</div>
+                )}
+                {activeMetrics.dispersion.avgForwardPhaseMs !== undefined && activeMetrics.dispersion.avgForwardPhaseMs > 0 && (
+                  <div className="text-slate-400">Tempo ~{activeMetrics.dispersion.avgForwardPhaseMs} ms</div>
+                )}
               </div>
             </div>
 
@@ -2308,6 +2492,34 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-300 font-bold">Slow-Mo FPS:</span>
+                    <div className="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-xl border border-white/10">
+                      <button
+                        onClick={() => setSlowMoFps(120)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                          slowMoFps === 120
+                            ? 'bg-cyan-400 text-slate-950 font-black'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                        title="120 FPS Zeitlupe (4x Dehnung)"
+                      >
+                        120 FPS (4x)
+                      </button>
+                      <button
+                        onClick={() => setSlowMoFps(240)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                          slowMoFps === 240
+                            ? 'bg-amber-400 text-slate-950 font-black'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                        title="240 FPS Ultra-Slow-Mo (8x Dehnung)"
+                      >
+                        240 FPS (8x)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-300 font-bold">Kalibrierung:</span>
                     <div className="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-xl border border-white/10">
                       <button
@@ -2454,7 +2666,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <h3 className="text-xs font-black text-white uppercase tracking-wider">
                   Dein Biomechanik-Verlauf ({savedSessions.length})
                 </h3>
-                <span className="text-[10px] text-slate-400">On-Device Speicher</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrintSession}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[10px] font-bold cursor-pointer transition-all"
+                    title="Analyse-Steckbrief drucken / als PDF speichern"
+                  >
+                    <Printer className="w-3 h-3 text-cyan-400" />
+                    <span className="hidden sm:inline">Drucken</span>
+                  </button>
+                  <span className="text-[10px] text-slate-400">On-Device Speicher</span>
+                </div>
               </div>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {savedSessions.map((s) => (
@@ -2471,13 +2693,22 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                         {s.releaseSpeedKmh} km/h • +{s.launchAngleDeg}° • Ellenbogen {s.elbowDropMm} mm{s.releaseDispersionMm !== undefined ? ` • Streuung ${s.releaseDispersionMm} mm` : ''}{s.stanceAngle !== undefined ? ` • Stand ${s.stanceAngle}° • Neigung ${s.trunkLeanAngle}°` : ''}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteSavedSession(s.id)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 cursor-pointer shrink-0"
-                      title="Messung löschen (§10.3 DSGVO)"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => handleExportSessionJson(s)}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 cursor-pointer"
+                        title="Steckbrief als JSON exportieren (Datensicherung gem. §10 DSGVO)"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSavedSession(s.id)}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 cursor-pointer"
+                        title="Messung löschen (§10.3 DSGVO)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

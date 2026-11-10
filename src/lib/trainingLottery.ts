@@ -542,6 +542,10 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
     FROM training_fussball
     WHERE is_aborted IS NULL OR is_aborted = 0
+    UNION
+    SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
+    FROM training_stellen_checken
+    WHERE is_aborted IS NULL OR is_aborted = 0
     ORDER BY m DESC;
   `;
 

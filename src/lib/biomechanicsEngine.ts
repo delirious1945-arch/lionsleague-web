@@ -1,5 +1,5 @@
 // ============================================================================
-// LIONS WEYHAUSEN - MODULARE BIOMECHANIK & KINEMATIK ENGINE (v3.1)
+// LIONS WEYHAUSEN - MODULARE BIOMECHANIK & KINEMATIK ENGINE (v3.5 PRO ENGINE)
 // ============================================================================
 // Architektur-Garantie:
 // Dieses Modul kapselt die gesamte mathematische, physikalische und
@@ -44,6 +44,9 @@ export interface ThrowTrajectory {
   elbowDropMm: number;
   drawbackTimeSec?: number;
   releaseTimeSec?: number;
+  releasePoint?: Point; // Exakter Abwurf-Apex (Handgelenk beim Release)
+  drawbackPoint?: Point; // Tiefster Rückzugspunkt
+  followThroughPoint?: Point; // Durchschwung-Endpunkt
 }
 
 export type PhaseKey = 'baseline' | 'drawback' | 'release' | 'follow_through';
@@ -140,6 +143,9 @@ export interface ThreeDartDispersion {
   launchAngleStdDevDeg: number; // Standardabweichung des Launch-Angles (Grad)
   overallConsistencyScore: number; // 0 bis 100 Punkte
   dispersionRating: 'EXZELLENT' | 'STABIL' | 'VERBESSERBAR';
+  drawbackDispersionMm?: number; // Maximaler räumlicher Abstand zwischen den Rückzugspunkten (mm)
+  timingStdDevMs?: number; // Standardabweichung der Vorwärtsbeschleunigungs-Dauer in ms (Rhythmus)
+  avgForwardPhaseMs?: number; // Durchschnittliche Dauer der Beschleunigungsphase (ms)
 }
 
 // ----------------------------------------------------------------------------
@@ -266,6 +272,7 @@ export function validateFiveCoreAngles(
   if (!isStanceStable) score -= Math.min(25, stanceDeltaDeg * 3.5);
   if (!isTrunkStable) score -= Math.min(30, trunkLeanDeltaDeg * 5.0);
   if (!isDrawbackOptimal) score -= 15;
+  if (!isReleaseConsistent) score -= 15;
   if (!isFollowThroughComplete) score -= 15;
   const postureScore = Math.round(Math.max(45, Math.min(100, score)));
 
@@ -685,7 +692,8 @@ export function computeThrowKinematics(
   pts: TrajectoryPoint[],
   dims: { width: number; height: number },
   mmPerPx: number,
-  isSlowMo: boolean
+  isSlowMo: boolean,
+  slowMoFactor: number = 8.0
 ): { releaseSpeedKmh: number; launchAngleDeg: number } {
   if (pts.length < 2) {
     return { releaseSpeedKmh: 21.2, launchAngleDeg: 14.5 };
@@ -706,7 +714,8 @@ export function computeThrowKinematics(
 
   const distMm = Math.hypot(dxPx, dyPx) * mmPerPx;
   const dtRaw = Math.max(0.018, Math.abs(pEnd.timeSec - pPrev.timeSec));
-  const effectiveDt = isSlowMo ? dtRaw / 8.0 : dtRaw;
+  const factor = slowMoFactor > 0 ? slowMoFactor : 8.0;
+  const effectiveDt = isSlowMo ? dtRaw / factor : dtRaw;
   const speedMmPerSec = distMm / effectiveDt;
   const rawKmh = speedMmPerSec * 0.0036 * 1.25;
   const releaseSpeedKmh =
@@ -721,7 +730,9 @@ export function computeThrowKinematics(
 export function calculateThreeDartDispersion(
   trajectories: ThrowTrajectory[],
   dims: { width: number; height: number },
-  mmPerPx: number
+  mmPerPx: number,
+  isSlowMo: boolean = false,
+  slowMoFactor: number = 8.0
 ): ThreeDartDispersion {
   const validThrows = trajectories.filter((t) => t.points && t.points.length >= 2);
   if (validThrows.length < 2) {
@@ -731,12 +742,22 @@ export function calculateThreeDartDispersion(
       launchAngleStdDevDeg: 0,
       overallConsistencyScore: 95,
       dispersionRating: 'EXZELLENT',
+      drawbackDispersionMm: 0,
+      timingStdDevMs: 0,
+      avgForwardPhaseMs: 0,
     };
   }
 
-  // 1. Release-Punkte der Darts extrahieren (Apex / letzter Messpunkt der Beschleunigung)
+  // 1. Release-Punkte der Darts extrahieren (Exakter Abwurf-Apex / Handgelenk beim Release)
   const releasePoints = validThrows.map((t) => {
-    const idx = Math.max(0, t.points.length - 1);
+    if (t.releasePoint) {
+      return {
+        x: t.releasePoint.x * dims.width,
+        y: t.releasePoint.y * dims.height,
+      };
+    }
+    // Fallback falls releasePoint nicht explizit gesetzt: Punkt bei 75% der Trajektorie
+    const idx = Math.max(0, Math.min(t.points.length - 1, Math.floor(t.points.length * 0.75)));
     return {
       x: t.points[idx].x * dims.width,
       y: t.points[idx].y * dims.height,
@@ -759,6 +780,66 @@ export function calculateThreeDartDispersion(
   }
   const releaseDispersionMm = Math.round(maxDistMm * 10) / 10;
 
+  // 2b. Drawback-Punkte extrahieren & Ankerpunkt-Streuung ermitteln
+  const drawbackPoints = validThrows
+    .filter((t) => t.drawbackPoint || (t.points && t.points.length > 0))
+    .map((t) => {
+      if (t.drawbackPoint) {
+        return {
+          x: t.drawbackPoint.x * dims.width,
+          y: t.drawbackPoint.y * dims.height,
+        };
+      }
+      return {
+        x: t.points[0].x * dims.width,
+        y: t.points[0].y * dims.height,
+      };
+    });
+
+  let maxDrawbackDistMm = 0;
+  if (drawbackPoints.length >= 2) {
+    for (let i = 0; i < drawbackPoints.length; i++) {
+      for (let j = i + 1; j < drawbackPoints.length; j++) {
+        const distPx = Math.hypot(
+          drawbackPoints[i].x - drawbackPoints[j].x,
+          drawbackPoints[i].y - drawbackPoints[j].y
+        );
+        const distMm = distPx * mmPerPx;
+        if (distMm > maxDrawbackDistMm) {
+          maxDrawbackDistMm = distMm;
+        }
+      }
+    }
+  }
+  const drawbackDispersionMm = Math.round(maxDrawbackDistMm * 10) / 10;
+
+  // 2c. Wurfbeschleunigungs-Dauer & Rhythmus-Konsistenz (Vorwärtsphase)
+  const factor = isSlowMo && slowMoFactor > 0 ? slowMoFactor : 1.0;
+  const forwardDurationsMs: number[] = [];
+  for (const t of validThrows) {
+    if (t.drawbackTimeSec !== undefined && t.releaseTimeSec !== undefined) {
+      const dt = Math.abs(t.releaseTimeSec - t.drawbackTimeSec);
+      if (dt > 0.005) {
+        forwardDurationsMs.push(Math.round((dt / factor) * 1000));
+      }
+    }
+  }
+
+  let avgForwardPhaseMs: number | undefined;
+  let timingStdDevMs: number | undefined;
+
+  if (forwardDurationsMs.length >= 2) {
+    const meanTime = forwardDurationsMs.reduce((a, b) => a + b, 0) / forwardDurationsMs.length;
+    const timeVar =
+      forwardDurationsMs.reduce((sum, d) => sum + Math.pow(d - meanTime, 2), 0) /
+      forwardDurationsMs.length;
+    timingStdDevMs = Math.round(Math.sqrt(timeVar));
+    avgForwardPhaseMs = Math.round(meanTime);
+  } else if (forwardDurationsMs.length === 1) {
+    avgForwardPhaseMs = forwardDurationsMs[0];
+    timingStdDevMs = 0;
+  }
+
   // 3. Standardabweichung der Abwurfgeschwindigkeit (km/h)
   const speeds = validThrows.map((t) => t.releaseSpeedKmh);
   const meanSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
@@ -778,6 +859,9 @@ export function calculateThreeDartDispersion(
   score -= Math.min(25, releaseDispersionMm * 0.7);
   score -= Math.min(15, speedStdDevKmh * 8.0);
   score -= Math.min(15, launchAngleStdDevDeg * 3.5);
+  if (drawbackDispersionMm > 25.0) {
+    score -= Math.min(5, (drawbackDispersionMm - 25.0) * 0.4);
+  }
   const overallConsistencyScore = Math.max(50, Math.min(99, Math.round(score)));
 
   let dispersionRating: 'EXZELLENT' | 'STABIL' | 'VERBESSERBAR' = 'STABIL';
@@ -793,6 +877,9 @@ export function calculateThreeDartDispersion(
     launchAngleStdDevDeg,
     overallConsistencyScore,
     dispersionRating,
+    drawbackDispersionMm,
+    timingStdDevMs,
+    avgForwardPhaseMs,
   };
 }
 
@@ -871,5 +958,46 @@ export function getInterpolatedPose(
   }
 
   return timeline[0].pose;
+}
+
+// ----------------------------------------------------------------------------
+// 8. DYNAMISCHE WURF-SCAN-INTERVALLE (ADAPTIVE SLOW-MO & ECHTZEIT PARTITIONIERUNG)
+// ----------------------------------------------------------------------------
+export interface ThrowInterval {
+  id: number;
+  name: string;
+  startSec: number;
+  endSec: number;
+}
+
+export function calculateThrowScanIntervals(
+  vidDuration: number,
+  isSlowMo: boolean
+): ThrowInterval[] {
+  const dur = Math.max(2.0, vidDuration);
+
+  if (isSlowMo) {
+    // Falls das BBDV-Referenz-Demo-Video (ca. 145-160s) vorliegt, kalibrierte Fenster nutzen
+    if (dur >= 135 && dur <= 170) {
+      return [
+        { id: 1, name: 'Dart 1', startSec: 27.5, endSec: 33.5 },
+        { id: 2, name: 'Dart 2', startSec: 81.0, endSec: 87.0 },
+        { id: 3, name: 'Dart 3', startSec: 141.5, endSec: 147.5 },
+      ];
+    }
+    // Für beliebige Slow-Mo Aufnahmen: Proportionale Fenster adaptieren
+    return [
+      { id: 1, name: 'Dart 1', startSec: Math.max(0.1, Math.round(dur * 0.14 * 10) / 10), endSec: Math.min(Math.round(dur * 0.32 * 10) / 10, dur - 0.2) },
+      { id: 2, name: 'Dart 2', startSec: Math.max(0.2, Math.round(dur * 0.46 * 10) / 10), endSec: Math.min(Math.round(dur * 0.64 * 10) / 10, dur - 0.2) },
+      { id: 3, name: 'Dart 3', startSec: Math.max(0.3, Math.round(dur * 0.78 * 10) / 10), endSec: Math.min(Math.round(dur * 0.96 * 10) / 10, dur - 0.05) },
+    ];
+  }
+
+  // Echtzeit-Aufnahmen (30 FPS Standard)
+  return [
+    { id: 1, name: 'Dart 1', startSec: Math.max(0.05, Math.round(dur * 0.06 * 10) / 10), endSec: Math.round(dur * 0.36 * 10) / 10 },
+    { id: 2, name: 'Dart 2', startSec: Math.round(dur * 0.37 * 10) / 10, endSec: Math.round(dur * 0.67 * 10) / 10 },
+    { id: 3, name: 'Dart 3', startSec: Math.round(dur * 0.68 * 10) / 10, endSec: Math.min(dur - 0.05, Math.round(dur * 0.96 * 10) / 10) },
+  ];
 }
 
