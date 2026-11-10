@@ -578,4 +578,24 @@ export async function batchImportSpieltageAction(
   }
 }
 
+export async function runSeasonAuditAction(season: string = '2026/2027') {
+  try {
+    const { runSeasonDataAudit } = await import('@/lib/auditEngine');
+    const report = await runSeasonDataAudit(season, true);
+
+    revalidatePath('/', 'layout');
+    revalidatePath('/analytics');
+    revalidatePath('/teams');
+    revalidatePath('/spieler');
+    revalidatePath('/verwaltung');
+    revalidatePath('/eingabe');
+
+    return { success: true, report };
+  } catch (err: any) {
+    console.error('Error in runSeasonAuditAction:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+
 

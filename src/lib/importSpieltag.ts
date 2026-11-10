@@ -1236,57 +1236,14 @@ export async function processSpieltagImport(
     }
   }
 
-  // 7. AUTOMATISCHER INTEGRITÄTS-CHECK & KORREKTUR
-  // Stellt sicher, dass keine doppelten Legs oder verwaiste/falsche Visits entstehen
+  // 7. AUTOMATISCHER INTEGRITÄTS-CHECK & AUDIT ENGINE
+  // Führt die zentrale Audit-Engine aus, um Datenintegrität, High Finishes und Specials zu garantieren
+  let auditReport = null;
   try {
-    // 7a. Doppelte Legs deduplizieren (falls CSV mehrfache Legs für selbes Match enthielt)
-    await sql`
-      DELETE FROM analytics_visits
-      WHERE leg_id IN (
-        SELECT l.id
-        FROM analytics_legs l
-        JOIN (
-          SELECT match_id, leg_num, MIN(id) as keep_id
-          FROM analytics_legs
-          WHERE match_id IN (SELECT id FROM analytics_matches WHERE match_date = ${matchdayDate} AND season = ${season})
-          GROUP BY match_id, leg_num
-          HAVING count(*) > 1
-        ) dup ON l.match_id = dup.match_id AND l.leg_num = dup.leg_num AND l.id > dup.keep_id
-      )
-    `;
-    await sql`
-      DELETE FROM analytics_legs
-      WHERE id IN (
-        SELECT l.id
-        FROM analytics_legs l
-        JOIN (
-          SELECT match_id, leg_num, MIN(id) as keep_id
-          FROM analytics_legs
-          WHERE match_id IN (SELECT id FROM analytics_matches WHERE match_date = ${matchdayDate} AND season = ${season})
-          GROUP BY match_id, leg_num
-          HAVING count(*) > 1
-        ) dup ON l.match_id = dup.match_id AND l.leg_num = dup.leg_num AND l.id > dup.keep_id
-      )
-    `;
-
-    // 7b. Falsche Zuordnungen in Einzelmatches prüfen & säubern
-    // (Falls ein Visit fälschlicherweise eine player_id erhalten hat, die gar nicht an dem Match teilnimmt)
-    await sql`
-      UPDATE analytics_visits v
-      SET player_id = 0
-      FROM analytics_legs l
-      JOIN analytics_matches m ON l.match_id = m.id
-      WHERE v.leg_id = l.id
-        AND m.match_date = ${matchdayDate}
-        AND m.season = ${season}
-        AND m.player_a_name NOT LIKE '%&%'
-        AND m.player_b_name NOT LIKE '%&%'
-        AND v.player_id > 0
-        AND v.player_id != m.player_a_id
-        AND v.player_id != m.player_b_id
-    `;
+    const { runSeasonDataAudit } = await import('./auditEngine');
+    auditReport = await runSeasonDataAudit(season, true);
   } catch (checkErr) {
-    console.warn('Integritäts-Check Warnung:', checkErr);
+    console.warn('Integritäts-Audit Warnung:', checkErr);
   }
 
   const updatedCount = Math.min(countMatches, existingBeforeCount);

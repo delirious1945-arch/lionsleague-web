@@ -8,6 +8,7 @@ import {
   updateMatchAction,
   resetPlayerPasswordAction,
   updatePlayerRoleAction,
+  runSeasonAuditAction,
 } from '../actions';
 import { MatchRow, Player } from '@/lib/data';
 import {
@@ -56,6 +57,30 @@ export default function VerwaltungClient({
   const [trainingPlayerFilter, setTrainingPlayerFilter] = useState<string>('all');
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditReport, setAuditReport] = useState<any>(null);
+
+  const handleRunAudit = () => {
+    setIsAuditing(true);
+    setStatusMessage(null);
+    startTransition(async () => {
+      const res = await runSeasonAuditAction();
+      setIsAuditing(false);
+      if (res.success && res.report) {
+        setAuditReport(res.report);
+        setStatusMessage({
+          text: `✅ System-Audit abgeschlossen: ${res.report.issuesFound} Probleme analysiert, ${res.report.issuesFixed} automatisch behoben.`,
+          type: 'success',
+        });
+      } else {
+        setStatusMessage({
+          text: `❌ Fehler beim System-Audit: ${res.error}`,
+          type: 'error',
+        });
+      }
+    });
+  };
+
   const [statusMessage, setStatusMessage] = useState<{
     text: string;
     type: 'success' | 'error';
@@ -236,6 +261,15 @@ export default function VerwaltungClient({
         <p className="text-slate-400 text-sm mt-1">
           Eingetragene Spielberichte korrigieren, löschen oder Spieler-Rollen & Passwörter verwalten.
         </p>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            onClick={handleRunAudit}
+            disabled={isAuditing}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs sm:text-sm px-4 py-2 rounded-xl transition-all shadow-md disabled:opacity-50 cursor-pointer"
+          >
+            <span>🛡️</span> {isAuditing ? 'Audit läuft...' : 'System-Audit & Daten-Konsistenz prüfen'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
