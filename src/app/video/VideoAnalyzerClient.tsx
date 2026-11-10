@@ -179,6 +179,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const [showTrajectory, setShowTrajectory] = useState<boolean>(true);
   const [showPlumbLine, setShowPlumbLine] = useState<boolean>(true);
   const [showFootTriangle, setShowFootTriangle] = useState<boolean>(false);
+  const [showHiddenRigDebug, setShowHiddenRigDebug] = useState<boolean>(false);
 
   // Gespeicherte Sessions des Spielers (On-Device Verlauf gem. §10.3 AGENTS.md)
   const [savedSessions, setSavedSessions] = useState<SavedBiomechanicsSession[]>([]);
@@ -1356,6 +1357,75 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
       ctx.fillStyle = '#ffffff';
       ctx.fillText(badgeText, pillX + 6 * scale, pillY + 13 * scale);
+
+      // Optionaler Engine-Röntgenblick (Standardmäßig unsichtbar in der UI; nur bei aktiviertem Experten-Debug sichtbar)
+      if (showHiddenRigDebug && p.hiddenRig) {
+        const rig = p.hiddenRig;
+        const lm = rig.rawLandmarks;
+        const sn = rig.syntheticNodes;
+
+        // 1. Virtuelle Wirbelsäule (C7 -> T8 -> CoM)
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+        ctx.lineWidth = 2.0 * scale;
+        ctx.beginPath();
+        ctx.moveTo(sn.neckC7.x * w, sn.neckC7.y * h);
+        ctx.lineTo(sn.thoraxT8.x * w, sn.thoraxT8.y * h);
+        ctx.lineTo(sn.pelvisCoM.x * w, sn.pelvisCoM.y * h);
+        ctx.stroke();
+
+        // 2. Wurfhand-Polygon & Haltehand-Dreieck
+        if (lm.length >= 23) {
+          const drawPoly = (indices: number[], col: string) => {
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 1.4 * scale;
+            ctx.beginPath();
+            ctx.moveTo(lm[indices[0]].x * w, lm[indices[0]].y * h);
+            for (let i = 1; i < indices.length; i++) {
+              ctx.lineTo(lm[indices[i]].x * w, lm[indices[i]].y * h);
+            }
+            ctx.closePath();
+            ctx.stroke();
+          };
+          drawPoly([16, 18, 20, 22], 'rgba(74, 222, 128, 0.85)');
+          drawPoly([15, 17, 19, 21], 'rgba(56, 189, 248, 0.85)');
+        }
+
+        // 3. Alle 33 nativen MediaPipe-Punkte (0..32)
+        lm.forEach((pt) => {
+          ctx.fillStyle =
+            pt.id <= 10
+              ? '#38bdf8'
+              : [12, 14, 16, 18, 20, 22].includes(pt.id)
+              ? '#4ade80'
+              : [11, 13, 15, 17, 19, 21].includes(pt.id)
+              ? '#60a5fa'
+              : '#e879f9';
+          ctx.beginPath();
+          ctx.arc(pt.x * w, pt.y * h, 2.2 * scale, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // 4. Die 7 virtuellen Biomechanik-Knoten (#33..#39)
+        const synthList: Array<{ pt: { x: number; y: number }; label: string }> = [
+          { pt: sn.dartGripPoint, label: 'P_Dart' },
+          { pt: sn.supplyHandCenter, label: 'P_Supply' },
+          { pt: sn.neckC7, label: 'C7' },
+          { pt: sn.thoraxT8, label: 'T8' },
+          { pt: sn.pelvisCoM, label: 'CoM' },
+          { pt: sn.forearmPivotAnchor, label: 'L_Arm' },
+        ];
+        if (rig.isBimanualHandover) {
+          synthList.push({ pt: sn.handoverPoint, label: 'P_Handover' });
+        }
+        ctx.font = `bold ${Math.round(8 * scale)}px monospace`;
+        synthList.forEach((s) => {
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath();
+          ctx.arc(s.pt.x * w, s.pt.y * h, 3.2 * scale, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillText(s.label, s.pt.x * w + 5 * scale, s.pt.y * h + 3 * scale);
+        });
+      }
     }
   }, [
     viewMode,
@@ -1367,6 +1437,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     showTrajectory,
     showPlumbLine,
     showFootTriangle,
+    showHiddenRigDebug,
     trajectories,
     activeThrowIdx,
     isAnalysisLocked,
@@ -2703,6 +2774,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                       }`}
                     >
                       Standdreieck: {showFootTriangle ? 'AN' : 'AUS'}
+                    </button>
+                    <button
+                      onClick={() => setShowHiddenRigDebug(!showHiddenRigDebug)}
+                      className={`col-span-2 px-2 py-1.5 rounded-xl text-[11px] font-bold border cursor-pointer ${
+                        showHiddenRigDebug
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                          : 'bg-white/5 text-slate-400 border-white/10'
+                      }`}
+                      title="Blendet alle 40 Hintergrund-Messpunkte (33 MediaPipe + 7 virtuelle Knoten) als Röntgenblick ein"
+                    >
+                      🔬 40-Punkte-Hintergrundnetz (Debug): {showHiddenRigDebug ? 'SICHTBAR' : 'IM HINTERGRUND'}
                     </button>
                   </div>
 

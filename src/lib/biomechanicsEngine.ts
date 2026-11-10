@@ -571,10 +571,12 @@ export function buildHiddenBiomechanicalRig(
   const handoverDistanceNorm =
     Math.round(Math.hypot(dartGripPoint.x - supplyHandCenter.x, dartGripPoint.y - supplyHandCenter.y) * 1000) / 1000;
 
-  // Übergabe findet statt, wenn beide Hände im unteren Brust-/Hüftbereich nah beieinander sind
+  // Übergabe findet statt, wenn beide Hände im unteren Brust-/Hüftbereich (unterhalb des Ellenbogens) nah beieinander sind
+  const torsoMidY = (shoulderThrow.y + hipThrow.y) * 0.48;
   const isBimanualHandover =
-    handoverDistanceNorm <= 0.145 &&
-    wristStabilized.y >= shoulderThrow.y + 0.04;
+    handoverDistanceNorm <= 0.155 &&
+    wristStabilized.y >= torsoMidY &&
+    wristStabilized.y >= elbowRaw.y - 0.01;
 
   // 5. Standbasis (Beine & Fußdreieck)
   const kIdx = isRight ? 26 : 25;
@@ -863,7 +865,8 @@ export function buildAnatomicalArmTrajectory(
       maxWristYAtHip = f.pose.wrist.y;
     }
     const rig = f.pose.hiddenRig;
-    if (rig && f.pose.wrist.y >= f.pose.shoulder.y + 0.04) {
+    const torsoMidY = (f.pose.shoulder.y + f.pose.hip.y) * 0.48;
+    if (rig && f.pose.wrist.y >= torsoMidY && f.pose.wrist.y >= f.pose.elbow.y - 0.01) {
       if (rig.handoverDistanceNorm < minHandoverDist) {
         minHandoverDist = rig.handoverDistanceNorm;
         bestBimanualIdx = i;
