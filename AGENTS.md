@@ -87,7 +87,10 @@ Jeder Zyklus schließt mit einem kompakten Management-Bericht ab:
 ---
 
 ## 9. Zusätzliche Leitplanken für Entwicklung & Analyse
-1. **Isolierte Arbeit:** Änderungen erfolgen ausschließlich in separaten Git-Branches oder Worktrees, niemals direkt auf dem Hauptzweig. Solange kein Git-Repository eingerichtet ist, wird nur in Kopien bzw. `test_env/` gearbeitet und vorab eine Sicherungskopie des Projekts erstellt.
+1. **Isolierte Arbeit:** Änderungen erfolgen ausschließlich in separaten Git-Branches oder Worktrees, niemals direkt auf dem Hauptzweig (`main`).
+   - *Windows Git-Pfad:* Falls `git` in PowerShell nicht im PATH liegt, MUSS der absolute Pfad `& "C:\Program Files\Git\cmd\git.exe"` genutzt werden.
+   - *Pre-Flight-Pflicht:* Vor jeder Codeänderung MUSS ein neuer Feature-Branch angelegt werden (`git checkout -b feature/...`). Änderungen direkt auf `main` oder ohne separaten Branch sind strikt untersagt.
+   - *Sandbox-Hinweis:* Git-Befehle, die `.git` schreiben (`checkout -b`, `commit`, `branch`), erfordern unter Windows AppContainer `BypassSandbox: true`.
 2. **Dokumentationspflicht:** Jede relevante Änderung wird mit Grund, Dateien und Testergebnis dokumentiert.
 3. **Schutz vor Daten-Leakage:** Der Referenzdatensatz (`test_env/reference_data/`) darf nicht zum Anpassen von Parametern verwendet werden. Prognosemodelle werden zeitlich getrennt validiert (Training auf früheren Spieltagen, Test auf späteren).
 4. **Prognosen sind keine Fakten:** Prädiktive Analysen und What-if-Szenarien werden stets mit Datenbasis (Anzahl Legs/Spiele) und Unsicherheit ausgewiesen. Bei zu wenig Daten erfolgt ein Hinweis statt einer Zahl.
