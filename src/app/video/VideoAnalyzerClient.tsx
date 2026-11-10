@@ -29,6 +29,7 @@ import {
   Mic,
   Volume2,
   Camera,
+  X,
 } from 'lucide-react';
 import { UserSession } from '@/app/actions';
 import {
@@ -193,6 +194,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   const autoAnalyzeAfterRecordRef = useRef<boolean>(false);
   const isLiveRecordingRef = useRef<boolean>(false);
   const isCountingDownRef = useRef<boolean>(false);
+  const isCancelledRecordingRef = useRef<boolean>(false);
+  const liveFullscreenContainerRef = useRef<HTMLDivElement | null>(null);
   const isScanningRef = useRef<boolean>(false);
   const autoTriggerStateRef = useRef<{
     inDrawback: boolean;
@@ -370,6 +373,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
     setIsListeningVoice(false);
 
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+
+    if (typeof document !== 'undefined' && document.fullscreenElement) {
+      try {
+        document.exitFullscreen().catch(() => {});
+      } catch {}
+    }
+
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach((track) => track.stop());
@@ -377,6 +392,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     }
     setIsLiveCameraActive(false);
   }, []);
+
+  // Kompletter Abbruch des Vollbild-Kameramodus (verwirft laufende Aufnahme/Countdown und kehrt zur App zurück)
+  const handleCancelLiveCamera = useCallback(() => {
+    isCancelledRecordingRef.current = true;
+    recordedChunksRef.current = [];
+    autoAnalyzeAfterRecordRef.current = false;
+    stopCameraStream();
+    if (!videoSrc) {
+      setHasUploadedVideo(false);
+    }
+    setStatusMessage('Kamera-Modus abgebrochen. Du bist wieder in der normalen App-Ansicht.');
+  }, [stopCameraStream, videoSrc]);
 
   // Ellenbogen-Innenwinkel über Engine-Modul
   const calcElbowAngle = useCallback(
@@ -726,6 +753,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       };
 
       recorder.onstop = () => {
+        if (isCancelledRecordingRef.current) {
+          recordedChunksRef.current = [];
+          isCancelledRecordingRef.current = false;
+          stopCameraStream();
+          return;
+        }
         const blobType = mimeType || 'video/webm';
         const blob = new Blob(recordedChunksRef.current, { type: blobType });
         stopCameraStream();
@@ -849,11 +882,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         if (!cleaned) return;
         setLastHeardCommand(cleaned);
 
+        // 0. Sprachbefehl: "Abbrechen" / "Schließen" / "Zurück" -> Komplett abbrechen & zurück zur App
+        if (/(?:^|\s)(abbrechen|abbruch|schliessen|schließen|zurück|zurueck)(?:$|\s)/i.test(cleaned)) {
+          handleCancelLiveCamera();
+          return;
+        }
+
         // 1. Sprachbefehl: "Start" / "Aufnahme" / "Los" -> 5-Sekunden-Countdown starten
         if (
           !isLiveRecordingRef.current &&
           !isCountingDownRef.current &&
-          (/(start|starten|aufnahme|los|bereit|countdown)/i.test(cleaned))
+          /(?:^|\s)(start|starten|aufnahme|los|bereit|countdown)(?:$|\s)/i.test(cleaned)
         ) {
           triggerFiveSecondCountdown();
           return;
@@ -862,14 +901,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         // 2. Sprachbefehl: "Stopp" / "Fertig" / "Analyse" -> Aufnahme beenden & auswerten
         if (
           isLiveRecordingRef.current &&
-          (/(stopp|stop|fertig|ende|analyse|auswerten)/i.test(cleaned))
+          /(?:^|\s)(stopp|stop|fertig|ende|analyse|auswerten)(?:$|\s)/i.test(cleaned)
         ) {
           handleStopLiveRecording('voice_stop');
           return;
         }
 
         // 3. Sprachbefehl: "Position" / "Position i.O." / "Check" / "Stehe ich gut" -> Sofortige Ansage
-        if (/(position|check|bild|stehe|gut|ok|okay)/i.test(cleaned)) {
+        if (/(?:^|\s)(position|check|bild|stehe|gut|ok|okay)(?:$|\s)/i.test(cleaned)) {
           const currentPoseNow = currentPoseRef.current;
           const check = evaluateFramingAndPosition(currentPoseNow, handedness);
           setFramingCheck(check);
@@ -896,7 +935,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     } catch {
       setIsListeningVoice(false);
     }
-  }, [handedness, handleStopLiveRecording, playCoachTone, speakCoachMessage, triggerFiveSecondCountdown]);
+  }, [handedness, handleCancelLiveCamera, handleStopLiveRecording, playCoachTone, speakCoachMessage, triggerFiveSecondCountdown]);
 
   // Öffnet die Live-Kamera inkl. Positions-Prüfer ("Position i.O.") & Sprachsteuerung
   const handleStartLiveVoiceCoach = useCallback(
@@ -915,6 +954,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           audio: false,
         });
 
+        isCancelledRecordingRef.current = false;
         setCameraFacingMode(preferredFacing);
         setIsLiveCameraActive(true);
         setHasUploadedVideo(true);
@@ -927,6 +967,11 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         setLiveThrowCounter(resetCounter);
 
         setTimeout(async () => {
+          if (liveFullscreenContainerRef.current && liveFullscreenContainerRef.current.requestFullscreen) {
+            try {
+              await liveFullscreenContainerRef.current.requestFullscreen();
+            } catch {}
+          }
           const video = videoRef.current;
           if (video) {
             video.srcObject = stream;
@@ -2242,7 +2287,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   };
 
   return (
-    <div className="w-full max-w-6xl overflow-x-hidden mx-auto px-2 sm:px-4 py-3 sm:py-4 space-y-4 animate-fadeIn select-none">
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-3 sm:py-4 space-y-4 animate-fadeIn touch-pan-y">
       {/* 1. KOMPAKTER HEADER (Need-to-Know) */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-white/10 backdrop-blur-xl shadow-lg">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -2347,7 +2392,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         <button
           type="button"
           onClick={() =>
-            isLiveCameraActive ? stopCameraStream() : handleStartLiveVoiceCoach(cameraFacingMode)
+            isLiveCameraActive ? handleCancelLiveCamera() : handleStartLiveVoiceCoach(cameraFacingMode)
           }
           className={`md:col-span-4 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-md cursor-pointer text-left ${
             isLiveCameraActive
@@ -2533,15 +2578,27 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </div>
             ) : (
               <div
-                style={{ aspectRatio: `${videoDims.width} / ${videoDims.height}` }}
-                className="relative max-h-[64vh] w-auto max-w-full rounded-2xl overflow-hidden shadow-xl bg-black"
+                ref={liveFullscreenContainerRef}
+                style={
+                  isLiveCameraActive
+                    ? undefined
+                    : { aspectRatio: `${videoDims.width} / ${videoDims.height}` }
+                }
+                className={
+                  isLiveCameraActive
+                    ? 'fixed inset-0 z-[9999] w-screen h-[100dvh] bg-black flex items-center justify-center overflow-hidden'
+                    : 'relative max-h-[64vh] w-auto max-w-full rounded-2xl overflow-hidden shadow-xl bg-black'
+                }
               >
                 <div
                   style={{
-                    transform: zoomMode === 'upper_body' ? 'scale(2.15)' : 'scale(1)',
+                    transform:
+                      !isLiveCameraActive && zoomMode === 'upper_body'
+                        ? 'scale(2.15)'
+                        : 'scale(1)',
                     transformOrigin: dynamicZoomOrigin,
                   }}
-                  className="w-full h-full relative"
+                  className="w-full h-full relative flex items-center justify-center"
                 >
                   <video
                     ref={videoRef}
@@ -2672,7 +2729,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                         }
                       }
                     }}
-                    className={`w-full h-full block object-fill transition-opacity duration-200 ${
+                    className={`w-full h-full block ${
+                      isLiveCameraActive ? 'object-contain' : 'object-fill'
+                    } transition-opacity duration-200 ${
                       viewMode === 'isolated' ? 'opacity-0' : 'opacity-100'
                     }`}
                   />
@@ -2685,61 +2744,74 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   />
                 </div>
 
-                {/* 3-METER FERN-AMPEL & SPRACH-COACH OVERLAY IM LIVE-KAMERA-MODUS */}
+                {/* VOLLBILD-KAMERA HUD: 3-METER FERN-AMPEL, SPRACH-COACH & JEDERZEITIGER ABBRUCH-BUTTON */}
                 {isLiveCameraActive && (
                   <div
-                    className={`absolute inset-0 pointer-events-none rounded-2xl border-[6px] transition-all duration-300 flex flex-col justify-between p-3 ${
+                    className={`absolute inset-0 pointer-events-none border-[8px] sm:border-[10px] transition-all duration-300 flex flex-col justify-between p-3 sm:p-5 ${
                       isLiveRecording
-                        ? 'border-rose-500 shadow-[inset_0_0_35px_rgba(244,63,94,0.45)]'
+                        ? 'border-rose-500 shadow-[inset_0_0_50px_rgba(244,63,94,0.5)]'
                         : framingCheck?.isPositionIO
-                        ? 'border-emerald-400 shadow-[inset_0_0_40px_rgba(16,185,129,0.45)]'
+                        ? 'border-emerald-400 shadow-[inset_0_0_55px_rgba(16,185,129,0.5)]'
                         : framingCheck?.status === 'adjust'
-                        ? 'border-amber-400 shadow-[inset_0_0_35px_rgba(251,191,36,0.35)]'
-                        : 'border-rose-500/80 shadow-[inset_0_0_30px_rgba(244,63,94,0.3)]'
+                        ? 'border-amber-400 shadow-[inset_0_0_45px_rgba(251,191,36,0.4)]'
+                        : 'border-rose-500/80 shadow-[inset_0_0_40px_rgba(244,63,94,0.35)]'
                     }`}
                   >
-                    {/* OBERES FERN-BANNER (Aus 3 Metern am Oche lesbar!) */}
-                    <div className="flex flex-col gap-2 pointer-events-auto">
-                      <div
-                        className={`w-full px-3.5 py-2.5 rounded-xl backdrop-blur-md border text-center shadow-xl ${
-                          isLiveRecording
-                            ? 'bg-rose-950/90 border-rose-400 text-white'
-                            : framingCheck?.isPositionIO
-                            ? 'bg-emerald-950/90 border-emerald-400 text-emerald-200'
-                            : framingCheck?.status === 'adjust'
-                            ? 'bg-amber-950/90 border-amber-400 text-amber-200'
-                            : 'bg-slate-950/90 border-rose-500/50 text-rose-200'
-                        }`}
-                      >
-                        <div className="text-sm sm:text-base font-black tracking-wide uppercase">
-                          {isLiveRecording
-                            ? `🔴 AUFNAHME LÄUFT (${liveRecordingElapsedSec.toFixed(1)}s) · DART ${liveThrowCounter.completedDartsInVisit} / 3`
-                            : framingCheck?.shortBadge || 'PRÜFE POSITION AM OCHE...'}
+                    {/* OBERE LEISTE: FERN-AMPEL-STATUS + GROSSER "✕ ABBRECHEN"-BUTTON RECHTS OBEN */}
+                    <div className="flex flex-col gap-2.5 pointer-events-auto max-w-4xl w-full mx-auto">
+                      <div className="flex items-stretch gap-2.5">
+                        <div
+                          className={`flex-1 px-4 py-3 rounded-2xl backdrop-blur-md border text-center shadow-2xl flex flex-col justify-center ${
+                            isLiveRecording
+                              ? 'bg-rose-950/90 border-rose-400 text-white'
+                              : framingCheck?.isPositionIO
+                              ? 'bg-emerald-950/90 border-emerald-400 text-emerald-200'
+                              : framingCheck?.status === 'adjust'
+                              ? 'bg-amber-950/90 border-amber-400 text-amber-200'
+                              : 'bg-slate-950/90 border-rose-500/50 text-rose-200'
+                          }`}
+                        >
+                          <div className="text-base sm:text-xl font-black tracking-wide uppercase">
+                            {isLiveRecording
+                              ? `🔴 AUFNAHME LÄUFT (${liveRecordingElapsedSec.toFixed(1)}s) · DART ${liveThrowCounter.completedDartsInVisit} / 3`
+                              : framingCheck?.shortBadge || 'PRÜFE POSITION AM OCHE...'}
+                          </div>
+                          <div className="text-xs sm:text-sm font-semibold opacity-95 mt-0.5">
+                            {isLiveRecording
+                              ? captureSessionMode === 'single_visit_3_darts'
+                                ? 'Automatischer Stopp direkt nach deinem 3. Dart (oder rufe „Stopp“ / „Abbrechen“)'
+                                : `Ganzes-Leg-Modus aktiv · Gesamt-Darts: ${liveThrowCounter.totalCompletedDartsInLeg}`
+                              : framingCheck?.voicePrompt ||
+                                'Stelle dich seitlich ans Oche. Sage „Position“, „Start“ oder „Abbrechen“.'}
+                          </div>
                         </div>
-                        <div className="text-[11px] sm:text-xs font-semibold opacity-95 mt-0.5">
-                          {isLiveRecording
-                            ? captureSessionMode === 'single_visit_3_darts'
-                              ? 'Automatischer Stopp direkt nach deinem 3. Dart (oder rufe „Stopp“)'
-                              : `Ganzes-Leg-Modus aktiv · Gesamt-Darts: ${liveThrowCounter.totalCompletedDartsInLeg}`
-                            : framingCheck?.voicePrompt ||
-                              'Stelle dich seitlich ans Oche. Sage „Position“ oder „Start“.'}
-                        </div>
+
+                        {/* PROMINENTER ABBRECHEN-BUTTON OBEN RECHTS (Mind. 52px Touch-Höhe) */}
+                        <button
+                          type="button"
+                          onClick={handleCancelLiveCamera}
+                          className="min-h-[56px] px-4 sm:px-5 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black text-xs sm:text-sm border-2 border-rose-300 shadow-[0_0_25px_rgba(225,29,72,0.6)] cursor-pointer flex items-center justify-center gap-2 shrink-0"
+                          title="Kamera und Aufnahme sofort abbrechen und zur App zurückkehren"
+                        >
+                          <X className="w-5 h-5 stroke-[3]" />
+                          <span>Abbrechen</span>
+                        </button>
                       </div>
 
-                      {/* Kompakte Steuer-Pills für Kamera-Wechsel, Sprach-Befehle & Leg-Vorbereitung */}
-                      <div className="flex flex-wrap items-center justify-between gap-1.5 bg-slate-950/85 border border-white/15 px-2.5 py-1.5 rounded-xl backdrop-blur-md">
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300">
-                          <Volume2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span className="truncate max-w-[200px]">
+                      {/* Zweite Kopfzeile: Mikrofon-Status, Modus-Umschalter & Kamera-Wechsel */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/85 border border-white/15 px-3.5 py-2 rounded-xl backdrop-blur-md">
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
+                          <Volume2 className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
+                          <span className="truncate max-w-[260px] sm:max-w-md">
                             {lastHeardCommand
-                              ? `Gehört: „${lastHeardCommand}“`
+                              ? `🎙️ Gehört: „${lastHeardCommand}“`
                               : isListeningVoice
-                              ? 'Hört zu: „Position“, „Start“, „Stopp“'
-                              : 'Sprach-Tipps aktiv'}
+                              ? '🎙️ Sprachbefehle: „Position“ · „Start“ · „Stopp“ · „Abbrechen“'
+                              : '🔊 Sprach-Coach aktiv'}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() =>
@@ -2749,15 +2821,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                                   : 'single_visit_3_darts'
                               )
                             }
-                            className={`px-2 py-1 rounded-lg text-[10px] font-black border cursor-pointer ${
+                            className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-black border cursor-pointer ${
                               captureSessionMode === 'single_visit_3_darts'
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
                                 : 'bg-amber-500/20 text-amber-300 border-amber-400/40'
                             }`}
-                            title="Umschalten zwischen 3-Dart-Auto-Stopp und vorbereitetem Ganzes-Leg-Modus"
                           >
                             {captureSessionMode === 'single_visit_3_darts'
-                              ? '🎯 Stopp: Nach 3 Darts'
+                              ? '🎯 Auto-Stopp: 3 Darts'
                               : '🏁 Ganzes Leg (Multi-Visit)'}
                           </button>
 
@@ -2768,10 +2839,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                                 cameraFacingMode === 'environment' ? 'user' : 'environment'
                               )
                             }
-                            className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold border border-white/15 cursor-pointer flex items-center gap-1"
+                            className="min-h-[38px] px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 cursor-pointer flex items-center gap-1.5"
                           >
-                            <Camera className="w-3 h-3" />
-                            <span>{cameraFacingMode === 'environment' ? 'Rück' : 'Front'}</span>
+                            <Camera className="w-4 h-4" />
+                            <span>{cameraFacingMode === 'environment' ? 'Rückkamera' : 'Frontkamera'}</span>
                           </button>
                         </div>
                       </div>
@@ -2779,30 +2850,48 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
                     {/* RIESIGER 5-SEKUNDEN-COUNTDOWN IN DER BILDMITTE (5 - 4 - 3 - 2 - 1 - LOS!) */}
                     {countdownRemaining !== null && (
-                      <div className="my-auto flex flex-col items-center justify-center">
-                        <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-slate-950/90 border-4 border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.75)] flex flex-col items-center justify-center animate-pulse">
-                          <span className="text-5xl sm:text-6xl font-black text-emerald-300 font-mono">
+                      <div className="my-auto flex flex-col items-center justify-center gap-4 pointer-events-auto">
+                        <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-full bg-slate-950/95 border-4 border-emerald-400 shadow-[0_0_70px_rgba(16,185,129,0.85)] flex flex-col items-center justify-center animate-pulse">
+                          <span className="text-6xl sm:text-7xl font-black text-emerald-300 font-mono">
                             {countdownRemaining === 0 ? 'LOS!' : countdownRemaining}
                           </span>
-                          <span className="text-[11px] font-bold text-white uppercase tracking-widest mt-1">
+                          <span className="text-xs font-bold text-white uppercase tracking-widest mt-1">
                             {countdownRemaining === 0 ? 'Wirf 3 Darts' : 'Sekunden'}
                           </span>
                         </div>
+                        {countdownRemaining > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (countdownTimerRef.current) {
+                                clearInterval(countdownTimerRef.current);
+                                countdownTimerRef.current = null;
+                              }
+                              isCountingDownRef.current = false;
+                              setCountdownRemaining(null);
+                              speakCoachMessage('Countdown abgebrochen.', true);
+                            }}
+                            className="min-h-[48px] px-5 py-2.5 rounded-xl bg-rose-600/95 hover:bg-rose-500 text-white font-black text-xs border border-rose-300 shadow-lg cursor-pointer flex items-center gap-2"
+                          >
+                            <X className="w-4 h-4" />
+                            <span>Countdown stoppen</span>
+                          </button>
+                        )}
                       </div>
                     )}
 
-                    {/* UNTERE LEISTE IM LIVE-MODUS: 3-DART-FORTSCHRITT & DIREKT-START/STOPP-BUTTON */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/90 border border-white/15 p-2.5 rounded-xl backdrop-blur-md pointer-events-auto">
-                      <div className="flex items-center gap-1.5">
+                    {/* UNTERE STEUERLEISTE IM VOLLBILD: 3-DART-FORTSCHRITT + START/STOPP + KAMERA SCHLIESSEN */}
+                    <div className="max-w-4xl w-full mx-auto flex flex-wrap items-center justify-between gap-2.5 bg-slate-950/90 border border-white/15 p-3 rounded-2xl backdrop-blur-md pointer-events-auto">
+                      <div className="flex items-center gap-2">
                         {[1, 2, 3].map((dNum) => {
                           const done = liveThrowCounter.completedDartsInVisit >= dNum;
                           return (
                             <div
                               key={dNum}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-black border transition-all ${
+                              className={`min-h-[48px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black border flex items-center justify-center transition-all ${
                                 done
-                                  ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
-                                  : 'bg-slate-900 text-slate-400 border-white/10'
+                                  ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                                  : 'bg-slate-900 text-slate-300 border-white/10'
                               }`}
                             >
                               Dart {dNum} {done ? '✓' : ''}
@@ -2811,13 +2900,22 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                         })}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={handleCancelLiveCamera}
+                          className="min-h-[52px] px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-white font-black text-xs sm:text-sm border border-white/20 cursor-pointer flex items-center gap-1.5 transition-all"
+                        >
+                          <X className="w-4 h-4 text-rose-400" />
+                          <span>Kamera schließen</span>
+                        </button>
+
                         {!isLiveRecording ? (
                           <button
                             type="button"
                             onClick={triggerFiveSecondCountdown}
                             disabled={countdownRemaining !== null}
-                            className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                            className="min-h-[52px] px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm cursor-pointer shadow-lg"
                           >
                             {countdownRemaining !== null
                               ? `Countdown (${countdownRemaining}s)...`
@@ -2827,9 +2925,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           <button
                             type="button"
                             onClick={() => handleStopLiveRecording('manual_stop')}
-                            className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-black text-xs cursor-pointer shadow-lg"
+                            className="min-h-[52px] px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-black text-xs sm:text-sm cursor-pointer shadow-lg"
                           >
-                            ⏹️ Jetzt stoppen & analysieren („Stopp“)
+                            ⏹️ Jetzt fertig & analysieren („Stopp“)
                           </button>
                         )}
                       </div>
