@@ -214,8 +214,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     minElbowAngle: 180,
   });
 
-  // Need-to-Know UI: Experten-Optionen einklappbar
+  // Need-to-Know UI: Experten-Optionen & Start-Historie einklappbar
   const [showExpertSettings, setShowExpertSettings] = useState<boolean>(false);
+  const [showStartHistory, setShowStartHistory] = useState<boolean>(false);
 
   // Visuelle Overlays Schalter
   const [showOverlay, setShowOverlay] = useState<boolean>(true);
@@ -416,6 +417,29 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       setHasUploadedVideo(false);
     }
     setStatusMessage('Kamera-Modus abgebrochen. Du bist wieder in der normalen App-Ansicht.');
+  }, [stopCameraStream, videoSrc]);
+
+  // Zurück zur aufgeräumten Need-to-Know Start-Ansicht (Stufe 1: Neues Video aufnehmen oder hochladen)
+  const handleResetToStartScreen = useCallback(() => {
+    isCancelledRecordingRef.current = true;
+    recordedChunksRef.current = [];
+    autoAnalyzeAfterRecordRef.current = false;
+    stopCameraStream();
+    if (videoSrc) {
+      URL.revokeObjectURL(videoSrc);
+    }
+    setVideoSrc(null);
+    setHasUploadedVideo(false);
+    setIsPlaying(false);
+    setIsScanning(false);
+    isScanningRef.current = false;
+    setIsAnalysisLocked(false);
+    setSnapshots(null);
+    setBaselinePose(null);
+    setCurrentPose(null);
+    currentPoseRef.current = null;
+    poseTimelineRef.current = [];
+    setStatusMessage('Schritt 1: Wähle dein Wurf-Video aus oder starte die Vollbild-Kamera.');
   }, [stopCameraStream, videoSrc]);
 
   // Ellenbogen-Innenwinkel über Engine-Modul
@@ -2308,7 +2332,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           <Link
             href="/"
             data-ui-id="VIDEO.NAV.BACK_BTN"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition-all shrink-0 cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/10 text-xs font-bold transition-all shrink-0 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 text-emerald-400" />
             <span>Zurück</span>
@@ -2326,56 +2350,70 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* 5. Auto-Trigger Schalter */}
-          <button
-            onClick={() => setAutoTriggerEnabled(!autoTriggerEnabled)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
-              autoTriggerEnabled
-                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/40'
-                : 'bg-white/5 text-slate-400 border-white/10'
-            }`}
-            title="Erkennt Aushol- und Abwurfbewegungen beim Abspielen automatisch"
-          >
-            <Zap className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Auto-Trigger: {autoTriggerEnabled ? 'AN' : 'AUS'}</span>
-          </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Technische Analyse-Schalter & "Neues Video" (Ergänzung 4) NUR in Stufe 2 anzeigen */}
+          {hasUploadedVideo && !isLiveCameraActive && (
+            <>
+              <button
+                type="button"
+                onClick={handleResetToStartScreen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-400/40 text-xs font-black transition-all cursor-pointer shadow-sm"
+                title="Aktuelles Video schließen und zurück zur Start-Auswahl"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-cyan-300" />
+                <span>🔄 Neues Video</span>
+              </button>
 
-          <div className="inline-flex items-center rounded-xl bg-slate-900 border border-white/10 p-0.5 text-[11px]">
-            <button
-              onClick={() => setVideoMode('auto')}
-              className={`px-2 py-0.5 rounded-lg font-bold cursor-pointer transition-all ${
-                videoMode === 'auto'
-                  ? 'bg-emerald-500 text-slate-950 font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Erkennt Slow-Mo automatisch anhand der Video-Laufzeit"
-            >
-              Auto
-            </button>
-            <button
-              onClick={() => setVideoMode('slowmo')}
-              className={`px-2 py-0.5 rounded-lg font-bold cursor-pointer transition-all ${
-                videoMode === 'slowmo'
-                  ? 'bg-amber-400 text-slate-950 font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Slow-Mo Modus (120/240 FPS Zeitlupe)"
-            >
-              Slow-Mo
-            </button>
-            <button
-              onClick={() => setVideoMode('realtime')}
-              className={`px-2 py-0.5 rounded-lg font-bold cursor-pointer transition-all ${
-                videoMode === 'realtime'
-                  ? 'bg-cyan-400 text-slate-950 font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Echtzeit-Modus (30 FPS Standard)"
-            >
-              30 FPS
-            </button>
-          </div>
+              <button
+                onClick={() => setAutoTriggerEnabled(!autoTriggerEnabled)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[40px] rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                  autoTriggerEnabled
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/40'
+                    : 'bg-white/5 text-slate-400 border-white/10'
+                }`}
+                title="Erkennt Aushol- und Abwurfbewegungen beim Abspielen automatisch"
+              >
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Auto-Trigger: {autoTriggerEnabled ? 'AN' : 'AUS'}</span>
+              </button>
+
+              <div className="inline-flex items-center rounded-xl bg-slate-900 border border-white/10 p-0.5 text-[11px]">
+                <button
+                  onClick={() => setVideoMode('auto')}
+                  className={`px-2 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                    videoMode === 'auto'
+                      ? 'bg-emerald-500 text-slate-950 font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Erkennt Slow-Mo automatisch anhand der Video-Laufzeit"
+                >
+                  Auto
+                </button>
+                <button
+                  onClick={() => setVideoMode('slowmo')}
+                  className={`px-2 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                    videoMode === 'slowmo'
+                      ? 'bg-amber-400 text-slate-950 font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Slow-Mo Modus (120/240 FPS Zeitlupe)"
+                >
+                  Slow-Mo
+                </button>
+                <button
+                  onClick={() => setVideoMode('realtime')}
+                  className={`px-2 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                    videoMode === 'realtime'
+                      ? 'bg-cyan-400 text-slate-950 font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Echtzeit-Modus (30 FPS Standard)"
+                >
+                  30 FPS
+                </button>
+              </div>
+            </>
+          )}
 
           <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/5 text-slate-300 border border-white/10 text-[11px] font-bold">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -2384,215 +2422,316 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         </div>
       </div>
 
-      {/* 2. HAUPT-WORKFLOW: 1a. Video laden | 1b. Live-Kamera & Sprach-Coach | 2. 3-Dart-Analyse starten */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
-        <label className="md:col-span-3 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl bg-slate-900/85 hover:bg-slate-800/90 border border-white/10 cursor-pointer transition-all shadow-md">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center shrink-0">
-              <Upload className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-black text-white truncate">
-                {hasUploadedVideo && !isLiveCameraActive ? '1a. Anderes Video' : '1a. Video-Datei'}
-              </div>
-              <p className="text-[11px] text-slate-400 truncate">
-                Aus Galerie laden
-              </p>
-            </div>
-          </div>
-          <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
-        </label>
-
-        <button
-          type="button"
-          onClick={() =>
-            isLiveCameraActive ? handleCancelLiveCamera() : handleStartLiveVoiceCoach(cameraFacingMode)
-          }
-          className={`md:col-span-4 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-md cursor-pointer text-left ${
-            isLiveCameraActive
-              ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.25)]'
-              : 'bg-slate-900/85 hover:bg-slate-800/90 border-emerald-500/30 text-white'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                isLiveCameraActive
-                  ? 'bg-emerald-500 text-slate-950 border-emerald-300 animate-pulse'
-                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
-              }`}
+      {/* ============================================================================
+          STUFE 1: AUFGERÄUMTE START-ANSICHT (NUR NEED-TO-KNOW + ERGÄNZUNGEN 2 & 3)
+         ============================================================================ */}
+      {!hasUploadedVideo && !isLiveCameraActive ? (
+        <div className="max-w-2xl mx-auto w-full py-2 sm:py-6 space-y-4">
+          {/* 2 große Need-to-Know Haupt-Aktionen: 1. Video aufnehmen | 2. Video hochladen */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Haupt-Aktion 1: Video aufnehmen (Vollbild-Kamera + Sprach-Coach) */}
+            <button
+              type="button"
+              onClick={() => handleStartLiveVoiceCoach(cameraFacingMode)}
+              className="group relative flex flex-col justify-between p-6 min-h-[190px] rounded-3xl bg-gradient-to-br from-emerald-500/20 via-slate-900/95 to-slate-950 hover:from-emerald-500/30 border-2 border-emerald-500/50 hover:border-emerald-400 text-left shadow-xl hover:shadow-[0_0_30px_rgba(16,185,129,0.25)] transition-all cursor-pointer active:scale-[0.99]"
             >
-              <Mic className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-black text-white flex items-center gap-1.5 truncate">
-                <span>
-                  {isLiveCameraActive
-                    ? '🎙️ Sprach-Coach aktiv (Beenden)'
-                    : '1b. 🎙️ Kamera & Sprach-Start'}
+              <div className="flex items-start justify-between gap-3 w-full">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                  <Camera className="w-7 h-7 stroke-[2.4]" />
+                </div>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider">
+                  <Mic className="w-3 h-3" />
+                  <span>Sprach-Coach</span>
                 </span>
               </div>
-              <p className="text-[11px] text-emerald-300/90 truncate">
-                „Position i.O.“ · „Start“ (5s) · Auto-Stopp (3 Darts)
-              </p>
-            </div>
-          </div>
-        </button>
 
-        <button
-          onClick={handleRunBiomechanicsAnalysis}
-          disabled={!hasUploadedVideo || isScanning || isLiveCameraActive}
-          className={`md:col-span-5 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-lg text-left ${
-            !hasUploadedVideo
-              ? 'bg-slate-900/40 border-white/5 opacity-50 cursor-not-allowed'
-              : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 border-emerald-300 hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-[0.99] cursor-pointer'
-          }`}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                !hasUploadedVideo ? 'bg-slate-800 text-slate-400' : 'bg-slate-950/20 text-slate-950'
-              }`}
-            >
-              <Sparkles className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
-            </div>
-            <div className="min-w-0">
-              <div
-                className={`text-xs sm:text-sm font-black flex items-center gap-2 flex-wrap ${
-                  !hasUploadedVideo ? 'text-white' : 'text-slate-950'
-                }`}
-              >
-                <span>
-                  {isScanning
-                    ? `Analysiere Wurf-Kinematik (${scanProgress}%)...`
-                    : '2. 🎯 Aufnahme analysieren (Alle 3 Darts)'}
+              <div className="mt-5 space-y-1.5">
+                <div className="text-lg sm:text-xl font-black text-white group-hover:text-emerald-300 transition-colors">
+                  🎙️ Video aufnehmen
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Öffnet die <strong className="text-emerald-300">100% Vollbild-Kamera</strong> mit „Position i.O.“-Ansage, 5s-Countdown auf Zuruf („Start“) und Auto-Stopp nach 3 Darts.
+                </p>
+              </div>
+            </button>
+
+            {/* Haupt-Aktion 2: Video hochladen (Aus Galerie wählen) */}
+            <label className="group relative flex flex-col justify-between p-6 min-h-[190px] rounded-3xl bg-gradient-to-br from-cyan-500/15 via-slate-900/95 to-slate-950 hover:from-cyan-500/25 border-2 border-cyan-500/40 hover:border-cyan-400 text-left shadow-xl hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] transition-all cursor-pointer active:scale-[0.99]">
+              <div className="flex items-start justify-between gap-3 w-full">
+                <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                  <Upload className="w-7 h-7 stroke-[2.2]" />
+                </div>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-[10px] font-black uppercase tracking-wider">
+                  Galerie / Datei
                 </span>
               </div>
-              <p
-                className={`text-[11px] truncate ${
-                  !hasUploadedVideo ? 'text-slate-400' : 'text-slate-900 font-semibold'
-                }`}
-              >
-                Berechnet echte Arm-Rotationskurven (Ausholen → Release), Speed (km/h) & Ellenbogen-Sensor
-              </p>
-            </div>
+
+              <div className="mt-5 space-y-1.5">
+                <div className="text-lg sm:text-xl font-black text-white group-hover:text-cyan-300 transition-colors">
+                  📁 Video hochladen
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Wähle ein vorhandenes Smartphone-Video (Echtzeit oder <strong className="text-cyan-300">120/240 FPS Slow-Mo</strong>) aus deiner Mediathek.
+                </p>
+              </div>
+              <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
+            </label>
           </div>
-        </button>
-      </div>
 
-      {/* 3. HAUPT-GRID: LINKS VIDEO-VIEWPORT, RECHTS NEED-TO-KNOW DIAGNOSE-STECKBRIEF */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* LINKE SPALTE: VIDEO & KOMPAKTE STEUERUNG */}
-        <div className="lg:col-span-7 flex flex-col gap-3 min-w-0 w-full">
-          {/* Kompakte Modus- & Wurf-Auswahl (Responsives Grid -> Kein horizontales Scrollen möglich!) */}
-          <div className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-md">
-            {/* Zeile 1: Ansicht & Zoom (2x2 auf Mobile, 4er Reihe auf Desktop) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              <button
-                onClick={() => setViewMode('video')}
-                className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
-                  viewMode === 'video'
-                    ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
-                }`}
-              >
-                🎬 Video + Kurven
-              </button>
-              <button
-                onClick={() => setViewMode('isolated')}
-                className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
-                  viewMode === 'isolated'
-                    ? 'bg-cyan-400 text-slate-950 font-black shadow-sm'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
-                }`}
-              >
-                📈 Nur Kurven
-              </button>
-              <button
-                onClick={() => setZoomMode('upper_body')}
-                className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
-                  zoomMode === 'upper_body'
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
-                }`}
-              >
-                🎯 Zoom: Oberkörper
-              </button>
-              <button
-                onClick={() => setZoomMode('full')}
-                className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
-                  zoomMode === 'full'
-                    ? 'bg-white text-slate-950 font-black shadow-sm'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
-                }`}
-              >
-                🧍 Gesamtkörper
-              </button>
+          {/* ERGÄNZUNG 2: Kompakte Wurfarm-Vorauswahl (Rechtshänder | Linkshänder) direkt unter den 2 Karten */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-white/10 flex flex-wrap items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-2.5">
+              <span className="text-base">✋</span>
+              <div>
+                <div className="text-xs font-black text-white">Wurfarm-Vorauswahl</div>
+                <div className="text-[11px] text-slate-400">
+                  Für Kamera-Positionsprüfung („Position i.O.“) & 70-Punkte-Armnetz
+                </div>
+              </div>
             </div>
 
-            {/* Zeile 2: Wurf-Kurven Umschalter (4er Grid -> Passt auf jedes Smartphone!) */}
-            <div className="grid grid-cols-4 gap-1.5">
-              {[
-                { idx: -1, label: 'Alle 3 Darts', activeClass: 'bg-blue-600 text-white' },
-                { idx: 0, label: 'Dart 1 (Blau)', activeClass: 'bg-blue-500 text-white' },
-                { idx: 1, label: 'Dart 2 (Cyan)', activeClass: 'bg-cyan-500 text-slate-950' },
-                { idx: 2, label: 'Dart 3 (Violett)', activeClass: 'bg-purple-500 text-white' },
-              ].map((item) => (
-                <button
-                  key={item.idx}
-                  onClick={() => setActiveThrowIdx(item.idx)}
-                  className={`px-1.5 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
-                    activeThrowIdx === item.idx
-                      ? `${item.activeClass} font-black shadow-sm`
-                      : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-1.5 bg-slate-950 p-1 rounded-xl border border-white/10 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setHandedness('right')}
+                className={`px-4 py-2 min-h-[44px] rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  handedness === 'right'
+                    ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Rechtshänder
+              </button>
+              <button
+                type="button"
+                onClick={() => setHandedness('left')}
+                className={`px-4 py-2 min-h-[44px] rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  handedness === 'left'
+                    ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Linkshänder
+              </button>
             </div>
           </div>
 
-          {/* Video-Rahmen */}
-          <div className="w-full rounded-3xl bg-slate-950 border-2 border-emerald-500/20 shadow-2xl p-2 flex flex-col items-center justify-center min-h-[340px] overflow-hidden">
-            {!hasUploadedVideo ? (
-              <div className="flex flex-col items-center justify-center py-8 px-4 text-center max-w-md mx-auto w-full">
-                <label className="flex flex-col items-center justify-center gap-3 py-6 px-6 w-full rounded-2xl border-2 border-dashed border-emerald-500/30 hover:border-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer group transition-all shadow-inner">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform shadow-lg">
-                    <Upload className="w-7 h-7" />
-                  </div>
-                  <div>
-                    <p className="text-sm sm:text-base font-black text-white group-hover:text-emerald-300 transition-colors">
-                      Wurf-Video hier auswählen
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                      Smartphone-Video (Hochformat 9:16 oder Querformat 16:9). 100% On-Device & DSGVO-konform.
-                    </p>
-                  </div>
-                  <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
-                </label>
+          {/* ERGÄNZUNG 3: Eingeklappte Historie ("📂 Meine gespeicherten Analysen (X)") */}
+          <div className="rounded-2xl bg-slate-900/80 border border-white/10 shadow-md overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowStartHistory(!showStartHistory)}
+              className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-2 text-xs font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <span>📂</span>
+                <span>Meine gespeicherten Analysen ({savedSessions.length})</span>
+              </span>
+              <span className="text-[11px] text-emerald-400 font-semibold">
+                {showStartHistory ? '▲ Einklappen' : '▼ Anzeigen'}
+              </span>
+            </button>
 
-                {/* High-Speed Slow-Mo Empfehlung gem. Biomechanik-Leitplanken */}
-                <div className="mt-4 w-full p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900/90 to-emerald-950/40 border border-cyan-400/30 text-left shadow-md flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center shrink-0 mt-0.5">
-                    <Zap className="w-4 h-4 text-cyan-400" />
+            {showStartHistory && (
+              <div className="p-4 pt-2 border-t border-white/10 space-y-2.5 bg-slate-950/60">
+                {savedSessions.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-2 text-center">
+                    Noch keine gespeicherten Wurf-Steckbriefe auf diesem Gerät vorhanden.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between pb-1">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                        On-Device & Profil-Verlauf
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handlePrintSession}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[10px] font-bold cursor-pointer"
+                      >
+                        <Printer className="w-3 h-3 text-cyan-400" />
+                        <span>Drucken</span>
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {savedSessions.map((s) => (
+                        <div
+                          key={s.id}
+                          className="p-3 rounded-xl bg-slate-900/90 border border-white/5 flex items-center justify-between gap-2 text-[11px]"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-bold text-white flex items-center gap-2">
+                              <span>{s.dateStr}</span>
+                              <span className="text-emerald-400 font-mono">
+                                {s.consistencyScore}% Konstanz
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono truncate">
+                              {s.releaseSpeedKmh} km/h • +{s.launchAngleDeg}° • Ellenbogen{' '}
+                              {s.elbowDropMm} mm
+                              {s.releaseDispersionMm !== undefined
+                                ? ` • Streuung ${s.releaseDispersionMm} mm`
+                                : ''}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleExportSessionJson(s)}
+                              className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 cursor-pointer"
+                              title="Steckbrief als JSON exportieren"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSavedSession(s.id)}
+                              className="p-2 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 cursor-pointer"
+                              title="Messung löschen"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ============================================================================
+              STUFE 2: ANALYSE-COCKPIT (NACH VIDEO-UPLOAD ODER KAMERA-AUFNAHME)
+             ============================================================================ */}
+          {!isLiveCameraActive && (
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
+              <button
+                onClick={handleRunBiomechanicsAnalysis}
+                disabled={isScanning}
+                className="md:col-span-8 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl border transition-all shadow-lg text-left bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 border-emerald-300 hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-[0.99] cursor-pointer"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-slate-950/20 text-slate-950">
+                    <Sparkles className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
-                      <span>⚡ High-Speed Slow-Mo Empfehlung</span>
-                      <span className="px-1.5 py-0.5 rounded-md bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[10px] font-mono font-bold">
-                        60 / 120 / 240 FPS
+                    <div className="text-xs sm:text-sm font-black flex items-center gap-2 flex-wrap text-slate-950">
+                      <span>
+                        {isScanning
+                          ? `Analysiere 70-Punkte-Kinematik (${scanProgress}%)...`
+                          : '🎯 Aufnahme analysieren (Alle 3 Darts)'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Für <strong className="text-emerald-300">4x höhere Release-Apex-Präzision</strong>: Nimm deine 3 Darts mit der Smartphone-Zeitlupenfunktion (120 oder 240 FPS) von der Seite auf. Bei 30 FPS vergeht der Release oft zwischen zwei Frames – 120+ FPS erfassen die Abflugdynamik und den exakten Apex auf die Millisekunde genau.
+                    <p className="text-[11px] truncate text-slate-900 font-semibold">
+                      Berechnet echte Arm-Rotationskurven (Ausholen → Release), Speed (km/h) & Ellenbogen-Sensor
                     </p>
                   </div>
                 </div>
+              </button>
+
+              {/* ERGÄNZUNG 4: "🔄 Neues Video" Button direkt neben der Analyse-Aktion */}
+              <button
+                type="button"
+                onClick={handleResetToStartScreen}
+                className="md:col-span-4 flex items-center justify-between p-3.5 min-h-[52px] rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-white/15 hover:border-cyan-400/50 text-white transition-all shadow-md cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 flex items-center justify-center shrink-0">
+                    <RotateCcw className="w-5 h-5 text-cyan-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-black text-white truncate">
+                      🔄 Neues Video
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      Zurück zur Start-Auswahl
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* 3. HAUPT-GRID: LINKS VIDEO-VIEWPORT, RECHTS NEED-TO-KNOW DIAGNOSE-STECKBRIEF */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            {/* LINKE SPALTE: VIDEO & KOMPAKTE STEUERUNG */}
+            <div className="lg:col-span-7 flex flex-col gap-3 min-w-0 w-full">
+              {/* Kompakte Modus- & Wurf-Auswahl (Responsives Grid -> Kein horizontales Scrollen möglich!) */}
+              <div className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-md">
+                {/* Zeile 1: Ansicht & Zoom (2x2 auf Mobile, 4er Reihe auf Desktop) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  <button
+                    onClick={() => setViewMode('video')}
+                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                      viewMode === 'video'
+                        ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                        : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    🎬 Video + Kurven
+                  </button>
+                  <button
+                    onClick={() => setViewMode('isolated')}
+                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                      viewMode === 'isolated'
+                        ? 'bg-cyan-400 text-slate-950 font-black shadow-sm'
+                        : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    📈 Nur Kurven
+                  </button>
+                  <button
+                    onClick={() => setZoomMode('upper_body')}
+                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                      zoomMode === 'upper_body'
+                        ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                        : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    🎯 Zoom: Oberkörper
+                  </button>
+                  <button
+                    onClick={() => setZoomMode('full')}
+                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                      zoomMode === 'full'
+                        ? 'bg-white text-slate-950 font-black shadow-sm'
+                        : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    🧍 Gesamtkörper
+                  </button>
+                </div>
+
+                {/* Zeile 2: Wurf-Kurven Umschalter (4er Grid -> Passt auf jedes Smartphone!) */}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { idx: -1, label: 'Alle 3 Darts', activeClass: 'bg-blue-600 text-white' },
+                    { idx: 0, label: 'Dart 1 (Blau)', activeClass: 'bg-blue-500 text-white' },
+                    { idx: 1, label: 'Dart 2 (Cyan)', activeClass: 'bg-cyan-500 text-slate-950' },
+                    { idx: 2, label: 'Dart 3 (Violett)', activeClass: 'bg-purple-500 text-white' },
+                  ].map((item) => (
+                    <button
+                      key={item.idx}
+                      onClick={() => setActiveThrowIdx(item.idx)}
+                      className={`px-1.5 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                        activeThrowIdx === item.idx
+                          ? `${item.activeClass} font-black shadow-sm`
+                          : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <div
-                ref={liveFullscreenContainerRef}
+
+              {/* Video-Rahmen */}
+              <div className="w-full rounded-3xl bg-slate-950 border-2 border-emerald-500/20 shadow-2xl p-2 flex flex-col items-center justify-center min-h-[340px] overflow-hidden">
+                <div
+                  ref={liveFullscreenContainerRef}
                 style={
                   isLiveCameraActive
                     ? undefined
@@ -2963,10 +3102,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Kompakte Player-Steuerung (inkl. Bild vermessen & PNG-Export) */}
+            {/* Kompakte Player-Steuerung (inkl. Bild vermessen & PNG-Export) */}
           {hasUploadedVideo && (
             <div className="p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2.5 shadow-md">
               <div className="flex items-center gap-2.5">
@@ -3747,6 +3885,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
