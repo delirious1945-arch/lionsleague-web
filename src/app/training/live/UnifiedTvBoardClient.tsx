@@ -281,7 +281,7 @@ export default function UnifiedTvBoardClient({
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Kombi-Ansicht</span>
+              <span>Gesamtübersicht (4 Spiele)</span>
             </button>
 
             <button
@@ -447,7 +447,7 @@ export default function UnifiedTvBoardClient({
             <span className="font-bold text-slate-400">Aktiver Modus:</span>
             <span className="px-2.5 py-0.5 rounded-lg bg-amber-400/[0.08] text-amber-200 border border-amber-400/30 font-bold">
               {viewMode === 'both'
-                ? 'Kombi-Ansicht (Checkout Battle & PDC Challenge)'
+                ? 'Gesamtübersicht (Alle 4 Trainingsspiele)'
                 : viewMode === 'doppelquote'
                 ? 'Checkout Battle (Doppelquote)'
                 : viewMode === 'pdc'
@@ -796,6 +796,288 @@ export default function UnifiedTvBoardClient({
                               </td>
 
                               {/* Zeit */}
+                              <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
+                                {row.time_label || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* TABELLE 3: FUßBALL DARTS (MATCHBOARD & DUELLE) */}
+              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+                {/* Header Spiel 3 */}
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
+                      ⚽
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                        <span>Fußball Darts</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
+                          1vs1 & vs. Computer
+                        </span>
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        Balleroberung auf Bull & Tore über beliebige Doppel • Wertung ab 5 Toren
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setViewMode('fussball')}
+                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-amber-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    title="Zur detaillierten Fußball-Matchliste"
+                  >
+                    <span>Details</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Tabelle Fußball Leaderboard */}
+                {data.todayFussballLeaderboard.length === 0 ? (
+                  <div className="flex-1 min-h-[260px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
+                    <div className="text-4xl mb-3">⚽</div>
+                    <h3 className="text-base font-bold text-slate-200">
+                      Noch keine Fußball-Spiele heute
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-sm mt-1">
+                      Sobald ein Spieler ein Match ab 5 Toren beendet (1vs1 oder gegen den Computer), erscheint die Wertung hier sofort auf dem TV-Board!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs sm:text-sm">
+                        <thead>
+                          <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
+                            <th className="py-2.5 px-2 text-center w-12">Platz</th>
+                            <th className="py-2.5 px-3">Spieler</th>
+                            <th className="py-2.5 px-2 text-center">Spiele</th>
+                            <th className="py-2.5 px-2 text-center">Tore</th>
+                            <th className="py-2.5 px-3 text-right">Siegquote</th>
+                            <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.05] font-medium">
+                          {data.todayFussballLeaderboard.map((row) => {
+                            const photo = getPlayerPhotoUrl(row.player_name);
+                            const initials = getPlayerInitials(row.player_name);
+                            return (
+                              <tr
+                                key={row.player_name}
+                                className={`transition-colors hover:bg-white/[0.04] ${
+                                  row.rank === 1
+                                    ? 'bg-amber-400/[0.08]'
+                                    : row.rank === 2
+                                    ? 'bg-white/[0.03]'
+                                    : row.rank === 3
+                                    ? 'bg-amber-900/[0.12]'
+                                    : ''
+                                }`}
+                              >
+                                <td className="py-3 px-2 text-center">
+                                  {renderRankBadge(row.rank, row.isShared)}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
+                                      {photo ? (
+                                        <Image src={photo} alt={row.player_name} width={32} height={32} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <span>{initials}</span>
+                                      )}
+                                    </div>
+                                    <div className="font-black text-white text-xs sm:text-sm tracking-tight">
+                                      {row.player_name}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-2 text-center font-mono">
+                                  <span className="font-bold text-white">{row.matches_count}</span>
+                                  <span className="text-[10px] text-slate-400 ml-1">({row.wins}S/{row.losses}N)</span>
+                                </td>
+                                <td className="py-3 px-2 text-center font-mono font-bold text-slate-200">
+                                  {row.goals_scored}:{row.goals_conceded}
+                                </td>
+                                <td className="py-3 px-3 text-right font-mono font-black text-sm text-amber-300">
+                                  {row.win_rate.toFixed(1)}%
+                                </td>
+                                <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
+                                  {row.last_time || '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mini-Match-Ticker */}
+                    {data.todayFussballMatches && data.todayFussballMatches.length > 0 && (
+                      <div className="pt-2.5 border-t border-white/[0.06]">
+                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-2 flex items-center justify-between">
+                          <span>Zuletzt gespielte Matches:</span>
+                          <span className="text-slate-500 font-mono">{data.todayFussballMatches.length} gesamt</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {data.todayFussballMatches.slice(0, 2).map((m) => {
+                            const p1Win = m.player1_goals > m.player2_goals;
+                            const p2Win = m.player2_goals > m.player1_goals;
+                            return (
+                              <div key={m.id} className="p-2 bg-white/[0.02] rounded-xl border border-white/[0.06] flex items-center justify-between text-xs">
+                                <div className="truncate pr-2">
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className={`font-bold truncate ${p1Win ? 'text-amber-300' : 'text-slate-300'}`}>{m.player1_name}</span>
+                                    <span className="text-slate-500 text-[10px]">vs.</span>
+                                    <span className={`truncate text-xs ${p2Win ? 'text-amber-300' : 'text-slate-400'}`}>{m.player2_name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[9px] text-slate-500 font-mono mt-0.5">
+                                    <span>{m.time_label}</span>
+                                    <span>•</span>
+                                    <span>{m.darts_thrown} Darts</span>
+                                    {m.is_computer && (
+                                      <span className="px-1 py-0.2 rounded bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/20">
+                                        vs. Computer
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="font-mono font-black px-2 py-0.5 rounded bg-black/40 border border-white/5 shrink-0 text-white">
+                                  {m.player1_goals} : {m.player2_goals}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* TABELLE 4: STELLEN & CHECKEN (3–101 PUNKTEJAGD) */}
+              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+                {/* Header Spiel 4 */}
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
+                      🎲
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                        <span>Stellen & Checken</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
+                          3–101
+                        </span>
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        15 Runden Finish-Jagd • +1 Pkt (3–60), +2 Pkt (61–80), +3 Pkt (81–101)
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setViewMode('stellen_checken')}
+                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-amber-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    title="Zur detaillierten Stellen & Checken Übersicht"
+                  >
+                    <span>Details</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Tabelle Stellen & Checken */}
+                {(!data.todayStellenCheckenLeaderboard || data.todayStellenCheckenLeaderboard.length === 0) ? (
+                  <div className="flex-1 min-h-[260px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
+                    <div className="text-4xl mb-3">🎲</div>
+                    <h3 className="text-base font-bold text-slate-200">
+                      Noch keine Stellen & Checken Spiele heute
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-sm mt-1">
+                      Sobald ein Spieler eine 15-Runden-Sequenz wirft, erscheint die Wertung hier sofort live auf dem TV-Board!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
+                          <th className="py-2.5 px-2 text-center w-12">Platz</th>
+                          <th className="py-2.5 px-3">Spieler</th>
+                          <th className="py-2.5 px-2 text-center">Sequenz</th>
+                          <th className="py-2.5 px-3 text-right">Punkte</th>
+                          <th className="py-2.5 px-3 text-right hidden sm:table-cell">Checks (15 R.)</th>
+                          <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.05] font-medium">
+                        {data.todayStellenCheckenLeaderboard.map((row, idx) => {
+                          const photo = getPlayerPhotoUrl(row.player_name);
+                          const initials = getPlayerInitials(row.player_name);
+                          return (
+                            <tr
+                              key={row.session_id + '_' + idx}
+                              className={`transition-colors hover:bg-white/[0.04] ${
+                                row.rank === 1
+                                  ? 'bg-amber-400/[0.08]'
+                                  : row.rank === 2
+                                  ? 'bg-white/[0.03]'
+                                  : row.rank === 3
+                                  ? 'bg-amber-900/[0.12]'
+                                  : ''
+                              }`}
+                            >
+                              <td className="py-3 px-2 text-center">
+                                {renderRankBadge(row.rank, row.isShared)}
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
+                                    {photo ? (
+                                      <Image src={photo} alt={row.player_name} width={32} height={32} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{initials}</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="font-black text-white text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
+                                      <span>{row.player_name}</span>
+                                      {row.attempt_nr > 1 && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/[0.06] text-amber-300 border border-white/[0.1]">
+                                          #{row.attempt_nr}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {row.opponent_name && (
+                                      <div className="text-[10px] text-slate-400">
+                                        vs. {row.opponent_name}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono">
+                                <span className="px-2 py-0.5 rounded-lg bg-white/[0.04] border border-white/[0.09] text-[11px] font-bold text-amber-200">
+                                  #{String(row.preset_id).padStart(3, '0')}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <span className="font-mono font-black text-sm sm:text-base text-amber-300">
+                                  {row.points_scored}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono ml-1">
+                                  / {row.max_possible_points}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right hidden sm:table-cell font-mono text-slate-300">
+                                {row.checks_count}/{row.total_rounds} ({row.quote_percent.toFixed(0)}%)
+                              </td>
                               <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
                                 {row.time_label || '-'}
                               </td>
