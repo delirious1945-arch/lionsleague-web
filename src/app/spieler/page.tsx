@@ -7,6 +7,7 @@ import {
   getPlayers,
   getSettings,
 } from '@/lib/data';
+import { getAllPlayersTrainingDoublesStats } from '@/lib/playerDoublesStats';
 import { calculateMatchPerformance } from '@/lib/scoring';
 import { getSessionAction } from '../actions';
 
@@ -27,11 +28,12 @@ export default async function SpielerPage({
 
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
 
-  const [players, matches, doubles, settings] = await Promise.all([
+  const [players, matches, doubles, settings, trainingDoublesStats] = await Promise.all([
     getPlayers(),
     getAllMatches(selectedSeason),
     getDoublesSpecials(selectedSeason),
     getSettings(),
+    getAllPlayersTrainingDoublesStats(),
   ]);
 
   // Matches by player name
@@ -140,6 +142,7 @@ export default async function SpielerPage({
         doublesByPlayer={doublesByPlayer}
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
+        trainingDoublesStats={trainingDoublesStats}
       />
     </div>
   );

@@ -14,6 +14,8 @@ import DartsToWinWidget from '@/components/analytics/DartsToWinWidget';
 import LegAnatomyWidget from '@/components/analytics/LegAnatomyWidget';
 import WhatIfSimulatorWidget from '@/components/analytics/WhatIfSimulatorWidget';
 import PlayerAvatar from '@/components/PlayerAvatar';
+import { PlayerTrainingDoublesStats } from '@/lib/playerDoublesStats';
+import { Target, Trophy, Flame, Award, Sparkles, ShieldCheck } from 'lucide-react';
 
 interface AnalyticsClientProps {
   matches: AnalyticsMatchItem[];
@@ -23,6 +25,7 @@ interface AnalyticsClientProps {
   availableSeasons: string[];
   selectedSeason: string;
   isAdmin?: boolean;
+  trainingDoublesStats?: Record<string, PlayerTrainingDoublesStats>;
 }
 
 export default function AnalyticsClient({
@@ -33,6 +36,7 @@ export default function AnalyticsClient({
   availableSeasons,
   selectedSeason,
   isAdmin = false,
+  trainingDoublesStats,
 }: AnalyticsClientProps) {
   // Tabs: 'single' | 'h2h' | 'matrix' | 'whatif'
   const [activeTab, setActiveTab] = useState<'single' | 'h2h' | 'matrix' | 'whatif'>('single');
@@ -86,6 +90,13 @@ export default function AnalyticsClient({
   }, [selectedPlayerId, allLegVisits, playersMap, simTargetAvg]);
 
   const currentPlayer = playersMap.get(selectedPlayerId);
+
+  // Empirische Doppel-Statistik aus den Trainingsspielen (Modell A)
+  const currentDoublesStats = useMemo(() => {
+    if (!currentPlayer || !trainingDoublesStats) return null;
+    const key = currentPlayer.name.trim().toLowerCase();
+    return trainingDoublesStats[key] || null;
+  }, [currentPlayer, trainingDoublesStats]);
 
   // H2H Spieler
   const h2hAna1 = useMemo(() => {
@@ -362,6 +373,288 @@ export default function AnalyticsClient({
               </div>
               <div className="text-[10px] text-slate-400 mt-1">Standard-Korridor</div>
             </div>
+          </div>
+
+          {/* ========================================================
+              🎯 EMPIRISCHE DOPPEL-DNA (MODELL A: ALLE TRAININGS-SPIELE)
+              ======================================================== */}
+          <div className="bg-gradient-to-b from-[#0c1836] via-[#071126] to-[#040916] border border-amber-400/35 rounded-3xl p-5 sm:p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_20px_50px_rgba(0,0,0,0.65)] space-y-5">
+            {/* Kopfzeile */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <Target className="w-5 h-5 text-amber-400" />
+                    <span>Empirische Doppel-DNA & Gesamt-Doppelquote</span>
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/35 text-[10px] font-black uppercase text-amber-300">
+                    Modell A
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Aggregiert aus allen absolvierten Trainingsspielen (Checkout-Battle, Fußball Darts & PDC Challenge Routine)
+                </p>
+              </div>
+
+              {currentDoublesStats && currentDoublesStats.hasTrainingData && (
+                <div className="flex items-center gap-2 self-start md:self-auto">
+                  <span className="px-3 py-1 rounded-xl bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-bold text-slate-300">
+                    🎯 <strong className="text-white">{currentDoublesStats.totalDoubleDarts}</strong> Darts auf Doppel
+                  </span>
+                  <span className="px-3 py-1 rounded-xl bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-bold text-slate-300">
+                    🎮 <strong className="text-white">{currentDoublesStats.totalTrainingGames}</strong> Trainingsspiele
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {currentDoublesStats && currentDoublesStats.hasTrainingData ? (
+              <div className="space-y-5">
+                {/* OBERER BEREICH: HERO QUOTE + BEWERTUNG */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+                  {/* Hero Zahl */}
+                  <div className="md:col-span-5 flex items-center gap-4">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-400/20 via-amber-500/10 to-transparent border border-amber-400/40 flex items-center justify-center shrink-0 shadow-lg">
+                      <Target className="w-9 h-9 sm:w-11 sm:h-11 text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-amber-300/90">
+                        Gesamt-Doppelquote (Modell A)
+                      </div>
+                      <div className="text-3xl sm:text-4xl font-black text-white tracking-tight flex items-baseline gap-2">
+                        <span>{currentDoublesStats.totalDoubleQuote.toFixed(1)}%</span>
+                        <span className="text-sm font-normal text-slate-400 font-mono">
+                          ({currentDoublesStats.totalDoubleHits} / {currentDoublesStats.totalDoubleDarts})
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {currentDoublesStats.totalDoubleHits} erfolgreiche Treffer auf {currentDoublesStats.totalDoubleDarts} geworfene Doppel-Darts
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Level Einstufung */}
+                  <div className="md:col-span-7 flex flex-col justify-center border-t md:border-t-0 md:border-l border-white/10 pt-3 md:pt-0 md:pl-5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400 font-medium">BBDV-Leistungsstufe auf Doppel:</span>
+                      <span
+                        className={`px-3 py-1 rounded-xl text-xs font-black border ${
+                          currentDoublesStats.totalDoubleQuote >= 20
+                            ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300'
+                            : currentDoublesStats.totalDoubleQuote >= 15
+                            ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-300'
+                            : currentDoublesStats.totalDoubleQuote >= 10
+                            ? 'bg-amber-500/15 border-amber-400/40 text-amber-300'
+                            : 'bg-rose-500/15 border-rose-400/40 text-rose-300'
+                        }`}
+                      >
+                        {currentDoublesStats.totalDoubleQuote >= 20
+                          ? '🌟 Elite-Klasse (≥20% BBDV Spitzenfeld)'
+                          : currentDoublesStats.totalDoubleQuote >= 15
+                          ? '🎯 Starke Ligaklasse (15–20% Verbandsebene)'
+                          : currentDoublesStats.totalDoubleQuote >= 10
+                          ? '⚡ Solide Bezirksklasse (10–15%)'
+                          : '🔧 Aufbautraining (<10% Ausbaufähig)'}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-900 rounded-full h-3 overflow-hidden border border-white/10 p-0.5">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          currentDoublesStats.totalDoubleQuote >= 20
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-400'
+                            : currentDoublesStats.totalDoubleQuote >= 15
+                            ? 'bg-gradient-to-r from-cyan-500 to-sky-400'
+                            : currentDoublesStats.totalDoubleQuote >= 10
+                            ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
+                            : 'bg-gradient-to-r from-rose-500 to-red-400'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(5, currentDoublesStats.totalDoubleQuote * 3))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4 SPIELMODUL-KACHELN */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Kachel 1: Checkout-Battle (Labor) */}
+                  <div className="bg-white/[0.03] border border-white/[0.08] hover:border-amber-400/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+                    <div>
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
+                        <span className="text-xs font-black text-white flex items-center gap-1.5">
+                          <span>🎯</span> Checkout Battle
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold">
+                          Labor
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-white font-mono">
+                        {currentDoublesStats.checkoutBattle.darts > 0
+                          ? `${currentDoublesStats.checkoutBattle.quote.toFixed(1)}%`
+                          : '-'}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {currentDoublesStats.checkoutBattle.hits} Treffer / {currentDoublesStats.checkoutBattle.darts} Darts
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        {currentDoublesStats.checkoutBattle.gamesCount} Spiele absolviert
+                      </div>
+                    </div>
+
+                    {currentDoublesStats.checkoutBattle.darts > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-white/[0.06] text-[10px] space-y-1">
+                        <div className="text-slate-400">
+                          Bestes Doppel: <strong className="text-amber-300">{currentDoublesStats.checkoutBattle.bestDouble}</strong>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400 font-mono text-[9px] pt-1">
+                          <span>D20: {currentDoublesStats.checkoutBattle.d20.quote}%</span>
+                          <span>D16: {currentDoublesStats.checkoutBattle.d16.quote}%</span>
+                          <span>D10: {currentDoublesStats.checkoutBattle.d10.quote}%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Kachel 2: Fußball Darts (Matchdruck) */}
+                  <div className="bg-white/[0.03] border border-white/[0.08] hover:border-amber-400/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+                    <div>
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
+                        <span className="text-xs font-black text-white flex items-center gap-1.5">
+                          <span>⚽</span> Fußball Darts
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-400/10 text-emerald-300 border border-emerald-400/20 font-bold">
+                          Matchdruck
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-white font-mono">
+                        {currentDoublesStats.fussball.darts > 0
+                          ? `${currentDoublesStats.fussball.quote.toFixed(1)}%`
+                          : '-'}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {currentDoublesStats.fussball.hits} Tore / {currentDoublesStats.fussball.darts} Tor-Darts
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        {currentDoublesStats.fussball.gamesCount} Matches absolviert
+                      </div>
+                    </div>
+
+                    {currentDoublesStats.fussball.darts > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-white/[0.06] text-[10px] space-y-1">
+                        <div className="text-slate-400">
+                          Bullseye (Balleroberung):{' '}
+                          <strong className="text-emerald-300 font-mono">
+                            {currentDoublesStats.fussball.bullHits}/{currentDoublesStats.fussball.bullDarts} ({currentDoublesStats.fussball.bullQuote}%)
+                          </strong>
+                        </div>
+                        <div className="text-[9px] text-slate-500">
+                          Unter Druck gegen Gegner/Computer
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Kachel 3: PDC Challenge (Part 2 Allround) */}
+                  <div className="bg-white/[0.03] border border-white/[0.08] hover:border-amber-400/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+                    <div>
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
+                        <span className="text-xs font-black text-white flex items-center gap-1.5">
+                          <span>🏆</span> PDC Challenge
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold">
+                          Allround
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-white font-mono">
+                        {currentDoublesStats.pdcChallenge.darts > 0
+                          ? `${currentDoublesStats.pdcChallenge.quote.toFixed(1)}%`
+                          : '-'}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {currentDoublesStats.pdcChallenge.hits} Treffer / {currentDoublesStats.pdcChallenge.darts} Doppel-Darts
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        {currentDoublesStats.pdcChallenge.gamesCount} Runden (Part 2: D1–D20 + Bull)
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-white/[0.06] text-[10px] text-slate-400">
+                      <span>Prüft alle 20 Doppel + Bullseye über das gesamte Board</span>
+                    </div>
+                  </div>
+
+                  {/* Kachel 4: Stellen & Checken (Finish-Quote) */}
+                  <div className="bg-white/[0.03] border border-white/[0.08] hover:border-amber-400/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+                    <div>
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
+                        <span className="text-xs font-black text-white flex items-center gap-1.5">
+                          <span>🎲</span> Stellen & Checken
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-400/10 text-cyan-300 border border-cyan-400/20 font-bold">
+                          Finish-Quote
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-white font-mono">
+                        {currentDoublesStats.stellenChecken.rounds > 0
+                          ? `${currentDoublesStats.stellenChecken.quote.toFixed(1)}%`
+                          : '-'}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {currentDoublesStats.stellenChecken.checks} Checks / {currentDoublesStats.stellenChecken.rounds} Finishes
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        {currentDoublesStats.stellenChecken.gamesCount} Sequenzen (15 Runden 3–101)
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-white/[0.06] text-[10px] text-slate-400">
+                      <span>Erfolgreich gelöschte Finishes im Finish-Korridor</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SEGMENT-DETAILS DES CHECKOUT-BATTLES */}
+                {currentDoublesStats.checkoutBattle.darts > 0 && (
+                  <div className="bg-black/30 border border-white/[0.06] rounded-2xl p-4">
+                    <div className="text-xs font-bold text-slate-300 mb-2.5 flex items-center justify-between">
+                      <span>🎯 Aufschlüsselung der 5 Kern-Doppel (Checkout-Battle):</span>
+                      <span className="text-[10px] text-slate-500 font-mono">D20, D16, D10, D8, D4</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                      {[
+                        { name: 'D20 (Tops)', stat: currentDoublesStats.checkoutBattle.d20 },
+                        { name: 'D16', stat: currentDoublesStats.checkoutBattle.d16 },
+                        { name: 'D10', stat: currentDoublesStats.checkoutBattle.d10 },
+                        { name: 'D8', stat: currentDoublesStats.checkoutBattle.d8 },
+                        { name: 'D4', stat: currentDoublesStats.checkoutBattle.d4 },
+                      ].map((seg) => (
+                        <div key={seg.name} className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-2.5">
+                          <div className="text-[10px] font-mono text-slate-400 uppercase font-bold">{seg.name}</div>
+                          <div className="text-lg font-black text-amber-300 font-mono mt-0.5">
+                            {seg.stat.quote.toFixed(1)}%
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            {seg.stat.hits} / {seg.stat.darts}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Leerer Zustand, falls Spieler noch keine Trainingsspiele hat */
+              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 text-center text-slate-400 space-y-2">
+                <Target className="w-8 h-8 text-slate-600 mx-auto" />
+                <div className="text-sm font-bold text-slate-300">
+                  Noch keine absolvierten Trainingsspiele für {currentPlayer?.name || 'diesen Spieler'} erfasst
+                </div>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Sobald der Spieler im Checkout-Battle, bei Fußball Darts oder in der PDC Challenge wirft, wird die empirische Gesamt-Doppelquote automatisch nach Modell A berechnet.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* VISUELLE HIGHLIGHTS: Radar + Grafik 1 (Leg-Trend) */}

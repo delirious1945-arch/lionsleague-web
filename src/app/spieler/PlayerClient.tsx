@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import PlayerAvatar from '@/components/PlayerAvatar';
+import { PlayerTrainingDoublesStats } from '@/lib/playerDoublesStats';
+import { Target } from 'lucide-react';
 
 interface PlayerProfile {
 
@@ -42,12 +44,14 @@ export default function PlayerClient({
   doublesByPlayer,
   availableSeasons,
   selectedSeason,
+  trainingDoublesStats,
 }: {
   players: PlayerProfile[];
   matchesByPlayer: Record<string, MatchHistoryItem[]>;
   doublesByPlayer: Record<string, DoubleSpecialItem[]>;
   availableSeasons: string[];
   selectedSeason: string;
+  trainingDoublesStats?: Record<string, PlayerTrainingDoublesStats>;
 }) {
   const [teamFilter, setTeamFilter] = useState<'all' | 'A-Team' | 'B-Team'>('all');
 
@@ -227,6 +231,24 @@ export default function PlayerClient({
               <p className="text-slate-400 text-sm mt-1">
                 Eingetragener Darter beim SC Weyhausen von 1921 e.V.
               </p>
+              {(() => {
+                const dStats = currentPlayer && trainingDoublesStats ? trainingDoublesStats[currentPlayer.name.trim().toLowerCase()] : null;
+                if (!dStats || !dStats.hasTrainingData) return null;
+                return (
+                  <div className="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-400/15 border border-amber-400/40 text-amber-300 text-xs font-bold font-mono shadow-sm">
+                      <Target className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Empirische Doppelquote: <strong className="text-white">{dStats.totalDoubleQuote.toFixed(1)}%</strong> ({dStats.totalDoubleHits}/{dStats.totalDoubleDarts} Darts)</span>
+                    </span>
+                    <Link
+                      href="/analytics"
+                      className="text-[11px] text-cyan-300 hover:text-cyan-200 underline underline-offset-2 transition-colors font-bold ml-1"
+                    >
+                      Zur Doppel-DNA Analyse →
+                    </Link>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

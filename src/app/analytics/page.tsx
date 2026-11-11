@@ -7,6 +7,7 @@ import {
   getTop26Players,
   getAllAnalyticsLegVisits,
 } from '@/lib/data';
+import { getAllPlayersTrainingDoublesStats } from '@/lib/playerDoublesStats';
 import { redirect } from 'next/navigation';
 import { getSessionAction } from '../actions';
 
@@ -27,11 +28,12 @@ export default async function AnalyticsPage({
 
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
 
-  const [matches, players, top26, allLegVisits] = await Promise.all([
+  const [matches, players, top26, allLegVisits, trainingDoublesStats] = await Promise.all([
     getAnalyticsMatches(selectedSeason),
     getPlayers(),
     getTop26Players(selectedSeason),
     getAllAnalyticsLegVisits(selectedSeason),
+    getAllPlayersTrainingDoublesStats(),
   ]);
 
   return (
@@ -44,6 +46,7 @@ export default async function AnalyticsPage({
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
         isAdmin={session?.role === 'admin'}
+        trainingDoublesStats={trainingDoublesStats}
       />
     </div>
   );
