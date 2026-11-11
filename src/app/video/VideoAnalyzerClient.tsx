@@ -74,6 +74,8 @@ import {
   CaptureSessionMode,
   DEFAULT_CAPTURE_CONFIG,
   LiveThrowCounterState,
+  evaluateThreeDartSelfComparison,
+  GuidedAnalysisStep,
 } from '@/lib/biomechanicsEngine';
 
 interface VideoAnalyzerClientProps {
@@ -161,7 +163,42 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   ]);
   const [activeThrowIdx, setActiveThrowIdx] = useState<number>(-1); // Standard: -1 = Alle 3 Darts überlagern
   const [viewMode, setViewMode] = useState<'video' | 'isolated'>('video');
-  const [zoomMode, setZoomMode] = useState<'upper_body' | 'full'>('upper_body');
+  const [zoomMode, setZoomMode] = useState<'upper_body' | 'full' | 'custom'>('upper_body');
+
+  // Frei definierbarer Bildausschnitt (Custom Crop / Zoom auf Oberkörper & Wurfarm)
+  const [customCrop, setCustomCrop] = useState<{
+    zoom: number; // 1.2x bis 3.5x
+    centerX: number; // 15% bis 85%
+    centerY: number; // 15% bis 85%
+  }>({
+    zoom: 2.35,
+    centerX: 54,
+    centerY: 40,
+  });
+  const [showCropControls, setShowCropControls] = useState<boolean>(false);
+  const cropDragRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    origCX: number;
+    origCY: number;
+  }>({
+    active: false,
+    startX: 0,
+    startY: 0,
+    origCX: 54,
+    origCY: 40,
+  });
+
+  // 5-Schritt Durchklick-Analyse (Dart 1 vs. Dart 2 vs. Dart 3 Selbstvergleich ohne Normzwang)
+  const [guidedStep, setGuidedStep] = useState<GuidedAnalysisStep>(1);
+
+  // On-Device Export-Konfigurator (Speichern als Video oder Bild mit Wahl: Video+Kurven vs. Nur Kurven & Ausschnitt)
+  const [showExportPanel, setShowExportPanel] = useState<boolean>(false);
+  const [exportRenderMode, setExportRenderMode] = useState<'video' | 'isolated'>('video');
+  const [exportCropMode, setExportCropMode] = useState<'active_crop' | 'full'>('active_crop');
+  const [isExportingVideo, setIsExportingVideo] = useState<boolean>(false);
+  const [exportVideoProgress, setExportVideoProgress] = useState<number>(0);
 
   // 5. AUTO-TRIGGER (Freihändige Wurf-Erkennung ab Hüfthöhe)
   const [autoTriggerEnabled, setAutoTriggerEnabled] = useState<boolean>(true);
@@ -1297,6 +1334,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         built.releaseFrame.deltaElbowY_mm
       );
 
+      const factor = isSlowMo ? (slowMoFps === 120 ? 4.0 : 8.0) : 1.0;
+      const accelMs = Math.max(
+        75,
+        Math.min(
+          340,
+          Math.round(
+            (Math.abs(built.releaseFrame.timeSec - built.drawbackFrame.timeSec) / factor) * 1000
+          )
+        )
+      );
+
       newTrajectories.push({
         id: throwIdx + 1,
         points: built.points,
@@ -1305,6 +1353,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         elbowDropMm: worstElbowDrop,
         drawbackTimeSec: built.drawbackFrame.timeSec,
         releaseTimeSec: built.releaseFrame.timeSec,
+        followThroughTimeSec: built.followThroughFrame.timeSec,
+        drawbackElbowAngleDeg: built.drawbackFrame.elbowAngle,
+        releaseElbowAngleDeg: built.releaseFrame.elbowAngle,
+        followThroughElbowAngleDeg: built.followThroughFrame.elbowAngle,
+        accelerationDurationMs: accelMs,
+        drawbackPose: built.drawbackFrame.pose,
+        releasePose: built.releaseFrame.pose,
+        followThroughPose: built.followThroughFrame.pose,
         releasePoint: {
           x: built.releaseFrame.pose.wrist.x,
           y: built.releaseFrame.pose.wrist.y,
@@ -1369,13 +1425,18 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       }
     }
 
-    // 5. Nach Abschluss der Analyse zurück zum Video-Anfang (0.1s) springen:
-    // Auf dem Standbild sind noch KEINE Kurven sichtbar – sie werden erst beim Abspielen
-    // synchron mit der Bewegung des Arms ab Hüfthöhe eingezeichnet!
-    setActivePhase('baseline');
-    await seekTo(0.1);
-    const initialPoseAtZero = detectPoseOnCurrentFrame();
-    const readyPose = initialPoseAtZero.isRealDetection ? initialPoseAtZero : base;
+    // 5. Nach Abschluss der Analyse direkt in Schritt 1 der 5-Schritt Durchklick-Analyse springen
+    // und den Oberkörper-Ausschnitt automatisch auf den erkannten Spieler zentrieren!
+    if (base) {
+      const cx = Math.round(Math.max(18, Math.min(82, ((base.shoulder.x + base.elbow.x + base.wrist.x) / 3) * 100)));
+      const cy = Math.round(Math.max(18, Math.min(82, ((base.head.y * 0.8 + base.shoulder.y + base.hip.y * 1.1) / 2.9) * 100)));
+      setCustomCrop((prev) => ({ ...prev, centerX: cx, centerY: cy }));
+    }
+
+    const firstDrawbackSec = newTrajectories[0]?.drawbackTimeSec ?? 0.2;
+    await seekTo(firstDrawbackSec);
+    const initialPoseAtDrawback = newTrajectories[0]?.drawbackPose || detectPoseOnCurrentFrame();
+    const readyPose = initialPoseAtDrawback.isRealDetection ? initialPoseAtDrawback : base;
     masterTimeline.push({
       timeSec: vidDuration,
       pose: masterTimeline[masterTimeline.length - 1]?.pose || readyPose,
@@ -1385,12 +1446,14 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     currentPoseRef.current = readyPose;
     setCurrentPose(readyPose);
-    setCurrentTime(0.1);
+    setCurrentTime(firstDrawbackSec);
 
-    // Die 3 ermittelten Original-Wurfkurven hinterlegen (werden beim Abspielen zeitgesteuert gezeichnet)
+    // Die 3 ermittelten Original-Wurfkurven hinterlegen
     setTrajectories(newTrajectories);
     setIsAnalysisLocked(true);
     setActiveThrowIdx(-1);
+    setGuidedStep(1);
+    setActivePhase('drawback');
     if (dart1Snapshots) {
       setSnapshots(dart1Snapshots);
     }
@@ -1400,7 +1463,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setIsScanning(false);
 
     setStatusMessage(
-      '✓ Analyse bereit! Drücke jetzt auf „Abspielen“, damit die Wurfkurven live ab dem Übergabepunkt (Hüfthöhe) mit der Bewegung des Arms eingezeichnet werden.'
+      '✓ 3-Dart-Analyse bereit! Klicke dich rechts mit „Weiter ▶“ durch die 5 Vergleichs-Schritte (Dart 1 vs. Dart 2 vs. Dart 3) oder drücke „Abspielen“.'
     );
   };
 
@@ -1418,19 +1481,88 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     setShowOverlay(true);
   };
 
-  // Statischer Zoom-Mittelpunkt: Orientiert sich fest am Rumpf/Hüfte-zu-Kopf-Bereich (inkl. Übergabepunkt auf Hüfthöhe!),
-  // damit das Bild während der gesamten Wurfbewegung ab Hüfthöhe absolut stabil steht und niemals driftet!
-  const dynamicZoomOrigin = useMemo(() => {
-    const p = baselinePose || snapshots?.baseline?.pose;
+  // 5-Schritt Durchklick-Analyse (Springt automatisch an die passende Stelle im Video & zeigt das Feedback)
+  const handleSelectGuidedStep = useCallback(
+    (step: GuidedAnalysisStep, targetDartIdx: number = 0) => {
+      setGuidedStep(step);
+      setShowOverlay(true);
+      setShowTrajectory(true);
+
+      const tr = trajectories[targetDartIdx] || trajectories[0];
+      const video = videoRef.current;
+      if (!video || !tr) return;
+
+      video.pause();
+      setIsPlaying(false);
+
+      let targetSec = video.currentTime;
+      let targetPose: PoseKeypoints | null = null;
+
+      if (step === 1) {
+        targetSec = tr.drawbackTimeSec ?? snapshots?.drawback?.timeSec ?? 0.5;
+        targetPose = tr.drawbackPose || snapshots?.drawback?.pose || null;
+        setActivePhase('drawback');
+      } else if (step === 2) {
+        targetSec = tr.releaseTimeSec ?? snapshots?.release?.timeSec ?? 1.0;
+        targetPose = tr.releasePose || snapshots?.release?.pose || null;
+        setActiveThrowIdx(-1);
+        setActivePhase('release');
+      } else if (step === 3) {
+        targetSec = tr.releaseTimeSec ?? snapshots?.release?.timeSec ?? 1.0;
+        targetPose = tr.releasePose || snapshots?.release?.pose || null;
+        setActivePhase('release');
+      } else if (step === 4) {
+        targetSec = tr.followThroughTimeSec ?? snapshots?.follow_through?.timeSec ?? 1.2;
+        targetPose = tr.followThroughPose || snapshots?.follow_through?.pose || null;
+        setActivePhase('follow_through');
+      } else {
+        targetSec = tr.releaseTimeSec ?? snapshots?.release?.timeSec ?? 1.0;
+        targetPose = tr.releasePose || snapshots?.release?.pose || null;
+        setActiveThrowIdx(-1);
+        setActivePhase('release');
+      }
+
+      video.currentTime = Math.max(0.05, targetSec);
+      setCurrentTime(Math.max(0.05, targetSec));
+      if (targetPose) {
+        currentPoseRef.current = targetPose;
+        setCurrentPose(targetPose);
+      } else if (poseTimelineRef.current.length > 0) {
+        const interp = getInterpolatedPose(poseTimelineRef.current, targetSec);
+        if (interp) {
+          currentPoseRef.current = interp;
+          setCurrentPose(interp);
+        }
+      }
+    },
+    [snapshots, trajectories]
+  );
+
+  // Automatischer Oberkörper-Mittelpunkt + frei wählbarer Custom-Crop-Mittelpunkt
+  const autoUpperBodyCenter = useMemo(() => {
+    const p = baselinePose || snapshots?.baseline?.pose || currentPose;
     if (p) {
-      const cxRaw = (p.shoulder.x + p.elbow.x) / 2;
-      const cyRaw = (p.head.y * 0.85 + p.shoulder.y + p.hip.y * 1.15) / 3;
+      const cxRaw = (p.shoulder.x + p.elbow.x + p.wrist.x) / 3;
+      const cyRaw = (p.head.y * 0.8 + p.shoulder.y + p.hip.y * 1.1) / 2.9;
       const cx = Math.round(Math.max(15, Math.min(85, cxRaw * 100)));
       const cy = Math.round(Math.max(15, Math.min(85, cyRaw * 100)));
-      return `${cx}% ${cy}%`;
+      return { cx, cy };
     }
-    return '52% 45%';
-  }, [baselinePose, snapshots]);
+    return { cx: 52, cy: 42 };
+  }, [baselinePose, snapshots, currentPose]);
+
+  const dynamicZoomOrigin = useMemo(() => {
+    if (zoomMode === 'custom') {
+      return `${customCrop.centerX}% ${customCrop.centerY}%`;
+    }
+    return `${autoUpperBodyCenter.cx}% ${autoUpperBodyCenter.cy}%`;
+  }, [zoomMode, customCrop.centerX, customCrop.centerY, autoUpperBodyCenter]);
+
+  const activeZoomScale = useMemo(() => {
+    if (zoomMode === 'full') return 1.0;
+    if (zoomMode === 'custom') return customCrop.zoom;
+    return 2.15;
+  }, [zoomMode, customCrop.zoom]);
 
   // Aktive Kinematik-Kennzahlen für das Diagnose-Cockpit
   const activeMetrics = useMemo(() => {
@@ -1474,12 +1606,20 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
 
     const isSlowMo = videoMode === 'slowmo' || (videoMode === 'auto' && duration > 40);
     const currentMmPerPx = getMmPerPx(baselinePose || currentPose, videoDims);
+    const slowMoFactor = slowMoFps === 120 ? 4.0 : 8.0;
     const dispersion = calculateThreeDartDispersion(
       trajectories,
       videoDims,
       currentMmPerPx,
       isSlowMo,
-      slowMoFps === 120 ? 4.0 : 8.0
+      slowMoFactor
+    );
+    const selfComparison = evaluateThreeDartSelfComparison(
+      trajectories,
+      videoDims,
+      currentMmPerPx,
+      isSlowMo,
+      slowMoFactor
     );
 
     return {
@@ -1489,8 +1629,9 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       shoulderDriftMm,
       isElbowDropping,
       isLaunchOptimal,
-      consistencyScore,
+      consistencyScore: selfComparison.repeatabilityScorePct || consistencyScore,
       dispersion,
+      selfComparison,
       liveDev,
       coreAngles: (currentPose || baselinePose)
         ? extractFiveCoreAngles(
@@ -1607,9 +1748,10 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         const fullPts = tr.points;
         if (fullPts.length < 2) return;
 
-        // Beim analysierten Video werden die Kurven erst beim Abspielen synchron mit der Armbewegung eingezeichnet!
+        // Beim aktiven Abspielen wachsen die Kurven zeitsynchron mit der Armbewegung;
+        // im pausierten Analyse-/Durchklick-Modus sind alle 3 Kurven vollständig zum Vergleich sichtbar!
         let pts: TrajectoryPoint[];
-        if (isAnalysisLocked) {
+        if (isAnalysisLocked && isPlaying) {
           const filtered = fullPts.filter((pt) => pt.timeSec <= vidTime + 0.025);
           const firstTime = fullPts[0].timeSec;
           const lastTime = fullPts[fullPts.length - 1].timeSec;
@@ -1675,7 +1817,33 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         ctx.fill();
 
         const releaseSec = tr.releaseTimeSec ?? fullPts[fullPts.length - 1].timeSec;
-        const hasReachedRelease = !isAnalysisLocked || vidTime >= releaseSec;
+        const hasReachedRelease = !isAnalysisLocked || !isPlaying || vidTime >= releaseSec;
+
+        // In Schritt 1 (Ausholen) zusätzlich den Umkehrpunkt (Drawback) jedes Darts klar markieren
+        if (tr.drawbackPoint && (!isPlaying || guidedStep === 1)) {
+          const dbx = tr.drawbackPoint.x * w;
+          const dby = tr.drawbackPoint.y * h;
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(dbx, dby, (guidedStep === 1 ? 4.4 : 2.8) * scale, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = (guidedStep === 1 ? 1.6 : 1.0) * scale;
+          ctx.stroke();
+          if (guidedStep === 1) {
+            const dbLabel = `D${tr.id} (${tr.drawbackElbowAngleDeg ?? 54}°)`;
+            ctx.font = `bold ${Math.round(8.5 * scale)}px sans-serif`;
+            const dlw = ctx.measureText(dbLabel).width;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+            ctx.beginPath();
+            ctx.roundRect(dbx - dlw - 10 * scale, dby - 7 * scale, dlw + 6 * scale, 13 * scale, 3 * scale);
+            ctx.fill();
+            ctx.fillStyle = '#fde68a';
+            ctx.fillText(dbLabel, dbx - dlw - 7 * scale, dby + 2.5 * scale);
+          }
+          ctx.restore();
+        }
 
         if (!hasReachedRelease) {
           // Aktuelle Handgelenks-Spitze während des Hochführens / Ausholens markieren
@@ -1688,20 +1856,20 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           ctx.lineWidth = 1.2 * scale;
           ctx.stroke();
         } else {
-          // Release-Punkt (Apex) + Launch-Vektor + Badge erst anzeigen, sobald der Abwurf erfolgt ist
+          // Release-Punkt (Apex) + Launch-Vektor + Badge anzeigen
           const last = fullPts[fullPts.length - 1];
           const rx = tr.releasePoint ? tr.releasePoint.x * w : last.x * w;
           const ry = tr.releasePoint ? tr.releasePoint.y * h : last.y * h;
           ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.arc(rx, ry, 3.8 * scale, 0, Math.PI * 2);
+          ctx.arc(rx, ry, (guidedStep === 3 ? 4.8 : 3.8) * scale, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1.3 * scale;
           ctx.stroke();
 
           // LAUNCH-ANGLE-RADAR: Feiner Tangential-Pfeil am Release für den ersten/aktiven Wurf
-          if (idx === 0) {
+          if (idx === 0 || guidedStep === 3) {
             const deg = tr.launchAngleDeg ?? 14.2;
             const rad = (-deg * Math.PI) / 180;
             const arrowLen = 26 * scale;
@@ -1718,26 +1886,55 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             ctx.setLineDash([]);
           }
 
-          // Dezenter Mini-Badge (D1, D2, D3 + Speed beim Einzelwurf)
+          // Dezenter Mini-Badge (je nach aktivem Durchklick-Schritt mit winkel- oder geschwindigkeitsspezifischer Info)
           const badgeLabel =
-            throwsToRender.length === 1 && tr.releaseSpeedKmh
+            guidedStep === 4
+              ? `D${tr.id}: ${tr.releaseSpeedKmh} km/h (${tr.accelerationDurationMs ?? 145} ms)`
+              : guidedStep === 3
+              ? `D${tr.id}: @${tr.releaseElbowAngleDeg ?? 114}°`
+              : throwsToRender.length === 1 && tr.releaseSpeedKmh
               ? `D${tr.id} • ${tr.releaseSpeedKmh} km/h • ${tr.launchAngleDeg ?? 14}°`
               : `D${tr.id}`;
           ctx.font = `bold ${Math.round(9.5 * scale)}px sans-serif`;
           const tw = ctx.measureText(badgeLabel).width;
           ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
           ctx.beginPath();
-          ctx.roundRect(rx + 6 * scale, ry - 8 * scale, tw + 8 * scale, 14 * scale, 4 * scale);
+          ctx.roundRect(rx + 6 * scale, ry - 8 * scale + (idx - 1) * 12 * scale, tw + 8 * scale, 14 * scale, 4 * scale);
           ctx.fill();
           ctx.fillStyle = color;
-          ctx.fillText(badgeLabel, rx + 10 * scale, ry + 2.5 * scale);
+          ctx.fillText(badgeLabel, rx + 10 * scale, ry + 2.5 * scale + (idx - 1) * 12 * scale);
         }
       });
 
-      // VISUELLE 3-DART RELEASE-STREUUNGSELLIPSE (BBDV-CLUSTER): Erst anzeigen, sobald mind. 2 Darts abgeworfen wurden
+      // SCHRITT 2 SPEZIAL-OVERLAY: Punkt der größten Bahn-Abweichung zwischen Dart 1, 2 und 3 hervorheben!
+      if (!isPlaying && guidedStep === 2 && throwsToRender.length >= 2) {
+        const divPt = activeMetrics.selfComparison.maxPathDivergence.point;
+        const dx = divPt.x * w;
+        const dy = divPt.y * h;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
+        ctx.lineWidth = 1.6 * scale;
+        ctx.setLineDash([3 * scale, 3 * scale]);
+        ctx.beginPath();
+        ctx.arc(dx, dy, 14 * scale, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const divLabel = `Max. Bahn-Δ: ${activeMetrics.selfComparison.maxPathDivergence.spreadMm} mm`;
+        ctx.font = `bold ${Math.round(8.5 * scale)}px sans-serif`;
+        const dlw = ctx.measureText(divLabel).width;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+        ctx.beginPath();
+        ctx.roundRect(dx - (dlw + 8 * scale) / 2, dy - 28 * scale, dlw + 8 * scale, 13 * scale, 3 * scale);
+        ctx.fill();
+        ctx.fillStyle = '#fde68a';
+        ctx.fillText(divLabel, dx - dlw / 2, dy - 18.5 * scale);
+        ctx.restore();
+      }
+
+      // VISUELLE 3-DART RELEASE-STREUUNGSELLIPSE & LOSLASS-DREIECK:
       const completedReleases = throwsToRender.filter((tr) => {
         const relSec = tr.releaseTimeSec ?? tr.points[tr.points.length - 1]?.timeSec ?? 0;
-        return !isAnalysisLocked || vidTime >= relSec;
+        return !isAnalysisLocked || !isPlaying || vidTime >= relSec;
       });
 
       if (
@@ -2090,10 +2287,13 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     trajectories,
     activeThrowIdx,
     isAnalysisLocked,
+    isPlaying,
+    guidedStep,
     currentTime,
     activeMetrics.isElbowDropping,
     activeMetrics.dispersion.dispersionRating,
     activeMetrics.dispersion.releaseDispersionMm,
+    activeMetrics.selfComparison.maxPathDivergence,
     getMmPerPx,
     videoDims,
   ]);
@@ -2134,18 +2334,274 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     };
   }, [isPlaying, renderCanvasOverlay]);
 
-  // Bild-Export
-  const handleDownloadAnalysisImage = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Berechnet das exakte Pixel-Rechteck (sx, sy, sw, sh) für den frei gewählten Oberkörper-/Custom-Ausschnitt
+  const computeExportCropRect = useCallback(
+    (cropType: 'active_crop' | 'full', w: number, h: number) => {
+      if (cropType === 'full') {
+        return { sx: 0, sy: 0, sw: w, sh: h };
+      }
+      const scale = zoomMode === 'custom' ? customCrop.zoom : zoomMode === 'upper_body' ? 2.15 : customCrop.zoom;
+      const cx = zoomMode === 'custom' ? customCrop.centerX : autoUpperBodyCenter.cx;
+      const cy = zoomMode === 'custom' ? customCrop.centerY : autoUpperBodyCenter.cy;
+      const ox = (cx / 100) * w;
+      const oy = (cy / 100) * h;
+      const sx = Math.max(0, Math.min(w - w / scale, ox * (1 - 1 / scale)));
+      const sy = Math.max(0, Math.min(h - h / scale, oy * (1 - 1 / scale)));
+      const sw = Math.max(80, Math.min(w - sx, w / scale));
+      const sh = Math.max(80, Math.min(h - sy, h / scale));
+      return { sx, sy, sw, sh };
+    },
+    [zoomMode, customCrop.zoom, customCrop.centerX, customCrop.centerY, autoUpperBodyCenter]
+  );
+
+  // Zeichnet ein vollständiges Export-Bild (Video+Kurven ODER Nur Kurven, im gewählten Ausschnitt + 3-Dart-Vergleichs-Stempel)
+  const drawCompositeExportFrame = useCallback(
+    (
+      targetCanvas: HTMLCanvasElement,
+      mode: 'video' | 'isolated',
+      cropType: 'active_crop' | 'full'
+    ) => {
+      const srcCanvas = canvasRef.current;
+      const video = videoRef.current;
+      if (!srcCanvas) return;
+
+      const w = srcCanvas.width || videoDims.width;
+      const h = srcCanvas.height || videoDims.height;
+      if (targetCanvas.width !== w || targetCanvas.height !== h) {
+        targetCanvas.width = w;
+        targetCanvas.height = h;
+      }
+
+      const ctx = targetCanvas.getContext('2d');
+      if (!ctx) return;
+
+      const { sx, sy, sw, sh } = computeExportCropRect(cropType, w, h);
+      const scale = Math.max(1, Math.min(w, h) / 500);
+
+      ctx.clearRect(0, 0, w, h);
+
+      if (mode === 'video' && video && video.readyState >= 2) {
+        ctx.fillStyle = '#050814';
+        ctx.fillRect(0, 0, w, h);
+        try {
+          ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+        } catch {}
+      } else {
+        // Dunkles Biomechanik-Analyse-Grid ("Nur Kurven")
+        ctx.fillStyle = '#050814';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = 1 * scale;
+        const step = Math.max(30, Math.round(w / 12));
+        for (let x = 0; x < w; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, h);
+          ctx.stroke();
+        }
+        for (let y = 0; y < h; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+        }
+      }
+
+      // Überlagere den exakt gleichen Ausschnitt des Kurven-/Skelett-Canvas
+      try {
+        ctx.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, w, h);
+      } catch {}
+
+      // Kompaktes 3-Dart-Selbstvergleichs-Banner unten einbrennen
+      const d1 = activeMetrics.selfComparison.darts[0];
+      const d2 = activeMetrics.selfComparison.darts[1];
+      const d3 = activeMetrics.selfComparison.darts[2];
+      const barH = Math.round(66 * scale);
+      const barY = h - barH - Math.round(10 * scale);
+      const barX = Math.round(12 * scale);
+      const barW = w - Math.round(24 * scale);
+
+      ctx.fillStyle = 'rgba(5, 8, 20, 0.88)';
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, 10 * scale);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.45)';
+      ctx.lineWidth = 1.2 * scale;
+      ctx.stroke();
+
+      ctx.font = `bold ${Math.round(10.5 * scale)}px sans-serif`;
+      ctx.fillStyle = '#10b981';
+      ctx.fillText(
+        `LIONS 3-DART SELBSTVERGLEICH • WIEDERHOLGENAUIGKEIT: ${activeMetrics.selfComparison.repeatabilityScorePct}% • LOSLASS-SPANNE: ${activeMetrics.selfComparison.pairwiseReleaseMm.maxSpreadMm} mm`,
+        barX + 12 * scale,
+        barY + 18 * scale
+      );
+
+      ctx.font = `bold ${Math.round(9.5 * scale)}px monospace`;
+      ctx.fillStyle = '#60a5fa';
+      ctx.fillText(
+        `D1: ${d1.releaseSpeedKmh} km/h (${d1.accelerationDurationMs}ms) | Aushol ${d1.drawbackAngleDeg}° | Release ${d1.releaseAngleDeg}°`,
+        barX + 12 * scale,
+        barY + 36 * scale
+      );
+      ctx.fillStyle = '#22d3ee';
+      ctx.fillText(
+        `D2: ${d2.releaseSpeedKmh} km/h (${d2.accelerationDurationMs}ms) | Aushol ${d2.drawbackAngleDeg}° | Release ${d2.releaseAngleDeg}°`,
+        barX + 12 * scale,
+        barY + 50 * scale
+      );
+      ctx.fillStyle = '#c084fc';
+      ctx.fillText(
+        `D3: ${d3.releaseSpeedKmh} km/h (${d3.accelerationDurationMs}ms) | Aushol ${d3.drawbackAngleDeg}° | Release ${d3.releaseAngleDeg}°`,
+        barX + 12 * scale,
+        barY + 62 * scale
+      );
+    },
+    [videoDims, computeExportCropRect, activeMetrics.selfComparison]
+  );
+
+  // 1. Speichern als hochauflösendes Bild (.png) auf dem Endgerät (mit Modus- & Ausschnitt-Wahl)
+  const handleDownloadAnalysisImage = (
+    modeOverride?: 'video' | 'isolated',
+    cropOverride?: 'active_crop' | 'full'
+  ) => {
+    const chosenMode = modeOverride ?? exportRenderMode;
+    const chosenCrop = cropOverride ?? exportCropMode;
     try {
+      renderCanvasOverlay();
+      const exportCanvas = document.createElement('canvas');
+      drawCompositeExportFrame(exportCanvas, chosenMode, chosenCrop);
       const link = document.createElement('a');
-      link.download = `Lions_Biomechanik_3Darts_${new Date().toISOString().slice(0, 10)}.png`;
-      link.href = canvas.toDataURL('image/png');
+      const modeTag = chosenMode === 'video' ? 'Video_plus_Kurven' : 'Nur_Kurven';
+      const cropTag = chosenCrop === 'active_crop' ? 'Ausschnitt' : 'Vollbild';
+      link.download = `Lions_3Dart_${modeTag}_${cropTag}_${new Date().toISOString().slice(0, 10)}.png`;
+      link.href = exportCanvas.toDataURL('image/png');
       link.click();
-      setStatusMessage('✓ Analyse-Bild mit den 3 überlagerten Kurven als PNG gespeichert!');
+      setStatusMessage(
+        `✓ Analyse-Bild (${chosenMode === 'video' ? 'Video + Kurven' : 'Nur Kurven'} · ${chosenCrop === 'active_crop' ? 'Gewählter Ausschnitt' : 'Volles Bild'}) auf deinem Gerät gespeichert!`
+      );
     } catch (err) {
       console.error('Export-Fehler:', err);
+    }
+  };
+
+  // 2. Speichern als komplettes Analyse-Video (.webm / .mp4) auf dem Endgerät (mit Modus- & Ausschnitt-Wahl)
+  const handleDownloadAnalysisVideo = async () => {
+    const video = videoRef.current;
+    const srcCanvas = canvasRef.current;
+    if (!video || !srcCanvas || isExportingVideo) return;
+
+    setIsExportingVideo(true);
+    setExportVideoProgress(5);
+    setStatusMessage(
+      `🎥 Erzeuge Analyse-Video (${exportRenderMode === 'video' ? 'Video + Kurven' : 'Nur Kurven'} · ${exportCropMode === 'active_crop' ? 'Gewählter Ausschnitt' : 'Volles Bild'}) für dein Endgerät...`
+    );
+
+    try {
+      video.pause();
+      setIsPlaying(false);
+
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = srcCanvas.width || videoDims.width;
+      exportCanvas.height = srcCanvas.height || videoDims.height;
+
+      const stream = exportCanvas.captureStream(30);
+      let mimeType = 'video/webm;codecs=vp9';
+      let fileExt = 'webm';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('video/mp4')) {
+          mimeType = 'video/mp4';
+          fileExt = 'mp4';
+        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+          mimeType = 'video/webm;codecs=vp9';
+          fileExt = 'webm';
+        } else if (MediaRecorder.isTypeSupported('video/webm')) {
+          mimeType = 'video/webm';
+          fileExt = 'webm';
+        } else {
+          mimeType = '';
+        }
+      }
+
+      const chunks: Blob[] = [];
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4500000 })
+        : new MediaRecorder(stream);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      const donePromise = new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+      });
+
+      recorder.start(100);
+
+      // Rendere die relevanten Wurf-Phasen flüssig in das Export-Video (ca. 90 Frames = ~3-4 Sekunden kompaktes Analyse-Video)
+      const vidDur = Math.max(2, video.duration || 10);
+      const startSec = trajectories[0]?.points?.[0]?.timeSec ?? 0.1;
+      const endSec =
+        trajectories[2]?.followThroughTimeSec ??
+        trajectories[2]?.points?.[trajectories[2].points.length - 1]?.timeSec ??
+        vidDur - 0.1;
+      const totalSteps = 75;
+
+      const seekFrame = (t: number) =>
+        new Promise<void>((res) => {
+          let done = false;
+          const finish = () => {
+            if (!done) {
+              done = true;
+              video.removeEventListener('seeked', finish);
+              requestAnimationFrame(() => setTimeout(res, 22));
+            }
+          };
+          video.addEventListener('seeked', finish);
+          video.currentTime = Math.max(0.05, Math.min(vidDur - 0.05, t));
+          setTimeout(finish, 260);
+        });
+
+      for (let i = 0; i <= totalSteps; i++) {
+        const t = startSec + ((endSec - startSec) * i) / totalSteps;
+        await seekFrame(t);
+        setCurrentTime(t);
+        const interpPose =
+          poseTimelineRef.current.length > 0
+            ? getInterpolatedPose(poseTimelineRef.current, t)
+            : currentPoseRef.current;
+        if (interpPose) {
+          currentPoseRef.current = interpPose;
+        }
+        renderCanvasOverlay(interpPose || undefined);
+        drawCompositeExportFrame(exportCanvas, exportRenderMode, exportCropMode);
+        setExportVideoProgress(Math.round(((i + 1) / (totalSteps + 1)) * 100));
+      }
+
+      recorder.stop();
+      await donePromise;
+
+      const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const modeTag = exportRenderMode === 'video' ? 'Video_plus_Kurven' : 'Nur_Kurven';
+      const cropTag = exportCropMode === 'active_crop' ? 'Ausschnitt' : 'Vollbild';
+      a.href = url;
+      a.download = `Lions_3Dart_Analyse_${modeTag}_${cropTag}_${new Date().toISOString().slice(0, 10)}.${fileExt}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      setStatusMessage(
+        `✓ Analyse-Video (${exportRenderMode === 'video' ? 'Video + Kurven' : 'Nur Kurven'} · ${exportCropMode === 'active_crop' ? 'Gewählter Ausschnitt' : 'Volles Bild'}) erfolgreich auf deinem Endgerät gespeichert!`
+      );
+    } catch (err) {
+      console.error('Video-Export Fehler:', err);
+      setStatusMessage('Hinweis: Video-Export konnte nicht abgeschlossen werden. Nutze alternativ den PNG-Bild-Download.');
+    } finally {
+      setIsExportingVideo(false);
+      setExportVideoProgress(0);
     }
   };
 
@@ -2659,13 +3115,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
             {/* LINKE SPALTE: VIDEO & KOMPAKTE STEUERUNG */}
             <div className="lg:col-span-7 flex flex-col gap-3 min-w-0 w-full">
-              {/* Kompakte Modus- & Wurf-Auswahl (Responsives Grid -> Kein horizontales Scrollen möglich!) */}
-              <div className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-md">
-                {/* Zeile 1: Ansicht & Zoom (2x2 auf Mobile, 4er Reihe auf Desktop) */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {/* Kompakte Modus-, Ausschnitt- & Wurf-Auswahl */}
+              <div className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2.5 shadow-md">
+                {/* Zeile 1: Ansicht & Bildausschnitt (Video+Kurven | Nur Kurven | Oberkörper | Eigener Ausschnitt | Vollbild) */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                   <button
-                    onClick={() => setViewMode('video')}
-                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                    type="button"
+                    onClick={() => {
+                      setViewMode('video');
+                      setExportRenderMode('video');
+                    }}
+                    className={`px-2 py-2 min-h-[42px] rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
                       viewMode === 'video'
                         ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
@@ -2674,8 +3134,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     🎬 Video + Kurven
                   </button>
                   <button
-                    onClick={() => setViewMode('isolated')}
-                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                    type="button"
+                    onClick={() => {
+                      setViewMode('isolated');
+                      setExportRenderMode('isolated');
+                    }}
+                    className={`px-2 py-2 min-h-[42px] rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
                       viewMode === 'isolated'
                         ? 'bg-cyan-400 text-slate-950 font-black shadow-sm'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
@@ -2684,18 +3148,40 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     📈 Nur Kurven
                   </button>
                   <button
-                    onClick={() => setZoomMode('upper_body')}
-                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                    type="button"
+                    onClick={() => {
+                      setZoomMode('upper_body');
+                      setShowCropControls(false);
+                    }}
+                    className={`px-2 py-2 min-h-[42px] rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
                       zoomMode === 'upper_body'
                         ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
                     }`}
                   >
-                    🎯 Zoom: Oberkörper
+                    🎯 Auto-Oberkörper
                   </button>
                   <button
-                    onClick={() => setZoomMode('full')}
-                    className={`px-2 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                    type="button"
+                    onClick={() => {
+                      setZoomMode('custom');
+                      setShowCropControls((v) => !v || zoomMode !== 'custom');
+                    }}
+                    className={`px-2 py-2 min-h-[42px] rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
+                      zoomMode === 'custom'
+                        ? 'bg-purple-500 text-white font-black shadow-sm border border-purple-300'
+                        : 'bg-slate-950 text-purple-300 hover:text-white border border-purple-500/30'
+                    }`}
+                  >
+                    ✂️ Ausschnitt wählen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoomMode('full');
+                      setShowCropControls(false);
+                    }}
+                    className={`col-span-2 sm:col-span-1 px-2 py-2 min-h-[42px] rounded-xl text-[11px] font-bold cursor-pointer transition-all text-center truncate ${
                       zoomMode === 'full'
                         ? 'bg-white text-slate-950 font-black shadow-sm'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-white/5'
@@ -2704,6 +3190,139 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                     🧍 Gesamtkörper
                   </button>
                 </div>
+
+                {/* INTERAKTIVER AUSSCHNITT-EDITOR (Frei wählbarer Bereich für Oberkörper / Wurfarm & Export) */}
+                {(zoomMode === 'custom' || showCropControls) && (
+                  <div className="p-3 rounded-xl bg-slate-950/95 border border-purple-500/40 space-y-2.5 animate-fadeIn">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[11px] font-black text-purple-200 flex items-center gap-1.5">
+                        <span>✂️ Bildausschnitt frei definieren ({customCrop.zoom.toFixed(1)}x Zoom)</span>
+                        <span className="text-[10px] font-normal text-slate-400">
+                          • Ziehe das Videobild direkt mit Finger/Maus oder nutze die Regler
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCropControls(false)}
+                        className="text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer px-2 py-0.5 rounded bg-white/5"
+                      >
+                        Fertig ✓
+                      </button>
+                    </div>
+
+                    {/* Zoom-Stufen Regler + Schnell-Fokus-Presets */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                      <div className="sm:col-span-5 flex items-center gap-2 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-white/10">
+                        <span className="text-[10px] font-bold text-slate-300 shrink-0">Zoom:</span>
+                        <input
+                          type="range"
+                          min={1.2}
+                          max={3.5}
+                          step={0.05}
+                          value={customCrop.zoom}
+                          onChange={(e) => {
+                            setZoomMode('custom');
+                            setCustomCrop((prev) => ({ ...prev, zoom: parseFloat(e.target.value) }));
+                          }}
+                          className="flex-1 accent-purple-400 cursor-pointer h-1.5"
+                        />
+                        <span className="text-[11px] font-mono font-black text-purple-300 w-9 text-right">
+                          {customCrop.zoom.toFixed(1)}x
+                        </span>
+                      </div>
+
+                      <div className="sm:col-span-7 grid grid-cols-3 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setZoomMode('custom');
+                            setCustomCrop({
+                              zoom: 2.25,
+                              centerX: autoUpperBodyCenter.cx,
+                              centerY: autoUpperBodyCenter.cy,
+                            });
+                          }}
+                          className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-purple-500/20 text-[10px] font-bold text-slate-200 border border-white/10 cursor-pointer truncate"
+                        >
+                          🎯 Oberkörper
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setZoomMode('custom');
+                            const relC = activeMetrics.selfComparison.pairwiseReleaseMm.centroid;
+                            setCustomCrop({
+                              zoom: 2.85,
+                              centerX: Math.round(Math.max(15, Math.min(85, relC.x * 100))),
+                              centerY: Math.round(Math.max(15, Math.min(85, relC.y * 100))),
+                            });
+                          }}
+                          className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-[10px] font-bold text-emerald-300 border border-emerald-500/30 cursor-pointer truncate"
+                        >
+                          🚀 Loslass-Zone
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setZoomMode('custom');
+                            const dbC = activeMetrics.selfComparison.pairwiseDrawbackMm.centroid;
+                            setCustomCrop({
+                              zoom: 2.75,
+                              centerX: Math.round(Math.max(15, Math.min(85, dbC.x * 100))),
+                              centerY: Math.round(Math.max(15, Math.min(85, dbC.y * 100))),
+                            });
+                          }}
+                          className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-amber-500/20 text-[10px] font-bold text-amber-300 border border-amber-500/30 cursor-pointer truncate"
+                        >
+                          🔄 Aushol-Zone
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fein-Verschiebung (Links / Rechts / Hoch / Runter) */}
+                    <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                      <span className="text-[10px] text-slate-400">Ausschnitt verschieben:</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomCrop((p) => ({ ...p, centerX: Math.max(12, p.centerX - 4) }))
+                          }
+                          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-slate-200 border border-white/10 cursor-pointer"
+                        >
+                          ◀ Links
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomCrop((p) => ({ ...p, centerY: Math.max(12, p.centerY - 4) }))
+                          }
+                          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-slate-200 border border-white/10 cursor-pointer"
+                        >
+                          ▲ Hoch
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomCrop((p) => ({ ...p, centerY: Math.min(88, p.centerY + 4) }))
+                          }
+                          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-slate-200 border border-white/10 cursor-pointer"
+                        >
+                          ▼ Runter
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomCrop((p) => ({ ...p, centerX: Math.min(88, p.centerX + 4) }))
+                          }
+                          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-slate-200 border border-white/10 cursor-pointer"
+                        >
+                          ▶ Rechts
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Zeile 2: Wurf-Kurven Umschalter (4er Grid -> Passt auf jedes Smartphone!) */}
                 <div className="grid grid-cols-4 gap-1.5">
@@ -2729,30 +3348,79 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
               </div>
 
               {/* Video-Rahmen */}
-              <div className="w-full rounded-3xl bg-slate-950 border-2 border-emerald-500/20 shadow-2xl p-2 flex flex-col items-center justify-center min-h-[340px] overflow-hidden">
+              <div className="w-full rounded-3xl bg-slate-950 border-2 border-emerald-500/20 shadow-2xl p-2 flex flex-col items-center justify-center min-h-[340px] overflow-hidden relative">
+                {zoomMode === 'custom' && !isLiveCameraActive && (
+                  <div className="absolute top-4 left-4 z-20 px-2.5 py-1 rounded-lg bg-purple-950/85 border border-purple-400/50 text-[10px] font-black text-purple-200 pointer-events-none shadow-md">
+                    ✂️ Eigener Ausschnitt ({customCrop.zoom.toFixed(1)}x) • Bild ziehen zum Verschieben
+                  </div>
+                )}
                 <div
                   ref={liveFullscreenContainerRef}
-                style={
-                  isLiveCameraActive
-                    ? undefined
-                    : { aspectRatio: `${videoDims.width} / ${videoDims.height}` }
-                }
-                className={
-                  isLiveCameraActive
-                    ? 'fixed inset-0 z-[9999] w-screen h-[100dvh] bg-black flex items-center justify-center overflow-hidden'
-                    : 'relative max-h-[64vh] w-auto max-w-full rounded-2xl overflow-hidden shadow-xl bg-black'
-                }
-              >
-                <div
-                  style={{
-                    transform:
-                      !isLiveCameraActive && zoomMode === 'upper_body'
-                        ? 'scale(2.15)'
-                        : 'scale(1)',
-                    transformOrigin: dynamicZoomOrigin,
+                  style={
+                    isLiveCameraActive
+                      ? undefined
+                      : { aspectRatio: `${videoDims.width} / ${videoDims.height}` }
+                  }
+                  className={
+                    isLiveCameraActive
+                      ? 'fixed inset-0 z-[9999] w-screen h-[100dvh] bg-black flex items-center justify-center overflow-hidden'
+                      : 'relative max-h-[64vh] w-auto max-w-full rounded-2xl overflow-hidden shadow-xl bg-black'
+                  }
+                  onMouseDown={(e) => {
+                    if (zoomMode !== 'custom' || isLiveCameraActive) return;
+                    cropDragRef.current = {
+                      active: true,
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      origCX: customCrop.centerX,
+                      origCY: customCrop.centerY,
+                    };
                   }}
-                  className="w-full h-full relative flex items-center justify-center"
+                  onMouseMove={(e) => {
+                    if (!cropDragRef.current.active || zoomMode !== 'custom') return;
+                    const dx = e.clientX - cropDragRef.current.startX;
+                    const dy = e.clientY - cropDragRef.current.startY;
+                    const nextCX = Math.round(Math.max(12, Math.min(88, cropDragRef.current.origCX - dx * 0.14)));
+                    const nextCY = Math.round(Math.max(12, Math.min(88, cropDragRef.current.origCY - dy * 0.14)));
+                    setCustomCrop((prev) => ({ ...prev, centerX: nextCX, centerY: nextCY }));
+                  }}
+                  onMouseUp={() => {
+                    cropDragRef.current.active = false;
+                  }}
+                  onMouseLeave={() => {
+                    cropDragRef.current.active = false;
+                  }}
+                  onTouchStart={(e) => {
+                    if (zoomMode !== 'custom' || isLiveCameraActive || e.touches.length !== 1) return;
+                    cropDragRef.current = {
+                      active: true,
+                      startX: e.touches[0].clientX,
+                      startY: e.touches[0].clientY,
+                      origCX: customCrop.centerX,
+                      origCY: customCrop.centerY,
+                    };
+                  }}
+                  onTouchMove={(e) => {
+                    if (!cropDragRef.current.active || zoomMode !== 'custom' || e.touches.length !== 1) return;
+                    const dx = e.touches[0].clientX - cropDragRef.current.startX;
+                    const dy = e.touches[0].clientY - cropDragRef.current.startY;
+                    const nextCX = Math.round(Math.max(12, Math.min(88, cropDragRef.current.origCX - dx * 0.16)));
+                    const nextCY = Math.round(Math.max(12, Math.min(88, cropDragRef.current.origCY - dy * 0.16)));
+                    setCustomCrop((prev) => ({ ...prev, centerX: nextCX, centerY: nextCY }));
+                  }}
+                  onTouchEnd={() => {
+                    cropDragRef.current.active = false;
+                  }}
                 >
+                  <div
+                    style={{
+                      transform: !isLiveCameraActive ? `scale(${activeZoomScale})` : 'scale(1)',
+                      transformOrigin: dynamicZoomOrigin,
+                    }}
+                    className={`w-full h-full relative flex items-center justify-center ${
+                      zoomMode === 'custom' && !isLiveCameraActive ? 'cursor-grab active:cursor-grabbing' : ''
+                    }`}
+                  >
                   <video
                     ref={videoRef}
                     src={videoSrc ?? undefined}
@@ -3213,13 +3881,24 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
-                    onClick={handleDownloadAnalysisImage}
-                    className="min-h-[52px] px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 text-xs font-bold cursor-pointer flex items-center gap-1"
+                    onClick={() => setShowExportPanel((prev) => !prev)}
+                    className={`min-h-[52px] px-3.5 py-2 rounded-xl border text-xs font-black cursor-pointer flex items-center gap-1.5 transition-all ${
+                      showExportPanel
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-lg shadow-emerald-500/20'
+                        : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-400/30'
+                    }`}
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>PNG</span>
+                    <Save className="w-4 h-4" />
+                    <span>Auf Gerät speichern</span>
+                  </button>
+                  <button
+                    onClick={() => handleDownloadAnalysisImage(exportRenderMode, exportCropMode)}
+                    className="min-h-[52px] px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-bold cursor-pointer flex items-center gap-1"
+                    title="Schnell-Download als Standbild (PNG)"
+                  >
+                    <span>📸 PNG</span>
                   </button>
                   <button
                     onClick={() => {
@@ -3237,11 +3916,146 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                   </button>
                 </div>
               </div>
+
+              {/* ON-DEVICE EXPORT-STUDIO: VIDEO + KURVEN ODER NUR KURVEN (INKL. OBERKÖRPER-AUSSCHNITT) */}
+              {showExportPanel && (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/95 border border-emerald-500/40 space-y-3 shadow-2xl">
+                  <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                    <div>
+                      <div className="text-xs sm:text-sm font-black text-emerald-300 flex items-center gap-1.5">
+                        <Save className="w-4 h-4 text-emerald-400" />
+                        <span>Wurfanalyse auf Endgerät speichern</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Wähle zwischen Video mit Kurven oder reinem Kurven-Diagramm – im gewählten Oberkörper-Ausschnitt oder Vollbild.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowExportPanel(false)}
+                      className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-bold text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      Schließen ✕
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* 1. Darstellungs-Modus: Video + Kurven vs. Nur Kurven */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-300 block">
+                        1. Inhalt (Darstellung):
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => setExportRenderMode('video')}
+                          className={`min-h-[48px] px-2.5 py-2 rounded-xl border text-[11px] font-black cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
+                            exportRenderMode === 'video'
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow'
+                              : 'bg-slate-900 text-slate-300 border-white/10 hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>🎬 Video + Kurven</span>
+                          <span className="text-[9px] opacity-80 font-semibold">Realbild & 3 Spuren</span>
+                        </button>
+                        <button
+                          onClick={() => setExportRenderMode('isolated')}
+                          className={`min-h-[48px] px-2.5 py-2 rounded-xl border text-[11px] font-black cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
+                            exportRenderMode === 'isolated'
+                              ? 'bg-cyan-400 text-slate-950 border-cyan-200 shadow'
+                              : 'bg-slate-900 text-slate-300 border-white/10 hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>📈 Nur Kurven</span>
+                          <span className="text-[9px] opacity-80 font-semibold">Dunkles Analyse-Grid</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Bildausschnitt: Gewählter Oberkörper-Ausschnitt vs. Volles Bild */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-300">
+                          2. Bildausschnitt (Zoom):
+                        </label>
+                        <button
+                          onClick={() => {
+                            setZoomMode('custom');
+                            setShowCropControls(true);
+                          }}
+                          className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline cursor-pointer"
+                        >
+                          ✂️ Ausschnitt feinjustieren
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => setExportCropMode('active_crop')}
+                          className={`min-h-[48px] px-2.5 py-2 rounded-xl border text-[11px] font-black cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
+                            exportCropMode === 'active_crop'
+                              ? 'bg-amber-400 text-slate-950 border-amber-200 shadow'
+                              : 'bg-slate-900 text-slate-300 border-white/10 hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>✂️ Oberkörper-Zoom</span>
+                          <span className="text-[9px] opacity-80 font-semibold">
+                            {zoomMode === 'custom' ? `Eigener Bereich (${customCrop.zoom.toFixed(1)}x)` : 'Fokus Wurfarm (1.85x)'}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => setExportCropMode('full')}
+                          className={`min-h-[48px] px-2.5 py-2 rounded-xl border text-[11px] font-black cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
+                            exportCropMode === 'full'
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow'
+                              : 'bg-slate-900 text-slate-300 border-white/10 hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>🧍 Volles Bild</span>
+                          <span className="text-[9px] opacity-80 font-semibold">Gesamte Aufnahme (1.0x)</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Speichern-Buttons: Video (.mp4/.webm) oder Standbild (.png) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <button
+                      onClick={handleDownloadAnalysisVideo}
+                      disabled={isExportingVideo}
+                      className={`min-h-[52px] px-4 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+                        isExportingVideo
+                          ? 'bg-amber-500/30 border border-amber-400/50 text-amber-200 cursor-wait'
+                          : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                      }`}
+                    >
+                      <Camera className="w-4 h-4 shrink-0" />
+                      <span>
+                        {isExportingVideo
+                          ? `Rendert Analyse-Video... (${exportVideoProgress}%)`
+                          : exportRenderMode === 'isolated'
+                          ? '🎥 Als Kurven-Video speichern'
+                          : '🎥 Als Video + Kurven speichern'}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDownloadAnalysisImage(exportRenderMode, exportCropMode)}
+                      disabled={isExportingVideo}
+                      className="min-h-[52px] px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-white/15 font-black text-xs flex items-center justify-center gap-2 shadow transition-all cursor-pointer"
+                    >
+                      <Save className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <span>
+                        {exportRenderMode === 'isolated'
+                          ? '📸 Nur Kurven als Bild (.png)'
+                          : '📸 Video + Kurven als Bild (.png)'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* RECHTE SPALTE: NEED-TO-KNOW DIAGNOSE & SPIELER-MEHRWERT (STECKBRIEF) */}
+        {/* RECHTE SPALTE: 5-SCHRITT DURCHKLICK-ANALYSE (3-DART SELBSTVERGLEICH OHNE NORMZWANG) */}
         <div className="lg:col-span-5 flex flex-col gap-3 min-w-0 w-full">
           {/* Status-Banner */}
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-medium flex items-center gap-2.5">
@@ -3249,347 +4063,321 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             <span className="leading-snug">{statusMessage}</span>
           </div>
 
-          {/* KERN-COCKPIT: DIE 4 WICHTIGSTEN BIOMECHANIK-KPIS (Need-to-Know Prinzip) */}
+          {/* HAUPT-COCKPIT: 5-SCHRITT DURCHKLICK-ANALYSE (DART 1 vs. DART 2 vs. DART 3) */}
           <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-white/10 backdrop-blur-xl shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            {/* Kopfzeile mit Wiederholgenauigkeit & Stamm-Paar */}
+            <div className="flex items-start justify-between gap-2 border-b border-white/10 pb-3">
               <div>
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-black uppercase tracking-wider mb-1">
+                  <Sparkles className="w-3 h-3" />
+                  <span>Dein 3-Dart Selbstvergleich (Ohne Lehrbuch-Norm)</span>
+                </div>
                 <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-emerald-400" />
-                  <span>Wurf-Steckbrief & Live-Telemetrie</span>
+                  <span>Durchklick-Analyse: Dart 1 vs. 2 vs. 3</span>
                 </h2>
                 <p className="text-[11px] text-slate-400">
-                  Kern-Kennzahlen für {user.name} • 1:1 Handgelenk-Spur ab Hüfthöhe (ohne Glättung)
+                  Klicke Schritt für Schritt durch deine 3 Würfe – das Video springt automatisch zur passenden Stelle.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+
+              <div className="flex flex-col items-end gap-1 shrink-0">
                 <span className="px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-mono text-xs font-black">
-                  {activeMetrics.consistencyScore}% Konstanz
+                  {activeMetrics.selfComparison.repeatabilityScorePct}% synchron
                 </span>
-                <span className={`px-2 py-1 rounded-xl border text-[11px] font-mono font-bold ${
-                  activeMetrics.dispersion.dispersionRating === 'EXZELLENT'
-                    ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300'
-                    : activeMetrics.dispersion.dispersionRating === 'STABIL'
-                    ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-300'
-                    : 'bg-amber-500/15 border-amber-400/40 text-amber-300'
-                }`}>
-                  Ø Streuung: {activeMetrics.dispersion.releaseDispersionMm} mm
+                <span className="text-[10px] font-bold text-slate-400">
+                  Basis: <strong className="text-white">{activeMetrics.selfComparison.referencePairLabel}</strong>
                 </span>
               </div>
             </div>
 
-            {/* 2x2 KPI-Kacheln (Grün = Optimal/Stabil, Rot = Warnung gem. §12.2 AGENTS.md) */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* KPI 1: Release-Tacho (km/h) */}
-              <div className="p-3 rounded-2xl bg-slate-950/90 border border-emerald-500/25">
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Abwurf-Tacho</span>
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                </div>
-                <div className="text-lg sm:text-xl font-black font-mono text-emerald-400">
-                  {activeMetrics.speedKmh.toFixed(1)} <span className="text-xs font-bold">km/h</span>
-                </div>
-                <div className="text-[10px] text-emerald-300/80 mt-0.5 font-semibold">
-                  ✓ Konstantes Tempo (Ziel: 19–24 km/h)
-                </div>
-              </div>
-
-              {/* KPI 2: Launch-Angle-Radar (°) */}
-              <div
-                className={`p-3 rounded-2xl bg-slate-950/90 border ${
-                  activeMetrics.isLaunchOptimal ? 'border-emerald-500/25' : 'border-amber-500/40'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Abwurfwinkel</span>
-                  <Compass className="w-3.5 h-3.5 text-cyan-400" />
-                </div>
-                <div
-                  className={`text-lg sm:text-xl font-black font-mono ${
-                    activeMetrics.isLaunchOptimal ? 'text-emerald-400' : 'text-amber-300'
-                  }`}
-                >
-                  +{activeMetrics.launchAngle.toFixed(1)}°
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5 font-semibold">
-                  {activeMetrics.isLaunchOptimal ? '✓ Idealer Parabelbogen' : 'Optimal: +10° bis +18°'}
-                </div>
-              </div>
-
-              {/* KPI 3: Ellenbogen-Absack-Sensor (Stabilitäts-Alarm!) */}
-              <div
-                className={`p-3 rounded-2xl bg-slate-950/90 border ${
-                  activeMetrics.isElbowDropping
-                    ? 'border-rose-500/60 bg-rose-950/20'
-                    : 'border-emerald-500/25'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Ellenbogen-Drift</span>
-                  {activeMetrics.isElbowDropping ? (
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-                  ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  )}
-                </div>
-                <div
-                  className={`text-lg sm:text-xl font-black font-mono ${
-                    activeMetrics.isElbowDropping ? 'text-rose-400' : 'text-emerald-400'
-                  }`}
-                >
-                  {activeMetrics.elbowDropMm > 0 ? '+' : ''}
-                  {activeMetrics.elbowDropMm.toFixed(1)} <span className="text-xs font-bold">mm</span>
-                </div>
-                <div
-                  className={`text-[10px] mt-0.5 font-semibold ${
-                    activeMetrics.isElbowDropping ? 'text-rose-300' : 'text-emerald-300/80'
-                  }`}
-                >
-                  {activeMetrics.isElbowDropping
-                    ? '⚠️ Warnung: Ellenbogen sackt ab!'
-                    : '✓ Stabiler Hebelpunkt'}
-                </div>
-              </div>
-
-              {/* KPI 4: Körperruhe / Lotlinie */}
-              <div
-                className={`p-3 rounded-2xl bg-slate-950/90 border ${
-                  activeMetrics.shoulderDriftMm > 18
-                    ? 'border-rose-500/50'
-                    : 'border-emerald-500/25'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Stand- & Lotlinie</span>
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                </div>
-                <div
-                  className={`text-lg sm:text-xl font-black font-mono ${
-                    activeMetrics.shoulderDriftMm > 18 ? 'text-rose-400' : 'text-emerald-400'
-                  }`}
-                >
-                  {activeMetrics.shoulderDriftMm.toFixed(1)} <span className="text-xs font-bold">mm</span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5 font-semibold">
-                  {activeMetrics.shoulderDriftMm <= 18
-                    ? '✓ Ruhige Körperachse'
-                    : '⚠️ Vorneigung am Oche'}
-                </div>
-              </div>
+            {/* 5 SCHRITT-REITER ZUM DIREKTEN ANWÄHLEN */}
+            <div className="grid grid-cols-5 gap-1">
+              {([1, 2, 3, 4, 5] as GuidedAnalysisStep[]).map((stepNum) => {
+                const st = activeMetrics.selfComparison.steps[stepNum];
+                const isCurrent = guidedStep === stepNum;
+                const dotColor =
+                  st.status === 'KONSTANT'
+                    ? 'bg-emerald-400'
+                    : st.status === 'LEICHTE_VARIANZ'
+                    ? 'bg-amber-400'
+                    : 'bg-rose-500';
+                return (
+                  <button
+                    key={stepNum}
+                    onClick={() => handleSelectGuidedStep(stepNum)}
+                    className={`min-h-[52px] px-1.5 py-1.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      isCurrent
+                        ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-md shadow-emerald-500/10'
+                        : 'bg-slate-950/70 hover:bg-slate-800 border-white/10 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                      <span className="text-[10px] font-black font-mono">#{stepNum}</span>
+                    </div>
+                    <span className="text-[10px] font-bold leading-tight truncate w-full">
+                      {st.shortTitle}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* 3-DART RELEASE-STREUUNGSELLIPSE (BBDV-GRUPPIERUNG) */}
-            <div className="p-3 rounded-2xl bg-slate-950/90 border border-emerald-500/20 flex items-center justify-between gap-3 shadow-inner">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shrink-0">
-                  <Target className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[11px] text-slate-400">3-Dart Release-Streuung</div>
-                  <div className="text-sm font-black font-mono text-white flex items-center gap-2">
-                    <span className={activeMetrics.dispersion.releaseDispersionMm <= 14 ? 'text-emerald-400' : 'text-amber-400'}>
-                      {activeMetrics.dispersion.releaseDispersionMm > 0 ? `${activeMetrics.dispersion.releaseDispersionMm} mm` : 'Wird vermessen...'}
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 font-sans font-bold">
-                      {activeMetrics.dispersion.dispersionRating}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="text-right text-[10px] text-slate-400 font-mono">
-                <div>Speed Δ {activeMetrics.dispersion.speedStdDevKmh} km/h</div>
-                <div>Winkel Δ {activeMetrics.dispersion.launchAngleStdDevDeg}°</div>
-                {activeMetrics.dispersion.drawbackDispersionMm !== undefined && activeMetrics.dispersion.drawbackDispersionMm > 0 && (
-                  <div className="text-slate-400">Anker Δ {activeMetrics.dispersion.drawbackDispersionMm} mm</div>
-                )}
-                {activeMetrics.dispersion.avgForwardPhaseMs !== undefined && activeMetrics.dispersion.avgForwardPhaseMs > 0 && (
-                  <div className="text-slate-400">Tempo ~{activeMetrics.dispersion.avgForwardPhaseMs} ms</div>
-                )}
-              </div>
-            </div>
+            {/* AKTIVER DURCHKLICK-SCHRITT: FRAGE, ANTWORT & 3-DART-VERGLEICH */}
+            {(() => {
+              const stepOrder: GuidedAnalysisStep[] = [1, 2, 3, 4, 5];
+              const currentIdx = Math.max(0, stepOrder.indexOf(guidedStep));
+              const activeStepObj =
+                activeMetrics.selfComparison.steps[guidedStep] ||
+                activeMetrics.selfComparison.steps[1];
+              const prevStep = stepOrder[(currentIdx - 1 + stepOrder.length) % stepOrder.length];
+              const nextStep = stepOrder[(currentIdx + 1) % stepOrder.length];
 
-            {/* 4 WURFPHASEN KOMPAKT-TABS */}
-            {snapshots && (
-              <div className="grid grid-cols-4 gap-1.5 pt-1">
-                {(['baseline', 'drawback', 'release', 'follow_through'] as PhaseKey[]).map((key) => {
-                  const snap = snapshots[key];
-                  const isActive = activePhase === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => handleSelectPhase(key)}
-                      className={`min-h-[52px] p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
-                        isActive
-                          ? 'bg-emerald-500/20 border-emerald-400'
-                          : 'bg-slate-950/70 hover:bg-slate-800 border-white/5'
-                      }`}
-                    >
-                      <div className="text-[10px] font-black text-white truncate">{snap.title}</div>
-                      <div className="text-xs font-mono font-black text-emerald-400 mt-0.5">
-                        {snap.elbowAngle}°
+              const statusBadgeClass =
+                activeStepObj.status === 'KONSTANT'
+                  ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                  : activeStepObj.status === 'LEICHTE_VARIANZ'
+                  ? 'bg-amber-500/20 border-amber-400/40 text-amber-300'
+                  : 'bg-rose-500/20 border-rose-400/50 text-rose-300';
+
+              const statusLabel =
+                activeStepObj.status === 'KONSTANT'
+                  ? '✓ Hohe Wiederholgenauigkeit'
+                  : activeStepObj.status === 'LEICHTE_VARIANZ'
+                  ? '⚡ Leichte Abweichung'
+                  : '⚠️ Deutlicher Ausreißer';
+
+              return (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/95 border border-white/15 space-y-3.5 shadow-inner">
+                  {/* Frage & Status-Badge */}
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div>
+                      <div className="text-[11px] font-bold text-cyan-300">
+                        Frage {activeStepObj.step}/5: {activeStepObj.question}
                       </div>
+                      <h3 className="text-sm sm:text-base font-black text-white mt-0.5">
+                        {activeStepObj.headline}
+                      </h3>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-xl border text-[10px] font-black shrink-0 ${statusBadgeClass}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+
+                  {/* Klartext-Antwort für den Spieler */}
+                  <p className="text-xs text-slate-200 leading-relaxed bg-slate-900/90 p-3 rounded-xl border border-white/5">
+                    {activeStepObj.feedbackText}
+                  </p>
+
+                  {/* DIREKTER 3-DART-KARTENVERGLEICH (Antippen springt im Video exakt zu diesem Wurf!) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold">
+                      <span>Direktvergleich deiner 3 Würfe (Antippen = Wurf im Video zeigen):</span>
+                      <span className="font-mono text-slate-300">
+                        {activeStepObj.primaryMetricLabel}: {activeStepObj.primaryMetricValue}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {activeStepObj.perDartValues.map((dv, idx) => {
+                        const dartColors = [
+                          {
+                            border: dv.isOutlier ? 'border-rose-500/70 bg-rose-950/25' : 'border-emerald-500/40 bg-emerald-950/15',
+                            badge: 'bg-emerald-500 text-slate-950',
+                            text: 'text-emerald-300',
+                          },
+                          {
+                            border: dv.isOutlier ? 'border-rose-500/70 bg-rose-950/25' : 'border-cyan-500/40 bg-cyan-950/15',
+                            badge: 'bg-cyan-400 text-slate-950',
+                            text: 'text-cyan-300',
+                          },
+                          {
+                            border: dv.isOutlier ? 'border-rose-500/70 bg-rose-950/25' : 'border-amber-500/40 bg-amber-950/15',
+                            badge: 'bg-amber-400 text-slate-950',
+                            text: 'text-amber-300',
+                          },
+                        ][idx] || {
+                          border: 'border-white/15 bg-slate-900',
+                          badge: 'bg-slate-700 text-white',
+                          text: 'text-white',
+                        };
+
+                        const isSelectedDart = activeThrowIdx === idx;
+
+                        return (
+                          <button
+                            key={dv.dartId}
+                            onClick={() => handleSelectGuidedStep(guidedStep, idx)}
+                            className={`min-h-[76px] p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                              dartColors.border
+                            } ${isSelectedDart ? 'ring-2 ring-white shadow-lg' : 'hover:border-white/40'}`}
+                          >
+                            <div className="flex items-center justify-between gap-1 w-full">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${dartColors.badge}`}>
+                                {dv.label}
+                              </span>
+                              {dv.isOutlier ? (
+                                <span className="text-[9px] font-black text-rose-400">⚠️ Ausreißer</span>
+                              ) : (
+                                <span className="text-[9px] font-bold text-emerald-400">✓ Synchron</span>
+                              )}
+                            </div>
+                            <div className={`text-xs sm:text-sm font-black font-mono mt-1.5 ${dartColors.text}`}>
+                              {dv.primaryValue}
+                            </div>
+                            {dv.secondaryValue && (
+                              <div className="text-[10px] text-slate-400 font-mono truncate">
+                                {dv.secondaryValue}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* SCHRITT-SPEZIFISCHE ZUSATZ-INFOS (Paarabstände in Schritt 3, Tempo-Balken in Schritt 4, Filter in Schritt 5) */}
+                  {guidedStep === 3 && (
+                    <div className="p-2.5 rounded-xl bg-slate-900/90 border border-white/10">
+                      <div className="text-[10px] font-bold text-slate-400 mb-1.5">
+                        Paarweiser Loslass-Abstand im Raum (Millimeter):
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 text-center font-mono text-xs">
+                        <div className="p-1.5 rounded-lg bg-slate-950 border border-white/5">
+                          <div className="text-[9px] text-slate-400">Dart 1 ↔ Dart 2</div>
+                          <div className={`font-black ${activeMetrics.selfComparison.pairwiseReleaseMm.d1_d2 <= 16 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                            {activeMetrics.selfComparison.pairwiseReleaseMm.d1_d2.toFixed(1)} mm
+                          </div>
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-slate-950 border border-white/5">
+                          <div className="text-[9px] text-slate-400">Dart 2 ↔ Dart 3</div>
+                          <div className={`font-black ${activeMetrics.selfComparison.pairwiseReleaseMm.d2_d3 <= 16 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                            {activeMetrics.selfComparison.pairwiseReleaseMm.d2_d3.toFixed(1)} mm
+                          </div>
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-slate-950 border border-white/5">
+                          <div className="text-[9px] text-slate-400">Dart 1 ↔ Dart 3</div>
+                          <div className={`font-black ${activeMetrics.selfComparison.pairwiseReleaseMm.d1_d3 <= 16 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                            {activeMetrics.selfComparison.pairwiseReleaseMm.d1_d3.toFixed(1)} mm
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {guidedStep === 4 && (
+                    <div className="p-2.5 rounded-xl bg-slate-900/90 border border-white/10 space-y-1.5">
+                      <div className="text-[10px] font-bold text-slate-400">
+                        Durchzugs-Zeit (Umkehrpunkt → Loslassen) & Abwurf-Tempo:
+                      </div>
+                      {activeMetrics.selfComparison.darts.map((dp, idx) => {
+                        const maxMs = Math.max(
+                          220,
+                          ...activeMetrics.selfComparison.darts.map((d) => d.accelerationDurationMs)
+                        );
+                        const widthPct = Math.min(100, Math.max(25, Math.round((dp.accelerationDurationMs / maxMs) * 100)));
+                        const barClass = idx === 0 ? 'bg-emerald-500' : idx === 1 ? 'bg-cyan-400' : 'bg-amber-400';
+                        return (
+                          <div key={dp.id} className="space-y-0.5">
+                            <div className="flex justify-between text-[10px] font-mono">
+                              <span className="text-slate-300 font-bold">{dp.label}</span>
+                              <span className="text-white font-black">
+                                {dp.accelerationDurationMs} ms • {dp.releaseSpeedKmh.toFixed(1)} km/h
+                              </span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
+                              <div className={`h-full rounded-full ${barClass}`} style={{ width: `${widthPct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {guidedStep === 5 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setActiveThrowIdx(-1)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black cursor-pointer border ${
+                            activeThrowIdx === -1
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-300'
+                              : 'bg-slate-900 text-slate-300 border-white/10'
+                          }`}
+                        >
+                          Alle 3 Kurven überlagern
+                        </button>
+                        {[0, 1, 2].map((dIdx) => (
+                          <button
+                            key={dIdx}
+                            onClick={() => setActiveThrowIdx(dIdx)}
+                            className={`px-2 py-1.5 rounded-lg text-[10px] font-black cursor-pointer border ${
+                              activeThrowIdx === dIdx
+                                ? 'bg-white text-slate-950 border-white'
+                                : 'bg-slate-900 text-slate-400 border-white/10'
+                            }`}
+                          >
+                            Nur D{dIdx + 1}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setShowExportPanel(true)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 text-[11px] font-black cursor-pointer flex items-center gap-1"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Analyse auf Gerät speichern</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* VOR / ZURÜCK NAVIGATION (DURCHKLICK-STEUERUNG MIT 52PX TOUCH-HÖHE) */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => handleSelectGuidedStep(prevStep)}
+                      className="min-h-[52px] px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-200 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                    >
+                      <span>◀ Vorheriger Punkt</span>
                     </button>
-                  );
-                })}
-              </div>
-            )}
+                    <button
+                      onClick={() => handleSelectGuidedStep(nextStep)}
+                      className="min-h-[52px] px-3 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/15 transition-all"
+                    >
+                      <span>Nächster Punkt ({ ((currentIdx + 1) % 5) + 1 }/5) ▶</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* 5 KERNWINKEL DER BIOMECHANIK GEMÄSS AGENTS.MD §12.6 */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-950/90 border border-white/10 space-y-2.5">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <Compass className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-xs font-black text-white">5 Kernwinkel (BBDV-Biomechanik)</span>
-                </div>
-                <div className="flex items-center gap-1 text-[10px] font-mono font-bold">
-                  <span className={landmarkQuality.isHighConfidence ? 'text-emerald-400' : 'text-amber-400'}>
-                    ● Tracking: {Math.round(landmarkQuality.averageConfidence * 100)}%
-                  </span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-slate-400">Score: {activeMetrics.coreValidation.evaluation.postureScore}/100</span>
-                </div>
-              </div>
+            {/* SPEICHERN IM SPIELER-STECKBRIEF + DIREKT-EXPORT AUF ENDGERÄT */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                onClick={handleSaveSessionToProfile}
+                className="w-full min-h-[52px] py-3 px-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+              >
+                {isSaved ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Im Profil gespeichert!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 shrink-0" />
+                    <span>Im Spielerprofil sichern</span>
+                  </>
+                )}
+              </button>
 
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-                {/* 1. Standwinkel */}
-                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isStanceStable ? 'border-emerald-500/30' : 'border-rose-500/50'
-                }`}>
-                  <div className="text-[10px] text-slate-400 truncate">1. Stand</div>
-                  <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isStanceStable ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
-                    {activeMetrics.coreAngles.stanceAngleDeg.toFixed(1)}°
-                  </div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
-                    Δ {activeMetrics.coreValidation.deltas.stanceDeltaDeg.toFixed(1)}°
-                  </div>
-                </div>
-
-                {/* 2. Rückzugwinkel */}
-                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'border-emerald-500/30' : 'border-rose-500/50'
-                }`}>
-                  <div className="text-[10px] text-slate-400 truncate">2. Rückzug</div>
-                  <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
-                    {activeMetrics.coreAngles.drawbackAngleDeg.toFixed(1)}°
-                  </div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
-                    {activeMetrics.coreValidation.evaluation.isDrawbackOptimal ? '✓ Optimal' : '35°–65°'}
-                  </div>
-                </div>
-
-                {/* 3. Releasewinkel */}
-                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'border-emerald-500/30' : 'border-rose-500/50'
-                }`}>
-                  <div className="text-[10px] text-slate-400 truncate">3. Release</div>
-                  <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isReleaseConsistent ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
-                    {activeMetrics.coreAngles.releaseAngleDeg.toFixed(1)}°
-                  </div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
-                    Apex
-                  </div>
-                </div>
-
-                {/* 4. Nachhaltewinkel */}
-                <div className={`p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'border-emerald-500/30' : 'border-rose-500/50'
-                }`}>
-                  <div className="text-[10px] text-slate-400 truncate">4. Nachhalte</div>
-                  <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
-                    {activeMetrics.coreAngles.followThroughAngleDeg.toFixed(1)}°
-                  </div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
-                    {activeMetrics.coreValidation.evaluation.isFollowThroughComplete ? '✓ Gestreckt' : '≥150°'}
-                  </div>
-                </div>
-
-                {/* 5. Neigungswinkel */}
-                <div className={`col-span-2 sm:col-span-1 p-2 rounded-xl bg-slate-900/90 border text-center ${
-                  activeMetrics.coreValidation.evaluation.isTrunkStable ? 'border-emerald-500/30' : 'border-rose-500/50'
-                }`}>
-                  <div className="text-[10px] text-slate-400 truncate">5. Neigung</div>
-                  <div className={`text-xs sm:text-sm font-mono font-black ${
-                    activeMetrics.coreValidation.evaluation.isTrunkStable ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
-                    {activeMetrics.coreAngles.trunkLeanAngleDeg.toFixed(1)}°
-                  </div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">
-                    Δ {activeMetrics.coreValidation.deltas.trunkLeanDeltaDeg.toFixed(1)}°
-                  </div>
-                </div>
-              </div>
+              <button
+                onClick={() => setShowExportPanel((prev) => !prev)}
+                className="w-full min-h-[52px] py-3 px-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 font-black text-xs flex items-center justify-center gap-2 shadow transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4 shrink-0" />
+                <span>Video / Kurven herunterladen</span>
+              </button>
             </div>
-
-            {/* KI-COACHING & SPIELER-EMPFEHLUNG ( Konkreter Mehrwert für den Spieler! ) */}
-            <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-white/10 space-y-2">
-              <div className="text-xs font-black text-white flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>KI-Trainer Diagnose für dein Spiel:</span>
-              </div>
-              <ul className="text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-emerald-400 font-black">•</span>
-                  <span>
-                    <strong>Wurf-Rhythmus (D1–D3):</strong> Deine 3 Wurfbahnen zeigen eine Pfad-Deckung von{' '}
-                    <strong className="text-emerald-300">{activeMetrics.consistencyScore}%</strong> mit einem
-                    Abwurfwinkel von <strong className="text-cyan-300">+{activeMetrics.launchAngle.toFixed(1)}°</strong>.
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className={activeMetrics.dispersion.dispersionRating === 'EXZELLENT' ? 'text-emerald-400 font-black' : activeMetrics.dispersion.dispersionRating === 'STABIL' ? 'text-cyan-400 font-black' : 'text-amber-400 font-black'}>
-                    •
-                  </span>
-                  <span>
-                    <strong>3-Dart Streuung ({activeMetrics.dispersion.dispersionRating}):</strong> Apex-Streuradius{' '}
-                    <strong className="text-white">{activeMetrics.dispersion.releaseDispersionMm} mm</strong> mit Tempo-Varianz von{' '}
-                    <strong className="text-white">±{activeMetrics.dispersion.speedStdDevKmh} km/h</strong>.
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className={activeMetrics.isElbowDropping ? 'text-rose-400 font-black' : 'text-emerald-400 font-black'}>
-                    •
-                  </span>
-                  <span>
-                    {activeMetrics.isElbowDropping ? (
-                      <>
-                        <strong className="text-rose-300">Achtung Hebel-Verlust:</strong> Dein Ellenbogen sackt im Rückzug um{' '}
-                        <strong>{Math.abs(activeMetrics.elbowDropMm).toFixed(1)} mm</strong> ab. Halte den Oberarm waagerecht, um tiefe Treffer (3/7/19) zu vermeiden!
-                      </>
-                    ) : (
-                      <>
-                        <strong className="text-emerald-300">Stabiler Ellenbogen:</strong> Nur{' '}
-                        <strong>{Math.abs(activeMetrics.elbowDropMm).toFixed(1)} mm</strong> vertikale Drift – ideale Voraussetzung für konstante Triple-20-Treffer.
-                      </>
-                    )}
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            {/* SPEICHERN IM SPIELER-STECKBRIEF */}
-            <button
-              onClick={handleSaveSessionToProfile}
-              className="w-full min-h-[52px] py-3.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
-            >
-              {isSaved ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Im persönlichen Wurf-Steckbrief gespeichert!</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>Wurf-Steckbrief im Spielerprofil sichern</span>
-                </>
-              )}
-            </button>
 
             {/* EINKLAPPBARE EXPERTEN- & KALIBRIERUNGS-EINSTELLUNGEN (Need-to-Know Prinzip!) */}
             <div className="pt-1 border-t border-white/10">

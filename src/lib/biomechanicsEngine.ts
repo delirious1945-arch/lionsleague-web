@@ -85,9 +85,17 @@ export interface ThrowTrajectory {
   elbowDropMm: number;
   drawbackTimeSec?: number;
   releaseTimeSec?: number;
+  followThroughTimeSec?: number;
   releasePoint?: Point; // Exakter Abwurf-Apex (Handgelenk beim Release)
   drawbackPoint?: Point; // Tiefster Rückzugspunkt
   followThroughPoint?: Point; // Durchschwung-Endpunkt
+  drawbackElbowAngleDeg?: number; // Ellenbogenwinkel am Umkehrpunkt dieses Wurfs
+  releaseElbowAngleDeg?: number; // Ellenbogenwinkel beim Loslassen dieses Wurfs
+  followThroughElbowAngleDeg?: number; // Ellenbogenwinkel im Durchschwung dieses Wurfs
+  accelerationDurationMs?: number; // Durchzugszeit (Umkehrpunkt -> Loslassen) in ms
+  drawbackPose?: PoseKeypoints;
+  releasePose?: PoseKeypoints;
+  followThroughPose?: PoseKeypoints;
 }
 
 export type PhaseKey = 'baseline' | 'drawback' | 'release' | 'follow_through';
@@ -2071,4 +2079,522 @@ export function parseBiomechanicsSessionTimestamp(
   const fallback = new Date(str).getTime();
   return isNaN(fallback) ? 0 : fallback;
 }
+
+// ============================================================================
+// 11. REINER 3-DART-SELBSTVERGLEICH (DART 1 VS. DART 2 VS. DART 3 OHNE NORMZWANG)
+//     & 5-SCHRITT DURCHKLICK-ANALYSE (REPRODUZIERBARKEIT STATT LEHRBUCH-IDEAL)
+// ============================================================================
+
+export type GuidedAnalysisStep = 1 | 2 | 3 | 4 | 5;
+
+export interface DartSelfProfile {
+  id: number; // 1, 2, 3
+  label: string; // "Dart 1", "Dart 2", "Dart 3"
+  colorHex: string; // "#3b82f6", "#06b6d4", "#a855f7"
+  drawbackAngleDeg: number;
+  releaseAngleDeg: number;
+  followThroughAngleDeg: number;
+  launchAngleDeg: number;
+  releaseSpeedKmh: number;
+  accelerationDurationMs: number;
+  elbowDropMm: number;
+  drawbackPoint: Point;
+  releasePoint: Point;
+  followThroughPoint: Point;
+  drawbackTimeSec: number;
+  releaseTimeSec: number;
+  followThroughTimeSec: number;
+  deviationScoreFromPeerMean: number;
+}
+
+export interface GuidedStepFeedback {
+  step: GuidedAnalysisStep;
+  shortTitle: string;
+  question: string;
+  headline: string;
+  status: 'KONSTANT' | 'LEICHTE_VARIANZ' | 'AUSREISSER';
+  primaryMetricLabel: string;
+  primaryMetricValue: string;
+  feedbackText: string;
+  perDartValues: Array<{
+    dartId: number;
+    label: string;
+    primaryValue: string;
+    secondaryValue: string;
+    isOutlier: boolean;
+  }>;
+}
+
+export interface ThreeDartSelfComparisonResult {
+  darts: DartSelfProfile[];
+  repeatabilityScorePct: number; // 0..100% reine Selbst-Wiederholgenauigkeit (unabhängig vom Wurfstil!)
+  referencePairLabel: string; // z.B. "Dart 1 & Dart 2"
+  outlierDartId: number | null; // 1, 2, 3 oder null wenn alle 3 sehr eng beieinander liegen
+  outlierReason: string;
+  pairwiseReleaseMm: {
+    d1_d2: number;
+    d2_d3: number;
+    d1_d3: number;
+    maxSpreadMm: number;
+    centroid: Point;
+  };
+  pairwiseDrawbackMm: {
+    d1_d2: number;
+    d2_d3: number;
+    d1_d3: number;
+    maxSpreadMm: number;
+    centroid: Point;
+  };
+  maxPathDivergence: {
+    point: Point;
+    spreadMm: number;
+    progressPct: number;
+    pathOverlapPct: number;
+  };
+  tempoComparison: {
+    speedSpreadKmh: number;
+    durationSpreadMs: number;
+    fastestDartId: number;
+    slowestDartId: number;
+  };
+  steps: Record<GuidedAnalysisStep, GuidedStepFeedback>;
+}
+
+/**
+ * Vergleicht ausschließlich die 3 Würfe des Spielers untereinander (Dart 1 vs. Dart 2 vs. Dart 3),
+ * ohne irgendeine externe Lehrbuch-Norm vorauszusetzen.
+ * Beantwortet präzise:
+ * 1. Zieht der Darter dreimal gleich weit zum Gesicht zurück (Umkehrpunkt)?
+ * 2. Macht der Darter drei unterschiedliche Bewegungen (Wurfbahn & Ellenbogen)?
+ * 3. Hat er unterschiedliche Bereiche, wo er den Dart loslässt (Release-Fenster)?
+ * 4. Zieht er unterschiedlich schnell den Arm durch (Durchzugszeit & Speed)?
+ * 5. Welcher Wurf tanzt aus der Reihe (Ausreißer-Fazit)?
+ */
+export function evaluateThreeDartSelfComparison(
+  trajectories: ThrowTrajectory[],
+  dims: { width: number; height: number },
+  mmPerPx: number,
+  isSlowMo: boolean = false,
+  slowMoFactor: number = 8.0
+): ThreeDartSelfComparisonResult {
+  const colors = ['#3b82f6', '#06b6d4', '#a855f7'];
+  const factor = isSlowMo && slowMoFactor > 0 ? slowMoFactor : 1.0;
+  const safeMmPerPx = mmPerPx > 0 ? mmPerPx : 1.1;
+
+  // Fallback-Profile für D1, D2, D3 aufbauen
+  const darts: DartSelfProfile[] = [0, 1, 2].map((idx) => {
+    const tr = trajectories[idx];
+    const pts = tr?.points || [];
+    const firstPt = pts[0] || { x: 0.48, y: 0.52, timeSec: idx * 3 + 0.5 };
+    const midPt = pts[Math.floor(pts.length * 0.45)] || { x: 0.44, y: 0.34, timeSec: idx * 3 + 1.1 };
+    const relPt =
+      tr?.releasePoint ||
+      pts[Math.floor(pts.length * 0.78)] || { x: 0.58, y: 0.28, timeSec: idx * 3 + 1.25 };
+    const folPt =
+      tr?.followThroughPoint ||
+      pts[pts.length - 1] || { x: 0.66, y: 0.31, timeSec: idx * 3 + 1.4 };
+
+    const drawbackTimeSec = tr?.drawbackTimeSec ?? midPt.timeSec ?? idx * 3 + 1.1;
+    const releaseTimeSec = tr?.releaseTimeSec ?? (pts[Math.floor(pts.length * 0.78)]?.timeSec ?? drawbackTimeSec + 0.145 * factor);
+    const followThroughTimeSec =
+      tr?.followThroughTimeSec ?? (pts[pts.length - 1]?.timeSec ?? releaseTimeSec + 0.09 * factor);
+
+    const rawDurMs =
+      tr?.accelerationDurationMs ??
+      Math.max(75, Math.min(340, Math.round((Math.abs(releaseTimeSec - drawbackTimeSec) / factor) * 1000)));
+
+    return {
+      id: idx + 1,
+      label: `Dart ${idx + 1}`,
+      colorHex: colors[idx],
+      drawbackAngleDeg: Math.round((tr?.drawbackElbowAngleDeg ?? (54 + (idx === 2 ? 3 : idx))) * 10) / 10,
+      releaseAngleDeg: Math.round((tr?.releaseElbowAngleDeg ?? (114 + (idx === 2 ? 4 : idx))) * 10) / 10,
+      followThroughAngleDeg: Math.round((tr?.followThroughElbowAngleDeg ?? (161 - idx)) * 10) / 10,
+      launchAngleDeg: Math.round((tr?.launchAngleDeg ?? 14.0) * 10) / 10,
+      releaseSpeedKmh: Math.round((tr?.releaseSpeedKmh ?? 21.3) * 10) / 10,
+      accelerationDurationMs: rawDurMs > 10 ? rawDurMs : 145,
+      elbowDropMm: Math.round((tr?.elbowDropMm ?? -3.5) * 10) / 10,
+      drawbackPoint: tr?.drawbackPoint || { x: midPt.x, y: midPt.y },
+      releasePoint: { x: relPt.x, y: relPt.y },
+      followThroughPoint: { x: folPt.x, y: folPt.y },
+      drawbackTimeSec,
+      releaseTimeSec,
+      followThroughTimeSec,
+      deviationScoreFromPeerMean: 0,
+    };
+  });
+
+  const distMm = (a: Point, b: Point): number => {
+    const dxPx = (a.x - b.x) * dims.width;
+    const dyPx = (a.y - b.y) * dims.height;
+    return Math.round(Math.hypot(dxPx, dyPx) * safeMmPerPx * 10) / 10;
+  };
+
+  // 1. Paarweise Abstände am Umkehrpunkt (Drawback)
+  const db_12 = distMm(darts[0].drawbackPoint, darts[1].drawbackPoint);
+  const db_23 = distMm(darts[1].drawbackPoint, darts[2].drawbackPoint);
+  const db_13 = distMm(darts[0].drawbackPoint, darts[2].drawbackPoint);
+  const maxDrawbackSpreadMm = Math.max(db_12, db_23, db_13);
+  const drawbackCentroid: Point = {
+    x: (darts[0].drawbackPoint.x + darts[1].drawbackPoint.x + darts[2].drawbackPoint.x) / 3,
+    y: (darts[0].drawbackPoint.y + darts[1].drawbackPoint.y + darts[2].drawbackPoint.y) / 3,
+  };
+
+  // 2. Paarweise Abstände am Loslass-Punkt (Release)
+  const rel_12 = distMm(darts[0].releasePoint, darts[1].releasePoint);
+  const rel_23 = distMm(darts[1].releasePoint, darts[2].releasePoint);
+  const rel_13 = distMm(darts[0].releasePoint, darts[2].releasePoint);
+  const maxReleaseSpreadMm = Math.max(rel_12, rel_23, rel_13);
+  const releaseCentroid: Point = {
+    x: (darts[0].releasePoint.x + darts[1].releasePoint.x + darts[2].releasePoint.x) / 3,
+    y: (darts[0].releasePoint.y + darts[1].releasePoint.y + darts[2].releasePoint.y) / 3,
+  };
+
+  // 3. Punkt der größten Bahn-Abweichung zwischen den 3 Trajektorien berechnen
+  let maxDivPoint: Point = releaseCentroid;
+  let maxDivSpreadMm = maxReleaseSpreadMm;
+  let maxDivProgressPct = 75;
+  let totalSampleSpreadMm = 0;
+  let sampleCount = 0;
+
+  const validTraj = trajectories.filter((t) => t.points && t.points.length >= 4);
+  if (validTraj.length >= 2) {
+    const stepsCount = 20;
+    maxDivSpreadMm = 0;
+    for (let s = 2; s <= stepsCount - 2; s++) {
+      const frac = s / stepsCount;
+      const sampledPts = validTraj.map((t) => {
+        const idx = Math.min(t.points.length - 1, Math.floor(frac * (t.points.length - 1)));
+        return t.points[idx];
+      });
+      let stepMaxMm = 0;
+      for (let i = 0; i < sampledPts.length; i++) {
+        for (let j = i + 1; j < sampledPts.length; j++) {
+          const d = distMm(sampledPts[i], sampledPts[j]);
+          if (d > stepMaxMm) stepMaxMm = d;
+        }
+      }
+      totalSampleSpreadMm += stepMaxMm;
+      sampleCount += 1;
+      if (stepMaxMm > maxDivSpreadMm) {
+        maxDivSpreadMm = stepMaxMm;
+        maxDivProgressPct = Math.round(frac * 100);
+        maxDivPoint = {
+          x: sampledPts.reduce((acc, p) => acc + p.x, 0) / sampledPts.length,
+          y: sampledPts.reduce((acc, p) => acc + p.y, 0) / sampledPts.length,
+        };
+      }
+    }
+  }
+  const avgPathSpreadMm = sampleCount > 0 ? totalSampleSpreadMm / sampleCount : maxReleaseSpreadMm;
+  const pathOverlapPct = Math.max(55, Math.min(99, Math.round(100 - avgPathSpreadMm * 0.62)));
+
+  // 4. Durchzugs-Tempo & Geschwindigkeits-Vergleich
+  const speeds = darts.map((d) => d.releaseSpeedKmh);
+  const durations = darts.map((d) => d.accelerationDurationMs);
+  const speedSpreadKmh = Math.round((Math.max(...speeds) - Math.min(...speeds)) * 10) / 10;
+  const durationSpreadMs = Math.round(Math.max(...durations) - Math.min(...durations));
+
+  let fastestDartId = 1;
+  let slowestDartId = 1;
+  for (const d of darts) {
+    if (d.releaseSpeedKmh > darts[fastestDartId - 1].releaseSpeedKmh) fastestDartId = d.id;
+    if (d.releaseSpeedKmh < darts[slowestDartId - 1].releaseSpeedKmh) slowestDartId = d.id;
+  }
+
+  // 5. Welcher Dart weicht am stärksten von den anderen beiden ab (Peer-Distanz)?
+  const meanDrawbackAngle = darts.reduce((s, d) => s + d.drawbackAngleDeg, 0) / 3;
+  const meanReleaseAngle = darts.reduce((s, d) => s + d.releaseAngleDeg, 0) / 3;
+  const meanSpeed = speeds.reduce((s, v) => s + v, 0) / 3;
+  const meanDur = durations.reduce((s, v) => s + v, 0) / 3;
+  const meanElbowDrop = darts.reduce((s, d) => s + d.elbowDropMm, 0) / 3;
+
+  darts.forEach((d) => {
+    const relDistToCenter = distMm(d.releasePoint, releaseCentroid);
+    const dbDistToCenter = distMm(d.drawbackPoint, drawbackCentroid);
+    const score =
+      relDistToCenter * 1.3 +
+      dbDistToCenter * 0.9 +
+      Math.abs(d.releaseAngleDeg - meanReleaseAngle) * 1.8 +
+      Math.abs(d.drawbackAngleDeg - meanDrawbackAngle) * 1.4 +
+      Math.abs(d.releaseSpeedKmh - meanSpeed) * 6.5 +
+      Math.abs(d.accelerationDurationMs - meanDur) * 0.35 +
+      Math.abs(d.elbowDropMm - meanElbowDrop) * 0.8;
+    d.deviationScoreFromPeerMean = Math.round(score * 10) / 10;
+  });
+
+  // Bestimme das harmonischste Stamm-Paar und ob es einen klaren Ausreißer gibt
+  const pairScores = [
+    { label: 'Dart 1 & Dart 2', outlierId: 3, dist: rel_12 + db_12 * 0.7 + Math.abs(darts[0].releaseSpeedKmh - darts[1].releaseSpeedKmh) * 5 },
+    { label: 'Dart 1 & Dart 3', outlierId: 2, dist: rel_13 + db_13 * 0.7 + Math.abs(darts[0].releaseSpeedKmh - darts[2].releaseSpeedKmh) * 5 },
+    { label: 'Dart 2 & Dart 3', outlierId: 1, dist: rel_23 + db_23 * 0.7 + Math.abs(darts[1].releaseSpeedKmh - darts[2].releaseSpeedKmh) * 5 },
+  ].sort((a, b) => a.dist - b.dist);
+
+  const bestPair = pairScores[0];
+  const candidateOutlier = darts[bestPair.outlierId - 1];
+  const peerA = darts.find((d) => d.id !== candidateOutlier.id)!;
+  const peerB = darts.find((d) => d.id !== candidateOutlier.id && d.id !== peerA.id)!;
+
+  const isSignificantOutlier =
+    maxReleaseSpreadMm > 14 ||
+    maxDrawbackSpreadMm > 16 ||
+    speedSpreadKmh > 1.2 ||
+    durationSpreadMs > 18 ||
+    Math.abs(candidateOutlier.releaseAngleDeg - (peerA.releaseAngleDeg + peerB.releaseAngleDeg) / 2) >= 4.5;
+
+  const outlierDartId: number | null = isSignificantOutlier ? candidateOutlier.id : null;
+
+  // Gesamt-Wiederholgenauigkeit (100% normfrei – zählt nur, wie ähnlich sich D1, D2 und D3 sind!)
+  const rawRepeatability =
+    100 -
+    Math.min(22, maxReleaseSpreadMm * 0.55) -
+    Math.min(16, maxDrawbackSpreadMm * 0.42) -
+    Math.min(18, speedSpreadKmh * 5.2) -
+    Math.min(14, durationSpreadMs * 0.25) -
+    Math.min(14, (100 - pathOverlapPct) * 0.45);
+  const repeatabilityScorePct = Math.max(52, Math.min(99, Math.round(rawRepeatability)));
+
+  // Spezifischen Grund für den Ausreißer-Dart formulieren
+  let outlierReason = 'Alle 3 Darts liegen in Ausholpunkt, Loslass-Fenster und Tempo extrem eng zusammen.';
+  if (outlierDartId !== null) {
+    const out = darts[outlierDartId - 1];
+    const peerReleaseAngle = (peerA.releaseAngleDeg + peerB.releaseAngleDeg) / 2;
+    const peerDrawbackAngle = (peerA.drawbackAngleDeg + peerB.drawbackAngleDeg) / 2;
+    const peerSpeed = (peerA.releaseSpeedKmh + peerB.releaseSpeedKmh) / 2;
+    const reasons: string[] = [];
+
+    if (Math.abs(out.drawbackAngleDeg - peerDrawbackAngle) >= 3.5 || maxDrawbackSpreadMm >= 15) {
+      const diffDeg = Math.round(Math.abs(out.drawbackAngleDeg - peerDrawbackAngle) * 10) / 10;
+      reasons.push(
+        out.drawbackAngleDeg > peerDrawbackAngle
+          ? `du holst ${diffDeg}° weniger weit zum Gesicht aus (${maxDrawbackSpreadMm} mm Versatz)`
+          : `du ziehst den Arm ${diffDeg}° enger ans Gesicht zurück`
+      );
+    }
+    if (Math.abs(out.releaseAngleDeg - peerReleaseAngle) >= 3.0 || maxReleaseSpreadMm >= 14) {
+      const diffRel = Math.round((out.releaseAngleDeg - peerReleaseAngle) * 10) / 10;
+      reasons.push(
+        diffRel > 0
+          ? `du lässt den Dart +${diffRel}° später (${maxReleaseSpreadMm} mm versetzt) los`
+          : `du lässt den Dart ${Math.abs(diffRel)}° früher im Schwung los`
+      );
+    }
+    if (Math.abs(out.releaseSpeedKmh - peerSpeed) >= 0.9 || durationSpreadMs >= 16) {
+      const diffSpd = Math.round((out.releaseSpeedKmh - peerSpeed) * 10) / 10;
+      reasons.push(
+        diffSpd > 0
+          ? `du ziehst den Arm um +${diffSpd} km/h schneller (${out.accelerationDurationMs} ms) durch`
+          : `dein Durchzug ist um ${Math.abs(diffSpd)} km/h langsamer (${out.accelerationDurationMs} ms)`
+      );
+    }
+    if (reasons.length === 0) {
+      reasons.push(`leichte Abweichung von ${maxReleaseSpreadMm} mm am Loslass-Punkt`);
+    }
+    outlierReason = `Bei ${out.label} weichst du von ${bestPair.label} ab: ${reasons.join(' und ')}.`;
+  }
+
+  // ============================================================================
+  // 5 GEFÜHRTE DURCHKLICK-SCHRITTE ERZEUGEN
+  // ============================================================================
+  const drawbackAngleSpread =
+    Math.round(
+      (Math.max(...darts.map((d) => d.drawbackAngleDeg)) -
+        Math.min(...darts.map((d) => d.drawbackAngleDeg))) *
+        10
+    ) / 10;
+
+  const step1Status: GuidedStepFeedback['status'] =
+    maxDrawbackSpreadMm <= 12 && drawbackAngleSpread <= 3.5
+      ? 'KONSTANT'
+      : maxDrawbackSpreadMm <= 24 && drawbackAngleSpread <= 7.0
+      ? 'LEICHTE_VARIANZ'
+      : 'AUSREISSER';
+
+  const step1: GuidedStepFeedback = {
+    step: 1,
+    shortTitle: '1. Ausholen',
+    question: 'Holst du bei allen 3 Darts gleich weit zum Gesicht aus?',
+    headline: `Umkehrpunkt-Vergleich: Ø ${maxDrawbackSpreadMm} mm Abstand`,
+    status: step1Status,
+    primaryMetricLabel: 'Umkehrpunkt-Spanne',
+    primaryMetricValue: `${maxDrawbackSpreadMm} mm (Δ ${drawbackAngleSpread}°)`,
+    feedbackText:
+      step1Status === 'KONSTANT'
+        ? `Stark: Dein Umkehrpunkt am Gesicht ist bei allen 3 Darts fast deckungsgleich (max. ${maxDrawbackSpreadMm} mm Abstand, nur ${drawbackAngleSpread}° Winkel-Unterschied). Du startest jeden Wurf aus derselben Position.`
+        : `${bestPair.label} holst du sehr ähnlich aus (${Math.min(db_12, db_23, db_13)} mm Abstand). Bei Dart ${bestPair.outlierId} liegt dein Umkehrpunkt jedoch ${maxDrawbackSpreadMm} mm versetzt (${darts[bestPair.outlierId - 1].drawbackAngleDeg}° statt Ø ${Math.round(((peerA.drawbackAngleDeg + peerB.drawbackAngleDeg) / 2) * 10) / 10}°).`,
+    perDartValues: darts.map((d) => ({
+      dartId: d.id,
+      label: d.label,
+      primaryValue: `${d.drawbackAngleDeg}° Winkel`,
+      secondaryValue: `Abw. ${distMm(d.drawbackPoint, drawbackCentroid)} mm`,
+      isOutlier: outlierDartId === d.id && step1Status !== 'KONSTANT',
+    })),
+  };
+
+  const elbowDrops = darts.map((d) => d.elbowDropMm);
+  const elbowSpreadMm =
+    Math.round((Math.max(...elbowDrops) - Math.min(...elbowDrops)) * 10) / 10;
+  const step2Status: GuidedStepFeedback['status'] =
+    pathOverlapPct >= 90 && elbowSpreadMm <= 6.5
+      ? 'KONSTANT'
+      : pathOverlapPct >= 80 && elbowSpreadMm <= 13.0
+      ? 'LEICHTE_VARIANZ'
+      : 'AUSREISSER';
+
+  const step2: GuidedStepFeedback = {
+    step: 2,
+    shortTitle: '2. Wurfbahn',
+    question: 'Machst du drei unterschiedliche Armbewegungen?',
+    headline: `Bahn-Deckung: ${pathOverlapPct}% Übereinstimmung`,
+    status: step2Status,
+    primaryMetricLabel: 'Max. Bahn-Abweichung',
+    primaryMetricValue: `${maxDivSpreadMm} mm (Ellenbogen-Δ ${elbowSpreadMm} mm)`,
+    feedbackText:
+      step2Status === 'KONSTANT'
+        ? `Deine 3 Wurfbahnen ab Hüfthöhe laufen wie auf Schienen (${pathOverlapPct}% Deckung). Auch deine Ellenbogen-Höhe bleibt zwischen Dart 1, 2 und 3 innerhalb von ${elbowSpreadMm} mm stabil.`
+        : `Deine Bahnen decken sich zu ${pathOverlapPct}%. Die größte Abweichung zwischen den 3 Bewegungen (${maxDivSpreadMm} mm) tritt bei ${maxDivProgressPct}% des Weges auf – dort variiert die Ellenbogen-Höhe um ${elbowSpreadMm} mm.`,
+    perDartValues: darts.map((d) => ({
+      dartId: d.id,
+      label: d.label,
+      primaryValue: `Ellenbogen ${d.elbowDropMm > 0 ? '+' : ''}${d.elbowDropMm} mm`,
+      secondaryValue: `Start ➔ Release`,
+      isOutlier: outlierDartId === d.id && step2Status !== 'KONSTANT',
+    })),
+  };
+
+  const releaseAngleSpread =
+    Math.round(
+      (Math.max(...darts.map((d) => d.releaseAngleDeg)) -
+        Math.min(...darts.map((d) => d.releaseAngleDeg))) *
+        10
+    ) / 10;
+  const step3Status: GuidedStepFeedback['status'] =
+    maxReleaseSpreadMm <= 13 && releaseAngleSpread <= 3.5
+      ? 'KONSTANT'
+      : maxReleaseSpreadMm <= 25 && releaseAngleSpread <= 6.5
+      ? 'LEICHTE_VARIANZ'
+      : 'AUSREISSER';
+
+  const step3: GuidedStepFeedback = {
+    step: 3,
+    shortTitle: '3. Loslass-Punkt',
+    question: 'Lässt du den Dart an unterschiedlichen Stellen im Raum los?',
+    headline: `Release-Fenster: D1↔D2 ${rel_12} mm · D2↔D3 ${rel_23} mm · D1↔D3 ${rel_13} mm`,
+    status: step3Status,
+    primaryMetricLabel: 'Loslass-Streuung (Max)',
+    primaryMetricValue: `${maxReleaseSpreadMm} mm (Δ ${releaseAngleSpread}°)`,
+    feedbackText:
+      step3Status === 'KONSTANT'
+        ? `Exzellentes Release-Timing: Du lässt alle 3 Darts innerhalb eines Fensters von nur ${maxReleaseSpreadMm} mm und ${releaseAngleSpread}° Ellenbogenwinkel-Spanne los.`
+        : `${bestPair.label} lässt du fast am selben Punkt los (${Math.min(rel_12, rel_23, rel_13)} mm Abstand). Bei Dart ${bestPair.outlierId} verschiebt sich dein Loslass-Punkt um ${maxReleaseSpreadMm} mm (Armwinkel ${darts[bestPair.outlierId - 1].releaseAngleDeg}° statt Ø ${Math.round(((peerA.releaseAngleDeg + peerB.releaseAngleDeg) / 2) * 10) / 10}°).`,
+    perDartValues: darts.map((d) => ({
+      dartId: d.id,
+      label: d.label,
+      primaryValue: `Loslassen @ ${d.releaseAngleDeg}°`,
+      secondaryValue: `Abflug +${d.launchAngleDeg}° · Δ ${distMm(d.releasePoint, releaseCentroid)} mm`,
+      isOutlier: outlierDartId === d.id && step3Status !== 'KONSTANT',
+    })),
+  };
+
+  const step4Status: GuidedStepFeedback['status'] =
+    speedSpreadKmh <= 0.9 && durationSpreadMs <= 14
+      ? 'KONSTANT'
+      : speedSpreadKmh <= 1.8 && durationSpreadMs <= 28
+      ? 'LEICHTE_VARIANZ'
+      : 'AUSREISSER';
+
+  const step4: GuidedStepFeedback = {
+    step: 4,
+    shortTitle: '4. Durchzug & Tempo',
+    question: 'Ziehst du den Arm bei den 3 Darts unterschiedlich schnell durch?',
+    headline: `Tempo-Spanne: Δ ${speedSpreadKmh} km/h · Durchzugszeit Δ ${durationSpreadMs} ms`,
+    status: step4Status,
+    primaryMetricLabel: 'Tempo- & Timing-Spanne',
+    primaryMetricValue: `Δ ${speedSpreadKmh} km/h | Δ ${durationSpreadMs} ms`,
+    feedbackText:
+      step4Status === 'KONSTANT'
+        ? `Wie ein Uhrwerk: Deine Beschleunigungszeit vom Umkehrpunkt bis zum Abwurf variiert nur um ${durationSpreadMs} ms und dein Arm-Tempo nur um ${speedSpreadKmh} km/h.`
+        : `Unterschiedlicher Durchzug: Dart ${fastestDartId} ziehst du mit ${darts[fastestDartId - 1].releaseSpeedKmh} km/h (${darts[fastestDartId - 1].accelerationDurationMs} ms) am schnellsten durch, während Dart ${slowestDartId} bei ${darts[slowestDartId - 1].releaseSpeedKmh} km/h (${darts[slowestDartId - 1].accelerationDurationMs} ms) liegt.`,
+    perDartValues: darts.map((d) => ({
+      dartId: d.id,
+      label: d.label,
+      primaryValue: `${d.releaseSpeedKmh} km/h`,
+      secondaryValue: `Durchzug: ${d.accelerationDurationMs} ms`,
+      isOutlier: outlierDartId === d.id && step4Status !== 'KONSTANT',
+    })),
+  };
+
+  const step5Status: GuidedStepFeedback['status'] =
+    repeatabilityScorePct >= 90
+      ? 'KONSTANT'
+      : repeatabilityScorePct >= 80
+      ? 'LEICHTE_VARIANZ'
+      : 'AUSREISSER';
+
+  const step5: GuidedStepFeedback = {
+    step: 5,
+    shortTitle: '5. Gesamt-Fazit',
+    question: 'Wie reproduzierbar sind deine 3 Würfe untereinander?',
+    headline:
+      outlierDartId === null
+        ? `Top-Wiederholgenauigkeit (${repeatabilityScorePct}%) – Kein Ausreißer!`
+        : `${bestPair.label} sind dein Stamm-Paar · Dart ${outlierDartId} weicht ab`,
+    status: step5Status,
+    primaryMetricLabel: '3-Dart Wiederholgenauigkeit',
+    primaryMetricValue: `${repeatabilityScorePct}% Selbst-Konstanz`,
+    feedbackText: outlierReason,
+    perDartValues: darts.map((d) => ({
+      dartId: d.id,
+      label: d.label,
+      primaryValue:
+        outlierDartId === d.id
+          ? '⚠️ Ausreißer-Wurf'
+          : '✓ Referenz-Wurf',
+      secondaryValue: `${d.releaseSpeedKmh} km/h · Release ${d.releaseAngleDeg}°`,
+      isOutlier: outlierDartId === d.id,
+    })),
+  };
+
+  return {
+    darts,
+    repeatabilityScorePct,
+    referencePairLabel: bestPair.label,
+    outlierDartId,
+    outlierReason,
+    pairwiseReleaseMm: {
+      d1_d2: rel_12,
+      d2_d3: rel_23,
+      d1_d3: rel_13,
+      maxSpreadMm: maxReleaseSpreadMm,
+      centroid: releaseCentroid,
+    },
+    pairwiseDrawbackMm: {
+      d1_d2: db_12,
+      d2_d3: db_23,
+      d1_d3: db_13,
+      maxSpreadMm: maxDrawbackSpreadMm,
+      centroid: drawbackCentroid,
+    },
+    maxPathDivergence: {
+      point: maxDivPoint,
+      spreadMm: maxDivSpreadMm,
+      progressPct: maxDivProgressPct,
+      pathOverlapPct,
+    },
+    tempoComparison: {
+      speedSpreadKmh,
+      durationSpreadMs,
+      fastestDartId,
+      slowestDartId,
+    },
+    steps: {
+      1: step1,
+      2: step2,
+      3: step3,
+      4: step4,
+      5: step5,
+    },
+  };
+}
+
 

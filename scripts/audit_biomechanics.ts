@@ -39,6 +39,7 @@ import {
   updateLiveThrowCounter,
   segmentMultiVisitLegStreams,
   parseBiomechanicsSessionTimestamp,
+  evaluateThreeDartSelfComparison,
   PoseKeypoints,
   ScannedFrame,
   ThrowTrajectory,
@@ -576,6 +577,59 @@ const missingComponents = [
     check: 'Audio- & Voice-Coach Mute-Schutz (Live-HUD Steuerung)',
     status: audioMuted ? 'PASS' : 'FAIL',
     note: 'Stummschaltung im Live-HUD garantiert lautloses Training am Oche',
+  });
+}
+
+// 19. Test 5-Schritt Durchklick-Analyse (3-Dart Selbstvergleich ohne Lehrbuch-Normzwang)
+{
+  const makeMockTrajectory = (
+    id: number,
+    drawbackX: number,
+    drawbackY: number,
+    releaseX: number,
+    releaseY: number,
+    speedKmh: number,
+    accelMs: number
+  ): ThrowTrajectory => ({
+    id,
+    points: [
+      { x: 0.42, y: 0.55, timeSec: id * 2.0 },
+      { x: drawbackX, y: drawbackY, timeSec: id * 2.0 + 0.2 },
+      { x: (drawbackX + releaseX) / 2, y: (drawbackY + releaseY) / 2, timeSec: id * 2.0 + 0.28 },
+      { x: releaseX, y: releaseY, timeSec: id * 2.0 + 0.2 + accelMs / 1000 },
+      { x: releaseX + 0.06, y: releaseY + 0.02, timeSec: id * 2.0 + 0.5 },
+    ],
+    releaseSpeedKmh: speedKmh,
+    launchAngleDeg: 14.0,
+    elbowDropMm: -3.0,
+    drawbackPoint: { x: drawbackX, y: drawbackY },
+    releasePoint: { x: releaseX, y: releaseY },
+    drawbackTimeSec: id * 2.0 + 0.2,
+    releaseTimeSec: id * 2.0 + 0.2 + accelMs / 1000,
+    drawbackElbowAngleDeg: 54.0,
+    releaseElbowAngleDeg: 102.0,
+    followThroughElbowAngleDeg: 162.0,
+    accelerationDurationMs: accelMs,
+  });
+
+  // Dart 1 & Dart 2 nahezu identisch ("Stamm-Paar"), Dart 3 deutlicher Ausreißer beim Loslassen & Tempo
+  const d1 = makeMockTrajectory(1, 0.36, 0.30, 0.52, 0.28, 21.4, 145);
+  const d2 = makeMockTrajectory(2, 0.362, 0.301, 0.522, 0.281, 21.2, 148);
+  const d3 = makeMockTrajectory(3, 0.39, 0.33, 0.57, 0.32, 24.5, 205);
+
+  const selfComp = evaluateThreeDartSelfComparison([d1, d2, d3], { width: 464, height: 832 }, 1.5);
+  const stepCount = Object.keys(selfComp.steps).length;
+
+  const passed =
+    stepCount === 5 &&
+    selfComp.outlierDartId === 3 &&
+    selfComp.referencePairLabel === 'Dart 1 & Dart 2' &&
+    selfComp.pairwiseReleaseMm.d1_d2 < selfComp.pairwiseReleaseMm.d1_d3;
+
+  auditResults.push({
+    check: '5-Schritt Durchklick-Analyse (3-Dart Selbstvergleich ohne Normzwang)',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Steps=${stepCount} | Stamm-Paar=${selfComp.referencePairLabel} | Ausreißer=Dart ${selfComp.outlierDartId} | D1↔D2=${selfComp.pairwiseReleaseMm.d1_d2.toFixed(1)}mm vs. D1↔D3=${selfComp.pairwiseReleaseMm.d1_d3.toFixed(1)}mm`,
   });
 }
 
