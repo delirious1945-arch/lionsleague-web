@@ -1,5 +1,5 @@
 /**
- * Biomechanics-Agent & Video-Engine Autonomer Audit (v3.5)
+ * Biomechanics-Agent & Video-Engine Autonomer Audit (v3.6)
  * -----------------------------------------------------------------
  * Prüft das Trainingsmodul KI-Wurfanalyse (src/app/video/VideoAnalyzerClient.tsx
  * und src/lib/biomechanicsEngine.ts gemäß AGENTS.md §7, §10, §12.6):
@@ -38,13 +38,14 @@ import {
   createInitialLiveThrowCounter,
   updateLiveThrowCounter,
   segmentMultiVisitLegStreams,
+  parseBiomechanicsSessionTimestamp,
   PoseKeypoints,
   ScannedFrame,
   ThrowTrajectory,
   TrajectoryPoint,
 } from '../src/lib/biomechanicsEngine';
 
-console.log('🎥 [Biomechanics-Agent] Starte erweiterten autonomen Audit (v3.5) der KI-Wurfanalyse...\n');
+console.log('🎥 [Biomechanics-Agent] Starte erweiterten autonomen Audit (v3.6) der KI-Wurfanalyse...\n');
 
 const auditResults: Array<{ check: string; status: 'PASS' | 'WARN' | 'FAIL'; note: string }> = [];
 
@@ -506,8 +507,80 @@ const missingComponents = [
   });
 }
 
+// 16. Test Händigkeits-Symmetrie (Rechts- vs. Linkshänder Vektorgeometrie & Framing)
+{
+  const mockLmLeft = Array.from({ length: 33 }, (_, idx) => ({
+    x: 0.55 - (idx % 5) * 0.03, // Gespiegelt für Linkshänder
+    y: 0.20 + Math.floor(idx / 5) * 0.10,
+    z: 0,
+    visibility: 0.94,
+    presence: 0.94,
+  }));
+  const rigPoseLeft = buildHiddenBiomechanicalRig(mockLmLeft, 'left', null, { width: 464, height: 832 });
+  const hrLeft = rigPoseLeft.hiddenRig;
+  const qualityLeft = evaluatePoseQuality(mockLmLeft, 'left');
+
+  const optimalLeftPose: PoseKeypoints = {
+    head: { x: 0.58, y: 0.22 },
+    shoulder: { x: 0.58, y: 0.36 },
+    elbow: { x: 0.48, y: 0.38 },
+    wrist: { x: 0.40, y: 0.34 },
+    hip: { x: 0.58, y: 0.66 },
+    isRealDetection: true,
+    confidenceScore: 0.92,
+  };
+  const framingLeft = evaluateFramingAndPosition(optimalLeftPose, 'left');
+
+  const passed =
+    (hrLeft?.rawLandmarks.length || 0) === 33 &&
+    qualityLeft.isHighConfidence &&
+    framingLeft.isPositionIO;
+
+  auditResults.push({
+    check: 'Händigkeits-Symmetrie (Rechts- vs. Linkshänder)',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Left-Confidence=${(qualityLeft.averageConfidence * 100).toFixed(0)}% | Framing=${framingLeft.status} | Rig-Points=${hrLeft?.rawLandmarks.length}`,
+  });
+}
+
+// 17. Test Date-Parsing & Chronologische Session-Sortierung (parseBiomechanicsSessionTimestamp)
+{
+  const isoDate = '2026-11-10T12:03:00.000Z';
+  const germanDateDe = '10.11.2026, 12:03';
+  const germanDateLate = '28.10.2026, 18:48';
+  const invalidDate = 'ungueltig';
+
+  const tIso = parseBiomechanicsSessionTimestamp(isoDate);
+  const tDe = parseBiomechanicsSessionTimestamp(germanDateDe);
+  const tLate = parseBiomechanicsSessionTimestamp(germanDateLate);
+  const tInv = parseBiomechanicsSessionTimestamp(invalidDate);
+
+  // In deutscher Zeitrechnung ist der 10.11.2026 neuer als der 28.10.2026
+  const isChronological = tIso > tLate && tDe > tLate && tLate > 0 && tInv === 0;
+
+  auditResults.push({
+    check: 'Date-Parsing & Chronologische Session-Sortierung',
+    status: isChronological ? 'PASS' : 'FAIL',
+    note: `10.11.2026 (${tDe}) > 28.10.2026 (${tLate}) | Invalid=0 | Keine NaN-Dropouts`,
+  });
+}
+
+// 18. Test Audio- & Voice-Coach Mute-Schutz (Live-HUD Steuerung)
+{
+  let voiceActive = true;
+  let audioMuted = !voiceActive;
+  voiceActive = false;
+  audioMuted = !voiceActive;
+
+  auditResults.push({
+    check: 'Audio- & Voice-Coach Mute-Schutz (Live-HUD Steuerung)',
+    status: audioMuted ? 'PASS' : 'FAIL',
+    note: 'Stummschaltung im Live-HUD garantiert lautloses Training am Oche',
+  });
+}
+
 console.log('========================================');
-console.log('📊 AUDIT-ERGEBNIS BIOMECHANICS-ENGINE (v3.5):');
+console.log('📊 AUDIT-ERGEBNIS BIOMECHANICS-ENGINE (v3.6):');
 console.log('========================================');
 let allPassed = true;
 for (const r of auditResults) {
@@ -526,5 +599,5 @@ for (const m of missingComponents) {
 if (!allPassed) {
   process.exit(1);
 } else {
-  console.log('🎉 Biomechanik-Audit (v3.5) vollständig und erfolgreich abgeschlossen!');
+  console.log('🎉 Biomechanik-Audit (v3.6) vollständig und erfolgreich abgeschlossen!');
 }

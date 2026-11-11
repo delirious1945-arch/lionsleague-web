@@ -55,18 +55,16 @@ export default function WhatIfSimulatorWidget({
     : 18.0;
 
   const [setupDarts, setSetupDarts] = useState<number>(defaultSetup);
+  const [prevPlayerId, setPrevPlayerId] = useState<number | null>(selectedPlayerId);
   const [doubleRateNow, setDoubleRateNow] = useState<number>(20.0);
   const [doubleRateScenario, setDoubleRateScenario] = useState<number>(25.0);
   const [setupDelta, setSetupDelta] = useState<number>(-2.0);
 
-  // Wenn der Spieler wechselt, Setup-Darts auf dessen Schätzwert setzen
-  React.useEffect(() => {
-    if (setupEstimation.sufficient && setupEstimation.setup_darts_mean) {
-      setSetupDarts(setupEstimation.setup_darts_mean);
-    } else {
-      setSetupDarts(18.0);
-    }
-  }, [selectedPlayerId, setupEstimation]);
+  // Wenn der Spieler wechselt, Setup-Darts auf dessen Schätzwert zurücksetzen
+  if (selectedPlayerId !== prevPlayerId) {
+    setPrevPlayerId(selectedPlayerId);
+    setSetupDarts(defaultSetup);
+  }
 
   // Szenario-Berechnung
   const scenarioResult = useMemo(() => {
@@ -97,14 +95,8 @@ export default function WhatIfSimulatorWidget({
 
   // Zielplaner
   const baseAvg = scenarioResult.baseline?.average || 50.0;
-  const [targetAverage, setTargetAverage] = useState<number>(Math.round(baseAvg + 5));
-
-  // Zielplaner neu ausrichten, wenn Baseline stark abweicht
-  React.useEffect(() => {
-    if (scenarioResult.baseline?.average) {
-      setTargetAverage(Math.round(scenarioResult.baseline.average + 5));
-    }
-  }, [scenarioResult.baseline?.average]);
+  const [userTargetAverage, setUserTargetAverage] = useState<number | null>(null);
+  const targetAverage = userTargetAverage ?? Math.round(baseAvg + 5);
 
   const targetReqDouble = useMemo(() => {
     return requiredDoubleRate(targetAverage, setupDarts);
@@ -595,7 +587,7 @@ export default function WhatIfSimulatorWidget({
               max="110"
               step="0.5"
               value={targetAverage}
-              onChange={(e) => setTargetAverage(Number(e.target.value))}
+              onChange={(e) => setUserTargetAverage(Number(e.target.value))}
               className="w-16 bg-transparent text-emerald-400 font-black text-base focus:outline-none"
             />
           </div>

@@ -1,5 +1,5 @@
 // ============================================================================
-// LIONS WEYHAUSEN - MODULARE BIOMECHANIK & KINEMATIK ENGINE (v3.5 PRO ENGINE)
+// LIONS WEYHAUSEN - MODULARE BIOMECHANIK & KINEMATIK ENGINE (v3.6 PRO ENGINE)
 // ============================================================================
 // Architektur-Garantie:
 // Dieses Modul kapselt die gesamte mathematische, physikalische und
@@ -2024,3 +2024,51 @@ export function segmentMultiVisitLegStreams(
 
   return visits;
 }
+
+// ----------------------------------------------------------------------------
+// 10. ZEITSTEMPEL-PARSER FÜR CHRONOLOGISCHE SESSION-SORTIERUNG (DSGVO & BBDV)
+// ----------------------------------------------------------------------------
+/**
+ * Parst Zeitstempel flexibel aus ISO-Strings (z.B. "2026-11-10T12:03:00.000Z")
+ * oder lokalisierten deutschen Datumsstrings (z.B. "10.11.2026, 12:03" bzw. "28.10.2026").
+ * Verhindert, dass deutsche Datumsformate in JS-Engines als ungültig (NaN) bewertet
+ * werden oder Tag und Monat bei DD.MM.YYYY vertauscht werden.
+ */
+export function parseBiomechanicsSessionTimestamp(
+  dateInput: string | number | Date | null | undefined
+): number {
+  if (!dateInput) return 0;
+  if (typeof dateInput === 'number') return isNaN(dateInput) ? 0 : dateInput;
+  if (dateInput instanceof Date) return isNaN(dateInput.getTime()) ? 0 : dateInput.getTime();
+
+  const str = String(dateInput).trim();
+  if (!str) return 0;
+
+  // 1. ISO-String oder eindeutiges YYYY-MM-DD Format
+  const isoMatch = str.match(/^\d{4}-\d{2}-\d{2}/);
+  if (isoMatch) {
+    const t = new Date(str).getTime();
+    if (!isNaN(t)) return t;
+  }
+
+  // 2. Deutsches Format: DD.MM.YYYY[, HH:mm[:ss]]
+  const deMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (deMatch) {
+    const [, day, month, year, hours = '12', minutes = '00', seconds = '00'] = deMatch;
+    const d = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hours),
+      Number(minutes),
+      Number(seconds)
+    );
+    const t = d.getTime();
+    if (!isNaN(t)) return t;
+  }
+
+  // 3. Fallback: Standard Date Parser
+  const fallback = new Date(str).getTime();
+  return isNaN(fallback) ? 0 : fallback;
+}
+

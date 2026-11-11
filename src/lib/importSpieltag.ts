@@ -1,6 +1,7 @@
 import { sql } from './db';
 import fs from 'fs';
 import path from 'path';
+import type { AuditReport } from './auditEngine';
 
 export const DEFAULT_SPIELTAGE_DIR =
   'C:\\Users\\sebas\\Documents\\Lions Weyhausen\\02_Liga\\Dart_Match_Image_Analyzer\\output\\spieltage';
@@ -35,6 +36,7 @@ export interface ImportResult {
   opponent: string;
   team: string;
   message: string;
+  auditReport?: AuditReport;
   error?: string;
 }
 
@@ -566,7 +568,7 @@ export async function processSpieltagImport(
     matchdayDate = parseIsoDate(matchesRows[0].start_datetime, slug);
   }
 
-  let rawTeam = spieltagInfo?.team || '';
+  const rawTeam = spieltagInfo?.team || '';
   let team = 'A-Team';
   if (
     rawTeam.includes('B') ||
@@ -1248,6 +1250,9 @@ export async function processSpieltagImport(
 
   const updatedCount = Math.min(countMatches, existingBeforeCount);
   const createdCount = Math.max(0, countMatches - updatedCount);
+  const auditNote = auditReport?.issuesFixed
+    ? ` (${auditReport.issuesFixed} Integritäts-Korrekturen angewendet)`
+    : '';
 
   return {
     success: true,
@@ -1261,6 +1266,7 @@ export async function processSpieltagImport(
     matchdayDate,
     opponent,
     team,
-    message: `🎉 Spieltag erfolgreich importiert! ${countMatches} Matches (${createdCount} neu, ${updatedCount} aktualisiert), ${countLegs} Legs und ${countVisits} Aufnahmen wurden in Supabase gespeichert.`,
+    auditReport: auditReport ?? undefined,
+    message: `🎉 Spieltag erfolgreich importiert! ${countMatches} Matches (${createdCount} neu, ${updatedCount} aktualisiert), ${countLegs} Legs und ${countVisits} Aufnahmen wurden in Supabase gespeichert.${auditNote}`,
   };
 }

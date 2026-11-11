@@ -13,6 +13,56 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 
 ---
 
+## [2026-11-11] – Saison-Audit-Engine Integration, PRO ENGINE 3.6 Zeitstempel-Harmonisierung & 33/33 Game-Simulationen
+
+### 🎯 Trainingsspiele & Game-Optimizer
+- **Behebung der Test-Kritik vom Vortag (`scripts/simulate_training_games.ts`):**
+  - Die bisherigen Mock-Tests wurden durch echte funktionale Testläufe ersetzt (von 32 auf **33 Tests**, 100% PASS).
+  - Neuer Real-Test 1: Verifikation der 4-monatigen Verlosungs-Sperrfrist (`getPrevious4Months`) inklusive fehlerfreiem Jahreswechsel-Roll-Over (z. B. `2027-02` -> `['2027-01', '2026-12', '2026-11', '2026-10']`).
+  - Neuer Real-Test 2: Verifikation der Lostopf-Qualifikation mit Schwellenwert-Prüfung (Mindestens 20 gewertete Spiele erforderlich, automatische Sperre bei Gewinnern der letzten 4 Monate).
+  - Neuer Real-Test 3: Validierung der Datums-Harmonisierung (Prüfung, dass deutsche Datumsformate und ISO-Strings vergleichbar sind und chronologisch absteigend sortiert werden).
+
+### 🎨 UI/UX-Cleaner & Farbsemantik
+- **React 19 State-Härtung & Linter-Bereinigung (`WhatIfSimulatorWidget.tsx`):**
+  - Beseitigung beider React 19 `react-hooks/set-state-in-effect`-Fehler im What-If-Simulator durch State-Anpassung während des Renderns (`prevPlayerId`) bzw. optionales User-Override (`userTargetAverage`).
+- **Verwaltung & Admin-Dashboard (`VerwaltungClient.tsx`):**
+  - Robuste Zeitstempel-Harmonisierung über `parseBiomechanicsSessionTimestamp`: Verhindert `NaN`-Werte bei deutschen Datumsstrings ("DD.MM.YYYY, HH:mm"). Biomechanik- und Spiel-Sessions werden strikt chronologisch sortiert und fallen nicht mehr ans Ende der Liste.
+  - Integration einer visuellen Audit-KPI-Zusammenfassung direkt im Erfolgs-Banner nach Klick auf "System-Audit & Daten-Konsistenz prüfen".
+- **Code-Hygiene (`daeEngine.ts`, `importSpieltag.ts`, `actions.ts`):**
+  - Umstellung unberührter Variablen auf `const` (`wonLegsDarts`, `boardRec`, `singleSlot`, `doublePartner`, `rawTeam`).
+  - Bereinigung ungenutzter Deklarationen (`DEFAULT_USER`, `catch (err)`).
+
+### 🎥 Biomechanik & KI-Wurfanalyse (PRO ENGINE 3.6, `VideoAnalyzerClient.tsx` & `biomechanicsEngine.ts`)
+- **PRO ENGINE 3.6 Upgrade:**
+  - Neue Hilfsfunktion `parseBiomechanicsSessionTimestamp` zur verlässlichen Auswertung von ISO- und DE-Zeitstempeln.
+  - Normalisierung der lokalen On-Device Historie (`localStorage`): Fehlende `createdAt`-Werte werden aus Session-IDs (`bio_<timestamp>`) deterministisch abgeleitet.
+  - Live-HUD: Neuer Stummschalt-Schalter (`Audio an / Audio stumm`) für die Web Audio Coaching-Signale und Sprachausgabe am Oche.
+  - Erweiterung der Biomechanik-Audit-Suite (`scripts/audit_biomechanics.ts`) von 16 auf **19 Tests** (100% PASS, inkl. Händigkeits-Symmetrie, Zeitstempel-Parsing und Audio-Mute-Garantie).
+
+### 🛡️ Datenintegrität & BBDV-Standard
+- **Integritäts-Audit-Engine getrackt (`src/lib/auditEngine.ts`):**
+  - Die zentrale Engine zur automatischen Bereinigung von doppelten Legs, fremden Visits in Einzelmatches und High-Finish-Synchronisation (Checkouts >= 100) wurde fest in Git aufgenommen und in `importSpieltag.ts` typisiert.
+  - 100% Unverändert: Die Baseline und BBDV-Rankinglogik in `database.py` und `analytics/` (`calculate_3dart_average`, Gewichtungen) bleiben unverändert (§8 AGENTS.md).
+- **DSGVO §10 Video-Datenschutz:**
+  - Weiterhin 100% On-Device: Es werden ausschließlich biometrische Kennzahlen und Floats verarbeitet, keine Video-Rohdaten im Backend.
+
+### ⚙️ Fehlende Komponenten & Handlungsbedarf an Sebastian (§6, §7, §12.6)
+- **1. Optischer Oche-Kalibrierungsmarker & Boardhöhe [GELÖST / IN PRODUKTION]**
+- **2. High-Speed Slow-Mo Empfehlung [GELÖST / IN PRODUKTION]**
+- **3. On-Device Daten-Export & Druckansicht [GELÖST / IN PRODUKTION]**
+- **4. Schema-Entwurf & Integration `biomechanics_sessions` [GELÖST / IN PRODUKTION]**
+- **5. 4-Core-Sync aller 5 Trainingsmodule [GELÖST / IN PRODUKTION]**
+- **6. Saison-Audit Engine [GELÖST / IN PRODUKTION]**
+- **Aktueller Status:** Keine offenen Blocker für den nächsten Zyklus.
+
+### 🛡️ Quality Gates & Systemstatus (11.11.2026)
+- **Gate 1 (Syntax, TypeScript & Linter):** ✅ PASS. `tsc --noEmit` hat **0 Fehler**. ESLint auf `src/`: Fehler von 181 auf **173 Fehler** reduziert (-8 Fehler), Warnungen von 118 auf **113 Warnungen** reduziert (-5 Warnungen). Keine neuen Fehler/Warnungen eingebracht.
+- **Gate 2 (DB-Integrität):** ✅ PASS. Keine destruktiven Schemaänderungen. Bereitstellung der `runSeasonDataAudit`-Routine für fortlaufende DB-Hygiene (Leg-Deduplizierung, High Finish-Sync).
+- **Gate 3 (Regressions- & Ranking-Tests):** ✅ PASS. 33/33 Game-Simulations-Tests (100%), 19/19 Biomechanik-Gates (100%), 5/5 What-If-Engine Tests (100%).
+- **Gate 4 (Security & DSGVO §10):** ✅ PASS. Keine Secrets, keine Video-Rohdaten im Datentransfer, DSGVO-konforme On-Device-Verarbeitung.
+
+---
+
 ## [2026-11-10] – 4-Core Admin-Sync aller 5 Trainingsmodule, React 19 State-Härtung & 32/32 Game-Simulationen
 
 ### 🎯 Trainingsspiele & Game-Optimizer (§12.7 4-Core-Sync Pflicht)

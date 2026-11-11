@@ -83,6 +83,7 @@ interface VideoAnalyzerClientProps {
 export interface SavedBiomechanicsSession {
   id: string;
   dateStr: string;
+  createdAt?: string;
   playerName: string;
   consistencyScore: number;
   releaseSpeedKmh: number;
@@ -240,7 +241,19 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       try {
         const raw = localStorage.getItem(`lions_biomechanics_${user.name}`);
         if (raw && isMounted) {
-          setSavedSessions(JSON.parse(raw));
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const normalized = parsed.map((s: SavedBiomechanicsSession) => {
+              if (!s.createdAt && s.id && s.id.startsWith('bio_')) {
+                const ts = Number(s.id.slice(4));
+                if (!isNaN(ts) && ts > 0) {
+                  return { ...s, createdAt: new Date(ts).toISOString() };
+                }
+              }
+              return s;
+            });
+            setSavedSessions(normalized);
+          }
         }
       } catch {}
     }, 0);
@@ -275,7 +288,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
   // Akustische Signaltöne über Web Audio API (aus 3 Metern am Oche klar hörbar)
   const playCoachTone = useCallback(
     (type: 'position_io' | 'countdown_tick' | 'countdown_go' | 'dart_detected' | 'finish') => {
-      if (typeof window === 'undefined') return;
+      if (typeof window === 'undefined' || !voiceControlEnabled) return;
       try {
         const AudioCtx =
           window.AudioContext ||
@@ -323,7 +336,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         }
       } catch {}
     },
-    []
+    [voiceControlEnabled]
   );
 
   // Deutsche Sprachausgabe (Text-to-Speech) für freihändiges Coaching am Oche
@@ -2123,6 +2136,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         hour: '2-digit',
         minute: '2-digit',
       }),
+      createdAt: new Date().toISOString(),
       playerName: user.name,
       consistencyScore: activeMetrics.consistencyScore,
       releaseSpeedKmh: activeMetrics.speedKmh,
@@ -2306,7 +2320,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <span>KI-Wurfstilanalyse</span>
               </h1>
               <span className="text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
-                PRO ENGINE 3.5
+                PRO ENGINE 3.6
               </span>
             </div>
           </div>
@@ -2830,6 +2844,20 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                             {captureSessionMode === 'single_visit_3_darts'
                               ? '🎯 Auto-Stopp: 3 Darts'
                               : '🏁 Ganzes Leg (Multi-Visit)'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setVoiceControlEnabled((v) => !v)}
+                            className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-black border cursor-pointer transition-colors flex items-center gap-1.5 ${
+                              voiceControlEnabled
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-400/40 hover:bg-purple-500/30'
+                                : 'bg-slate-800 text-slate-400 border-white/10 hover:bg-slate-700'
+                            }`}
+                            title="Sprach-Coach und Töne an/aus"
+                          >
+                            <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                            <span>{voiceControlEnabled ? 'Audio an' : 'Audio stumm'}</span>
                           </button>
 
                           <button

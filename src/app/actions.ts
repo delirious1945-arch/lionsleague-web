@@ -11,13 +11,6 @@ export interface UserSession {
   team: string;
 }
 
-const DEFAULT_USER: UserSession = {
-  id: 3,
-  name: 'Sebastian Kirste',
-  role: 'admin',
-  team: 'A-Team',
-};
-
 export async function getSessionAction(): Promise<UserSession | null> {
   try {
     const cookieStore = await cookies();
@@ -25,7 +18,7 @@ export async function getSessionAction(): Promise<UserSession | null> {
     if (sessionCookie?.value) {
       return JSON.parse(sessionCookie.value) as UserSession;
     }
-  } catch (err) {}
+  } catch {}
   return null;
 }
 

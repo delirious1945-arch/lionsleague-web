@@ -10,6 +10,7 @@ import {
   updatePlayerRoleAction,
   runSeasonAuditAction,
 } from '../actions';
+import type { AuditReport } from '@/lib/auditEngine';
 import { MatchRow, Player } from '@/lib/data';
 import {
   ChevronDown,
@@ -22,6 +23,49 @@ import {
 import { getPdcBadge, PART2_TARGETS } from '@/app/training/pdc-challenge/types';
 import AdminTrainingOverview from '@/components/AdminTrainingOverview';
 import { AdminTrainingOverviewData } from '@/lib/trainingLottery';
+import { parseBiomechanicsSessionTimestamp } from '@/lib/biomechanicsEngine';
+
+/**
+ * Robustes Parsing beliebiger Trainings-Zeitstempel (ISO-String, SQL Datetime oder deutsches Format "DD.MM.YYYY, HH:mm").
+ * Verhindert NaN und fehlerhafte Chronologie im Admin-Dashboard.
+ */
+function parseTrainingDate(created_at?: string, training_date?: string): number {
+  if (created_at) {
+    const t = parseBiomechanicsSessionTimestamp(created_at);
+    if (t > 0) return t;
+  }
+  if (training_date) {
+    const t = parseBiomechanicsSessionTimestamp(training_date);
+    if (t > 0) return t;
+    const m = String(training_date).match(/^(\d{2})\.(\d{2})\.(\d{4})(?:,\s*(\d{2}):(\d{2}))?/);
+    if (m) {
+      const [, day, month, year, hour, minute] = m;
+      const parsed = new Date(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        Number(hour || 0),
+        Number(minute || 0)
+      ).getTime();
+      if (!isNaN(parsed)) return parsed;
+    }
+  }
+  return 0;
+}
+
+function formatTrainingDate(created_at?: string, training_date?: string): string {
+  const time = parseTrainingDate(created_at, training_date);
+  if (time > 0) {
+    return new Date(time).toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  return training_date || created_at || '-';
+}
 
 export default function VerwaltungClient({
   matches,
@@ -58,7 +102,7 @@ export default function VerwaltungClient({
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAuditing, setIsAuditing] = useState(false);
-  const [auditReport, setAuditReport] = useState<any>(null);
+  const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
 
   const handleRunAudit = () => {
     setIsAuditing(true);
@@ -316,7 +360,16 @@ export default function VerwaltungClient({
               : 'bg-rose-500/15 border-rose-500/40 text-rose-300'
           }`}
         >
-          {statusMessage.text}
+          <div>{statusMessage.text}</div>
+          {auditReport && (
+            <div className="mt-2 pt-2 border-t border-white/10 text-xs font-normal text-slate-300 flex flex-wrap gap-4">
+              <span>Geprüfte Matches: <strong>{auditReport.totalMatchesAudited}</strong></span>
+              <span>Geprüfte Legs: <strong>{auditReport.totalLegsAudited}</strong></span>
+              <span>Geprüfte Visits: <strong>{auditReport.totalVisitsAudited}</strong></span>
+              <span>High Finishes: <strong>{auditReport.highFinishesFound?.length || 0}</strong></span>
+              <span>180er: <strong>{auditReport.top180sFound?.length || 0}</strong> Spieler</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -504,9 +557,9 @@ export default function VerwaltungClient({
             created_at: b.createdAt || b.dateStr,
           })),
         ].sort((a: any, b: any) => {
-          const tA = new Date(a.created_at || a.training_date).getTime();
-          const tB = new Date(b.created_at || b.training_date).getTime();
-          return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA);
+          const tA = parseTrainingDate(a.created_at, a.training_date);
+          const tB = parseTrainingDate(b.created_at, b.training_date);
+          return tB - tA;
         });
 
         const filteredSessions = combinedSessions.filter((s: any) => {
@@ -743,15 +796,15 @@ export default function VerwaltungClient({
                   const isAborted = Boolean(s.is_aborted);
                   const sessionKey = s.session_id ? `${s.session_id}_${s.player_name}_${idx}` : `s_${idx}`;
                   const isExpanded = expandedTrainingKey === sessionKey;
-                  const dateObj = new Date(s.training_date || s.created_at);
-                  const dStr = isNaN(dateObj.getTime())
-                    ? s.training_date
-                    : dateObj.toLocaleString('de-DE', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      });
+                  const dStr = formatTrainingDate(s.created_at, s.training_date);
+
+
+
+
+
+
+
+
 
                   const pdcBadge = isPdc ? getPdcBadge(s.total_score || 0) : null;
 

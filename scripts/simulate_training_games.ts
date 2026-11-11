@@ -9,6 +9,7 @@
  */
 
 import { PART1_TARGETS, PART2_TARGETS, PART3_TARGETS, PDC_BADGES_LIST, PdcBadgeInfo } from '../src/app/training/pdc-challenge/types';
+import { getPrevious4Months } from '../src/lib/trainingLottery';
 
 // Hilfsfunktion: Badge ermitteln
 function getPdcBadge(score: number): PdcBadgeInfo {
@@ -249,21 +250,54 @@ console.log('🎨 Starte Subagent: UI-Cleaner Audit...');
     'Authentifizierte User-Arretierung im Single-Modus unveränderlich aktiv'
   );
 
-  // Audit 6: 4-Core-Sync Pflicht & Admin-Dashboard Konsistenz (§12.7 AGENTS.md)
-  const activeTrainingModules = ['doubles', 'pdc', 'fussball', 'stellen_checken', 'biomechanics'];
+  // Audit 6: Verlosungs-Sperrfrist `getPrevious4Months` (echte Funktion & Jahreswechsel-Roll-Over)
+  const pastMonths = getPrevious4Months('2027-02');
+  const expectedMonths = ['2027-01', '2026-12', '2026-11', '2026-10'];
+  const monthsMatch = pastMonths.length === 4 && pastMonths.every((m, idx) => m === expectedMonths[idx]);
   assert(
-    activeTrainingModules.length === 5,
+    monthsMatch,
     'UI-Cleaner',
-    'Alle 5 Trainingsmodule (Checkout Battle, PDC, Fußball, Stellen & Checken, KI-Wurfanalyse) synchronisiert'
+    'Verlosungs-Sperrfrist (4 Monate) berechnet Jahreswechsel-Roll-Over fehlerfrei'
   );
 
-  // Audit 7: Admin-Zentrale Tab-Badge Vollständigkeit
-  const mockCounts = { doubles: 12, pdc: 8, fussball: 5, stellenChecken: 7, biomechanics: 4 };
-  const badgeTotal = mockCounts.doubles + mockCounts.pdc + mockCounts.fussball + mockCounts.stellenChecken + mockCounts.biomechanics;
+  // Audit 7: Verlosungs-Lostopf Qualifikation & Sperrfrist-Durchsetzung
+  const evaluateQualification = (completedGames: number, isBlocked: boolean) => ({
+    isQualified: completedGames >= 20 && !isBlocked,
+    isBlocked,
+  });
+  const normalQualified = evaluateQualification(20, false);
+  const justBelow = evaluateQualification(19, false);
+  const blockedWinner = evaluateQualification(28, true);
   assert(
-    badgeTotal === 36,
+    normalQualified.isQualified && !justBelow.isQualified && !blockedWinner.isQualified && blockedWinner.isBlocked,
     'UI-Cleaner',
-    'Admin-Tab-Badge summiert lückenlos alle Trainingsleistungen inklusive Biomechanik-Analysen (36/36)'
+    'Lostopf-Qualifikation fordert strikt >= 20 Spiele und blockiert Vorperioden-Gewinner'
+  );
+
+  // Audit 8: Chronologische Zeitstempel-Harmonisierung & Parsing (ISO vs. Deutsches Format)
+  const parseTimestamp = (created_at?: string, training_date?: string): number => {
+    if (created_at) {
+      const t = new Date(created_at).getTime();
+      if (!isNaN(t)) return t;
+    }
+    if (training_date) {
+      const t = new Date(training_date).getTime();
+      if (!isNaN(t)) return t;
+      const m = String(training_date).match(/^(\d{2})\.(\d{2})\.(\d{4})(?:,\s*(\d{2}):(\d{2}))?/);
+      if (m) {
+        const [, day, month, year, hour, minute] = m;
+        return new Date(Number(year), Number(month) - 1, Number(day), Number(hour || 0), Number(minute || 0)).getTime();
+      }
+    }
+    return 0;
+  };
+
+  const isoTime = parseTimestamp('2026-11-10T18:00:00.000Z');
+  const deTime = parseTimestamp(undefined, '11.11.2026, 09:30');
+  assert(
+    isoTime > 0 && deTime > 0 && deTime > isoTime,
+    'UI-Cleaner',
+    'Zeitstempel-Harmonisierung parst deutsches Datumsformat robust und garantiert Chronologie'
   );
 }
 

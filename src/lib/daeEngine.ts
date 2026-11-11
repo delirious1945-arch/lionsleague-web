@@ -525,7 +525,7 @@ export function computePlayerAnalytics(
 ): PlayerDAEAnalytics {
   const allScores: number[] = [];
   const legsPlainScores: number[][] = [];
-  let wonLegsDarts: number[] = [];
+  const wonLegsDarts: number[] = [];
   let bestLegDarts = 999;
   let wonLegsCount = 0;
   let totalDartsAll = 0;
@@ -1693,17 +1693,17 @@ export function computePlayerAnalytics(
   }
 
   // 10. MATCHPLAN- & AUFSTELLUNGS-BERATER (Q30: B & C)
-  let boardRec = customProfile?.boardRec || (volStd <= 22
+  const boardRec = customProfile?.boardRec || (volStd <= 22
     ? 'Board 1 (Präsentations-Board): Lässt sich von Umgebungsgeräuschen und Zuschauern nicht irritieren.'
     : 'Board 2 (Ruhigeres Board): Profitiert von fokussierter Atmosphäre und weniger Ablenkung.');
 
-  let singleSlot = customProfile?.singleSlot || (clutchDelta >= 2 && gClutch.grade <= 2.2
+  const singleSlot = customProfile?.singleSlot || (clutchDelta >= 2 && gClutch.grade <= 2.2
     ? 'Schluss-Block oder Decider-Position: Höchste Nervenstärke unter Druck, ideal für knappe Schlussphasen.'
     : gKaltstart.grade > 3.0
     ? 'Block 2 (Spiele 5–8): Gibt Zeit zum Einwerfen und akklimatisieren.'
     : 'Block 1 (Spiele 1–4): Startet engagiert und setzt frühe Team-Akzente.');
 
-  let doublePartner = customProfile?.doublePartner || (scoreDanger >= 60 && instabilityIndex > 15
+  const doublePartner = customProfile?.doublePartner || (scoreDanger >= 60 && instabilityIndex > 15
     ? 'Stoischer Doppel-Partner mit hoher Finish-Quote (gleicht Scoring-Schwankungen aus).'
     : scoreFinish >= 65 && scorePower < 50
     ? 'Aggressiver Power-Scorer (schafft schnellen Vorsprung, den dieser Spieler veredelt).'
