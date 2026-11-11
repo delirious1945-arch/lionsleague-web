@@ -71,6 +71,8 @@ export interface TvFussballMatch {
   winner_name: string;
   darts_thrown: number;
   time_label: string;
+  is_computer?: boolean;
+  game_mode?: string;
 }
 
 export interface TvStellenCheckenRow {
@@ -133,6 +135,7 @@ export interface ArchiveDayDetail {
     goalsConceded: number;
     dartsThrown: number;
     time: string;
+    isComputer?: boolean;
   }[];
   stellenCheckenGames: {
     id: string;

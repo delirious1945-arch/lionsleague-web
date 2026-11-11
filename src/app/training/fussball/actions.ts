@@ -27,6 +27,8 @@ export async function saveFussballSessionAction(sessions: FussballSessionSavePay
       }
       revalidatePath('/training');
       revalidatePath('/training/fussball');
+      revalidatePath('/training/live');
+      revalidatePath('/verwaltung');
       return { success: true };
     } catch (error: any) {
       lastError = error;

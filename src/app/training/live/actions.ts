@@ -74,14 +74,10 @@ function formatTime(val: any): string {
   }
 }
 
-function isHuman1vs1Fussball(r: any): boolean {
+function isRegularFussball(r: any): boolean {
   if (Number(r.is_aborted || 0) !== 0) return false;
-  if (Number(r.is_computer || 0) === 1) return false;
-  if (r.game_mode && r.game_mode !== '1vs1') return false;
-  const opp = String(r.opponent_name || '').toLowerCase();
-  const p = String(r.player_name || '').toLowerCase();
-  if (opp.includes('computer') || opp.includes('bot') || opp.includes('ki')) return false;
-  if (p.includes('computer') || p.includes('bot') || p.includes('ki')) return false;
+  // Mindest-Schwellenwert >= 5 Tore gemäß §12.4 AGENTS.md (Kurzspiele unter 5 Toren sind nur Fun/Warm-up)
+  if (Number(r.target_goals || 5) < 5) return false;
   return true;
 }
 
@@ -159,11 +155,13 @@ export async function getUnifiedTvBoardDataAction(options?: {
     const hasTodayData =
       doublesRows.some((r: any) => extractRowDate(r) === deTodayDateStr) ||
       pdcRows.some((r: any) => extractRowDate(r) === deTodayDateStr) ||
+      fussballRows.some((r: any) => isRegularFussball(r) && extractRowDate(r) === deTodayDateStr) ||
       stellenCheckenRows.some((r: any) => extractRowDate(r) === deTodayDateStr);
 
     const hasMonthData =
       doublesRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
       pdcRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
+      fussballRows.some((r: any) => isRegularFussball(r) && extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
       stellenCheckenRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
 
     // 3. Filter rows based on active timeframe
@@ -171,27 +169,27 @@ export async function getUnifiedTvBoardDataAction(options?: {
     let activePdc: any[] = [];
     let activeFussball: any[] = [];
     let activeStellenChecken: any[] = [];
-    const humanFussball1vs1 = fussballRows.filter(isHuman1vs1Fussball);
+    const regularFussball = fussballRows.filter(isRegularFussball);
 
     if (timeframe === 'today') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
-      activeFussball = humanFussball1vs1.filter((r: any) => extractRowDate(r) === deTodayDateStr);
+      activeFussball = regularFussball.filter((r: any) => extractRowDate(r) === deTodayDateStr);
       activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
     } else if (timeframe === 'month') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
-      activeFussball = humanFussball1vs1.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
+      activeFussball = regularFussball.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
     } else if (timeframe === 'all') {
       activeDoubles = doublesRows;
       activePdc = pdcRows;
-      activeFussball = humanFussball1vs1;
+      activeFussball = regularFussball;
       activeStellenChecken = stellenCheckenRows;
     } else if (timeframe === 'archive') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
-      activeFussball = humanFussball1vs1.filter((r: any) => extractRowDate(r) === selectedDateStr);
+      activeFussball = regularFussball.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
     }
 
@@ -494,7 +492,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       todayPdcLeaderboard[i].isShared = prevMatch || nextMatch;
     }
 
-    // 8. Build Fußball 1vs1 Leaderboard & Matches (Ausschließlich 1vs1, keine Computer-Spiele!)
+    // 8. Build Fußball Leaderboard & Matches (1vs1 & vs. Computer ab 5 Toren)
     const fussballMap = new Map<string, {
       player_name: string;
       matches_count: number;
@@ -513,6 +511,10 @@ export async function getUnifiedTvBoardDataAction(options?: {
     for (const r of activeFussball) {
       const pName = String(r.player_name || '').trim();
       if (!pName) continue;
+      const pLower = pName.toLowerCase();
+      // Nur menschliche Spieler ins Leaderboard aufnehmen (keine Bots)
+      if (pLower.includes('computer') || pLower.includes('bot') || pLower === 'ki') continue;
+
       if (!fussballMap.has(pName)) {
         fussballMap.set(pName, {
           player_name: pName,
@@ -607,7 +609,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       todayFussballLeaderboard[i].isShared = prevMatch || nextMatch;
     }
 
-    // 1vs1 Match Log List für Fußball
+    // Match Log List für Fußball (1vs1 & vs. Computer)
     const matchSessionMap = new Map<string, any[]>();
     for (const r of activeFussball) {
       const sId = String(r.session_id || r.id);
@@ -634,20 +636,29 @@ export async function getUnifiedTvBoardDataAction(options?: {
           winner_name: winnerName,
           darts_thrown: Math.max(Number(p1.darts_thrown || 0), Number(p2.darts_thrown || 0)),
           time_label: formatTime(p1.created_at),
+          is_computer: false,
+          game_mode: '1vs1',
         });
       } else if (group.length === 1) {
         const p1 = group[0];
         const isWin = Number(p1.is_winner || 0) === 1;
+        const isComp =
+          Number(p1.is_computer || 0) === 1 ||
+          String(p1.game_mode) === '1vsComputer' ||
+          String(p1.opponent_name || '').toLowerCase().includes('computer');
+        const defaultOpp = isComp ? 'Computer' : 'Gegner';
         todayFussballMatches.push({
           id: String(p1.id || sId),
           session_id: sId,
           player1_name: p1.player_name,
-          player2_name: p1.opponent_name || 'Gegner',
+          player2_name: p1.opponent_name || defaultOpp,
           player1_goals: Number(p1.goals_scored || 0),
           player2_goals: Number(p1.goals_conceded || 0),
-          winner_name: isWin ? p1.player_name : (p1.opponent_name || 'Gegner'),
+          winner_name: isWin ? p1.player_name : (p1.opponent_name || defaultOpp),
           darts_thrown: Number(p1.darts_thrown || 0),
           time_label: formatTime(p1.created_at),
+          is_computer: isComp,
+          game_mode: p1.game_mode || (isComp ? '1vsComputer' : '1vs1'),
         });
       }
     }
@@ -862,7 +873,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
           doubles: Number(r.doubles_hit || 0),
           time: formatTime(r.created_at),
         })),
-        fussballGames: dayFussball.filter(isHuman1vs1Fussball).map((r: any) => ({
+        fussballGames: dayFussball.filter(isRegularFussball).map((r: any) => ({
           id: String(r.id || r.session_id),
           playerName: String(r.player_name || ''),
           opponentName: String(r.opponent_name || 'Gegner'),
@@ -871,6 +882,10 @@ export async function getUnifiedTvBoardDataAction(options?: {
           goalsConceded: Number(r.goals_conceded || 0),
           dartsThrown: Number(r.darts_thrown || 0),
           time: formatTime(r.created_at),
+          isComputer:
+            Number(r.is_computer || 0) === 1 ||
+            String(r.game_mode) === '1vsComputer' ||
+            String(r.opponent_name || '').toLowerCase().includes('computer'),
         })),
         stellenCheckenGames: dayStellenChecken.map((r: any) => {
           const rds = Number(r.total_rounds || 15);

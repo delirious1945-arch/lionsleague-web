@@ -323,7 +323,7 @@ export default function UnifiedTvBoardClient({
                   : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
-              <span>Fußball (1vs1)</span>
+              <span>Fußball</span>
             </button>
 
             <button
@@ -453,7 +453,7 @@ export default function UnifiedTvBoardClient({
                 : viewMode === 'pdc'
                 ? 'PDC Challenge Routine'
                 : viewMode === 'fussball'
-                ? 'Fußball (1vs1 Matchboard)'
+                ? 'Fußball (Matchboard & Duelle)'
                 : viewMode === 'stellen_checken'
                 ? 'Stellen & Checken (3–101)'
                 : 'Archiv & Kalender'}
@@ -482,7 +482,7 @@ export default function UnifiedTvBoardClient({
             </span>
             <span>•</span>
             <span>
-              <strong className="text-white font-mono">{data.todayFussballMatches?.length || 0}</strong> Fußball 1vs1
+              <strong className="text-white font-mono">{data.todayFussballMatches?.length || 0}</strong> Fußball Matches
             </span>
             <span>•</span>
             <span>
@@ -1042,13 +1042,13 @@ export default function UnifiedTvBoardClient({
                   </div>
                   <div>
                     <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-                      <span>Fußball • 1-gegen-1 Matchboard</span>
+                      <span>Fußball • Matchboard & Duelle</span>
                       <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
-                        Reine Spieler-Duelle
+                        1vs1 & vs. Computer
                       </span>
                     </h2>
                     <p className="text-xs text-slate-400">
-                      Offizielle 1vs1 Liga-Duelle zwischen Spielern (Matches gegen den Computer werden hier nicht gewertet).
+                      Offizielle Fußball Darts Duelle & Matches (gewertet ab 5 Toren gem. BBDV-Leistungsstandard).
                     </p>
                   </div>
                 </div>
@@ -1074,10 +1074,10 @@ export default function UnifiedTvBoardClient({
                 <div className="py-12 flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08] mt-4">
                   <div className="text-4xl mb-3">⚽</div>
                   <h3 className="text-base font-bold text-slate-200">
-                    Noch keine 1vs1 Fußball-Matches in diesem Zeitraum
+                    Noch keine regulären Fußball-Matches in diesem Zeitraum
                   </h3>
                   <p className="text-xs text-slate-400 max-w-md mt-1">
-                    Hier werden ausschließlich echte 1-gegen-1 Duelle zwischen zwei Spielern gelistet. Fordere jetzt deinen Trainingspartner zu einem Fußball-Match heraus!
+                    Spiele ab 5 Toren (1-gegen-1 Duelle oder Spiele gegen den Computer) werden hier automatisch für das Leistungsranking gewertet.
                   </p>
                   <Link
                     href="/training/fussball"
@@ -1202,7 +1202,7 @@ export default function UnifiedTvBoardClient({
                     <div className="pt-4 border-t border-white/[0.07] space-y-3">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                         <span className="flex items-center gap-1.5">
-                          <span>⚽ Ausgetragene 1-gegen-1 Duelle ({data.todayFussballMatches.length}):</span>
+                          <span>⚽ Ausgetragene Matches ({data.todayFussballMatches.length}):</span>
                         </span>
                         <span className="text-slate-500 text-[11px]">
                           Chronologisch sortiert
@@ -1219,7 +1219,16 @@ export default function UnifiedTvBoardClient({
                               className="bg-white/[0.03] backdrop-blur-xl p-3.5 rounded-2xl border border-white/[0.08] flex flex-col justify-between gap-2 shadow-inner"
                             >
                               <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-white/[0.06] pb-1.5">
-                                <span className="font-mono text-slate-400">{m.time_label || 'Spiel'}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-slate-400">{m.time_label || 'Spiel'}</span>
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                                    m.is_computer
+                                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/25'
+                                      : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25'
+                                  }`}>
+                                    {m.is_computer ? '🤖 vs. Computer' : '👥 1-gegen-1'}
+                                  </span>
+                                </div>
                                 <span className="text-[11px] text-slate-500 font-mono">
                                   {m.darts_thrown} Darts
                                 </span>
@@ -1684,7 +1693,14 @@ export default function UnifiedTvBoardClient({
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-slate-400">vs. {g.opponentName}</div>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                <span>vs. {g.opponentName}</span>
+                                {g.isComputer && (
+                                  <span className="text-[9px] px-1 rounded bg-cyan-500/15 text-cyan-300 font-bold border border-cyan-500/25">
+                                    vs. Computer
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="font-mono font-black text-amber-300 text-sm">

@@ -87,6 +87,27 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   const [targetGoals, setTargetGoals] = useState<number>(5);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [showCacheInspector, setShowCacheInspector] = useState<boolean>(false);
+  const [offlineQueueCount, setOfflineQueueCount] = useState<number>(0);
+  const [localArchive, setLocalArchive] = useState<FussballSessionSavePayload[]>([]);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
+  const loadLocalCacheState = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const qRaw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      const q = qRaw ? JSON.parse(qRaw) : [];
+      setOfflineQueueCount(Array.isArray(q) ? q.length : 0);
+
+      const hRaw = localStorage.getItem(LOCAL_HISTORY_KEY);
+      const h = hRaw ? JSON.parse(hRaw) : [];
+      setLocalArchive(Array.isArray(h) ? h : []);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadLocalCacheState();
+  }, []);
 
   // Arretierung von Spieler 1 im 1vsComputer-Modus auf den angemeldeten Benutzer
   useEffect(() => {
@@ -945,6 +966,113 @@ export default function FussballClient({ players, initialHistory, currentUser }:
             <span>⚽</span>
             <span>ANPFIFF! MATCH STARTEN</span>
           </button>
+
+          {/* Tablet-Cache & Speicher-Status (Transparenz für Offline-Speicherung) */}
+          <div className="bg-slate-950/70 border border-white/10 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xl shrink-0">📱</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                    <span>Tablet-Cache & Speicher-Status</span>
+                    {offlineQueueCount === 0 ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                        ✓ Synchronisiert
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                        {offlineQueueCount} in Warteschlange
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    Spiele werden redundant im Browser-Cache & in Supabase gesichert.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  loadLocalCacheState();
+                  setShowCacheInspector(!showCacheInspector);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shrink-0"
+              >
+                {showCacheInspector ? '▲ Einklappen' : '▼ Cache ansehen'}
+              </button>
+            </div>
+
+            {showCacheInspector && (
+              <div className="space-y-3 pt-3 border-t border-white/5 animate-fadeIn">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs text-slate-300">
+                    Lokal im Browser archivierte Spiele: <strong className="text-white">{localArchive.length}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSyncFeedback('Synchronisiere mit Supabase Cloud...');
+                      await syncOfflineQueue();
+                      loadLocalCacheState();
+                      setSyncFeedback('✅ Alle ausstehenden Spiele erfolgreich mit der Supabase-Cloud synchronisiert!');
+                      setTimeout(() => setSyncFeedback(null), 4000);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>🔄</span>
+                    <span>Jetzt synchronisieren</span>
+                  </button>
+                </div>
+
+                {syncFeedback && (
+                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-medium">
+                    {syncFeedback}
+                  </div>
+                )}
+
+                {localArchive.length === 0 ? (
+                  <div className="p-4 bg-slate-900/60 rounded-xl text-center text-xs text-slate-500 border border-dashed border-white/10">
+                    Noch keine Fußball-Spiele im lokalen Tablet-Cache abgelegt.
+                  </div>
+                ) : (
+                  <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                    {localArchive.map((item, idx) => (
+                      <div
+                        key={item.session_id + '_' + idx}
+                        className="p-2.5 bg-slate-900/80 border border-white/5 rounded-xl flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <div className="font-bold text-white flex items-center gap-1.5">
+                            <span>{item.player_name}</span>
+                            <span className="text-slate-500">vs.</span>
+                            <span className="text-amber-300">{item.opponent_name}</span>
+                            {item.is_winner === 1 && (
+                              <span className="text-[10px] px-1.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                                Sieg
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            {item.training_date ? new Date(item.training_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Heute'} • {item.target_goals} Tore Ziel • {item.darts_thrown} Darts
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="font-mono font-black text-white text-sm">
+                            {item.goals_scored} : {item.goals_conceded}
+                          </div>
+                          <div className="text-[9px] text-emerald-400 font-bold">
+                            ✓ Lokal gesichert
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
 
