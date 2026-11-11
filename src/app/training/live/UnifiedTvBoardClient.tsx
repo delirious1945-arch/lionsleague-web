@@ -32,7 +32,115 @@ import {
   Users,
   CheckCircle2,
   Zap,
+  Tv,
+  Monitor,
+  Smartphone,
+  Settings2,
+  Sliders,
+  ShieldCheck,
+  Check,
+  Info,
 } from 'lucide-react';
+
+export type DisplayProfileSetting = 'auto' | 'tv' | 'laptop' | 'tablet';
+export type ResolvedDisplayMode = 'tv' | 'laptop' | 'tablet';
+
+function detectCurrentDisplay(): {
+  resolvedMode: ResolvedDisplayMode;
+  reason: string;
+  isSmartTv: boolean;
+  screenWidth: number;
+  screenHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+} {
+  if (typeof window === 'undefined') {
+    return {
+      resolvedMode: 'tv',
+      reason: 'Standard (Server-Rendering)',
+      isSmartTv: false,
+      screenWidth: 1920,
+      screenHeight: 1080,
+      viewportWidth: 1920,
+      viewportHeight: 1080,
+    };
+  }
+
+  const ua = navigator.userAgent || '';
+  const isSmartTv =
+    /TV|SmartTV|GoogleTV|AppleTV|HbbTV|CrKey|Roku|Tizen|Web0S|NetCast|BRAVIA|LargeScreen|AFT|MiTV|Hisense/i.test(
+      ua
+    );
+  const isFullscreen = !!document.fullscreenElement;
+  const screenW = window.screen?.width || window.innerWidth;
+  const screenH = window.screen?.height || window.innerHeight;
+  const winW = window.innerWidth;
+  const winH = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+
+  // 1. Eindeutiger Smart-TV User-Agent
+  if (isSmartTv) {
+    return {
+      resolvedMode: 'tv',
+      reason: 'Smart-TV / TV-Browser erkannt (User-Agent)',
+      isSmartTv: true,
+      screenWidth: screenW,
+      screenHeight: screenH,
+      viewportWidth: winW,
+      viewportHeight: winH,
+    };
+  }
+
+  // 2. Vollbildmodus auf großem Bildschirm (z. B. TV-Wandboard per F11)
+  if (isFullscreen && (winW >= 1700 || screenW >= 1700)) {
+    return {
+      resolvedMode: 'tv',
+      reason: 'Vollbild Kiosk-Modus aktiv (55-65" TV-Wandboard)',
+      isSmartTv: false,
+      screenWidth: screenW,
+      screenHeight: screenH,
+      viewportWidth: winW,
+      viewportHeight: winH,
+    };
+  }
+
+  // 3. Ultra-HD / 4K Großbildschirm
+  if (screenW >= 2560 || (screenW >= 1920 && dpr <= 1 && winW >= 1700)) {
+    return {
+      resolvedMode: 'tv',
+      reason: 'Großbild / 4K Monitor (≥1920px Wurfdistanz)',
+      isSmartTv: false,
+      screenWidth: screenW,
+      screenHeight: screenH,
+      viewportWidth: winW,
+      viewportHeight: winH,
+    };
+  }
+
+  // 4. Kompakte Mobilgeräte / Tablets
+  if (winW < 1024) {
+    return {
+      resolvedMode: 'tablet',
+      reason: 'Kompakter Viewport (<1024px)',
+      isSmartTv: false,
+      screenWidth: screenW,
+      screenHeight: screenH,
+      viewportWidth: winW,
+      viewportHeight: winH,
+    };
+  }
+
+  // 5. Standard Laptop / Desktop Monitor (15–17 Zoll, 50cm Sitzabstand)
+  return {
+    resolvedMode: 'laptop',
+    reason: 'Standard 15–17" Laptop / Desktop (Sitzdistanz ~50cm)',
+    isSmartTv: false,
+    screenWidth: screenW,
+    screenHeight: screenH,
+    viewportWidth: winW,
+    viewportHeight: winH,
+  };
+}
 
 interface UnifiedTvBoardClientProps {
   initialData: UnifiedTvBoardData;
@@ -58,6 +166,162 @@ export default function UnifiedTvBoardClient({
   const [autoSync, setAutoSync] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [soundAlert, setSoundAlert] = useState<boolean>(true);
+
+  // Monitor- & Display-Erkennung (17" Laptop vs. 56" Vereinsheim-TV)
+  const [displaySetting, setDisplaySetting] = useState<DisplayProfileSetting>('auto');
+  const [resolvedDisplayMode, setResolvedDisplayMode] = useState<ResolvedDisplayMode>('tv');
+  const [detectionReason, setDetectionReason] = useState<string>('Erkenne Anzeigegerät...');
+  const [displayZoom, setDisplayZoom] = useState<number>(1.15);
+  const [showDisplayMenu, setShowDisplayMenu] = useState<boolean>(false);
+  const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
+  const [wakeLockEnabled, setWakeLockEnabled] = useState<boolean>(true);
+  const displayMenuRef = useRef<HTMLDivElement>(null);
+
+  // Initialisierung aus URL (?display=tv|laptop|tablet|auto) und localStorage
+  useEffect(() => {
+    let initialSetting: DisplayProfileSetting = 'auto';
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlDisp = params.get('display');
+      if (urlDisp === 'tv' || urlDisp === 'laptop' || urlDisp === 'tablet' || urlDisp === 'auto') {
+        initialSetting = urlDisp;
+      } else {
+        const stored = localStorage.getItem('lions_tv_display_profile') as DisplayProfileSetting | null;
+        if (stored === 'tv' || stored === 'laptop' || stored === 'tablet' || stored === 'auto') {
+          initialSetting = stored;
+        }
+      }
+    }
+
+    setDisplaySetting(initialSetting);
+
+    const detected = detectCurrentDisplay();
+    if (initialSetting === 'auto') {
+      setResolvedDisplayMode(detected.resolvedMode);
+      setDetectionReason(detected.reason);
+      setDisplayZoom(detected.resolvedMode === 'tv' ? 1.15 : 1.0);
+    } else {
+      setResolvedDisplayMode(initialSetting);
+      setDetectionReason(
+        `Manuell gewählt: ${initialSetting === 'tv' ? '56" TV' : initialSetting === 'laptop' ? '17" Laptop' : 'Tablet'}`
+      );
+      setDisplayZoom(initialSetting === 'tv' ? 1.15 : 1.0);
+    }
+  }, []);
+
+  // Automatische Neubewertung bei Resize & Vollbild-Änderung
+  useEffect(() => {
+    const handleReevaluate = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      if (displaySetting === 'auto') {
+        const detected = detectCurrentDisplay();
+        setResolvedDisplayMode(detected.resolvedMode);
+        setDetectionReason(detected.reason);
+        setDisplayZoom(detected.resolvedMode === 'tv' ? 1.15 : 1.0);
+      }
+    };
+
+    window.addEventListener('resize', handleReevaluate);
+    document.addEventListener('fullscreenchange', handleReevaluate);
+    return () => {
+      window.removeEventListener('resize', handleReevaluate);
+      document.removeEventListener('fullscreenchange', handleReevaluate);
+    };
+  }, [displaySetting]);
+
+  // Umschalten des Monitor-Profils (mit Persistenz)
+  const handleSelectDisplaySetting = (setting: DisplayProfileSetting) => {
+    setDisplaySetting(setting);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lions_tv_display_profile', setting);
+    }
+
+    if (setting === 'auto') {
+      const detected = detectCurrentDisplay();
+      setResolvedDisplayMode(detected.resolvedMode);
+      setDetectionReason(detected.reason);
+      setDisplayZoom(detected.resolvedMode === 'tv' ? 1.15 : 1.0);
+    } else {
+      setResolvedDisplayMode(setting);
+      setDetectionReason(
+        `Manuell gewählt: ${setting === 'tv' ? '56" TV' : setting === 'laptop' ? '17" Laptop' : 'Tablet'}`
+      );
+      setDisplayZoom(setting === 'tv' ? 1.15 : 1.0);
+    }
+  };
+
+  // Screen Wake Lock API (verhindert Standby/Bildschirmschoner auf Fernsehern)
+  useEffect(() => {
+    let sentinel: any = null;
+    let isCancelled = false;
+
+    const requestLock = async () => {
+      if (!wakeLockEnabled) {
+        if (sentinel) {
+          try {
+            await sentinel.release();
+          } catch (e) {}
+          sentinel = null;
+        }
+        setWakeLockActive(false);
+        return;
+      }
+
+      if (
+        typeof navigator !== 'undefined' &&
+        'wakeLock' in navigator &&
+        (resolvedDisplayMode === 'tv' || wakeLockEnabled)
+      ) {
+        try {
+          sentinel = await (navigator as any).wakeLock.request('screen');
+          if (!isCancelled) {
+            setWakeLockActive(true);
+            sentinel.addEventListener('release', () => {
+              if (!isCancelled) setWakeLockActive(false);
+            });
+          }
+        } catch (e) {
+          if (!isCancelled) setWakeLockActive(false);
+        }
+      }
+    };
+
+    requestLock();
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        requestLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      isCancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (sentinel) {
+        try {
+          sentinel.release();
+        } catch (e) {}
+      }
+    };
+  }, [resolvedDisplayMode, wakeLockEnabled]);
+
+  // Click-Outside für das Display-Einstellungs-Menü
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (displayMenuRef.current && !displayMenuRef.current.contains(e.target as Node)) {
+        setShowDisplayMenu(false);
+      }
+    };
+    if (showDisplayMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDisplayMenu]);
 
   const prevSessionTotalRef = useRef<number>(
     initialData.todayDoppelLeaderboard.length +
@@ -235,7 +499,14 @@ export default function UnifiedTvBoardClient({
   };
 
   return (
-    <div className="relative min-h-screen w-full max-w-full overflow-x-hidden bg-[#05070e] text-slate-100 flex flex-col font-sans select-none antialiased">
+    <div
+      className={`relative min-h-screen w-full max-w-full overflow-x-hidden bg-[#05070e] text-slate-100 flex flex-col font-sans select-none antialiased ${
+        resolvedDisplayMode === 'tv' ? 'tv-board-large-screen font-medium' : ''
+      }`}
+      style={{
+        zoom: displayZoom !== 1.0 ? displayZoom : undefined,
+      }}
+    >
       {/* Dezente Hintergrund-Lichtquellen für edlen Glassmorphism-Effekt */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
         <div className="absolute top-[10%] left-[15%] w-[30rem] h-[30rem] rounded-full bg-amber-500/[0.05] blur-[140px]" />
@@ -402,8 +673,225 @@ export default function UnifiedTvBoardClient({
               <span>{currentTime || '--:--:--'}</span>
             </div>
 
-            {/* Sync, Audio & Vollbild */}
+            {/* Sync, Audio, Monitor-Automation & Vollbild */}
             <div className="flex items-center gap-1">
+              {/* DISPLAY / MONITOR PROFILE AUTOMATION BUTTON & DROPDOWN */}
+              <div className="relative" ref={displayMenuRef}>
+                <button
+                  onClick={() => setShowDisplayMenu((prev) => !prev)}
+                  className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer ${
+                    showDisplayMenu
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
+                      : resolvedDisplayMode === 'tv'
+                      ? 'bg-white/[0.05] text-amber-300 border-amber-400/40 hover:bg-white/[0.1]'
+                      : resolvedDisplayMode === 'laptop'
+                      ? 'bg-white/[0.05] text-sky-300 border-sky-400/40 hover:bg-white/[0.1]'
+                      : 'bg-white/[0.05] text-emerald-300 border-emerald-400/40 hover:bg-white/[0.1]'
+                  }`}
+                  title="Monitor- & TV-Automation konfigurieren"
+                >
+                  {resolvedDisplayMode === 'tv' ? (
+                    <Tv className="w-4 h-4 shrink-0" />
+                  ) : resolvedDisplayMode === 'laptop' ? (
+                    <Monitor className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <Smartphone className="w-4 h-4 shrink-0" />
+                  )}
+                  <span className="hidden md:inline font-mono text-[11px]">
+                    {displaySetting === 'auto' ? 'Auto' : 'Profil'}:{' '}
+                    {resolvedDisplayMode === 'tv'
+                      ? '56" TV'
+                      : resolvedDisplayMode === 'laptop'
+                      ? '17" Laptop'
+                      : 'Tablet'}
+                  </span>
+                  {wakeLockActive && resolvedDisplayMode === 'tv' && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"
+                      title="Bildschirmschoner-Schutz aktiv"
+                    />
+                  )}
+                </button>
+
+                {/* DROPDOWN MENU */}
+                {showDisplayMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl bg-slate-950/95 backdrop-blur-2xl border border-white/[0.15] shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-4 z-50 text-slate-200 text-xs">
+                    <div className="flex items-center justify-between pb-3 border-b border-white/[0.1]">
+                      <div className="flex items-center gap-2">
+                        <Settings2 className="w-4 h-4 text-amber-400" />
+                        <span className="font-black text-sm text-white">Monitor- & TV-Automation</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.08] text-slate-300 font-bold">
+                        {Math.round(displayZoom * 100)}% Zoom
+                      </span>
+                    </div>
+
+                    {/* Erkennungs-Info-Box */}
+                    <div className="my-3 p-2.5 rounded-xl bg-amber-500/[0.08] border border-amber-400/25 flex items-start gap-2.5">
+                      <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="text-[11px] leading-relaxed">
+                        <div className="font-bold text-amber-300">
+                          {displaySetting === 'auto' ? 'Auto-Erkennung aktiv' : 'Manuelle Einstellung'}
+                        </div>
+                        <div className="text-slate-300">{detectionReason}</div>
+                      </div>
+                    </div>
+
+                    {/* Auswahl Monitor-Profile */}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-mono uppercase text-slate-400 font-bold px-1">
+                        Profil auswählen
+                      </div>
+
+                      <button
+                        onClick={() => handleSelectDisplaySetting('auto')}
+                        className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                          displaySetting === 'auto'
+                            ? 'bg-amber-400/15 border-amber-400/50 text-white'
+                            : 'bg-white/[0.03] border-white/[0.07] text-slate-300 hover:bg-white/[0.07]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Sliders className="w-4 h-4 text-amber-400" />
+                          <div>
+                            <div className="font-bold text-xs flex items-center gap-1.5">
+                              <span>✨ Automatische Erkennung</span>
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-mono font-bold">
+                                Empfohlen
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              Prüft User-Agent, Auflösung, Vollbild und Kiosk-Modus
+                            </div>
+                          </div>
+                        </div>
+                        {displaySetting === 'auto' && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                      </button>
+
+                      <button
+                        onClick={() => handleSelectDisplaySetting('tv')}
+                        className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                          displaySetting === 'tv'
+                            ? 'bg-amber-400/15 border-amber-400/50 text-white'
+                            : 'bg-white/[0.03] border-white/[0.07] text-slate-300 hover:bg-white/[0.07]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Tv className="w-4 h-4 text-amber-400" />
+                          <div>
+                            <div className="font-bold text-xs">📺 Vereinsheim-TV (56" Großbild)</div>
+                            <div className="text-[10px] text-slate-400">
+                              Große Schriften, High-Contrast, Wurfdistanz 3–5m, Standby-Schutz
+                            </div>
+                          </div>
+                        </div>
+                        {displaySetting === 'tv' && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                      </button>
+
+                      <button
+                        onClick={() => handleSelectDisplaySetting('laptop')}
+                        className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                          displaySetting === 'laptop'
+                            ? 'bg-sky-400/15 border-sky-400/50 text-white'
+                            : 'bg-white/[0.03] border-white/[0.07] text-slate-300 hover:bg-white/[0.07]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Monitor className="w-4 h-4 text-sky-400" />
+                          <div>
+                            <div className="font-bold text-xs">🖥️ Laptop / PC (15–17" Schreibtisch)</div>
+                            <div className="text-[10px] text-slate-400">
+                              Kompakte Datendichte, Standard-Zoom, Sitzabstand ~50cm
+                            </div>
+                          </div>
+                        </div>
+                        {displaySetting === 'laptop' && <Check className="w-4 h-4 text-sky-400 shrink-0" />}
+                      </button>
+
+                      <button
+                        onClick={() => handleSelectDisplaySetting('tablet')}
+                        className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                          displaySetting === 'tablet'
+                            ? 'bg-emerald-400/15 border-emerald-400/50 text-white'
+                            : 'bg-white/[0.03] border-white/[0.07] text-slate-300 hover:bg-white/[0.07]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Smartphone className="w-4 h-4 text-emerald-400" />
+                          <div>
+                            <div className="font-bold text-xs">📱 Tablet / Mobil</div>
+                            <div className="text-[10px] text-slate-400">
+                              Touch-optimiert, vertikaler Stapelfluss
+                            </div>
+                          </div>
+                        </div>
+                        {displaySetting === 'tablet' && <Check className="w-4 h-4 text-emerald-400 shrink-0" />}
+                      </button>
+                    </div>
+
+                    {/* Zoom-Feinjustierung */}
+                    <div className="mt-3 pt-3 border-t border-white/[0.08]">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">
+                          Skalierung / Zoom
+                        </span>
+                        <span className="font-mono text-amber-300 font-bold text-xs">
+                          {Math.round(displayZoom * 100)}%
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1">
+                        {[1.0, 1.1, 1.15, 1.25].map((zVal) => (
+                          <button
+                            key={zVal}
+                            onClick={() => setDisplayZoom(zVal)}
+                            className={`py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                              Math.abs(displayZoom - zVal) < 0.02
+                                ? 'bg-amber-400 text-slate-950 font-black'
+                                : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300'
+                            }`}
+                          >
+                            {Math.round(zVal * 100)}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Standby- / Bildschirmschoner-Schutz (WakeLock) */}
+                    <div className="mt-3 pt-3 border-t border-white/[0.08] flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck
+                          className={`w-4 h-4 ${wakeLockActive ? 'text-emerald-400' : 'text-slate-500'}`}
+                        />
+                        <div>
+                          <div className="text-xs font-bold text-white">Bildschirmschoner-Schutz</div>
+                          <div className="text-[10px] text-slate-400">
+                            {wakeLockActive
+                              ? 'Display bleibt beim Werfen dauerhaft an'
+                              : 'Standard Standby-Verhalten'}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setWakeLockEnabled((prev) => !prev)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          wakeLockEnabled
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : 'bg-white/[0.05] text-slate-400 border border-white/[0.1]'
+                        }`}
+                      >
+                        {wakeLockEnabled ? 'Aktiv' : 'Aus'}
+                      </button>
+                    </div>
+
+                    {/* Lesezeichen-Tipp für Vereinsheim */}
+                    <div className="mt-3 pt-2 border-t border-white/[0.06] text-[10px] text-slate-400 leading-normal">
+                      💡 <strong>Tipp für den Vereinsheim-TV:</strong> Als Lesezeichen{' '}
+                      <code className="text-amber-300">/training/live?display=tv</code> speichern, um den 56"-Modus fest einzustellen.
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => setSoundAlert(!soundAlert)}
                 className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${
@@ -460,6 +948,33 @@ export default function UnifiedTvBoardClient({
             </span>
 
             <span className="text-slate-600">•</span>
+
+            {/* Display-Profil Pill */}
+            <button
+              onClick={() => setShowDisplayMenu(true)}
+              className="px-2 py-0.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.08] font-mono text-[10px] flex items-center gap-1 transition-all cursor-pointer"
+              title="Klicken zum Anpassen des Monitor-Profils"
+            >
+              {resolvedDisplayMode === 'tv' ? (
+                <>
+                  <Tv className="w-3 h-3 text-amber-300" />
+                  <span className="font-bold text-amber-200">56" TV-Modus</span>
+                </>
+              ) : resolvedDisplayMode === 'laptop' ? (
+                <>
+                  <Monitor className="w-3 h-3 text-sky-300" />
+                  <span className="font-bold text-sky-200">17" Laptop-Modus</span>
+                </>
+              ) : (
+                <>
+                  <Smartphone className="w-3 h-3 text-emerald-300" />
+                  <span className="font-bold text-emerald-200">Mobil / Tablet</span>
+                </>
+              )}
+              {wakeLockActive && resolvedDisplayMode === 'tv' && (
+                <span className="text-emerald-400 font-bold ml-0.5">• WakeLock ✓</span>
+              )}
+            </button>
 
             <span className="text-slate-400">
               {timeframe === 'today'

@@ -95,9 +95,16 @@ async function main() {
       </div>
     </div>
 
-    <!-- Rechts: Status-Kompakt & Zeit -->
-    <div class="flex items-center gap-4">
-      <div class="text-right text-[11px] text-slate-400">
+    <!-- Rechts: Status-Kompakt, Monitor-Automation & Zeit -->
+    <div class="flex items-center gap-3">
+      <!-- Monitor-Erkennungs-Pill -->
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-200 text-xs font-mono font-bold shadow-sm">
+        <span>📺</span>
+        <span>Auto: 56" TV-Modus (115%)</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-live ml-1" title="WakeLock aktiv"></span>
+      </div>
+
+      <div class="text-right text-[11px] text-slate-400 hidden xl:block">
         <div class="text-white font-mono font-bold">${data.todayDoppelLeaderboard.length} Doppel • ${data.todayPdcLeaderboard.length} PDC • ${data.todayFussballMatches.length} Fußball • ${data.todayStellenCheckenLeaderboard.length} St. & Ch.</div>
         <div class="text-slate-500">Heutiger Trainingstag • Live aktualisiert</div>
       </div>
