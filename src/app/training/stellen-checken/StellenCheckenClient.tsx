@@ -421,10 +421,11 @@ export default function StellenCheckenClient({
   return (
     <div className="w-full max-w-5xl overflow-x-hidden mx-auto px-2 sm:px-6 space-y-6">
       {/* Top Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3 shadow-xl">
+      <div data-ui-id="STELLEN.NAV.BAR" className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3 shadow-xl">
         <div className="flex items-center gap-3">
           <Link
             href="/training"
+            data-ui-id="STELLEN.NAV.BACK_BTN"
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 transition-colors"
             title="Zurück zur Trainingsübersicht"
           >
@@ -447,6 +448,7 @@ export default function StellenCheckenClient({
           <Link
             href="/training/live?view=stellen_checken"
             target="_blank"
+            data-ui-id="STELLEN.NAV.TV_BTN"
             className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-black flex items-center gap-1.5 transition-all"
           >
             <Tv className="w-4 h-4 text-amber-400" />
@@ -456,6 +458,7 @@ export default function StellenCheckenClient({
           <button
             type="button"
             onClick={() => setSoundEnabled(!soundEnabled)}
+            data-ui-id="STELLEN.NAV.SOUND_BTN"
             className={`p-2 rounded-xl border text-xs font-bold transition-colors ${
               soundEnabled
                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
@@ -469,6 +472,7 @@ export default function StellenCheckenClient({
           <button
             type="button"
             onClick={() => setShowHelp(!showHelp)}
+            data-ui-id="STELLEN.NAV.HELP_BTN"
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 transition-colors"
             title="Spielregeln & Punktesystem"
           >
@@ -519,10 +523,10 @@ export default function StellenCheckenClient({
           1. SETUP SCREEN (VOR SPIELSTART)
       ===================================================================== */}
       {!isGameStarted && (
-        <div className="space-y-6">
-          <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
+        <div data-ui-id="STELLEN.SETUP.CONTAINER" className="space-y-6">
+          <div data-ui-id="STELLEN.SETUP.CARD" className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
             {/* Punkteschlüssel Übersicht */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div data-ui-id="STELLEN.SETUP.POINTS_OVERVIEW" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-2xl bg-emerald-950/40 border border-emerald-500/40 p-3.5 flex items-center justify-between">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block">
@@ -561,7 +565,7 @@ export default function StellenCheckenClient({
             </div>
 
             {/* Spielmodus-Wahl */}
-            <div className="space-y-2">
+            <div data-ui-id="STELLEN.SETUP.MODE_SECTION" className="space-y-2">
               <label className="text-xs font-black uppercase tracking-wider text-slate-400 block">
                 1. Spielmodus wählen
               </label>
@@ -569,6 +573,7 @@ export default function StellenCheckenClient({
                 <button
                   type="button"
                   onClick={() => setGameMode('solo')}
+                  data-ui-id="STELLEN.SETUP.MODE_SOLO_BTN"
                   className={`p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-3 cursor-pointer ${
                     gameMode === 'solo'
                       ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-lg shadow-cyan-500/10'
@@ -589,6 +594,7 @@ export default function StellenCheckenClient({
                 <button
                   type="button"
                   onClick={() => setGameMode('1vs1')}
+                  data-ui-id="STELLEN.SETUP.MODE_1VS1_BTN"
                   className={`p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-3 cursor-pointer ${
                     gameMode === '1vs1'
                       ? 'bg-amber-500/15 border-amber-400 text-white shadow-lg shadow-amber-500/10'
@@ -610,7 +616,7 @@ export default function StellenCheckenClient({
 
             {/* Spielerauswahl */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
+              <div data-ui-id="STELLEN.SETUP.P1_WRAPPER" className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-black uppercase tracking-wider text-slate-400 block">
                     {gameMode === 'solo' ? 'Spieler' : 'Spieler 1 (beginnt)'}
@@ -635,6 +641,7 @@ export default function StellenCheckenClient({
                   <select
                     value={p1Name}
                     onChange={(e) => setP1Name(e.target.value)}
+                    data-ui-id="STELLEN.SETUP.P1_SELECT"
                     className="w-full rounded-xl bg-slate-950 border border-white/15 px-3.5 py-3 text-sm font-bold text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
                   >
                     {validPlayers.map((p) => (
@@ -647,13 +654,14 @@ export default function StellenCheckenClient({
               </div>
 
               {gameMode === '1vs1' && (
-                <div className="space-y-1.5">
+                <div data-ui-id="STELLEN.SETUP.P2_WRAPPER" className="space-y-1.5">
                   <label className="text-xs font-black uppercase tracking-wider text-slate-400 block">
                     Spieler 2 (Herausforderer)
                   </label>
                   <select
                     value={p2Name}
                     onChange={(e) => setP2Name(e.target.value)}
+                    data-ui-id="STELLEN.SETUP.P2_SELECT"
                     className="w-full rounded-xl bg-slate-950 border border-white/15 px-3.5 py-3 text-sm font-bold text-white focus:outline-none focus:border-amber-400"
                   >
                     {validPlayers.map((p) => (
@@ -667,7 +675,7 @@ export default function StellenCheckenClient({
             </div>
 
             {/* Sequenz-Auswahl (200 Reihenfolgen) */}
-            <div className="space-y-3 pt-2 border-t border-white/10">
+            <div data-ui-id="STELLEN.SETUP.PRESET_SECTION" className="space-y-3 pt-2 border-t border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-400">
                   2. Reihenfolge / Sequenz-ID (#001 – #200)
@@ -681,6 +689,7 @@ export default function StellenCheckenClient({
                 <button
                   type="button"
                   onClick={() => setPresetMode('random')}
+                  data-ui-id="STELLEN.SETUP.PRESET_RANDOM_BTN"
                   className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                     presetMode === 'random'
                       ? 'bg-cyan-500/15 border-cyan-400 text-white'
@@ -699,6 +708,7 @@ export default function StellenCheckenClient({
                 <button
                   type="button"
                   onClick={() => setPresetMode('fixed')}
+                  data-ui-id="STELLEN.SETUP.PRESET_FIXED_BTN"
                   className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                     presetMode === 'fixed'
                       ? 'bg-purple-500/15 border-purple-400 text-white'
@@ -716,13 +726,14 @@ export default function StellenCheckenClient({
               </div>
 
               {presetMode === 'fixed' && (
-                <div className="bg-slate-950/90 border border-purple-500/30 rounded-2xl p-4 space-y-3">
+                <div data-ui-id="STELLEN.SETUP.PRESET_FIXED_PANEL" className="bg-slate-950/90 border border-purple-500/30 rounded-2xl p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-300">Sequenz-ID wählen:</span>
                       <select
                         value={selectedPresetId}
                         onChange={(e) => setSelectedPresetId(Number(e.target.value))}
+                        data-ui-id="STELLEN.SETUP.PRESET_SELECT"
                         className="rounded-xl bg-slate-900 border border-purple-500/40 px-3 py-1.5 text-sm font-black text-purple-300"
                       >
                         {STELLEN_CHECKEN_PRESETS.map((pr) => (
@@ -767,6 +778,7 @@ export default function StellenCheckenClient({
             <button
               type="button"
               onClick={() => startGame()}
+              data-ui-id="STELLEN.SETUP.START_BTN"
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-base sm:text-lg shadow-xl shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Target className="w-5 h-5" />
@@ -777,7 +789,7 @@ export default function StellenCheckenClient({
           </div>
 
           {/* Letzte Spiele / Historie */}
-          <div className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4">
+          <div data-ui-id="STELLEN.HISTORY.CARD" className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-400" />
@@ -866,9 +878,9 @@ export default function StellenCheckenClient({
           2. ACTIVE GAME SCREEN (WÄHREND DER 15 AUFNAHMEN)
       ===================================================================== */}
       {isGameStarted && !isGameFinished && (
-        <div className="space-y-5">
+        <div data-ui-id="STELLEN.MATCH.CONTAINER" className="space-y-5">
           {/* Status-Bar: Sequenz-ID, Aufnahme X/15, Korrektur & Abbrechen */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3">
+          <div data-ui-id="STELLEN.MATCH.STATUS_BAR" className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3">
             <div className="flex items-center gap-2.5">
               <span className="px-3 py-1 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono font-black text-xs sm:text-sm">
                 Sequenz {activePreset.code}
@@ -883,6 +895,7 @@ export default function StellenCheckenClient({
                 type="button"
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
+                data-ui-id="STELLEN.MATCH.UNDO_BTN"
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -896,6 +909,7 @@ export default function StellenCheckenClient({
                     setIsGameStarted(false);
                   }
                 }}
+                data-ui-id="STELLEN.MATCH.ABORT_BTN"
                 className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/70 text-rose-300 border border-rose-500/30 text-xs font-bold transition-colors cursor-pointer"
               >
                 Abbrechen
@@ -904,7 +918,7 @@ export default function StellenCheckenClient({
           </div>
 
           {/* 15er Sequenz-Leiste (Alle 15 Ziele im Überblick) */}
-          <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3">
+          <div data-ui-id="STELLEN.MATCH.ROUNDS_STEPPER" className="bg-slate-900/80 border border-white/10 rounded-2xl p-3">
             <div className="grid grid-cols-5 sm:grid-cols-15 gap-1.5">
               {activePreset.targets.map((tNum, idx) => {
                 const p1Done = p1Rounds[idx];
@@ -937,7 +951,7 @@ export default function StellenCheckenClient({
           </div>
 
           {/* Spieler-Scoreboard (Solo oder 1vs1) */}
-          <div className={`grid gap-4 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+          <div data-ui-id="STELLEN.MATCH.SCOREBOARD" className={`grid gap-4 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             {/* Spieler 1 */}
             <div
               className={`rounded-2xl p-4 border-2 transition-all flex items-center justify-between ${
@@ -1001,6 +1015,7 @@ export default function StellenCheckenClient({
 
           {/* HAUPT-ZIELANZEIGE & CHECK / MISS BUTTONS */}
           <div
+            data-ui-id="STELLEN.MATCH.TARGET_HERO"
             className={`rounded-3xl bg-gradient-to-b ${currentTier.glowClass} border-2 p-6 sm:p-10 text-center space-y-6 shadow-2xl`}
           >
             <div className="flex flex-col items-center gap-2">
@@ -1039,6 +1054,7 @@ export default function StellenCheckenClient({
               <button
                 type="button"
                 onClick={() => handleDecision(true)}
+                data-ui-id="STELLEN.MATCH.CHECK_SUCCESS_BTN"
                 className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-[0.98] border-2 border-emerald-300 text-slate-950 font-black text-xl sm:text-2xl shadow-xl shadow-emerald-500/30 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 group-hover:scale-105 transition-transform">
@@ -1053,6 +1069,7 @@ export default function StellenCheckenClient({
               <button
                 type="button"
                 onClick={() => handleDecision(false)}
+                data-ui-id="STELLEN.MATCH.CHECK_MISS_BTN"
                 className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/50 hover:to-zinc-900 active:scale-[0.98] border-2 border-zinc-700 hover:border-red-700/60 text-zinc-300 hover:text-red-300 font-black text-xl sm:text-2xl shadow-xl shadow-red-950/20 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 group-hover:scale-105 transition-transform">
@@ -1072,7 +1089,7 @@ export default function StellenCheckenClient({
           3. FINISHED / AUSWERTUNGS-SCREEN (NACH 15 AUFNAHMEN)
       ===================================================================== */}
       {isGameStarted && isGameFinished && (
-        <div className="bg-slate-900/95 border-2 border-amber-500/50 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+        <div data-ui-id="STELLEN.COMPLETION.CARD" className="bg-slate-900/95 border-2 border-amber-500/50 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="text-center space-y-2">
             <span className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider">
               15 Aufnahmen beendet • Sequenz {activePreset.code}
@@ -1175,6 +1192,7 @@ export default function StellenCheckenClient({
             <button
               type="button"
               onClick={() => startGame( getRandomPresetId() )}
+              data-ui-id="STELLEN.COMPLETION.NEW_RANDOM_BTN"
               className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg cursor-pointer"
             >
               <Shuffle className="w-4 h-4" />
@@ -1184,6 +1202,7 @@ export default function StellenCheckenClient({
             <button
               type="button"
               onClick={() => startGame(activePresetId)}
+              data-ui-id="STELLEN.COMPLETION.REPLAY_BTN"
               className="px-5 py-3.5 rounded-2xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 font-black text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
@@ -1193,6 +1212,7 @@ export default function StellenCheckenClient({
             <button
               type="button"
               onClick={() => setIsGameStarted(false)}
+              data-ui-id="STELLEN.COMPLETION.RESET_BTN"
               className="px-4 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 font-bold text-xs sm:text-sm transition-all cursor-pointer"
             >
               Modus / Spieler wechseln
@@ -1201,6 +1221,7 @@ export default function StellenCheckenClient({
             <Link
               href="/training/live?view=stellen_checken"
               target="_blank"
+              data-ui-id="STELLEN.COMPLETION.TV_BTN"
               className="px-4 py-3.5 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-black text-xs sm:text-sm flex items-center gap-2 transition-all"
             >
               <Tv className="w-4 h-4" />

@@ -517,12 +517,13 @@ export default function UnifiedTvBoardClient({
       {/* ========================================================
           TV HEADER / CONTROL BAR (AUFGERÄUMT, EINZEILIG & GLASSMORPHISM)
           ======================================================== */}
-      <header className="bg-white/[0.025] border-b border-white/[0.08] px-4 py-2.5 sticky top-0 z-40 backdrop-blur-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.5)]">
+      <header data-ui-id="TV_BOARD.HEADER.BAR" className="bg-white/[0.025] border-b border-white/[0.08] px-4 py-2.5 sticky top-0 z-40 backdrop-blur-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.5)]">
         <div className="max-w-[1920px] mx-auto flex flex-wrap xl:flex-nowrap items-center justify-between gap-3">
           {/* 1. LINKS: Zurück-Button & Einzeiliger Titel */}
           <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/training"
+              data-ui-id="TV_BOARD.HEADER.BACK_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-slate-300 hover:text-white transition-all text-xs font-bold whitespace-nowrap"
               title="Zurück zum Trainingsmenü"
             >
@@ -530,7 +531,7 @@ export default function UnifiedTvBoardClient({
               <span>Training</span>
             </Link>
 
-            <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2 whitespace-nowrap">
+            <h1 data-ui-id="TV_BOARD.HEADER.TITLE" className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2 whitespace-nowrap">
               <span>LIONS TV-BOARD</span>
               <span className="px-2 py-0.5 rounded-md bg-amber-400/[0.12] text-amber-300 text-[10px] font-black uppercase tracking-wider border border-amber-400/35">
                 LIVE
@@ -539,12 +540,13 @@ export default function UnifiedTvBoardClient({
           </div>
 
           {/* 2. MITTE: Spiel-Auswahl (Einheitliches Dark-Gold Glassmorphism) */}
-          <div className="flex items-center justify-center gap-1 bg-black/40 backdrop-blur-xl p-1 rounded-2xl border border-white/[0.08] flex-wrap sm:flex-nowrap order-3 xl:order-2 w-full xl:w-auto">
+          <div data-ui-id="TV_BOARD.NAV.TABS_BAR" className="flex items-center justify-center gap-1 bg-black/40 backdrop-blur-xl p-1 rounded-2xl border border-white/[0.08] flex-wrap sm:flex-nowrap order-3 xl:order-2 w-full xl:w-auto">
             <button
               onClick={() => {
                 setViewMode('both');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
+              data-ui-id="TV_BOARD.NAV.TAB_ALL_4"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'both' && timeframe !== 'archive'
                   ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
@@ -560,6 +562,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('doppelquote');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
+              data-ui-id="TV_BOARD.NAV.TAB_CHECKOUT"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'doppelquote' && timeframe !== 'archive'
                   ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
@@ -574,6 +577,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('pdc');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
+              data-ui-id="TV_BOARD.NAV.TAB_PDC"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'pdc' && timeframe !== 'archive'
                   ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
@@ -588,6 +592,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('fussball');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
+              data-ui-id="TV_BOARD.NAV.TAB_FUSSBALL"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'fussball' && timeframe !== 'archive'
                   ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
@@ -602,6 +607,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('stellen_checken');
                 if (timeframe === 'archive') setTimeframe('today');
               }}
+              data-ui-id="TV_BOARD.NAV.TAB_STELLEN"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'stellen_checken' && timeframe !== 'archive'
                   ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
@@ -616,6 +622,7 @@ export default function UnifiedTvBoardClient({
                 setViewMode('archive');
                 setTimeframe('archive');
               }}
+              data-ui-id="TV_BOARD.NAV.TAB_ARCHIVE"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 viewMode === 'archive' || timeframe === 'archive'
                   ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
@@ -630,9 +637,10 @@ export default function UnifiedTvBoardClient({
           {/* 3. RECHTS: Zeitraum-Wahl, Uhrzeit & TV-Tools */}
           <div className="flex items-center gap-2 shrink-0 order-2 xl:order-3">
             {viewMode !== 'archive' && (
-              <div className="flex items-center gap-0.5 bg-black/40 backdrop-blur-xl p-1 rounded-xl border border-white/[0.08] text-xs">
+              <div data-ui-id="TV_BOARD.TIMEFRAME.BAR" className="flex items-center gap-0.5 bg-black/40 backdrop-blur-xl p-1 rounded-xl border border-white/[0.08] text-xs">
                 <button
                   onClick={() => handleTimeframeChange('today')}
+                  data-ui-id="TV_BOARD.TIMEFRAME.TODAY_BTN"
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'today'
                       ? 'bg-amber-400 text-slate-950 font-black'
@@ -644,6 +652,7 @@ export default function UnifiedTvBoardClient({
                 </button>
                 <button
                   onClick={() => handleTimeframeChange('month')}
+                  data-ui-id="TV_BOARD.TIMEFRAME.MONTH_BTN"
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'month'
                       ? 'bg-amber-400 text-slate-950 font-black'
@@ -655,6 +664,7 @@ export default function UnifiedTvBoardClient({
                 </button>
                 <button
                   onClick={() => handleTimeframeChange('all')}
+                  data-ui-id="TV_BOARD.TIMEFRAME.ALL_BTN"
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                     timeframe === 'all'
                       ? 'bg-amber-400 text-slate-950 font-black'
@@ -668,7 +678,7 @@ export default function UnifiedTvBoardClient({
             )}
 
             {/* Uhrzeit */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.09] text-amber-300 font-mono text-xs sm:text-sm font-bold shadow-inner whitespace-nowrap">
+            <div data-ui-id="TV_BOARD.HEADER.CLOCK" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.09] text-amber-300 font-mono text-xs sm:text-sm font-bold shadow-inner whitespace-nowrap">
               <Clock className="w-3.5 h-3.5 text-amber-300/80" />
               <span>{currentTime || '--:--:--'}</span>
             </div>
@@ -679,6 +689,7 @@ export default function UnifiedTvBoardClient({
               <div className="relative" ref={displayMenuRef}>
                 <button
                   onClick={() => setShowDisplayMenu((prev) => !prev)}
+                  data-ui-id="TV_BOARD.HEADER.DISPLAY_PROFILE_BTN"
                   className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer ${
                     showDisplayMenu
                       ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
@@ -1020,7 +1031,7 @@ export default function UnifiedTvBoardClient({
           <div className="space-y-4">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 sm:gap-6">
               {/* TABELLE LINKS: CHECKOUT BATTLE (DOPPELQUOTE) */}
-              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+              <div data-ui-id="TV_BOARD.QUADRANT.CHECKOUT_CARD" className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
                 {/* Header Spiel 1 */}
                 <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
                   <div className="flex items-center gap-3">
@@ -1166,7 +1177,7 @@ export default function UnifiedTvBoardClient({
               </div>
 
               {/* TABELLE RECHTS: PDC CHALLENGE (57 DARTS) */}
-              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+              <div data-ui-id="TV_BOARD.QUADRANT.PDC_CARD" className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
                 {/* Header Spiel 2 */}
                 <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
                   <div className="flex items-center gap-3">
@@ -1324,7 +1335,7 @@ export default function UnifiedTvBoardClient({
               </div>
 
               {/* TABELLE 3: FUßBALL DARTS (MATCHBOARD & DUELLE) */}
-              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+              <div data-ui-id="TV_BOARD.QUADRANT.FUSSBALL_CARD" className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
                 {/* Header Spiel 3 */}
                 <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
                   <div className="flex items-center gap-3">
@@ -1477,7 +1488,7 @@ export default function UnifiedTvBoardClient({
               </div>
 
               {/* TABELLE 4: STELLEN & CHECKEN (3–101 PUNKTEJAGD) */}
-              <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+              <div data-ui-id="TV_BOARD.QUADRANT.STELLEN_CARD" className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
                 {/* Header Spiel 4 */}
                 <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
                   <div className="flex items-center gap-3">

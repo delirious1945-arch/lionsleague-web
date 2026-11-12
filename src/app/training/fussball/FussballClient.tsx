@@ -717,9 +717,10 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     <div className="w-full max-w-4xl overflow-x-hidden mx-auto px-2 sm:px-4 py-4 space-y-4 select-none">
       
       {/* Top Header */}
-      <div className="flex items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl p-3 sm:p-4 shadow-xl backdrop-blur-md">
+      <div data-ui-id="FUSSBALL.NAV.BAR" className="flex items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl p-3 sm:p-4 shadow-xl backdrop-blur-md">
         <Link
           href="/training"
+          data-ui-id="FUSSBALL.NAV.BACK_BTN"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
@@ -741,6 +742,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
+            data-ui-id="FUSSBALL.NAV.SOUND_BTN"
             className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
             title="Sound"
           >
@@ -748,6 +750,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           </button>
           <button
             onClick={() => setShowHelp(true)}
+            data-ui-id="FUSSBALL.NAV.HELP_BTN"
             className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
             title="Spielregeln"
           >
@@ -758,7 +761,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
 
       {/* SETUP SCREEN (VOR DEM ANPFIFF) */}
       {!isGameStarted ? (
-        <div className="bg-slate-900/95 border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
+        <div data-ui-id="FUSSBALL.SETUP.CARD" className="bg-slate-900/95 border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
           <div className="text-center space-y-1">
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest block">
               Match-Konfiguration
@@ -780,6 +783,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               <button
                 type="button"
                 onClick={() => setGameMode('1vsComputer')}
+                data-ui-id="FUSSBALL.SETUP.MODE_COMPUTER_BTN"
                 className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
                   gameMode === '1vsComputer'
                     ? 'bg-emerald-950/80 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] text-white scale-[1.02]'
@@ -794,6 +798,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               <button
                 type="button"
                 onClick={() => setGameMode('1vs1')}
+                data-ui-id="FUSSBALL.SETUP.MODE_1VS1_BTN"
                 className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
                   gameMode === '1vs1'
                     ? 'bg-blue-950/80 border-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.3)] text-white scale-[1.02]'
@@ -809,7 +814,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
 
           {/* Spieler Auswahl */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            <div data-ui-id="FUSSBALL.SETUP.P1_WRAPPER">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-sky-400 uppercase tracking-wider block">
                   Spieler 1 (Heimteam)
@@ -844,7 +849,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
             </div>
 
             {gameMode === '1vs1' ? (
-              <div>
+              <div data-ui-id="FUSSBALL.SETUP.P2_WRAPPER">
                 <label className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1.5">
                   Spieler 2 (Gastteam)
                 </label>
@@ -859,13 +864,14 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 </select>
               </div>
             ) : (
-              <div>
+              <div data-ui-id="FUSSBALL.SETUP.DIFFICULTY_WRAPPER">
                 <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-1.5">
                   Computer-Schwierigkeit
                 </label>
                 <select
                   value={computerDifficulty}
                   onChange={(e) => setComputerDifficulty(e.target.value as ComputerDifficulty)}
+                  data-ui-id="FUSSBALL.SETUP.DIFFICULTY_SELECT"
                   className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none focus:border-emerald-500"
                 >
                   {(Object.keys(DIFFICULTY_CONFIGS) as ComputerDifficulty[]).map(key => {
@@ -911,7 +917,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           )}
 
           {/* Ziel-Tore */}
-          <div className="space-y-2">
+          <div className="space-y-2" data-ui-id="FUSSBALL.SETUP.GOALS_SECTION">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
                 Ziel-Tore zum Sieg
@@ -920,7 +926,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 ⭐ Offizielles Vereins-Ranking ab mindestens 5 Toren!
               </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-ui-id="FUSSBALL.SETUP.TARGET_GOALS_GRID">
               {[3, 5, 7, 10].map(val => {
                 const isRanking = val >= 5;
                 const isSelected = targetGoals === val;
@@ -930,6 +936,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                     key={val}
                     type="button"
                     onClick={() => setTargetGoals(val)}
+                    data-ui-id={`FUSSBALL.SETUP.GOALS_${val}_BTN`}
                     className={`py-3 px-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                       isSelected
                         ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 border-2 border-emerald-300 text-slate-950 font-black shadow-lg shadow-emerald-500/30 scale-105'
@@ -961,6 +968,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           <button
             type="button"
             onClick={handleStartGame}
+            data-ui-id="FUSSBALL.SETUP.START_BTN"
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
           >
             <span>⚽</span>
@@ -968,7 +976,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           </button>
 
           {/* Tablet-Cache & Speicher-Status (Transparenz für Offline-Speicherung) */}
-          <div className="bg-slate-950/70 border border-white/10 rounded-2xl p-4 space-y-3">
+          <div data-ui-id="FUSSBALL.SETUP.CACHE_CARD" className="bg-slate-950/70 border border-white/10 rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-xl shrink-0">📱</span>
@@ -997,6 +1005,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                   loadLocalCacheState();
                   setShowCacheInspector(!showCacheInspector);
                 }}
+                data-ui-id="FUSSBALL.SETUP.CACHE_TOGGLE_BTN"
                 className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shrink-0"
               >
                 {showCacheInspector ? '▲ Einklappen' : '▼ Cache ansehen'}
@@ -1018,6 +1027,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                       setSyncFeedback('✅ Alle ausstehenden Spiele erfolgreich mit der Supabase-Cloud synchronisiert!');
                       setTimeout(() => setSyncFeedback(null), 4000);
                     }}
+                    data-ui-id="FUSSBALL.SETUP.CACHE_SYNC_BTN"
                     className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
                   >
                     <span>🔄</span>
@@ -1077,10 +1087,10 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       ) : (
 
         /* ================= SPIEL-BILDSCHIRM (LIVE MATCH) ================= */
-        <div className="space-y-4">
+        <div data-ui-id="FUSSBALL.MATCH.CONTAINER" className="space-y-4">
           
           {/* Stadion Anzeigetafel */}
-          <div className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-2 border-white/10 rounded-3xl p-4 sm:p-6 shadow-2xl text-center relative overflow-hidden">
+          <div data-ui-id="FUSSBALL.MATCH.SCOREBOARD" className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-2 border-white/10 rounded-3xl p-4 sm:p-6 shadow-2xl text-center relative overflow-hidden">
             {/* Hintergrund Rasen-Glow */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/25 via-transparent to-transparent pointer-events-none" />
 
@@ -1136,7 +1146,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
             </div>
 
             {/* Ballbesitz Status Banner */}
-            <div className={`mt-4 p-2.5 rounded-2xl border text-xs font-black flex items-center justify-center gap-2 shadow-inner transition-all ${
+            <div data-ui-id="FUSSBALL.MATCH.POSSESSION_BANNER" className={`mt-4 p-2.5 rounded-2xl border text-xs font-black flex items-center justify-center gap-2 shadow-inner transition-all ${
               ballPossession === 1
                 ? 'bg-blue-950/70 border-sky-500/40 text-sky-300'
                 : ballPossession === 2
@@ -1155,7 +1165,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           </div>
 
           {/* Aktuelle Aufnahme & Darts (Dart 1, Dart 2, Dart 3) */}
-          <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
+          <div data-ui-id="FUSSBALL.MATCH.THROWER_BAR" className="bg-slate-900/90 border border-white/10 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
             
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3">
               <div>
@@ -1178,7 +1188,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               </div>
 
               {/* Darts Indikatoren */}
-              <div className="flex items-center gap-2">
+              <div data-ui-id="FUSSBALL.MATCH.DARTS_INDICATOR" className="flex items-center gap-2">
                 {[1, 2, 3].map(dartNum => {
                   const shot = currentTurnShots.find(s => s.dartNum === dartNum);
                   const isCurrent = currentDart === dartNum && !gameOver && !isBotThinking;
@@ -1211,7 +1221,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
             {!gameOver ? (
               isBotThinking ? (
                 /* Computer wirft gerade */
-                <div className="py-8 text-center space-y-3 bg-slate-950/60 rounded-2xl border border-white/5 animate-pulse">
+                <div data-ui-id="FUSSBALL.MATCH.BOT_WAITING" className="py-8 text-center space-y-3 bg-slate-950/60 rounded-2xl border border-white/5 animate-pulse">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-2xl mx-auto">
                     🤖
                   </div>
@@ -1224,7 +1234,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 </div>
               ) : (
                 /* Mensch wirft */
-                <div className="space-y-3">
+                <div data-ui-id="FUSSBALL.MATCH.CONTROLS" className="space-y-3">
                   <div className="text-center text-xs font-bold text-slate-300">
                     {currentWerferHasBall ? (
                       <span className="text-emerald-400">
@@ -1302,7 +1312,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               )
             ) : (
               /* Spielende Anzeige */
-              <div className="py-6 text-center space-y-4 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-5 shadow-2xl">
+              <div data-ui-id="FUSSBALL.COMPLETION.CARD" className="py-6 text-center space-y-4 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-5 shadow-2xl">
                 <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center text-3xl mx-auto shadow-lg animate-bounce">
                   🏆
                 </div>
@@ -1332,6 +1342,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                       e.preventDefault();
                       handleStartGame(e);
                     }}
+                    data-ui-id="FUSSBALL.COMPLETION.REMATCH_BTN"
                     className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer select-none"
                   >
                     <RefreshCw className="w-4 h-4" />
@@ -1345,6 +1356,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                       clearActiveGameCache();
                       setIsGameStarted(false);
                     }}
+                    data-ui-id="FUSSBALL.COMPLETION.NEW_GAME_BTN"
                     className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition-all cursor-pointer select-none"
                   >
                     Neues Match konfigurieren
@@ -1354,7 +1366,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
             )}
 
             {/* Live Ticker */}
-            <div className="bg-slate-950/80 rounded-2xl p-3 border border-white/5 space-y-1">
+            <div data-ui-id="FUSSBALL.MATCH.TICKER" className="bg-slate-950/80 rounded-2xl p-3 border border-white/5 space-y-1">
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Live Stadion-Ticker</span>
@@ -1370,6 +1382,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 <button
                   type="button"
                   onClick={handleAbortMatch}
+                  data-ui-id="FUSSBALL.MATCH.ABORT_BTN"
                   className="px-3 py-1.5 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer select-none"
                 >
                   Match abbrechen
@@ -1378,6 +1391,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 <button
                   type="button"
                   onClick={handleUndo}
+                  data-ui-id="FUSSBALL.MATCH.UNDO_BTN"
                   disabled={
                     isBotThinking ||
                     (currentTurnShots.length === 0 && historyStack.length === 0)
@@ -1393,7 +1407,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           </div>
 
           {/* Match-Statistiken */}
-          <div className="grid grid-cols-2 gap-3 text-xs">
+          <div data-ui-id="FUSSBALL.MATCH.STATS_CARD" className="grid grid-cols-2 gap-3 text-xs">
             <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3.5 space-y-2">
               <span className="font-black text-sky-400 block truncate">{p1Name}</span>
               <div className="space-y-1 font-mono text-[11px] text-slate-300">

@@ -297,7 +297,7 @@ export default function VerwaltungClient({
       </div>
 
       {/* Title */}
-      <div className="pb-4 border-b border-white/10">
+      <div data-ui-id="VERWALTUNG.HEADER.BAR" className="pb-4 border-b border-white/10">
 
         <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
           <span>⚙️</span> Verwaltung & Spielberichts-Bearbeitung
@@ -309,6 +309,7 @@ export default function VerwaltungClient({
           <button
             onClick={handleRunAudit}
             disabled={isAuditing}
+            data-ui-id="VERWALTUNG.HEADER.AUDIT_BTN"
             className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs sm:text-sm px-4 py-2 rounded-xl transition-all shadow-md disabled:opacity-50 cursor-pointer"
           >
             <span>🛡️</span> {isAuditing ? 'Audit läuft...' : 'System-Audit & Daten-Konsistenz prüfen'}
@@ -317,9 +318,10 @@ export default function VerwaltungClient({
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 sm:gap-3 border-b border-white/10 pb-4">
+      <div data-ui-id="VERWALTUNG.NAV.TABS_BAR" className="flex flex-wrap gap-2 sm:gap-3 border-b border-white/10 pb-4">
         <button
           onClick={() => setActiveTab('matches')}
+          data-ui-id="VERWALTUNG.NAV.TAB_MATCHES"
           className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
             activeTab === 'matches'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-lg shadow-cyan-500/20'
@@ -331,6 +333,7 @@ export default function VerwaltungClient({
 
         <button
           onClick={() => setActiveTab('players')}
+          data-ui-id="VERWALTUNG.NAV.TAB_PLAYERS"
           className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
             activeTab === 'players'
               ? 'bg-purple-500/20 text-purple-300 border border-purple-400/50 shadow-lg shadow-purple-500/20'
@@ -342,6 +345,7 @@ export default function VerwaltungClient({
 
         <button
           onClick={() => setActiveTab('training')}
+          data-ui-id="VERWALTUNG.NAV.TAB_TRAINING"
           className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
             activeTab === 'training'
               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 shadow-lg shadow-emerald-500/20'
@@ -578,9 +582,9 @@ export default function VerwaltungClient({
         const bestPdcScore = trainingPdc.reduce((max: number, p: any) => Math.max(max, Number(p.total_score || 0)), 0);
 
         return (
-          <div className="space-y-5 animate-fadeIn">
+          <div data-ui-id="VERWALTUNG.TRAINING.CONTAINER" className="space-y-5 animate-fadeIn">
             {/* Header & Quick Links */}
-            <div className="bg-[#081022] border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div data-ui-id="VERWALTUNG.TRAINING.HEADER_CARD" className="bg-[#081022] border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
@@ -595,9 +599,10 @@ export default function VerwaltungClient({
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div data-ui-id="VERWALTUNG.TRAINING.QUICK_LINKS" className="flex flex-wrap items-center gap-2">
                 <Link
                   href="/doppelquote"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_CHECKOUT"
                   className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <Target size={13} />
@@ -606,6 +611,7 @@ export default function VerwaltungClient({
                 </Link>
                 <Link
                   href="/training/pdc-challenge"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_PDC"
                   className="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <Award size={13} />
@@ -614,6 +620,7 @@ export default function VerwaltungClient({
                 </Link>
                 <Link
                   href="/training/fussball"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_FUSSBALL"
                   className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <span>⚽ Fußball Darts</span>
@@ -621,6 +628,7 @@ export default function VerwaltungClient({
                 </Link>
                 <Link
                   href="/training/stellen-checken"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_STELLEN"
                   className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <Target size={13} />
@@ -629,6 +637,7 @@ export default function VerwaltungClient({
                 </Link>
                 <Link
                   href="/video"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_VIDEO"
                   className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <span>🎥 KI-Wurfanalyse</span>
@@ -653,7 +662,7 @@ export default function VerwaltungClient({
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div data-ui-id="VERWALTUNG.TRAINING.KPIS_GRID" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-[#081022] border border-white/10 rounded-xl p-3 text-center">
                 <div className="text-[11px] text-slate-400 font-bold uppercase">Gesamt-Trainings</div>
                 <div className="text-xl sm:text-2xl font-black text-white mt-1">
@@ -690,11 +699,12 @@ export default function VerwaltungClient({
             </div>
 
             {/* Filter Bar */}
-            <div className="bg-[#081022] border border-white/10 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div data-ui-id="VERWALTUNG.TRAINING.FILTER_BAR" className="bg-[#081022] border border-white/10 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
               {/* Type Switcher */}
               <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-lg border border-white/5">
                 <button
                   onClick={() => setTrainingGameType('all')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_ALL_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
                     trainingGameType === 'all'
                       ? 'bg-emerald-600 text-white shadow-sm'
@@ -705,6 +715,7 @@ export default function VerwaltungClient({
                 </button>
                 <button
                   onClick={() => setTrainingGameType('doubles')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_DOUBLES_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
                     trainingGameType === 'doubles'
                       ? 'bg-blue-600 text-white shadow-sm'
@@ -715,6 +726,7 @@ export default function VerwaltungClient({
                 </button>
                 <button
                   onClick={() => setTrainingGameType('pdc')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_PDC_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
                     trainingGameType === 'pdc'
                       ? 'bg-amber-600 text-white shadow-sm'
@@ -725,6 +737,7 @@ export default function VerwaltungClient({
                 </button>
                 <button
                   onClick={() => setTrainingGameType('fussball')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_FUSSBALL_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
                     trainingGameType === 'fussball'
                       ? 'bg-emerald-600 text-white shadow-sm'
@@ -735,6 +748,7 @@ export default function VerwaltungClient({
                 </button>
                 <button
                   onClick={() => setTrainingGameType('stellen_checken')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_STELLEN_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
                     trainingGameType === 'stellen_checken'
                       ? 'bg-cyan-600 text-white shadow-sm'
@@ -745,6 +759,7 @@ export default function VerwaltungClient({
                 </button>
                 <button
                   onClick={() => setTrainingGameType('biomechanics')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_BIOMECHANICS_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
                     trainingGameType === 'biomechanics'
                       ? 'bg-purple-600 text-white shadow-sm'
@@ -763,6 +778,7 @@ export default function VerwaltungClient({
                 <select
                   value={trainingPlayerFilter}
                   onChange={(e) => setTrainingPlayerFilter(e.target.value)}
+                  data-ui-id="VERWALTUNG.TRAINING.PLAYER_SELECT"
                   className="bg-slate-900 border border-white/15 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 >
                   <option value="all">🌐 Alle Spieler ({combinedSessions.length})</option>
