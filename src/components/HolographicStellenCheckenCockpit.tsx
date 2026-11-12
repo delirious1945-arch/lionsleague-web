@@ -117,42 +117,6 @@ function parseRoute(routeStr: string): {
   };
 }
 
-// Golden Lion Head Emblem (Königliches Wappen mit feinem Gold-Glow)
-function GoldenLionHead({ className = 'w-16 h-16' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#fff8cc" />
-          <stop offset="25%" stopColor="#ffd700" />
-          <stop offset="65%" stopColor="#d4af37" />
-          <stop offset="100%" stopColor="#996515" />
-        </linearGradient>
-        <filter id="goldGlowFilter" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-      </defs>
-      <g filter="url(#goldGlowFilter)" fill="url(#goldGrad)">
-        {/* Äußere Mähne */}
-        <path d="M50 10 L54 19 L64 13 L63 24 L74 21 L70 31 L81 32 L74 40 L84 44 L75 51 L84 58 L74 62 L81 70 L70 71 L74 81 L63 78 L64 89 L54 83 L50 93 L46 83 L36 89 L37 78 L26 81 L30 71 L19 70 L26 62 L16 58 L25 51 L16 44 L26 40 L19 32 L30 31 L26 21 L37 24 L36 13 L46 19 Z" fillOpacity="0.9" />
-        {/* Löwengesicht Kontur */}
-        <path d="M50 26 C41 26 36 33 36 45 C36 57 43 67 50 73 C57 67 64 57 64 45 C64 33 59 26 50 26 Z" fillOpacity="0.95" />
-        {/* Stirn-Spitzen */}
-        <polygon points="50,29 46,37 54,37" fill="#fff9d6" />
-        {/* Augen */}
-        <path d="M42 44 C44 42 47 42 48 45 C46 46 43 46 42 44 Z" fill="#1e1810" />
-        <path d="M58 44 C56 42 53 42 52 45 C54 46 57 46 58 44 Z" fill="#1e1810" />
-        {/* Nase & Schnauze */}
-        <polygon points="50,57 46,51 54,51" fill="#2a1f10" />
-        <path d="M50 57 L50 63 M50 63 C46 63 44 61 43 59 M50 63 C54 63 56 61 57 59" stroke="#2a1f10" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="47" cy="60" r="1" fill="#fff" />
-        <circle cx="53" cy="60" r="1" fill="#fff" />
-      </g>
-    </svg>
-  );
-}
-
 export default function HolographicStellenCheckenCockpit({
   boardId,
   activeName,
@@ -278,37 +242,30 @@ export default function HolographicStellenCheckenCockpit({
       <main className="my-auto w-full max-w-7xl mx-auto flex items-center justify-center relative z-20 px-2 sm:px-4">
         <div className="relative flex items-center justify-center w-full">
           {/* --------------------------------------------------------------- */}
-          {/* LINKER FLÜGEL: SPIELER-CARD MIT GOLD-RAHMEN & LÖWEN-WAPPEN */}
+          {/* LINKER FLÜGEL: SPIELER-CARD (PERFEKT ZENTRIERT & EDEL) */}
           {/* --------------------------------------------------------------- */}
           <div
-            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/60 backdrop-blur-3xl border-2 border-[#d4af37] shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.4),0_0_35px_rgba(212,175,55,0.3)] p-6 sm:p-8 flex items-center gap-5 -mr-8 overflow-hidden"
+            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-center text-center -mr-8 overflow-hidden"
           >
-            {/* Oberer goldener Glanzstreifen */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#ffd700]/70 to-transparent" />
+            {/* Oberer Lichtglanz */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
-            {/* Golden Lion Crest */}
-            <div className="shrink-0 drop-shadow-[0_0_20px_rgba(255,215,0,0.4)]">
-              <GoldenLionHead className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24" />
+            {/* Spielername zentriert in monumentaler Typografie */}
+            <div className="flex flex-col items-center justify-center">
+              <span className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)]">
+                {firstName}
+              </span>
+              <span className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)] mt-1 sm:mt-1.5">
+                {lastName}
+              </span>
             </div>
 
-            {/* Spielername & Status */}
-            <div className="flex flex-col justify-center space-y-2">
-              <div className="flex flex-col">
-                <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.9)]">
-                  {firstName}
-                </span>
-                <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.9)] mt-0.5">
-                  {lastName}
-                </span>
-              </div>
-
-              {/* Status Badge */}
-              <div className="pt-1">
-                <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-950/80 border-2 border-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.5)] text-cyan-300 font-mono text-xs sm:text-sm font-black tracking-widest">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#ff3366] animate-pulse" />
-                  <span>🎯 AM WURF</span>
-                </span>
-              </div>
+            {/* Status Badge */}
+            <div className="mt-4 sm:mt-5">
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-950/80 border-2 border-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.5)] text-cyan-300 font-mono text-xs sm:text-sm font-black tracking-widest">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#ff3366] animate-pulse" />
+                <span>🎯 AM WURF</span>
+              </span>
             </div>
           </div>
 
@@ -549,40 +506,45 @@ export default function HolographicStellenCheckenCockpit({
           </div>
 
           {/* --------------------------------------------------------------- */}
-          {/* RECHTER FLÜGEL: CHECKS & QUOTE MIT 15 FORTSCHRITTS-KAPSELN */}
+          {/* RECHTER FLÜGEL: CHECKS & QUOTE (PERFEKT ZENTRIERT & HARMONISCH) */}
           {/* --------------------------------------------------------------- */}
           <div
-            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/60 backdrop-blur-3xl border-2 border-[#d4af37] shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.4),0_0_35px_rgba(212,175,55,0.3)] p-6 sm:p-8 flex flex-col justify-between -ml-8 overflow-hidden"
+            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-between text-center -ml-8 overflow-hidden"
           >
-            {/* Oberer goldener Glanzstreifen */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#ffd700]/70 to-transparent" />
+            {/* Oberer Lichtglanz */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
-            {/* Oberer Bereich: Gigantische Typografie (5 / 15 Checks & 33.3%) */}
-            <div className="space-y-1">
-              <div className="flex items-baseline gap-2.5">
-                <span className="text-6xl sm:text-7xl lg:text-8xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.8)]">
+            {/* Zentraler Score-Bereich: Komplett zentriert & perfekt ausbalanciert */}
+            <div className="flex flex-col items-center justify-center my-auto space-y-1 w-full">
+              {/* Große Zahl: 0 / 15 */}
+              <div className="flex items-baseline justify-center gap-2.5">
+                <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.8)]">
                   {checksCount}
                 </span>
-                <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#00ff88] tracking-tight leading-none drop-shadow-[0_0_20px_rgba(0,255,136,0.5)]">
-                  /{totalVisits} Checks
+                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold font-mono text-slate-400 leading-none">
+                  / {totalVisits}
                 </span>
               </div>
 
-              <div className="pt-1">
-                <span className="text-2xl sm:text-3xl font-black font-mono text-[#ffd700] tracking-wider drop-shadow-[0_0_20px_rgba(255,215,0,0.7)]">
-                  {checkPct}%
-                </span>
-              </div>
+              {/* Dezentes, edles Label */}
+              <span className="text-[11px] sm:text-xs font-black font-mono uppercase tracking-widest text-emerald-400/90 block pt-1">
+                CHECKS VERWANDELT
+              </span>
+
+              {/* Quote */}
+              <span className="text-2xl sm:text-3xl font-black font-mono text-amber-300 tracking-wider drop-shadow-[0_0_20px_rgba(251,191,36,0.7)] pt-1 block">
+                {checkPct}%
+              </span>
             </div>
 
-            {/* Unterer Bereich: Exakt 15 Fortschritts-Kapseln (Pill-Dots) */}
-            <div className="flex items-center gap-2 w-full pt-4">
+            {/* 15 gleichmäßige Kapseln zentriert am Boden */}
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 w-full pt-2">
               {Array.from({ length: totalVisits }).map((_, i) => {
                 const isChecked = i < checksCount;
                 return (
                   <div
                     key={i}
-                    className={`h-3.5 flex-1 rounded-full transition-all duration-500 ${
+                    className={`h-3 sm:h-3.5 flex-1 max-w-[20px] rounded-full transition-all duration-500 ${
                       isChecked
                         ? 'bg-[#00ff88] shadow-[0_0_15px_#00ff88,0_0_5px_#ffffff] border border-[#00ff88]'
                         : 'bg-slate-800/80 border border-white/10'
