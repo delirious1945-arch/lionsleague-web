@@ -281,10 +281,7 @@ export default function HolographicStellenCheckenCockpit({
           {/* LINKER FLÜGEL: SPIELER-CARD MIT GOLD-RAHMEN & LÖWEN-WAPPEN */}
           {/* --------------------------------------------------------------- */}
           <div
-            className="relative z-10 w-[300px] sm:w-[360px] lg:w-[410px] h-[220px] sm:h-[260px] lg:h-[280px] rounded-[2.5rem] bg-slate-900/50 backdrop-blur-3xl border-2 border-[#d4af37]/75 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.4),0_0_35px_rgba(212,175,55,0.25)] p-6 sm:p-8 flex items-center gap-5 -mr-10 overflow-hidden"
-            style={{
-              clipPath: 'polygon(0% 0%, 100% 4%, 96% 96%, 0% 100%)',
-            }}
+            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/60 backdrop-blur-3xl border-2 border-[#d4af37] shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.4),0_0_35px_rgba(212,175,55,0.3)] p-6 sm:p-8 flex items-center gap-5 -mr-8 overflow-hidden"
           >
             {/* Oberer goldener Glanzstreifen */}
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#ffd700]/70 to-transparent" />
@@ -318,7 +315,7 @@ export default function HolographicStellenCheckenCockpit({
           {/* --------------------------------------------------------------- */}
           {/* ZENTRUM: HOLOGRAFISCHES DARTBOARD-RADAR (1:1 SOLL-BILD) */}
           {/* --------------------------------------------------------------- */}
-          <div className="relative z-20 w-[340px] h-[340px] sm:w-[420px] sm:h-[420px] lg:w-[490px] lg:h-[490px] shrink-0 flex items-center justify-center select-none pointer-events-none">
+          <div className="relative z-20 w-[360px] h-[360px] sm:w-[440px] sm:h-[440px] lg:w-[500px] lg:h-[500px] shrink-0 flex items-center justify-center select-none pointer-events-none">
             {/* Äußerer Leuchtring */}
             <div className="absolute -inset-4 rounded-full bg-cyan-500/15 blur-2xl animate-pulse pointer-events-none" />
 
@@ -530,7 +527,7 @@ export default function HolographicStellenCheckenCockpit({
             {/* ============================================================= */}
             {/* GEDOCKTER ROUTEN-POD (T16 ➔ D8) AM UNTEREN RAND DES RADARS */}
             {/* ============================================================= */}
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-7 py-2 rounded-full bg-slate-950/95 border-2 border-cyan-400/80 shadow-[0_0_30px_rgba(6,182,212,0.6)] flex items-center gap-2.5 z-30">
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-8 py-2.5 rounded-full bg-slate-950/95 border-2 border-cyan-400/90 shadow-[0_0_30px_rgba(6,182,212,0.7)] flex items-center gap-3 z-30 pointer-events-auto">
               {primaryTokens.map((tok, i) => {
                 const isFinish = tok.toUpperCase().startsWith('D') || tok.toUpperCase().includes('BULL');
                 return (
@@ -555,10 +552,7 @@ export default function HolographicStellenCheckenCockpit({
           {/* RECHTER FLÜGEL: CHECKS & QUOTE MIT 15 FORTSCHRITTS-KAPSELN */}
           {/* --------------------------------------------------------------- */}
           <div
-            className="relative z-10 w-[300px] sm:w-[360px] lg:w-[410px] h-[220px] sm:h-[260px] lg:h-[280px] rounded-[2.5rem] bg-slate-900/50 backdrop-blur-3xl border-2 border-[#d4af37]/75 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.4),0_0_35px_rgba(212,175,55,0.25)] p-6 sm:p-8 flex flex-col justify-between -ml-10 overflow-hidden"
-            style={{
-              clipPath: 'polygon(4% 4%, 100% 0%, 100% 100%, 0% 96%)',
-            }}
+            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/60 backdrop-blur-3xl border-2 border-[#d4af37] shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.4),0_0_35px_rgba(212,175,55,0.3)] p-6 sm:p-8 flex flex-col justify-between -ml-8 overflow-hidden"
           >
             {/* Oberer goldener Glanzstreifen */}
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#ffd700]/70 to-transparent" />

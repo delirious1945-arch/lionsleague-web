@@ -160,28 +160,36 @@ export default function StellenCheckenClient({
     };
   }, [activeBoard]);
 
-  // Live Sync Push
-  useEffect(() => {
-    if (!isGameStarted && !isGameFinished) return;
+  // Live-Sync State-Broadcaster: Sendet sofort & verzögerungsfrei an /api/live/board
+  const broadcastLiveState = (
+    started: boolean,
+    finished: boolean,
+    presetIdToUse: number,
+    rIdx: number,
+    p1R: StellenCheckenRoundDetail[],
+    p2R: StellenCheckenRoundDetail[],
+    actPlayer: 1 | 2
+  ) => {
+    if (!started && !finished) return;
 
-    const preset = getPresetById(activePresetId);
-    const activeNum = preset?.targets?.[roundIdx] ?? 64;
+    const preset = getPresetById(presetIdToUse);
+    const activeNum = preset?.targets?.[rIdx] ?? 64;
     const hint = getSetupCheckoutHint(activeNum);
 
-    const p1ChecksCount = p1Rounds.filter((r) => r.checked).length;
-    const p1PointsCount = p1Rounds.reduce((sum, r) => sum + r.pointsEarned, 0);
-    const p2ChecksCount = p2Rounds.filter((r) => r.checked).length;
-    const p2PointsCount = p2Rounds.reduce((sum, r) => sum + r.pointsEarned, 0);
+    const p1ChecksCount = p1R.filter((r) => r.checked).length;
+    const p1PointsCount = p1R.reduce((sum, r) => sum + r.pointsEarned, 0);
+    const p2ChecksCount = p2R.filter((r) => r.checked).length;
+    const p2PointsCount = p2R.reduce((sum, r) => sum + r.pointsEarned, 0);
 
     const payload = {
       boardId: activeBoard,
-      status: isGameFinished ? 'completed' : isGameStarted ? 'playing' : 'idle',
+      status: finished ? 'completed' : 'playing',
       gameType: 'stellen_checken' as const,
       gameMode,
       p1Name,
       p2Name,
-      activePlayer,
-      currentVisit: roundIdx + 1,
+      activePlayer: actPlayer,
+      currentVisit: rIdx + 1,
       totalVisits: 15,
       currentNumber: activeNum,
       recommendedRoute: hint,
@@ -189,7 +197,7 @@ export default function StellenCheckenClient({
       p1Points: p1PointsCount,
       p2Checks: p2ChecksCount,
       p2Points: p2PointsCount,
-      presetId: activePresetId,
+      presetId: presetIdToUse,
       updatedAt: Date.now(),
     };
 
@@ -213,6 +221,13 @@ export default function StellenCheckenClient({
         body: JSON.stringify(payload),
       }).catch(() => {});
     } catch (e) {}
+  };
+
+  // Live Sync Push via React Effect
+  useEffect(() => {
+    if (isGameStarted || isGameFinished) {
+      broadcastLiveState(isGameStarted, isGameFinished, activePresetId, roundIdx, p1Rounds, p2Rounds, activePlayer);
+    }
   }, [
     isGameStarted,
     isGameFinished,
@@ -339,6 +354,9 @@ export default function StellenCheckenClient({
     setIsGameFinished(false);
     setIsGameStarted(true);
     playSound('start');
+
+    // Sofortiger Live-Push an den TV-Monitor (ohne 1 Frame Verzögerung!)
+    broadcastLiveState(true, false, chosenId, 0, [], [], 1);
   };
 
   const triggerAutoSave = async (
@@ -496,8 +514,10 @@ export default function StellenCheckenClient({
         setIsGameFinished(true);
         playSound('finish');
         triggerAutoSave(nextP1, [], activePresetId);
+        broadcastLiveState(true, true, activePresetId, roundIdx, nextP1, [], 1);
       } else {
         setRoundIdx(roundIdx + 1);
+        broadcastLiveState(true, false, activePresetId, roundIdx + 1, nextP1, [], 1);
       }
     } else {
       // 1 vs. 1 Modus: Erst Spieler 1 für diese Runde, dann Spieler 2 für dieselbe Zielzahl
@@ -505,6 +525,7 @@ export default function StellenCheckenClient({
         const nextP1 = [...p1Rounds, detail];
         setP1Rounds(nextP1);
         setActivePlayer(2);
+        broadcastLiveState(true, false, activePresetId, roundIdx, nextP1, p2Rounds, 2);
       } else {
         const nextP2 = [...p2Rounds, detail];
         setP2Rounds(nextP2);
@@ -513,9 +534,11 @@ export default function StellenCheckenClient({
           setIsGameFinished(true);
           playSound('finish');
           triggerAutoSave(p1Rounds, nextP2, activePresetId);
+          broadcastLiveState(true, true, activePresetId, roundIdx, p1Rounds, nextP2, 2);
         } else {
           setActivePlayer(1);
           setRoundIdx(roundIdx + 1);
+          broadcastLiveState(true, false, activePresetId, roundIdx + 1, p1Rounds, nextP2, 1);
         }
       }
     }
@@ -529,6 +552,8 @@ export default function StellenCheckenClient({
     setP1Rounds(last.p1Rounds);
     setP2Rounds(last.p2Rounds);
     setUndoStack((prev) => prev.slice(0, -1));
+
+    broadcastLiveState(true, false, activePresetId, last.roundIdx, last.p1Rounds, last.p2Rounds, last.activePlayer);
   };
 
   // Kategorie-Aufschlüsselung für einen Spieler

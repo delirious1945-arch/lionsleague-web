@@ -24,7 +24,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     boardId: initialBoardId,
     status: 'idle',
     gameType: 'idle',
-    updatedAt: Date.now(),
+    updatedAt: 0,
   });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -99,19 +99,34 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     return () => window.removeEventListener('storage', handleStorage);
   }, [boardId]);
 
-  // 3. API Polling alle 1.0s für externe Smart-TVs / Fire TV Sticks
+  // 3. API Polling alle 1.0s für externe Smart-TVs / Fire TV Sticks mit Cache-Busting
   useEffect(() => {
     const pollApi = async () => {
       try {
-        const res = await fetch(`/api/live/board?board=${boardId}`, { cache: 'no-store' });
+        const res = await fetch(`/api/live/board?board=${boardId}&_t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
+        });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.updatedAt) {
+          if (data) {
             setLiveState((prev) => {
-              if (!prev.updatedAt || data.updatedAt > prev.updatedAt || data.status === 'idle') {
+              // 1. Wenn ein Spiel läuft: IMMER sofort umschalten!
+              if (data.status === 'playing' || (data.gameType && data.gameType !== 'idle' && data.status !== 'idle')) {
                 return data;
               }
-              return prev;
+              // 2. Wenn das Spiel beendet ist:
+              if (data.status === 'completed') {
+                return data;
+              }
+              // 3. Wenn Standby:
+              if (data.status === 'idle') {
+                return data;
+              }
+              return data;
             });
           }
         }
@@ -322,11 +337,8 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="relative z-20 flex items-center justify-between w-full px-2 text-xs text-slate-400 font-mono">
-          <span>LIONS WEYHAUSEN · LIVE TELEMETRY</span>
-          <span>BOARD {boardId} · CHECKOUT BATTLE</span>
-        </div>
+        {/* Bottom Bar: Sauber ohne Corner-Clutter */}
+        <div className="relative z-20 h-4" />
       </div>
     );
   }
@@ -427,10 +439,8 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
           </div>
         </div>
 
-        <div className="relative z-20 flex items-center justify-between w-full px-2 text-xs text-slate-400 font-mono">
-          <span>LIONS WEYHAUSEN · LIVE TELEMETRY</span>
-          <span>BOARD {boardId} · PDC CHALLENGE</span>
-        </div>
+        {/* Bottom Bar: Sauber ohne Corner-Clutter */}
+        <div className="relative z-20 h-4" />
       </div>
     );
   }
@@ -531,10 +541,8 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
           </div>
         </div>
 
-        <div className="relative z-20 flex items-center justify-between w-full px-2 text-xs text-slate-400 font-mono">
-          <span>LIONS WEYHAUSEN · LIVE TELEMETRY</span>
-          <span>BOARD {boardId} · FUßBALL DARTS</span>
-        </div>
+        {/* Bottom Bar: Sauber ohne Corner-Clutter */}
+        <div className="relative z-20 h-4" />
       </div>
     );
   }
