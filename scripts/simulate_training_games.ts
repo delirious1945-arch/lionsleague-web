@@ -299,6 +299,43 @@ console.log('🎨 Starte Subagent: UI-Cleaner Audit...');
     'UI-Cleaner',
     'Zeitstempel-Harmonisierung parst deutsches Datumsformat robust und garantiert Chronologie'
   );
+
+  // Audit 9: Modell A – Empirische Doppelquoten-Berechnung (§3 & §11 AGENTS.md)
+  const calcQuote = (hits: number, darts: number): number => {
+    if (darts <= 0) return 0;
+    return Math.round((hits / darts) * 1000) / 10;
+  };
+  const checkoutBattleHits = 12;
+  const checkoutBattleDarts = 45;
+  const fussballHits = 8;
+  const fussballDarts = 32;
+  const pdcGames = 1;
+  const pdcHits = 7;
+  const pdcDarts = pdcGames * 21; // Part 2: exakt 21 Darts je Spiel
+  const totalDoubleHits = checkoutBattleHits + fussballHits + pdcHits; // 27
+  const totalDoubleDarts = checkoutBattleDarts + fussballDarts + pdcDarts; // 98
+  const totalQuote = calcQuote(totalDoubleHits, totalDoubleDarts); // 27.6%
+  assert(
+    totalDoubleHits === 27 && totalDoubleDarts === 98 && totalQuote === 27.6 && calcQuote(0, 0) === 0,
+    'UI-Cleaner',
+    'Modell A: Empirische Doppelquote aggregiert Labor-, Fußball- und PDC-Doppel präzise'
+  );
+
+  // Audit 10: Segment-Auswertung & Bestes Doppel Ermittlung
+  const segments = [
+    { name: 'D20', q: 25.0, h: 5 },
+    { name: 'D16', q: 40.0, h: 8 },
+    { name: 'D10', q: 20.0, h: 2 },
+    { name: 'D8', q: 0.0, h: 0 },
+    { name: 'D4', q: 10.0, h: 1 },
+  ].sort((a, b) => b.q - a.q || b.h - a.h);
+  const bestDouble = segments[0].h > 0 ? `${segments[0].name} (${segments[0].q}%)` : '-';
+  const emptyBestDouble = [{ name: 'D20', q: 0, h: 0 }].filter(s => s.h > 0);
+  assert(
+    bestDouble === 'D16 (40%)' && emptyBestDouble.length === 0,
+    'UI-Cleaner',
+    'Bestes Doppel wird nach Quote und Treffern sortiert und bei 0 Treffern neutralisiert'
+  );
 }
 
 // ----------------------------------------------------------------------

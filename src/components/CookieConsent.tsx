@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Cookie, X, Check, ExternalLink, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { Shield, Cookie, X, Check, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 
 export default function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false);
@@ -9,16 +9,21 @@ export default function CookieConsent() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   useEffect(() => {
-    // Prüfen, ob bereits zugestimmt wurde
-    const consent = localStorage.getItem('lions_cookie_consent');
-    if (!consent) {
-      setShowBanner(true);
-    }
+    // Prüfen, ob bereits zugestimmt wurde (asynchron entkoppelt für React 19)
+    const initTimer = setTimeout(() => {
+      const consent = localStorage.getItem('lions_cookie_consent');
+      if (!consent) {
+        setShowBanner(true);
+      }
+    }, 0);
 
     // Globaler Event Listener, um das Datenschutz-Modal über Links öffnen zu können
     const handleOpenPrivacy = () => setShowPrivacyModal(true);
     window.addEventListener('open-privacy-modal', handleOpenPrivacy);
-    return () => window.removeEventListener('open-privacy-modal', handleOpenPrivacy);
+    return () => {
+      clearTimeout(initTimer);
+      window.removeEventListener('open-privacy-modal', handleOpenPrivacy);
+    };
   }, []);
 
   const acceptAll = () => {

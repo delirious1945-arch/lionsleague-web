@@ -8,7 +8,6 @@ import {
   executeMonthlyLottery,
   LotteryWinner,
   PlayerMonthProgress,
-  formatMonthKey,
   getPreviousMonth,
 } from '@/lib/trainingLottery';
 import { getSessionAction } from '@/app/actions';

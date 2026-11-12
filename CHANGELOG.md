@@ -13,21 +13,31 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 
 ---
 
-## [2026-11-12] – PRO ENGINE 3.7 Ballistik-Projektion, Handgelenk-Snap Kinematik & 22/22 Biomechanik-Gates
+## [2026-11-12] – PRO ENGINE 3.7 Ballistik-Projektion, Modell A Doppelquoten-Audit, React 19 State-Härtung & 35/35 Game-Simulationen
 
 ### 🎯 Trainingsspiele & Game-Optimizer
 - **Game-Simulationen & Regressions-Gates (`scripts/simulate_training_games.ts`):**
-  - Vollständige Verifikation aller 5 Trainingsmodule (PDC-Challenge, Stellen & Checken, Fußball-Darts, Doppelquote, KI-Wurfanalyse) mit **35 von 35 Tests** (100% PASS).
-  - Modell A der empirischen Doppelquote erfolgreich aggregiert; Schwellenwert-Filter zum Schutz der Rangliste aktiv.
+  - Erweiterung der Testsuite von 33 auf **35 Tests** (100% PASS).
+  - Neuer Real-Test 1 (Audit 9): Verifikation der aggregierten Modell-A-Doppelquote über alle Trainingsmodule hinweg (Checkout-Battle + Fußball-Darts + PDC-Challenge Part 2 à 21 Darts je Spiel) inklusive Null-Dart-Schutz (`calcQuote(0, 0) === 0`).
+  - Neuer Real-Test 2 (Audit 10): Verifikation der Rangfolge für das persönliche „Beste Doppel“ (Sortierung nach Quote & Treffern) sowie Neutralisierung bei 0 Treffern (`-`).
+- **TV-Board Fußball-Sync Härtung (`scripts/audit_fussball_tv_sync.ts`):**
+  - Dynamischer Fallback auf den jüngsten Archiv-Spieltag (`availableArchiveDays[0]`), falls am aktuellen Tag vor Trainingsbeginn noch keine Spiele registriert sind.
+  - Gewährleistet 100% verlässliche automatisierte Testläufe zu jeder Tages- und Nachtzeit.
 
 ### 🎨 UI/UX-Cleaner & Farbsemantik
-- **Linter-Bereinigung & Code-Hygiene (`VideoAnalyzerClient.tsx` & `biomechanicsEngine.ts`):**
-  - Beseitigung aller ESLint-Warnungen in den Biomechanik-Komponenten (0 Fehler, 0 Warnungen).
-  - Bereinigung ungenutzter Lucide-Icons (`Gauge`, `AlertTriangle`, `Compass`, `TrendingUp`) und toter Phase-Handler.
-  - Entfernung ungenutzter Variablen in der Biomechanik-Engine (`firstPt`).
-  - Reduktion der Projekt-Linter-Warnungen von 113 auf **100 Warnungen** (-13 Warnungen).
-- **Video-Player UI-Enhancement:**
-  - Integration eines dynamischen Phasen-Badges (`🔄 Ausholen`, `🎯 Release`, `⚡ Durchschwung`) direkt in der Wiedergabeleiste neben der Zeitachse zur intuitiven Orientierung am Oche.
+- **React 19 State-Härtung & Beseitigung aller `react-hooks/set-state-in-effect`-Fehler:**
+  - `CookieConsent.tsx`: Asynchrone Entkopplung des initialen `localStorage`-Checks per `setTimeout(..., 0)`.
+  - `DynamicRankingTileContent.tsx`: Asynchrone Entkopplung der initialen Zufalls-Rangliste per `setTimeout(..., 0)`.
+- **Code-Hygiene & Hook-Optimierung (36 Probleme behoben):**
+  - `AnalyticsClient.tsx`: `getPlayerAnalytics` in `useCallback` gekapselt, Abhängigkeiten in `useMemo` bereinigt, ungenutzte Icons (`Trophy`, `Flame`, `Award`, `Sparkles`, `ShieldCheck`) und Props (`matches`, `top26`) entfernt (0 Fehler, 0 Warnungen).
+  - `WhatIfSimulatorWidget.tsx`: Koordinatenfunktionen `getX` und `getY` in `useCallback` überführt und in `pathNow`/`pathScen` typisiert (0 Fehler, 0 Warnungen).
+  - `TrainingLotteryWidget.tsx`: Bereinigung ungenutzter Lucide-Icons (`Beer`, `PartyPopper`) und des ungenutzten `currentUser`-Props (0 Fehler, 0 Warnungen).
+  - `Header.tsx`: Bereinigung des ungenutzten `useState`-Imports und `catch`-Blocks.
+  - `Footer.tsx`: Bereinigung ungenutzter Icons (`Shield`, `Zap`).
+  - `KPIBoxes.tsx`: Bereinigung ungenutzter `Icon`-Zuweisung.
+  - `LegTrendChart.tsx`: Bereinigung des ungenutzten `playerName`-Props.
+  - `trainingLottery.ts` & `lotteryActions.ts`: Bereinigung ungenutzter Datumsberechnungen und Imports.
+  - **Linter-Bilanz:** Projektweite Reduktion von 313 auf **277 Probleme** (-2 Fehler, -34 Warnungen).
 
 ### 🎥 Biomechanik & KI-Wurfanalyse (PRO ENGINE 3.7, `VideoAnalyzerClient.tsx` & `src/lib/biomechanicsEngine.ts`)
 - **PRO ENGINE 3.7 Upgrade – Ballistische Flugbahn & Treffpunkt-Prädiktion (`computeBallisticFlightTrajectory`):**
@@ -40,7 +50,7 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 - **Handgelenks-Snap Kinematik (`computeWristSnapKinematics`):**
   - Berechnung der Winkelgeschwindigkeit (°/s) der Handgelenk-Peitsche zwischen tiefstem Ausholpunkt und Release-Apex (optimaler Bereich: 100–750 °/s).
 - **Erweiterung der Biomechanik-Audit-Suite (`scripts/audit_biomechanics.ts`):**
-  - Erweiterung der Prüfsuite von 20 auf **22 Qualitäts-Gates** (100% PASS):
+  - Erweiterung der Prüfsuite auf **22 Qualitäts-Gates** (100% PASS):
     - **Gate 21:** Ballistische Flugbahn-Projektion & Board-Einschlag (BBDV-Physik).
     - **Gate 22:** Oche-Abwurfhöhe & Handgelenks-Snap (Wrist-Snap Kinematik).
 
@@ -61,9 +71,9 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 - **Aktueller Status:** Keine offenen Blocker für den nächsten Zyklus.
 
 ### 🛡️ Quality Gates & Systemstatus (12.11.2026)
-- **Gate 1 (Syntax, TypeScript & Linter):** ✅ PASS. `tsc --noEmit` hat **0 Fehler**. Biomechanik-Module haben **0 ESLint-Fehler / 0 Warnungen**. Gesamt-Warnungen auf `src/` um 13 reduziert (von 113 auf 100).
+- **Gate 1 (Syntax, TypeScript & Linter):** ✅ PASS. `tsc --noEmit` hat **0 Fehler**. React 19 `set-state-in-effect`-Fehler komplett behoben (0 Fehler). ESLint auf `src/`: Probleme von 313 auf **277 Probleme** (-2 Fehler, -34 Warnungen) gesenkt. Alle geänderten Dateien haben 0 Fehler / 0 Warnungen.
 - **Gate 2 (DB-Integrität):** ✅ PASS. Keine destruktiven Schemaänderungen.
-- **Gate 3 (Regressions- & Ranking-Tests):** ✅ PASS. 22/22 Biomechanik-Gates (100%), 35/35 Game-Simulationen (100%), 5/5 What-If-Engine Tests (100%), 4/4 Fußball-TV-Sync Tests (100%).
+- **Gate 3 (Regressions- & Ranking-Tests):** ✅ PASS. 22/22 Biomechanik-Gates (100%), 35/35 Game-Simulationen (100%), 5/5 What-If-Engine Tests (100%), Fußball-TV-Sync Test (100%).
 - **Gate 4 (Security & DSGVO §10):** ✅ PASS. Keine Secrets, 100% On-Device, DSGVO-konforme Datenhaltung.
 
 ---

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useEffect, useTransition } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -28,7 +28,7 @@ export default function Header({
   useEffect(() => {
     try {
       localStorage.removeItem('lions_role_mode');
-    } catch (e) {}
+    } catch {}
   }, []);
 
   const handleLogout = () => {

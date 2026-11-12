@@ -44,8 +44,10 @@ export default function DynamicRankingTileContent() {
   const [fade, setFade] = useState(true);
 
   useEffect(() => {
-    // Erste Initialisierung client-seitig
-    setRanking(getRandomRanking());
+    // Erste Initialisierung client-seitig asynchron entkoppelt (React 19 konform)
+    const initTimer = setTimeout(() => {
+      setRanking(getRandomRanking());
+    }, 0);
 
     // Sanfte Rotation alle 5 Sekunden: Neuer Stand, wer oben oder unten steht
     const interval = setInterval(() => {
@@ -56,7 +58,10 @@ export default function DynamicRankingTileContent() {
       }, 300);
     }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(interval);
+    };
   }, []);
 
   if (ranking.length === 0) {

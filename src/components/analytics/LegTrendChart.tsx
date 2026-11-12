@@ -16,7 +16,6 @@ export default function LegTrendChart({
   matchAvg,
   korridorMin,
   korridorMax,
-  playerName,
 }: LegTrendChartProps) {
   const [hoveredPoint, setHoveredPoint] = useState<LegTrendPoint | null>(null);
   const [filterScope, setFilterScope] = useState<'season' | 'all'>('season');

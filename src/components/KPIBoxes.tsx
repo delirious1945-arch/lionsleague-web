@@ -49,7 +49,6 @@ export default function KPIBoxes({ kpis }: KPIBoxesProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {items.map((item, idx) => {
-        const Icon = item.icon;
         return (
           <div
             key={idx}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Player, RawLegVisit } from '@/lib/data';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import {
@@ -143,36 +143,42 @@ export default function WhatIfSimulatorWidget({
     return Math.ceil(Math.max(...all) / 5) * 5;
   }, [chartData]);
 
-  const getX = (rate: number) => {
-    return (
-      padding.left +
-      ((rate - minRate) / (maxRate - minRate)) *
-        (chartWidth - padding.left - padding.right)
-    );
-  };
+  const getX = useCallback(
+    (rate: number) => {
+      return (
+        padding.left +
+        ((rate - minRate) / (maxRate - minRate)) *
+          (chartWidth - padding.left - padding.right)
+      );
+    },
+    [minRate, maxRate, chartWidth, padding.left, padding.right]
+  );
 
-  const getY = (avg: number) => {
-    return (
-      chartHeight -
-      padding.bottom -
-      ((avg - minAvg) / (maxAvg - minAvg)) *
-        (chartHeight - padding.top - padding.bottom)
-    );
-  };
+  const getY = useCallback(
+    (avg: number) => {
+      return (
+        chartHeight -
+        padding.bottom -
+        ((avg - minAvg) / (maxAvg - minAvg)) *
+          (chartHeight - padding.top - padding.bottom)
+      );
+    },
+    [minAvg, maxAvg, chartHeight, padding.top, padding.bottom]
+  );
 
   const pathNow = useMemo(() => {
     if (chartData.length === 0) return '';
     return chartData
       .map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.rate).toFixed(1)} ${getY(d.avgNow).toFixed(1)}`)
       .join(' ');
-  }, [chartData, minAvg, maxAvg]);
+  }, [chartData, getX, getY]);
 
   const pathScen = useMemo(() => {
     if (chartData.length === 0) return '';
     return chartData
       .map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.rate).toFixed(1)} ${getY(d.avgScen).toFixed(1)}`)
       .join(' ');
-  }, [chartData, minAvg, maxAvg]);
+  }, [chartData, getX, getY]);
 
   return (
     <div className="space-y-6">

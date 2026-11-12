@@ -86,16 +86,6 @@ export function getPreviousMonth(date: Date = new Date()): { monthKey: string; m
  * Zählt die vollständig abgeschlossenen Trainingsspiele aller Spieler in einem Zielmonat.
  */
 export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promise<Map<string, { playerId: number | null; count: number }>> {
-  const [yStr, mStr] = monthKey.split('-');
-  const y = parseInt(yStr, 10);
-  const m = parseInt(mStr, 10); // 1-12
-
-  // Start und Ende des Monats in ISO-Format
-  const startDate = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0, 0));
-  const endDate = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
-  const startIso = startDate.toISOString();
-  const endIso = endDate.toISOString();
-
   const playerStats = new Map<string, { playerId: number | null; count: number }>();
 
   // 1. Doppelquote / Checkout Battle
@@ -184,7 +174,7 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
       if (r.player_id && !current.playerId) current.playerId = r.player_id;
       playerStats.set(name, current);
     }
-  } catch (err) {
+  } catch {
     // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
   }
 

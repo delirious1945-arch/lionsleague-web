@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { AnalyticsMatchItem, Player, Top26Player, RawLegVisit } from '@/lib/data';
 import {
@@ -15,7 +15,7 @@ import LegAnatomyWidget from '@/components/analytics/LegAnatomyWidget';
 import WhatIfSimulatorWidget from '@/components/analytics/WhatIfSimulatorWidget';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { PlayerTrainingDoublesStats } from '@/lib/playerDoublesStats';
-import { Target, Trophy, Flame, Award, Sparkles, ShieldCheck } from 'lucide-react';
+import { Target } from 'lucide-react';
 
 interface AnalyticsClientProps {
   matches: AnalyticsMatchItem[];
@@ -29,9 +29,7 @@ interface AnalyticsClientProps {
 }
 
 export default function AnalyticsClient({
-  matches,
   players,
-  top26,
   allLegVisits,
   availableSeasons,
   selectedSeason,
@@ -68,26 +66,29 @@ export default function AnalyticsClient({
   }, [players]);
 
   // Berechne DAE für einen Spieler
-  const getPlayerAnalytics = (pid: number, targetAvg = 48): PlayerDAEAnalytics => {
-    const p = playersMap.get(pid);
-    const pName = p ? p.name : 'Spieler';
-    const rawLegs = allLegVisits[pid] || [];
+  const getPlayerAnalytics = useCallback(
+    (pid: number, targetAvg = 48): PlayerDAEAnalytics => {
+      const p = playersMap.get(pid);
+      const pName = p ? p.name : 'Spieler';
+      const rawLegs = allLegVisits[pid] || [];
 
-    if (rawLegs.length === 0) {
-      // Simulation
-      const simLegs = generateSimulatedLegVisits(pid, targetAvg);
-      const res = computePlayerAnalytics(pid, pName, simLegs);
-      res.isSimulated = true;
-      return res;
-    }
+      if (rawLegs.length === 0) {
+        // Simulation
+        const simLegs = generateSimulatedLegVisits(pid, targetAvg);
+        const res = computePlayerAnalytics(pid, pName, simLegs);
+        res.isSimulated = true;
+        return res;
+      }
 
-    return computePlayerAnalytics(pid, pName, rawLegs);
-  };
+      return computePlayerAnalytics(pid, pName, rawLegs);
+    },
+    [playersMap, allLegVisits]
+  );
 
   // Aktiver Spieler für Single Tab
   const singleAna = useMemo(() => {
     return getPlayerAnalytics(selectedPlayerId, simTargetAvg);
-  }, [selectedPlayerId, allLegVisits, playersMap, simTargetAvg]);
+  }, [selectedPlayerId, simTargetAvg, getPlayerAnalytics]);
 
   const currentPlayer = playersMap.get(selectedPlayerId);
 
@@ -101,11 +102,11 @@ export default function AnalyticsClient({
   // H2H Spieler
   const h2hAna1 = useMemo(() => {
     return getPlayerAnalytics(h2hPlayerId1);
-  }, [h2hPlayerId1, allLegVisits, playersMap]);
+  }, [h2hPlayerId1, getPlayerAnalytics]);
 
   const h2hAna2 = useMemo(() => {
     return getPlayerAnalytics(h2hPlayerId2);
-  }, [h2hPlayerId2, allLegVisits, playersMap]);
+  }, [h2hPlayerId2, getPlayerAnalytics]);
 
   // Matrix Daten für alle Spieler
   const matrixData = useMemo(() => {
@@ -119,7 +120,7 @@ export default function AnalyticsClient({
         };
       })
       .sort((a, b) => b.ana.visit_stats.match_average - a.ana.visit_stats.match_average);
-  }, [players, allLegVisits, matrixTeamFilter]);
+  }, [players, matrixTeamFilter, getPlayerAnalytics]);
 
   return (
     <div className="space-y-6 animate-fadeIn py-2 max-w-7xl mx-auto">

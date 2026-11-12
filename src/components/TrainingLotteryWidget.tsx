@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Trophy, Beer, Sparkles, CheckCircle2, PartyPopper, X, Gift } from 'lucide-react';
+import { Trophy, Sparkles, CheckCircle2, X, Gift } from 'lucide-react';
 import { LotteryWinner } from '@/lib/trainingLottery';
 import { acknowledgeWinAction } from '@/app/actions/lotteryActions';
 
@@ -14,7 +14,6 @@ interface TrainingLotteryWidgetProps {
 export default function TrainingLotteryWidget({
   bannerWinner,
   unacknowledgedWin,
-  currentUser,
 }: TrainingLotteryWidgetProps) {
   const [modalOpen, setModalOpen] = useState<boolean>(!!unacknowledgedWin);
   const [isSubmitting, setIsSubmitting] = useState(false);

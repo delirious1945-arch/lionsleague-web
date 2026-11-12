@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Shield, Zap } from 'lucide-react';
 import CookieConsent from './CookieConsent';
 import { usePathname, useSearchParams } from 'next/navigation';
 
