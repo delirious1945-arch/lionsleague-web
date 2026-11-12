@@ -134,8 +134,15 @@ export default function StellenCheckenClient({
       try {
         const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
           navigator.sendBeacon('/api/live/stellen-checken', new Blob([payload], { type: 'application/json' }));
         } else {
+          fetch('/api/live/board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
           fetch('/api/live/stellen-checken', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -169,6 +176,7 @@ export default function StellenCheckenClient({
     const payload = {
       boardId: activeBoard,
       status: isGameFinished ? 'completed' : isGameStarted ? 'playing' : 'idle',
+      gameType: 'stellen_checken' as const,
       gameMode,
       p1Name,
       p2Name,
@@ -187,7 +195,18 @@ export default function StellenCheckenClient({
 
     try {
       liveBroadcastRef.current?.postMessage(payload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+        masterBc.postMessage(payload);
+        masterBc.close();
+      }
       localStorage.setItem(`lions_stellen_checken_live_sync_${activeBoard}`, JSON.stringify(payload));
+      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(payload));
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
       fetch('/api/live/stellen-checken', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

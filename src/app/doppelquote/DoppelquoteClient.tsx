@@ -308,8 +308,15 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       try {
         const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
           navigator.sendBeacon('/api/live/doppelquote', new Blob([payload], { type: 'application/json' }));
         } else {
+          fetch('/api/live/board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
           fetch('/api/live/doppelquote', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -334,6 +341,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     const payload = {
       boardId: activeBoard,
       status: isCompleted ? 'completed' : isPlaying ? 'playing' : 'idle',
+      gameType: 'doppelquote' as const,
       gameMode,
       p1Name,
       p2Name,
@@ -351,15 +359,26 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     // 1. BroadcastChannel (0ms Sync am selben Gerät / DeX)
     try {
       liveBroadcastRef.current?.postMessage(payload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+        masterBc.postMessage(payload);
+        masterBc.close();
+      }
     } catch (e) {}
 
     // 2. localStorage Event (0ms Sync zwischen Tabs/Fenstern)
     try {
       localStorage.setItem(`lions_doppelquote_live_sync_${activeBoard}`, JSON.stringify(payload));
+      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(payload));
     } catch (e) {}
 
     // 3. API Sync (für externe Smart-TVs / separate Geräte)
     try {
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
       fetch('/api/live/doppelquote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,4 +1,4 @@
-import FussballLiveMonitorClient from './FussballLiveMonitorClient';
+import UnifiedBoardLiveClient from '@/app/live/UnifiedBoardLiveClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,5 +10,5 @@ export default async function FussballLivePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const initialBoardId = params?.board || '1';
 
-  return <FussballLiveMonitorClient initialBoardId={initialBoardId} />;
+  return <UnifiedBoardLiveClient initialBoardId={initialBoardId} />;
 }

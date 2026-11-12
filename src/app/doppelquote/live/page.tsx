@@ -1,4 +1,4 @@
-import DoppelquoteLiveMonitorClient from './DoppelquoteLiveMonitorClient';
+import UnifiedBoardLiveClient from '@/app/live/UnifiedBoardLiveClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,5 +9,5 @@ interface PageProps {
 export default async function DoppelquoteLivePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const boardId = params?.board || '1';
-  return <DoppelquoteLiveMonitorClient initialBoardId={boardId} />;
+  return <UnifiedBoardLiveClient initialBoardId={boardId} />;
 }
