@@ -70,6 +70,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
 
   // Alle vorhandenen Teams sammeln
   const allTeams = Array.from(new Set(data.players.map((p) => p.team).filter(Boolean)));
+  const targetGames = data.targetGames ?? (data.selectedMonthKey >= '2026-11' ? 40 : 20);
 
   return (
     <div
@@ -93,7 +94,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-300">
-                Zentrale Erfassung aller Vereins-Trainingsmodule (Checkout Battle, PDC Challenge, Fußball Darts & Stellen & Checken). Jedes absolvierte Match zählt +1. Ab 20 Spielen im Monat qualifiziert sich ein Spieler für die Monatsverlosung (5 Freigetränke, 4 Monate Sperrfrist nach Gewinn). Klicke auf einen Spieler, um alle Partien aufzuklappen.
+                Zentrale Erfassung aller Vereins-Trainingsmodule (Checkout Battle, PDC Challenge, Fußball Darts & Stellen & Checken). Jedes absolvierte Match zählt +1. Ab {targetGames} Spielen im Monat qualifiziert sich ein Spieler für die Monatsverlosung (5 Freigetränke, 4 Monate Sperrfrist nach Gewinn). Klicke auf einen Spieler, um alle Partien aufzuklappen.
               </p>
             </div>
           </div>
@@ -151,10 +152,10 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
           </div>
         </div>
 
-        {/* KPI 3: Im Lostopf (>= 20) */}
+        {/* KPI 3: Im Lostopf (>= targetGames) */}
         <div className="bg-slate-950/70 border border-white/10 rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-inner">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Im Lostopf (≥ 20)</span>
+            <span>Im Lostopf (≥ {targetGames})</span>
             <Beer className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-black font-mono text-amber-400">
@@ -217,7 +218,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
           >
             <option value="all">Alle Spieler ({data.players.length})</option>
             <option value="active">Nur mit Spielen ({data.totalActivePlayers})</option>
-            <option value="qualified">Im Lostopf ≥20 ({data.qualifiedPlayersCount})</option>
+            <option value="qualified">Im Lostopf ≥{targetGames} ({data.qualifiedPlayersCount})</option>
           </select>
         </div>
       </div>
@@ -237,7 +238,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
               <th className="py-3 px-2 text-center">Fußball (Bot / 1vs1)</th>
               <th className="py-3 px-2 text-center">Stellen & Checken (Solo / 1vs1)</th>
               <th className="py-3 px-3 text-center">Gesamt</th>
-              <th className="py-3 px-3">Fortschritt (Ziel: 20)</th>
+              <th className="py-3 px-3">Fortschritt (Ziel: {targetGames})</th>
               <th className="py-3 px-3 text-right">Lostopf-Status</th>
             </tr>
           </thead>
@@ -251,7 +252,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
             ) : (
               filteredPlayers.map((p, idx) => {
                 const isExpanded = expandedPlayer === p.playerName;
-                const pct = Math.min(100, Math.round((p.totalCompletedGames / 20) * 100));
+                const pct = Math.min(100, Math.round((p.totalCompletedGames / targetGames) * 100));
 
                 return (
                   <React.Fragment key={p.playerName}>
@@ -341,7 +342,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-[11px] font-bold">
                             <span className="text-slate-400 font-mono">
-                              {p.totalCompletedGames} / 20
+                              {p.totalCompletedGames} / {targetGames}
                             </span>
                             <span className={p.isQualified ? 'text-emerald-400' : 'text-amber-400'}>
                               {pct}%
@@ -378,7 +379,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                             </span>
                           ) : p.totalCompletedGames > 0 ? (
                             <span className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-800 text-slate-300 border border-white/10">
-                              Noch {20 - p.totalCompletedGames} offen
+                              Noch {targetGames - p.totalCompletedGames} offen
                             </span>
                           ) : (
                             <span className="text-slate-500 text-[11px]">

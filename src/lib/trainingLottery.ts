@@ -35,6 +35,19 @@ const GERMAN_MONTHS = [
 ];
 
 /**
+ * Liefert die erforderliche Mindestanzahl an abgeschlossenen Trainingsspielen
+ * für die Monatsverlosung:
+ * - Bis Oktober 2026: 20 Spiele
+ * - Ab November 2026: 40 Spiele
+ */
+export function getTargetGamesForMonth(monthKey: string): number {
+  if (monthKey >= '2026-11') {
+    return 40;
+  }
+  return 20;
+}
+
+/**
  * Gibt den Monats-Key (z.B. "2026-10") und das deutsche Label ("Oktober 2026") zurück.
  */
 export function formatMonthKey(date: Date = new Date()): { monthKey: string; monthLabel: string } {
@@ -242,14 +255,17 @@ export async function executeMonthlyLottery(targetMonthKey: string, targetMonthL
   // 2. Gesperrte Spieler ermitteln (letzte 4 Monate)
   const blocked = await getBlockedPlayersForMonth(targetMonthKey);
 
-  // 3. Qualifizierte Spieler filtern (>= 20 Spiele & nicht gesperrt)
+  // Erforderliche Zielspiele für diesen Monat ermitteln (ab Nov. 2026: 40 Spiele, vorher 20)
+  const targetGames = getTargetGamesForMonth(targetMonthKey);
+
+  // 3. Qualifizierte Spieler filtern (>= targetGames Spiele & nicht gesperrt)
   const eligible: { playerName: string; playerId: number | null; completedGames: number }[] = [];
-  const allWith20: { playerName: string; completedGames: number; blocked: boolean }[] = [];
+  const allWithTarget: { playerName: string; completedGames: number; blocked: boolean }[] = [];
 
   for (const [name, data] of statsMap.entries()) {
-    if (data.count >= 20) {
+    if (data.count >= targetGames) {
       const isBlocked = blocked.has(name);
-      allWith20.push({ playerName: name, completedGames: data.count, blocked: isBlocked });
+      allWithTarget.push({ playerName: name, completedGames: data.count, blocked: isBlocked });
       if (!isBlocked) {
         eligible.push({ playerName: name, playerId: data.playerId, completedGames: data.count });
       }
@@ -258,11 +274,11 @@ export async function executeMonthlyLottery(targetMonthKey: string, targetMonthL
 
   if (eligible.length === 0) {
     // Niemand qualifiziert
-    console.log(`[Trainings-Verlosung] Keine qualifizierten Spieler für ${label} gefunden.`);
+    console.log(`[Trainings-Verlosung] Keine qualifizierten Spieler für ${label} gefunden (Ziel: ${targetGames} Spiele).`);
     return {
       success: false,
       reason: 'NO_ELIGIBLE_PLAYERS',
-      message: `Für ${label} hat kein ungesperrter Spieler 20 abgeschlossene Spiele erreicht.`
+      message: `Für ${label} hat kein ungesperrter Spieler ${targetGames} abgeschlossene Spiele erreicht.`
     };
   }
 
@@ -443,15 +459,17 @@ export async function getCurrentMonthProgressForPlayer(playerName?: string): Pro
     isBlockedByPastWin = blocked.has(cleanName);
   }
 
-  // Zählen wie viele Spieler aktuell >= 20 haben und nicht gesperrt sind
+  // Erforderliche Zielspiele für den Monat ermitteln (ab Nov. 2026: 40 Spiele, vorher 20)
+  const targetGames = getTargetGamesForMonth(monthKey);
+
+  // Zählen wie viele Spieler aktuell >= targetGames haben und nicht gesperrt sind
   let eligibleCount = 0;
   for (const [name, data] of statsMap.entries()) {
-    if (data.count >= 20 && !blocked.has(name)) {
+    if (data.count >= targetGames && !blocked.has(name)) {
       eligibleCount++;
     }
   }
 
-  const targetGames = 20;
   const remainingGames = Math.max(0, targetGames - completedGames);
   const isQualified = completedGames >= targetGames && !isBlockedByPastWin;
 
@@ -507,6 +525,7 @@ export interface AdminTrainingOverviewData {
   totalGamesInMonth: number;
   totalActivePlayers: number;
   qualifiedPlayersCount: number;
+  targetGames: number;
   monthWinner: LotteryWinner | null;
   players: PlayerMonthlyTrainingStat[];
 }
@@ -867,12 +886,13 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
   }
 
   // Qualifikation und Sortierung berechnen
+  const targetGames = getTargetGamesForMonth(selectedMonthKey);
   let totalGamesInMonth = 0;
   let totalActivePlayers = 0;
   let qualifiedPlayersCount = 0;
 
   const playerList = Array.from(statsMap.values()).map((p) => {
-    p.isQualified = p.totalCompletedGames >= 20 && !p.isBlockedByPastWin;
+    p.isQualified = p.totalCompletedGames >= targetGames && !p.isBlockedByPastWin;
     totalGamesInMonth += p.totalCompletedGames;
     if (p.totalCompletedGames > 0) totalActivePlayers += 1;
     if (p.isQualified) qualifiedPlayersCount += 1;
@@ -894,6 +914,7 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     totalGamesInMonth,
     totalActivePlayers,
     qualifiedPlayersCount,
+    targetGames,
     monthWinner,
     players: playerList,
   };

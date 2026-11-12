@@ -257,7 +257,7 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Läuft am 1. eines jeden Monats automatisch für alle Spieler mit mind. 20 abgeschlossenen Trainingsspielen (inkl. 4 Monate Sperre für vorherige Gewinner).
+                Läuft am 1. eines jeden Monats automatisch für alle qualifizierten Spieler (ab November 2026 mind. 40 abgeschlossene Trainingsspiele, vorher 20 Spiele; inkl. 4 Monate Sperre für vorherige Gewinner).
               </p>
             </div>
           </div>
