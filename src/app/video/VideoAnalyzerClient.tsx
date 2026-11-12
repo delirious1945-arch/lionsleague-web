@@ -14,16 +14,12 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
-  Gauge,
   Crosshair,
   Target,
   RotateCcw,
-  AlertTriangle,
   Sliders,
   Trash2,
   Zap,
-  Compass,
-  TrendingUp,
   Download,
   Printer,
   Mic,
@@ -76,6 +72,8 @@ import {
   LiveThrowCounterState,
   evaluateThreeDartSelfComparison,
   GuidedAnalysisStep,
+  computeBallisticFlightTrajectory,
+  calculateVerticalReleaseHeightMm,
 } from '@/lib/biomechanicsEngine';
 
 interface VideoAnalyzerClientProps {
@@ -1467,20 +1465,6 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
     );
   };
 
-  // Phase auswählen (springt auf den Frame und vermisst ihn)
-  const handleSelectPhase = (key: PhaseKey) => {
-    if (!snapshots || !videoRef.current) return;
-    const snap = snapshots[key];
-    videoRef.current.pause();
-    setIsPlaying(false);
-    videoRef.current.currentTime = snap.timeSec;
-    setCurrentTime(snap.timeSec);
-    currentPoseRef.current = snap.pose;
-    setCurrentPose(snap.pose);
-    setActivePhase(key);
-    setShowOverlay(true);
-  };
-
   // 5-Schritt Durchklick-Analyse (Springt automatisch an die passende Stelle im Video & zeigt das Feedback)
   const handleSelectGuidedStep = useCallback(
     (step: GuidedAnalysisStep, targetDartIdx: number = 0) => {
@@ -1622,6 +1606,17 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       slowMoFactor
     );
 
+    const releaseHeightMm = (currentPose || baselinePose)
+      ? calculateVerticalReleaseHeightMm((currentPose || baselinePose)!, videoDims, currentMmPerPx, playerHeightCm)
+      : 1950;
+    const ballisticTrajectory = computeBallisticFlightTrajectory(
+      speedKmh,
+      launchAngle,
+      releaseHeightMm,
+      BBDV_STANDARDS.HORIZONTAL_DISTANCE_MM,
+      BBDV_STANDARDS.BULLSEYE_HEIGHT_MM
+    );
+
     return {
       speedKmh,
       launchAngle,
@@ -1633,6 +1628,8 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       dispersion,
       selfComparison,
       liveDev,
+      releaseHeightMm,
+      ballisticTrajectory,
       coreAngles: (currentPose || baselinePose)
         ? extractFiveCoreAngles(
             (currentPose || baselinePose)!,
@@ -1681,7 +1678,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
             }
       ),
     };
-  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots, videoDims, getMmPerPx, videoMode, duration, slowMoFps]);
+  }, [trajectories, activeThrowIdx, currentPose, baselinePose, calcDeviations, snapshots, videoDims, getMmPerPx, videoMode, duration, slowMoFps, playerHeightCm]);
 
   // ============================================================================
   // CANVAS OVERLAY RENDERING (INKL. LAUNCH-RADAR, SPEED-CHIP & ABSACK-ALARM)
@@ -2432,7 +2429,7 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
       ctx.font = `bold ${Math.round(10.5 * scale)}px sans-serif`;
       ctx.fillStyle = '#10b981';
       ctx.fillText(
-        `LIONS 3-DART SELBSTVERGLEICH • WIEDERHOLGENAUIGKEIT: ${activeMetrics.selfComparison.repeatabilityScorePct}% • LOSLASS-SPANNE: ${activeMetrics.selfComparison.pairwiseReleaseMm.maxSpreadMm} mm`,
+        `LIONS 3-DART SELBSTVERGLEICH • KONSTANZ: ${activeMetrics.selfComparison.repeatabilityScorePct}% • FLUGZEIT: ~${activeMetrics.ballisticTrajectory.flightTimeMs} ms • LOSLASS-SPANNE: ${activeMetrics.selfComparison.pairwiseReleaseMm.maxSpreadMm} mm`,
         barX + 12 * scale,
         barY + 18 * scale
       );
@@ -2457,7 +2454,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
         barY + 62 * scale
       );
     },
-    [videoDims, computeExportCropRect, activeMetrics.selfComparison]
+    [
+      videoDims,
+      computeExportCropRect,
+      activeMetrics.selfComparison,
+      activeMetrics.ballisticTrajectory.flightTimeMs,
+    ]
   );
 
   // 1. Speichern als hochauflösendes Bild (.png) auf dem Endgerät (mit Modus- & Ausschnitt-Wahl)
@@ -3791,6 +3793,13 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                 <span className="text-[11px] font-mono text-slate-400 w-11 shrink-0">
                   {(duration || 0).toFixed(2)}s
                 </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-white/5 border border-white/10 text-cyan-300 shrink-0">
+                  {activePhase === 'drawback'
+                    ? '🔄 Ausholen'
+                    : activePhase === 'release'
+                    ? '🎯 Release'
+                    : '⚡ Durchschwung'}
+                </span>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -4291,6 +4300,12 @@ export default function VideoAnalyzerClient({ user }: VideoAnalyzerClientProps) 
                           </div>
                         );
                       })}
+                      <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-cyan-300">
+                        <span>🎯 Ballistische Flugzeit (2,37 m):</span>
+                        <span className="font-bold">
+                          ~{activeMetrics.ballisticTrajectory.flightTimeMs} ms ({activeMetrics.ballisticTrajectory.releaseSpeedMs} m/s) • Einschlag: {activeMetrics.ballisticTrajectory.impactHeightMm} mm
+                        </span>
+                      </div>
                     </div>
                   )}
 

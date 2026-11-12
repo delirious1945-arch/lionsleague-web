@@ -1497,6 +1497,138 @@ export function calculateThreeDartDispersion(
 }
 
 // ----------------------------------------------------------------------------
+// 6c. BALLISTISCHE FLUGBAHN-PROJEKTION & BOARD-EINSCHLAG-PRÄDIKTION (BBDV-PHYSIK)
+// ----------------------------------------------------------------------------
+export interface BallisticFlightWaypoint {
+  xDistMm: number;    // Distanz ab Oche in mm (0 bis 2370)
+  yHeightMm: number;  // Höhe über dem Boden in mm
+}
+
+export interface BallisticFlightTrajectory {
+  flightTimeMs: number;              // Flugzeit Oche -> Board in ms (z.B. ~400 ms)
+  releaseSpeedMs: number;            // Abwurfgeschwindigkeit in m/s (z.B. 6.0 m/s bei 21.6 km/h)
+  releaseHeightMm: number;           // Abwurfhöhe über dem Oche-Boden in mm
+  impactHeightMm: number;            // Berechnete Einschlagshöhe am Board in mm über Boden
+  deltaToBullseyeMm: number;         // Abweichung zum Bullseye-Zentrum (1730 mm): + = über Bull, - = unter Bull
+  impactAngleDeg: number;            // Einschlagswinkel des Darts am Board (Grad, typisch -15° bis -30°)
+  gravityDropMm: number;             // Reiner Gravitationsabfall (0.5 * g * t^2) in mm
+  launchLiftMm: number;              // Höhengewinn durch Launch-Angle (v_y * t) in mm
+  waypoints: BallisticFlightWaypoint[]; // Flugbahn-Stützpunkte
+}
+
+export function computeBallisticFlightTrajectory(
+  releaseSpeedKmh: number,
+  launchAngleDeg: number,
+  releaseHeightMm: number = 1950,
+  targetDistanceMm: number = BBDV_STANDARDS.HORIZONTAL_DISTANCE_MM, // 2370 mm
+  bullseyeHeightMm: number = BBDV_STANDARDS.BULLSEYE_HEIGHT_MM // 1730 mm
+): BallisticFlightTrajectory {
+  const g = 9.81; // Erdbeschleunigung m/s^2
+  const speedKmh = Math.max(12.0, Math.min(32.0, releaseSpeedKmh));
+  const v0 = (speedKmh * 1000) / 3600; // m/s
+  const thetaRad = (Math.max(2.0, Math.min(35.0, launchAngleDeg)) * Math.PI) / 180;
+
+  const v0x = v0 * Math.cos(thetaRad);
+  const v0y = v0 * Math.sin(thetaRad);
+
+  const targetDistM = Math.max(1.0, targetDistanceMm / 1000);
+  const flightTimeSec = targetDistM / v0x;
+  const flightTimeMs = Math.round(flightTimeSec * 1000);
+
+  // Ballistische Parabel y(t) = y0 + v0y * t - 0.5 * g * t^2
+  const launchLiftM = v0y * flightTimeSec;
+  const gravityDropM = 0.5 * g * Math.pow(flightTimeSec, 2);
+  const netDeltaHeightM = launchLiftM - gravityDropM;
+
+  const releaseHeightM = releaseHeightMm / 1000;
+  const impactHeightM = releaseHeightM + netDeltaHeightM;
+  const impactHeightMm = Math.round(impactHeightM * 1000);
+
+  const deltaToBullseyeMm = Math.round((impactHeightMm - bullseyeHeightMm) * 10) / 10;
+
+  // Einschlagswinkel am Board
+  const vyImpact = v0y - g * flightTimeSec;
+  const impactAngleRad = Math.atan2(vyImpact, v0x);
+  const impactAngleDeg = Math.round(((impactAngleRad * 180) / Math.PI) * 10) / 10;
+
+  // 11 Stützpunkte entlang der Flugbahn (0% bis 100% Distanz)
+  const waypoints: BallisticFlightWaypoint[] = [];
+  const steps = 10;
+  for (let i = 0; i <= steps; i++) {
+    const fraction = i / steps;
+    const t = flightTimeSec * fraction;
+    const xMm = Math.round(fraction * targetDistanceMm);
+    const yM = releaseHeightM + v0y * t - 0.5 * g * Math.pow(t, 2);
+    waypoints.push({
+      xDistMm: xMm,
+      yHeightMm: Math.round(yM * 1000),
+    });
+  }
+
+  return {
+    flightTimeMs,
+    releaseSpeedMs: Math.round(v0 * 100) / 100,
+    releaseHeightMm: Math.round(releaseHeightMm),
+    impactHeightMm,
+    deltaToBullseyeMm,
+    impactAngleDeg,
+    gravityDropMm: Math.round(gravityDropM * 1000),
+    launchLiftMm: Math.round(launchLiftM * 1000),
+    waypoints,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// 6d. VERTIKALE ABWURFHÖHE ÜBER DEM OCHE-BODEN (BBDV-KALIBRIERUNG)
+// ----------------------------------------------------------------------------
+export function calculateVerticalReleaseHeightMm(
+  pose: PoseKeypoints,
+  dims: { width: number; height: number },
+  mmPerPx: number,
+  playerHeightCm: number = 180
+): number {
+  const wristY = pose.wrist.y * dims.height;
+  let groundY: number;
+
+  if (pose.ankle) {
+    const ankleY = pose.ankle.y * dims.height;
+    const heelDelta = pose.heel ? (pose.heel.y - pose.ankle.y) * dims.height : 22 * (dims.height / 1920);
+    groundY = ankleY + Math.max(10, heelDelta);
+  } else {
+    const headY = pose.head.y * dims.height;
+    const estBodyHeightPx = (playerHeightCm * 10) / (mmPerPx > 0 ? mmPerPx : 1.1);
+    groundY = headY + estBodyHeightPx;
+  }
+
+  const heightPx = Math.max(50, groundY - wristY);
+  return Math.round(heightPx * (mmPerPx > 0 ? mmPerPx : 1.1));
+}
+
+// ----------------------------------------------------------------------------
+// 6e. HANDGELENKS-SNAP & WINKELGESCHWINDIGKEIT (WRIST-SNAP KINEMATIK)
+// ----------------------------------------------------------------------------
+export interface WristSnapKinematics {
+  snapAngleSpanDeg: number;       // Winkeländerung des Handgelenks während der Vorwärtsphase in Grad
+  snapVelocityDegPerSec: number;  // Winkelgeschwindigkeit (°/s) der Handgelenk-Peitsche
+  isSnapConsistent: boolean;      // Handgelenks-Stabilität (100 bis 750 °/s)
+}
+
+export function computeWristSnapKinematics(
+  drawbackSnapAngleDeg: number,
+  releaseSnapAngleDeg: number,
+  accelerationDurationMs: number
+): WristSnapKinematics {
+  const angleSpan = Math.abs(releaseSnapAngleDeg - drawbackSnapAngleDeg);
+  const durSec = Math.max(0.035, accelerationDurationMs / 1000);
+  const velocity = Math.round((angleSpan / durSec) * 10) / 10;
+  return {
+    snapAngleSpanDeg: Math.round(angleSpan * 10) / 10,
+    snapVelocityDegPerSec: velocity,
+    isSnapConsistent: velocity >= 100 && velocity <= 750,
+  };
+}
+
+// ----------------------------------------------------------------------------
 // 7. PRÄZISIONS-LERP & KINEMATIK-TIMELINE-ENTKOPPLUNG (0ms Latenz)
 // ----------------------------------------------------------------------------
 export interface TimelinePoseFrame {
@@ -2185,7 +2317,6 @@ export function evaluateThreeDartSelfComparison(
   const darts: DartSelfProfile[] = [0, 1, 2].map((idx) => {
     const tr = trajectories[idx];
     const pts = tr?.points || [];
-    const firstPt = pts[0] || { x: 0.48, y: 0.52, timeSec: idx * 3 + 0.5 };
     const midPt = pts[Math.floor(pts.length * 0.45)] || { x: 0.44, y: 0.34, timeSec: idx * 3 + 1.1 };
     const relPt =
       tr?.releasePoint ||

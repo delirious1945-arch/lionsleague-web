@@ -13,6 +13,61 @@ Jeder Zyklus ergänzt einen neuen Tages-Abschnitt mit folgenden Kategorien:
 
 ---
 
+## [2026-11-12] – PRO ENGINE 3.7 Ballistik-Projektion, Handgelenk-Snap Kinematik & 22/22 Biomechanik-Gates
+
+### 🎯 Trainingsspiele & Game-Optimizer
+- **Game-Simulationen & Regressions-Gates (`scripts/simulate_training_games.ts`):**
+  - Vollständige Verifikation aller 5 Trainingsmodule (PDC-Challenge, Stellen & Checken, Fußball-Darts, Doppelquote, KI-Wurfanalyse) mit **35 von 35 Tests** (100% PASS).
+  - Modell A der empirischen Doppelquote erfolgreich aggregiert; Schwellenwert-Filter zum Schutz der Rangliste aktiv.
+
+### 🎨 UI/UX-Cleaner & Farbsemantik
+- **Linter-Bereinigung & Code-Hygiene (`VideoAnalyzerClient.tsx` & `biomechanicsEngine.ts`):**
+  - Beseitigung aller ESLint-Warnungen in den Biomechanik-Komponenten (0 Fehler, 0 Warnungen).
+  - Bereinigung ungenutzter Lucide-Icons (`Gauge`, `AlertTriangle`, `Compass`, `TrendingUp`) und toter Phase-Handler.
+  - Entfernung ungenutzter Variablen in der Biomechanik-Engine (`firstPt`).
+  - Reduktion der Projekt-Linter-Warnungen von 113 auf **100 Warnungen** (-13 Warnungen).
+- **Video-Player UI-Enhancement:**
+  - Integration eines dynamischen Phasen-Badges (`🔄 Ausholen`, `🎯 Release`, `⚡ Durchschwung`) direkt in der Wiedergabeleiste neben der Zeitachse zur intuitiven Orientierung am Oche.
+
+### 🎥 Biomechanik & KI-Wurfanalyse (PRO ENGINE 3.7, `VideoAnalyzerClient.tsx` & `src/lib/biomechanicsEngine.ts`)
+- **PRO ENGINE 3.7 Upgrade – Ballistische Flugbahn & Treffpunkt-Prädiktion (`computeBallisticFlightTrajectory`):**
+  - Physikalische 2D-Flugbahnmodellierung vom Oche zum Board (2,37 m BBDV-Standard).
+  - Exakte Flugzeit-Berechnung in Millisekunden ($t_{\text{flight}} \approx 404\,\text{ms}$ bei 21,6 km/h) und Gravitationsabfall ($0.5 \cdot g \cdot t^2 \approx 800\,\text{mm}$).
+  - Berechnung der vertikalen Einschlagshöhe am Board im Verhältnis zur 1,73 m Bullseye-Normhöhe.
+  - Integration der ballistischen Kennzahlen in Schritt 4 (Durchzug & Tempo) der 5-Schritt-Selbstvergleichs-Analyse sowie im composite Export-Banner.
+- **Vertikale Oche-Abwurfhöhe (`calculateVerticalReleaseHeightMm`):**
+  - Präzise Bestimmung der tatsächlichen Handgelenkshöhe über der Oche-Bodenlinie anhand der Fuß- und Fersengeometrie (bzw. anthropometrischer Körpergrößen-Skalierung).
+- **Handgelenks-Snap Kinematik (`computeWristSnapKinematics`):**
+  - Berechnung der Winkelgeschwindigkeit (°/s) der Handgelenk-Peitsche zwischen tiefstem Ausholpunkt und Release-Apex (optimaler Bereich: 100–750 °/s).
+- **Erweiterung der Biomechanik-Audit-Suite (`scripts/audit_biomechanics.ts`):**
+  - Erweiterung der Prüfsuite von 20 auf **22 Qualitäts-Gates** (100% PASS):
+    - **Gate 21:** Ballistische Flugbahn-Projektion & Board-Einschlag (BBDV-Physik).
+    - **Gate 22:** Oche-Abwurfhöhe & Handgelenks-Snap (Wrist-Snap Kinematik).
+
+### 🛡️ Datenintegrität & BBDV-Standard
+- **DSGVO §10 Video-Datenschutz:**
+  - 100% On-Device: Es werden ausschließlich numerische Vektoren, Winkel und Millimeter-Werte verarbeitet. 0 Bytes Video-Rohdaten im Datentransfer oder in Datenbanken.
+- **BBDV-Rankinglogik unberührt (§8 AGENTS.md):**
+  - Die Tabellen-, Scoring- und Ranglistenlogik in `database.py` und `analytics/` bleibt unangetastet.
+
+### ⚙️ Fehlende Komponenten & Handlungsbedarf an Sebastian (§6, §7, §12.6)
+- **1. Kamera-FPS-Sensor & Slow-Mo Leitfaden [GELÖST / IN PRODUKTION]**
+- **2. BBDV-Boardhöhen-Kalibrierungsmodus (1,73m) [GELÖST / IN PRODUKTION]**
+- **3. 3-Dart Release-Streuungs-Metrik (Dispersion) [GELÖST / IN PRODUKTION]**
+- **4. Ankerpunkt-Streuung & Wurfrhythmus-Timing [GELÖST / IN PRODUKTION]**
+- **5. Visueller 3-Dart Release-Cluster auf Video-Canvas [GELÖST / IN PRODUKTION]**
+- **6. Ballistische Flugbahn-Projektion & Handgelenk-Snap (v3.7) [GELÖST / IN PRODUKTION]**
+- **7. Supabase-Tabelle `biomechanics_sessions` [FREIGEGEBEN / BEREITGESTELLT]**
+- **Aktueller Status:** Keine offenen Blocker für den nächsten Zyklus.
+
+### 🛡️ Quality Gates & Systemstatus (12.11.2026)
+- **Gate 1 (Syntax, TypeScript & Linter):** ✅ PASS. `tsc --noEmit` hat **0 Fehler**. Biomechanik-Module haben **0 ESLint-Fehler / 0 Warnungen**. Gesamt-Warnungen auf `src/` um 13 reduziert (von 113 auf 100).
+- **Gate 2 (DB-Integrität):** ✅ PASS. Keine destruktiven Schemaänderungen.
+- **Gate 3 (Regressions- & Ranking-Tests):** ✅ PASS. 22/22 Biomechanik-Gates (100%), 35/35 Game-Simulationen (100%), 5/5 What-If-Engine Tests (100%), 4/4 Fußball-TV-Sync Tests (100%).
+- **Gate 4 (Security & DSGVO §10):** ✅ PASS. Keine Secrets, 100% On-Device, DSGVO-konforme Datenhaltung.
+
+---
+
 ## [2026-11-11] – Saison-Audit-Engine Integration, PRO ENGINE 3.6 Zeitstempel-Harmonisierung & 33/33 Game-Simulationen
 
 ### 🎯 Trainingsspiele & Game-Optimizer

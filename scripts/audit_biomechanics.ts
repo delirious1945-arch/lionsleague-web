@@ -40,13 +40,16 @@ import {
   segmentMultiVisitLegStreams,
   parseBiomechanicsSessionTimestamp,
   evaluateThreeDartSelfComparison,
+  computeBallisticFlightTrajectory,
+  calculateVerticalReleaseHeightMm,
+  computeWristSnapKinematics,
   PoseKeypoints,
   ScannedFrame,
   ThrowTrajectory,
   TrajectoryPoint,
 } from '../src/lib/biomechanicsEngine';
 
-console.log('🎥 [Biomechanics-Agent] Starte erweiterten autonomen Audit (v3.6) der KI-Wurfanalyse...\n');
+console.log('🎥 [Biomechanics-Agent] Starte erweiterten autonomen Audit (v3.7) der KI-Wurfanalyse...\n');
 
 const auditResults: Array<{ check: string; status: 'PASS' | 'WARN' | 'FAIL'; note: string }> = [];
 
@@ -633,8 +636,61 @@ const missingComponents = [
   });
 }
 
+// 20. Test Ballistische Flugbahn-Projektion & Board-Einschlag (BBDV-Physik)
+{
+  const speedKmh = 21.6; // 6.0 m/s
+  const launchAngle = 12.0; // 12 Grad
+  const releaseHeight = 2026; // mm
+  const ballistic = computeBallisticFlightTrajectory(speedKmh, launchAngle, releaseHeight);
+
+  const passed =
+    ballistic.flightTimeMs >= 380 &&
+    ballistic.flightTimeMs <= 430 &&
+    ballistic.releaseSpeedMs === 6.0 &&
+    ballistic.gravityDropMm >= 750 &&
+    ballistic.gravityDropMm <= 850 &&
+    Math.abs(ballistic.impactHeightMm - 1730) <= 25 &&
+    ballistic.waypoints.length === 11 &&
+    ballistic.waypoints[10].xDistMm === BBDV_STANDARDS.HORIZONTAL_DISTANCE_MM;
+
+  auditResults.push({
+    check: 'Ballistische Flugbahn-Projektion & Board-Einschlag (BBDV-Physik)',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Flugzeit: ${ballistic.flightTimeMs} ms (${ballistic.releaseSpeedMs} m/s) | Fallhöhe: -${ballistic.gravityDropMm} mm | Board-Einschlag: ${ballistic.impactHeightMm} mm (Δ zum Bull: ${ballistic.deltaToBullseyeMm > 0 ? '+' : ''}${ballistic.deltaToBullseyeMm} mm)`,
+  });
+}
+
+// 21. Test Oche-Abwurfhöhe & Handgelenks-Snap (Wrist-Snap Kinematik)
+{
+  const testPoseAnkle: PoseKeypoints = {
+    head: { x: 0.45, y: 0.15 },
+    shoulder: { x: 0.45, y: 0.28 },
+    elbow: { x: 0.55, y: 0.32 },
+    wrist: { x: 0.62, y: 0.26 },
+    hip: { x: 0.45, y: 0.52 },
+    ankle: { x: 0.45, y: 0.90 },
+    heel: { x: 0.43, y: 0.92 },
+  };
+
+  const relHeightMm = calculateVerticalReleaseHeightMm(testPoseAnkle, dims, 1.1, 180);
+  const snap = computeWristSnapKinematics(142.0, 180.0, 140); // 38 Grad Handgelenks-Streckung in 140 ms
+
+  const passed =
+    relHeightMm >= 1150 &&
+    relHeightMm <= 1550 &&
+    snap.snapVelocityDegPerSec >= 240 &&
+    snap.snapVelocityDegPerSec <= 300 &&
+    snap.isSnapConsistent;
+
+  auditResults.push({
+    check: 'Oche-Abwurfhöhe & Handgelenks-Snap (Wrist-Snap Kinematik)',
+    status: passed ? 'PASS' : 'FAIL',
+    note: `Abwurfhöhe über Boden: ${relHeightMm} mm | Wrist-Snap: ${snap.snapVelocityDegPerSec} °/s (Spanne: ${snap.snapAngleSpanDeg}°, Konsistent=${snap.isSnapConsistent})`,
+  });
+}
+
 console.log('========================================');
-console.log('📊 AUDIT-ERGEBNIS BIOMECHANICS-ENGINE (v3.6):');
+console.log('📊 AUDIT-ERGEBNIS BIOMECHANICS-ENGINE (v3.7):');
 console.log('========================================');
 let allPassed = true;
 for (const r of auditResults) {
@@ -653,5 +709,5 @@ for (const m of missingComponents) {
 if (!allPassed) {
   process.exit(1);
 } else {
-  console.log('🎉 Biomechanik-Audit (v3.6) vollständig und erfolgreich abgeschlossen!');
+  console.log('🎉 Biomechanik-Audit (v3.7) vollständig und erfolgreich abgeschlossen!');
 }
