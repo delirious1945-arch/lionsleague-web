@@ -444,41 +444,6 @@ export default function StellenCheckenClient({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/training/live?view=stellen_checken"
-            target="_blank"
-            data-ui-id="STELLEN.NAV.TV_BTN"
-            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-black flex items-center gap-1.5 transition-all"
-          >
-            <Tv className="w-4 h-4 text-amber-400" />
-            <span>TV-Board</span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            data-ui-id="STELLEN.NAV.SOUND_BTN"
-            className={`p-2 rounded-xl border text-xs font-bold transition-colors ${
-              soundEnabled
-                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                : 'bg-slate-800 border-white/10 text-slate-400'
-            }`}
-            title={soundEnabled ? 'Ton aktiviert' : 'Ton stummgeschaltet'}
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowHelp(!showHelp)}
-            data-ui-id="STELLEN.NAV.HELP_BTN"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 transition-colors"
-            title="Spielregeln & Punktesystem"
-          >
-            <HelpCircle className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       {/* Spielregeln Einklapp-Box */}
@@ -576,11 +541,11 @@ export default function StellenCheckenClient({
                   data-ui-id="STELLEN.SETUP.MODE_SOLO_BTN"
                   className={`p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-3 cursor-pointer ${
                     gameMode === 'solo'
-                      ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-lg shadow-cyan-500/10'
+                      ? 'bg-emerald-950/80 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]'
                       : 'bg-slate-950/70 border-white/10 text-slate-400 hover:border-white/20'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
                     <User className="w-5 h-5" />
                   </div>
                   <div>
@@ -616,24 +581,24 @@ export default function StellenCheckenClient({
 
             {/* Spielerauswahl */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div data-ui-id="STELLEN.SETUP.P1_WRAPPER" className="space-y-1.5">
+              <div data-ui-id="STELLEN.SETUP.P1_WRAPPER" className={`space-y-2 ${gameMode === 'solo' ? 'sm:col-span-2' : ''}`}>
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-black uppercase tracking-wider text-slate-400 block">
                     {gameMode === 'solo' ? 'Spieler' : 'Spieler 1 (beginnt)'}
                   </label>
                   {gameMode === 'solo' && !isBoardUser && userPlayerMatch && (
-                    <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950/80 border border-cyan-500/40 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full">
                       ✓ Angemeldet
                     </span>
                   )}
                 </div>
                 {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
-                  <div className="w-full rounded-xl bg-slate-950 border border-cyan-500/40 px-3.5 py-3 text-sm font-bold text-white flex items-center justify-between shadow-inner">
-                    <span className="flex items-center gap-2 truncate">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
+                  <div data-ui-id="STELLEN.SETUP.P1_BADGE" className="w-full min-h-[56px] rounded-2xl bg-slate-950 border-2 border-emerald-500/50 px-4 py-3.5 text-lg sm:text-xl font-black text-white flex items-center justify-between shadow-inner">
+                    <span className="flex items-center gap-2.5 truncate">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
                       <span className="truncate">{userPlayerMatch.name}</span>
                     </span>
-                    <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
+                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
                       Fest fixiert
                     </span>
                   </div>
@@ -642,7 +607,7 @@ export default function StellenCheckenClient({
                     value={p1Name}
                     onChange={(e) => setP1Name(e.target.value)}
                     data-ui-id="STELLEN.SETUP.P1_SELECT"
-                    className="w-full rounded-xl bg-slate-950 border border-white/15 px-3.5 py-3 text-sm font-bold text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    className="w-full min-h-[56px] rounded-2xl bg-slate-950 border-2 border-white/15 px-4 py-3.5 text-lg sm:text-xl font-black text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
                   >
                     {validPlayers.map((p) => (
                       <option key={p.id || p.name} value={p.name}>
@@ -692,11 +657,11 @@ export default function StellenCheckenClient({
                   data-ui-id="STELLEN.SETUP.PRESET_RANDOM_BTN"
                   className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                     presetMode === 'random'
-                      ? 'bg-cyan-500/15 border-cyan-400 text-white'
+                      ? 'bg-emerald-950/80 border-emerald-500 text-white'
                       : 'bg-slate-950/60 border-white/10 text-slate-400'
                   }`}
                 >
-                  <Shuffle className="w-5 h-5 text-cyan-400 shrink-0" />
+                  <Shuffle className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
                     <div className="font-black text-sm">Zufällige Sequenz ziehen</div>
                     <div className="text-[11px] text-slate-400">
@@ -779,7 +744,7 @@ export default function StellenCheckenClient({
               type="button"
               onClick={() => startGame()}
               data-ui-id="STELLEN.SETUP.START_BTN"
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-base sm:text-lg shadow-xl shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full min-h-[64px] py-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-lg sm:text-xl shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Target className="w-5 h-5" />
               <span>
@@ -788,89 +753,6 @@ export default function StellenCheckenClient({
             </button>
           </div>
 
-          {/* Letzte Spiele / Historie */}
-          <div data-ui-id="STELLEN.HISTORY.CARD" className="bg-slate-900/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-400" />
-                <span>Letzte Ergebnisse (Stellen & Checken)</span>
-              </h2>
-              <span className="text-xs text-slate-400">{history.length} Einträge</span>
-            </div>
-
-            {history.length === 0 ? (
-              <div className="text-center py-8 text-sm text-slate-400">
-                Noch keine Spiele absolviert. Starte jetzt die erste Runde!
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-400">
-                      <th className="py-2.5 px-2">Spieler</th>
-                      <th className="py-2.5 px-2">Modus</th>
-                      <th className="py-2.5 px-2">Sequenz</th>
-                      <th className="py-2.5 px-2 text-right">Punkte</th>
-                      <th className="py-2.5 px-2 text-right">Checks</th>
-                      <th className="py-2.5 px-2 text-right">Quote</th>
-                      <th className="py-2.5 px-2 text-right">Aktion</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {history.slice(0, 15).map((item) => (
-                      <tr key={item.id} className="hover:bg-white/[0.02]">
-                        <td className="py-2.5 px-2 font-bold text-white">
-                          {item.player_name}
-                          {item.opponent_name && (
-                            <span className="text-xs text-slate-400 font-normal ml-1">
-                              vs. {item.opponent_name}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              item.game_mode === '1vs1'
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                            }`}
-                          >
-                            {item.game_mode}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-2 font-mono font-bold text-purple-300">
-                          #{String(item.preset_id).padStart(3, '0')}
-                        </td>
-                        <td className="py-2.5 px-2 text-right font-black text-amber-300">
-                          {item.points_scored} <span className="text-slate-500 font-normal">/ {item.max_possible_points}</span>
-                        </td>
-                        <td className="py-2.5 px-2 text-right font-bold text-emerald-300">
-                          {item.checks_count} / {item.total_rounds}
-                        </td>
-                        <td className="py-2.5 px-2 text-right font-mono text-slate-300">
-                          {(item.check_quote * 100).toFixed(1)}%
-                        </td>
-                        <td className="py-2.5 px-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPresetMode('fixed');
-                              setSelectedPresetId(item.preset_id);
-                              startGame(item.preset_id);
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold transition-colors cursor-pointer"
-                            title={`Genau diese Sequenz #${String(item.preset_id).padStart(3, '0')} spielen`}
-                          >
-                            #{String(item.preset_id).padStart(3, '0')} spielen
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -956,15 +838,15 @@ export default function StellenCheckenClient({
             <div
               className={`rounded-2xl p-4 border-2 transition-all flex items-center justify-between ${
                 activePlayer === 1
-                  ? 'bg-slate-900 border-cyan-400 shadow-lg shadow-cyan-500/10'
+                  ? 'bg-slate-900 border-emerald-400 shadow-lg shadow-emerald-500/10'
                   : 'bg-slate-900/50 border-white/10 opacity-75'
               }`}
             >
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg font-black text-white">{p1Name}</span>
+                  <span data-ui-id="STELLEN.MATCH.P1_NAME" className="text-2xl sm:text-3xl font-black text-white">{p1Name}</span>
                   {activePlayer === 1 && (
-                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-[10px] font-black uppercase">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 text-[10px] font-black uppercase">
                       Am Board 🎯
                     </span>
                   )}
@@ -992,7 +874,7 @@ export default function StellenCheckenClient({
               >
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-base sm:text-lg font-black text-white">{p2Name}</span>
+                    <span data-ui-id="STELLEN.MATCH.P2_NAME" className="text-2xl sm:text-3xl font-black text-white">{p2Name}</span>
                     {activePlayer === 2 && (
                       <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400 text-amber-300 text-[10px] font-black uppercase">
                         Am Board 🎯
@@ -1070,13 +952,13 @@ export default function StellenCheckenClient({
                 type="button"
                 onClick={() => handleDecision(false)}
                 data-ui-id="STELLEN.MATCH.CHECK_MISS_BTN"
-                className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/50 hover:to-zinc-900 active:scale-[0.98] border-2 border-zinc-700 hover:border-red-700/60 text-zinc-300 hover:text-red-300 font-black text-xl sm:text-2xl shadow-xl shadow-red-950/20 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group"
+                className="py-6 sm:py-7 px-6 rounded-2xl bg-gradient-to-b from-red-950/80 to-zinc-900 hover:from-red-900/70 hover:to-zinc-900 active:scale-[0.98] border-2 border-red-600/80 hover:border-red-500 text-red-300 hover:text-red-200 font-black text-xl sm:text-2xl shadow-xl shadow-red-950/20 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 group-hover:scale-105 transition-transform">
                   <XCircle className="w-7 h-7 stroke-[2.5]" />
                   <span className="tracking-wide">MISS</span>
                 </div>
-                <span className="text-xs font-bold uppercase tracking-wider bg-zinc-950/60 px-3 py-0.5 rounded-full text-zinc-400 group-hover:text-red-400/80">
+                <span className="text-xs font-bold uppercase tracking-wider bg-zinc-950/60 px-3 py-0.5 rounded-full text-red-400/90 group-hover:text-red-300">
                   0 Punkte • Nächste Zahl
                 </span>
               </button>
@@ -1193,7 +1075,7 @@ export default function StellenCheckenClient({
               type="button"
               onClick={() => startGame( getRandomPresetId() )}
               data-ui-id="STELLEN.COMPLETION.NEW_RANDOM_BTN"
-              className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg cursor-pointer"
+              className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg cursor-pointer"
             >
               <Shuffle className="w-4 h-4" />
               <span>🎲 Neues Spiel (Zufalls-Sequenz)</span>

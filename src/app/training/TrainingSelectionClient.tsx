@@ -144,7 +144,7 @@ export default function TrainingSelectionClient({
           {/* SPIEL 1: Checkout Battle (Doppelquote) */}
           <div
             data-ui-id="TRAINING.GAME_CHECKOUT.CARD"
-            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-amber-400/35 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
+            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-emerald-400/40 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
           >
             <div className="space-y-3.5">
               <div className="flex items-start justify-between gap-3">
@@ -183,24 +183,15 @@ export default function TrainingSelectionClient({
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
-              <Link
-                href="/training/live?view=doppelquote"
-                data-ui-id="TRAINING.GAME_CHECKOUT.TV_BTN"
-                className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
-                title="Live-Ranking für TV im Vereinsheim"
-              >
-                <Tv className="w-3.5 h-3.5 text-amber-300" />
-                <span>TV Board</span>
-              </Link>
+            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
                 href="/doppelquote"
                 data-ui-id="TRAINING.GAME_CHECKOUT.START_BTN"
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Spiel starten</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
           </div>
@@ -208,7 +199,7 @@ export default function TrainingSelectionClient({
           {/* SPIEL 2: PDC Challenge Routine */}
           <div
             data-ui-id="TRAINING.GAME_PDC.CARD"
-            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-amber-400/35 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
+            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-emerald-400/40 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
           >
             <div className="space-y-3.5">
               <div className="flex items-start justify-between gap-3">
@@ -234,24 +225,15 @@ export default function TrainingSelectionClient({
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
-              <Link
-                href="/training/live?view=pdc"
-                data-ui-id="TRAINING.GAME_PDC.TV_BTN"
-                className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
-                title="Live-Ranking für TV im Vereinsheim"
-              >
-                <Tv className="w-3.5 h-3.5 text-amber-300" />
-                <span>TV Board</span>
-              </Link>
+            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
                 href="/training/pdc-challenge"
                 data-ui-id="TRAINING.GAME_PDC.START_BTN"
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Spiel starten</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
           </div>
@@ -259,7 +241,7 @@ export default function TrainingSelectionClient({
           {/* SPIEL 3: Fußball (Soccer Darts) */}
           <div
             data-ui-id="TRAINING.GAME_FUSSBALL.CARD"
-            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-amber-400/35 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
+            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-emerald-400/40 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
           >
             <div className="space-y-3.5">
               <div className="flex items-start justify-between gap-3">
@@ -282,24 +264,15 @@ export default function TrainingSelectionClient({
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
-              <Link
-                href="/training/live?view=fussball"
-                data-ui-id="TRAINING.GAME_FUSSBALL.TV_BTN"
-                className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
-                title="1vs1 TV-Board im Vereinsheim"
-              >
-                <Tv className="w-3.5 h-3.5 text-amber-300" />
-                <span>TV Board</span>
-              </Link>
+            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
                 href="/training/fussball"
                 data-ui-id="TRAINING.GAME_FUSSBALL.START_BTN"
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Spiel starten</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
           </div>
@@ -307,7 +280,7 @@ export default function TrainingSelectionClient({
           {/* SPIEL 4: Stellen & Checken (3–101) */}
           <div
             data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.CARD"
-            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-amber-400/35 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
+            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-emerald-400/40 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between"
           >
             <div className="space-y-3.5">
               <div className="flex items-start justify-between gap-3">
@@ -330,24 +303,15 @@ export default function TrainingSelectionClient({
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between gap-3">
-              <Link
-                href="/training/live?view=stellen_checken"
-                data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.TV_BTN"
-                className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] text-slate-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-1.5 backdrop-blur-md transition-all cursor-pointer"
-                title="Stellen & Checken TV-Board im Vereinsheim"
-              >
-                <Tv className="w-3.5 h-3.5 text-amber-300" />
-                <span>TV Board</span>
-              </Link>
+            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
                 href="/training/stellen-checken"
                 data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.START_BTN"
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Spiel starten</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
           </div>

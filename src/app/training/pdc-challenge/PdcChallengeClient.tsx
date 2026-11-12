@@ -910,43 +910,6 @@ export default function PdcChallengeClient({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSetupSettings((prev) => !prev)}
-              data-ui-id="PDC.NAV.SETUP_BTN"
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                showSetupSettings
-                  ? 'bg-amber-500 text-zinc-950 border-amber-400'
-                  : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
-              }`}
-              title="Setup ansehen / anpassen"
-            >
-              <span>⚙️</span>
-              <span className="hidden sm:inline">Setup</span>
-            </button>
-
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              data-ui-id="PDC.NAV.SOUND_BTN"
-              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                soundEnabled
-                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                  : 'bg-zinc-800 text-zinc-500 border-zinc-700'
-              }`}
-              title={soundEnabled ? 'Sound aktiviert' : 'Sound stummgeschaltet'}
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-
-            <Link
-              href="/training/pdc-challenge/live"
-              target="_blank"
-              data-ui-id="PDC.NAV.TV_BTN"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
-              title="TV Live-Board öffnen"
-            >
-              <Tv className="w-3.5 h-3.5" />
-              <span>TV</span>
-            </Link>
 
             <button
               onClick={resetGame}
@@ -986,30 +949,6 @@ export default function PdcChallengeClient({
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              data-ui-id="PDC.NAV.SOUND_BTN"
-              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                soundEnabled
-                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                  : 'bg-zinc-800 text-zinc-500 border-zinc-700'
-              }`}
-              title={soundEnabled ? 'Sound aktiviert' : 'Sound stummgeschaltet'}
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-
-            <Link
-              href="/training/pdc-challenge/live"
-              target="_blank"
-              data-ui-id="PDC.NAV.TV_BTN"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
-              title="TV Live-Board öffnen"
-            >
-              <Tv className="w-3.5 h-3.5" />
-              <span>TV Live-Board</span>
-            </Link>
-
-            <button
               onClick={resetGame}
               data-ui-id="PDC.NAV.RESET_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
@@ -1018,66 +957,6 @@ export default function PdcChallengeClient({
               <span>Neu</span>
             </button>
           </div>
-        </div>
-      )}
-
-      {/* TABS: NUR SICHTBAR WENN KEIN SPIEL AKTIV LÄUFT */}
-      {!isPlaying && (
-        <div
-          data-ui-id="PDC.NAV.TABS_BAR"
-          className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto text-xs font-bold"
-        >
-          <button
-            onClick={() => setActiveTab('game')}
-            data-ui-id="PDC.NAV.TAB_BOARD"
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'game'
-                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
-            }`}
-          >
-            <Target className="w-4 h-4" />
-            <span>Wurf-Board & Setup</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('summary')}
-            data-ui-id="PDC.NAV.TAB_SUMMARY"
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'summary'
-                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            <span>Übersicht & Abzeichen</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('leaderboard')}
-            data-ui-id="PDC.NAV.TAB_LEADERBOARD"
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'leaderboard'
-                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
-            }`}
-          >
-            <Trophy className="w-4 h-4" />
-            <span>Bestenliste</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('history')}
-            data-ui-id="PDC.NAV.TAB_HISTORY"
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'history'
-                ? 'bg-amber-500 text-zinc-950 font-black shadow-lg shadow-amber-500/20'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
-            }`}
-          >
-            <span>📜</span>
-            <span>{isAdmin ? 'Verlauf (Admin)' : 'Mein Verlauf'} ({visibleHistory.length})</span>
-          </button>
         </div>
       )}
 
@@ -1125,7 +1004,7 @@ export default function PdcChallengeClient({
                   onClick={() => setGameMode('solo')}
                   className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     gameMode === 'solo'
-                      ? 'bg-amber-500 text-zinc-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-black shadow-lg shadow-emerald-500/25'
                       : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
                   }`}
                 >
@@ -1139,7 +1018,7 @@ export default function PdcChallengeClient({
                   onClick={() => setGameMode('1vs1')}
                   className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     gameMode === '1vs1'
-                      ? 'bg-amber-500 text-zinc-950 border-amber-400 font-black shadow-lg shadow-amber-500/20'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-black shadow-lg shadow-emerald-500/25'
                       : 'bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700'
                   }`}
                 >
@@ -1152,7 +1031,7 @@ export default function PdcChallengeClient({
             {/* Spieler Auswahl */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
               {/* Spieler 1 */}
-              <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-2" data-ui-id="PDC.SETUP.P1_WRAPPER">
+              <div className={`p-5 sm:p-6 rounded-2xl bg-zinc-950/80 border border-emerald-500/30 space-y-3 ${gameMode === 'solo' ? 'sm:col-span-2' : ''}`} data-ui-id="PDC.SETUP.P1_WRAPPER">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-white flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
@@ -1164,12 +1043,12 @@ export default function PdcChallengeClient({
                 </div>
 
                 {gameMode === 'solo' && !isBoardUser && userPlayerMatch ? (
-                  <div className="w-full bg-zinc-900 border border-amber-500/40 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white flex items-center justify-between shadow-inner">
-                    <span className="flex items-center gap-2 truncate">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                  <div className="w-full min-h-[56px] bg-zinc-900 border-2 border-emerald-500/50 rounded-2xl px-4 py-3.5 text-lg sm:text-xl font-black text-white flex items-center justify-between shadow-inner">
+                    <span className="flex items-center gap-2.5 truncate">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
                       <span className="truncate">{userPlayerMatch.name}</span>
                     </span>
-                    <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
+                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
                       Fest fixiert
                     </span>
                   </div>
@@ -1177,7 +1056,7 @@ export default function PdcChallengeClient({
                   <select
                     value={p1Name}
                     onChange={(e) => setP1Name(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                    className="w-full min-h-[56px] bg-zinc-900 border-2 border-zinc-700 rounded-2xl px-4 py-3.5 text-lg sm:text-xl font-black text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
                   >
                     {players.map((p) => (
                       <option key={p.id} value={p.name}>
@@ -1213,12 +1092,7 @@ export default function PdcChallengeClient({
                     ))}
                   </select>
                 </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-zinc-950/40 border border-dashed border-zinc-800 flex flex-col items-center justify-center text-center text-xs text-zinc-500">
-                  <span>Solo-Modus aktiviert</span>
-                  <span className="text-[11px] text-zinc-600 mt-0.5">Spiele alleine für deine persönliche Bestenliste</span>
-                </div>
-              )}
+              ) : null}
             </div>
 
             {/* Großer prominenter Gold-Start-Button */}
@@ -1229,7 +1103,7 @@ export default function PdcChallengeClient({
                 onClick={() => {
                   setIsMatchStarted(true);
                 }}
-                className="w-full py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-yellow-400 active:scale-[0.99] text-zinc-950 font-black text-lg sm:text-xl shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer"
+                className="w-full min-h-[64px] py-5 sm:py-6 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 active:scale-[0.99] text-slate-950 font-black text-lg sm:text-xl shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer"
               >
                 <span className="text-2xl">🎯</span>
                 <span>SPIEL STARTEN</span>
@@ -1491,7 +1365,7 @@ export default function PdcChallengeClient({
                   </div>
 
                   {/* 10 Button Grid (0 bis 9) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3 max-w-2xl mx-auto pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 max-w-3xl mx-auto pt-2">
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((val) => {
                       const targetNum = Number(currentTargetLabel);
                       const basePts = val * targetNum;
@@ -1499,7 +1373,7 @@ export default function PdcChallengeClient({
 
                       let btnStyle =
                         val === 0
-                          ? 'bg-zinc-900 hover:bg-red-950/30 hover:border-red-800/50 border-zinc-800 text-zinc-400'
+                          ? 'bg-red-950/70 hover:bg-red-900/60 border-red-600/80 hover:border-red-500 text-red-300'
                           : isSix
                           ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 text-zinc-950 font-black border-emerald-300 shadow-lg shadow-emerald-500/30'
                           : 'bg-zinc-800 hover:bg-zinc-700 hover:border-emerald-500/50 border-zinc-700 text-white font-black';
@@ -1508,25 +1382,25 @@ export default function PdcChallengeClient({
                         <button
                           key={val}
                           onClick={() => handleShanghaiInput(val)}
-                          className={`py-3.5 sm:py-4 px-2 rounded-2xl border-2 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${btnStyle}`}
+                          className={`min-h-[96px] py-5 sm:py-6 px-2 rounded-2xl border-2 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${btnStyle}`}
                         >
-                          <div className="flex items-center gap-1 text-lg sm:text-2xl font-black">
+                          <div className="flex items-center gap-1 text-3xl sm:text-4xl font-black">
                             <span>{val}</span>
                             {isSix && <span className="text-xs">🌟</span>}
                           </div>
                           <div
-                            className={`text-[10px] font-mono font-bold ${
-                              isSix ? 'text-zinc-950' : val === 0 ? 'text-zinc-500' : 'text-emerald-400'
+                            className={`text-xs sm:text-sm font-mono font-bold ${
+                              isSix ? 'text-zinc-950' : val === 0 ? 'text-red-400/90' : 'text-emerald-400'
                             }`}
                           >
                             {basePts} Pkt
                           </div>
                           {isSix ? (
-                            <div className="text-[9px] uppercase font-black text-zinc-950 bg-emerald-300 px-1.5 py-0.2 rounded mt-0.5">
+                            <div className="text-[11px] uppercase font-black text-zinc-950 bg-emerald-300 px-2 py-0.5 rounded mt-1">
                               Shanghai?
                             </div>
                           ) : (
-                            <div className={`text-[9px] ${val === 0 ? 'text-red-400/80 font-bold' : 'text-zinc-400'}`}>
+                            <div className={`text-[11px] ${val === 0 ? 'text-red-300 font-bold' : 'text-zinc-400'}`}>
                               {val === 0 ? 'Fehlwurf' : `${val}x`}
                             </div>
                           )}
@@ -1607,7 +1481,7 @@ export default function PdcChallengeClient({
                     <button
                       onClick={() => handleDoubleDart(false)}
                       data-ui-id="PDC.MATCH.DOUBLE_MISS_BTN"
-                      className="py-6 px-4 rounded-3xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/40 hover:to-zinc-900 hover:border-red-700/60 active:scale-95 border-2 border-zinc-700 text-zinc-200 font-black text-lg transition-all shadow-xl cursor-pointer flex flex-col items-center justify-center gap-1 group"
+                      className="py-6 px-4 rounded-3xl bg-gradient-to-b from-red-950/80 to-zinc-900 hover:from-red-900/70 hover:to-zinc-900 hover:border-red-500 active:scale-95 border-2 border-red-600/80 text-red-300 font-black text-lg transition-all shadow-xl cursor-pointer flex flex-col items-center justify-center gap-1 group"
                     >
                       <span className="text-2xl group-hover:scale-110 transition-transform">❌</span>
                       <span className="group-hover:text-red-300 transition-colors">Daneben</span>

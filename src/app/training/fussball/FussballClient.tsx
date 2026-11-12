@@ -728,7 +728,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         </Link>
 
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-lg shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+          <div data-ui-id="FUSSBALL.NAV.LOGO" className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-lg shadow-[0_0_15px_rgba(16,185,129,0.3)]">
             ⚽
           </div>
           <div>
@@ -740,29 +740,50 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            data-ui-id="FUSSBALL.NAV.SOUND_BTN"
-            className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
-            title="Sound"
-          >
-            {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
-          </button>
-          <button
-            onClick={() => setShowHelp(true)}
-            data-ui-id="FUSSBALL.NAV.HELP_BTN"
-            className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
-            title="Spielregeln"
-          >
-            <HelpCircle size={15} />
-          </button>
+          {!isGameStarted ? (
+            <>
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                data-ui-id="FUSSBALL.NAV.SOUND_BTN"
+                className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                title="Sound"
+              >
+                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              </button>
+              <button
+                onClick={() => setShowHelp(true)}
+                data-ui-id="FUSSBALL.NAV.HELP_BTN"
+                className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                title="Spielregeln"
+              >
+                <HelpCircle size={15} />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                if (isBotThinking) return;
+                if (stats.p1Darts + stats.p2Darts === 0 || gameOver || confirm('Match wirklich neu starten? Der aktuelle Spielstand geht verloren.')) {
+                  handleStartGame(e);
+                }
+              }}
+              disabled={isBotThinking}
+              data-ui-id="FUSSBALL.NAV.RESET_BTN"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-950/60 disabled:opacity-40 text-slate-200 hover:text-red-300 border border-white/10 hover:border-red-600/60 text-xs font-bold transition-all cursor-pointer select-none"
+              title="Match mit gleichen Einstellungen neu starten"
+            >
+              <RotateCcw size={15} />
+              <span>Neustart</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* SETUP SCREEN (VOR DEM ANPFIFF) */}
       {!isGameStarted ? (
         <div data-ui-id="FUSSBALL.SETUP.CARD" className="bg-slate-900/95 border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
-          <div className="text-center space-y-1">
+          <div data-ui-id="FUSSBALL.SETUP.HEADER" className="text-center space-y-1">
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest block">
               Match-Konfiguration
             </span>
@@ -775,7 +796,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           </div>
 
           {/* Modus Auswahl */}
-          <div className="space-y-2">
+          <div data-ui-id="FUSSBALL.SETUP.MODE_SECTION" className="space-y-2">
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
               Spielmodus
             </label>
@@ -826,9 +847,9 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 )}
               </div>
               {gameMode === '1vsComputer' && !isBoardUser && userPlayerMatch ? (
-                <div className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white flex items-center justify-between shadow-inner">
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <div data-ui-id="FUSSBALL.SETUP.P1_BADGE" className="w-full min-h-[56px] bg-slate-950 border-2 border-emerald-500/50 rounded-2xl px-4 py-3.5 text-lg sm:text-xl font-black text-white flex items-center justify-between shadow-inner">
+                  <span className="flex items-center gap-2.5 truncate">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
                     <span className="truncate">{userPlayerMatch.name}</span>
                   </span>
                   <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded shrink-0 ml-2">
@@ -839,7 +860,8 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 <select
                   value={p1Name}
                   onChange={(e) => setP1Name(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none focus:border-blue-500 cursor-pointer"
+                  data-ui-id="FUSSBALL.SETUP.P1_SELECT"
+                  className="w-full min-h-[56px] bg-slate-950 border-2 border-white/10 rounded-2xl px-4 py-3.5 text-lg sm:text-xl font-black text-white outline-none focus:border-emerald-500 cursor-pointer"
                 >
                   {players.map(p => (
                     <option key={p.id} value={p.name}>{p.name} ({p.team})</option>
@@ -856,6 +878,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 <select
                   value={p2Name}
                   onChange={(e) => setP2Name(e.target.value)}
+                  data-ui-id="FUSSBALL.SETUP.P2_SELECT"
                   className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none focus:border-amber-500"
                 >
                   {players.map(p => (
@@ -889,7 +912,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
 
           {/* Computer-Stufen Vorschau wenn Bot gewählt */}
           {gameMode === '1vsComputer' && (
-            <div className="bg-slate-950/70 border border-white/5 rounded-2xl p-4">
+            <div data-ui-id="FUSSBALL.SETUP.AI_PREVIEW" className="bg-slate-950/70 border border-white/5 rounded-2xl p-4">
               <div className="flex items-center justify-between text-xs mb-2">
                 <span className="font-bold text-slate-300">Ausgewählte KI-Stufe:</span>
                 <span className="font-mono text-emerald-400 font-bold">
@@ -969,120 +992,12 @@ export default function FussballClient({ players, initialHistory, currentUser }:
             type="button"
             onClick={handleStartGame}
             data-ui-id="FUSSBALL.SETUP.START_BTN"
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+            className="w-full min-h-[64px] py-5 sm:py-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-lg sm:text-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
           >
             <span>⚽</span>
             <span>ANPFIFF! MATCH STARTEN</span>
           </button>
 
-          {/* Tablet-Cache & Speicher-Status (Transparenz für Offline-Speicherung) */}
-          <div data-ui-id="FUSSBALL.SETUP.CACHE_CARD" className="bg-slate-950/70 border border-white/10 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-xl shrink-0">📱</span>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
-                    <span>Tablet-Cache & Speicher-Status</span>
-                    {offlineQueueCount === 0 ? (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
-                        ✓ Synchronisiert
-                      </span>
-                    ) : (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                        {offlineQueueCount} in Warteschlange
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-400 truncate">
-                    Spiele werden redundant im Browser-Cache & in Supabase gesichert.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  loadLocalCacheState();
-                  setShowCacheInspector(!showCacheInspector);
-                }}
-                data-ui-id="FUSSBALL.SETUP.CACHE_TOGGLE_BTN"
-                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shrink-0"
-              >
-                {showCacheInspector ? '▲ Einklappen' : '▼ Cache ansehen'}
-              </button>
-            </div>
-
-            {showCacheInspector && (
-              <div className="space-y-3 pt-3 border-t border-white/5 animate-fadeIn">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-xs text-slate-300">
-                    Lokal im Browser archivierte Spiele: <strong className="text-white">{localArchive.length}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setSyncFeedback('Synchronisiere mit Supabase Cloud...');
-                      await syncOfflineQueue();
-                      loadLocalCacheState();
-                      setSyncFeedback('✅ Alle ausstehenden Spiele erfolgreich mit der Supabase-Cloud synchronisiert!');
-                      setTimeout(() => setSyncFeedback(null), 4000);
-                    }}
-                    data-ui-id="FUSSBALL.SETUP.CACHE_SYNC_BTN"
-                    className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>🔄</span>
-                    <span>Jetzt synchronisieren</span>
-                  </button>
-                </div>
-
-                {syncFeedback && (
-                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-medium">
-                    {syncFeedback}
-                  </div>
-                )}
-
-                {localArchive.length === 0 ? (
-                  <div className="p-4 bg-slate-900/60 rounded-xl text-center text-xs text-slate-500 border border-dashed border-white/10">
-                    Noch keine Fußball-Spiele im lokalen Tablet-Cache abgelegt.
-                  </div>
-                ) : (
-                  <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
-                    {localArchive.map((item, idx) => (
-                      <div
-                        key={item.session_id + '_' + idx}
-                        className="p-2.5 bg-slate-900/80 border border-white/5 rounded-xl flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <div className="font-bold text-white flex items-center gap-1.5">
-                            <span>{item.player_name}</span>
-                            <span className="text-slate-500">vs.</span>
-                            <span className="text-amber-300">{item.opponent_name}</span>
-                            {item.is_winner === 1 && (
-                              <span className="text-[10px] px-1.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                                Sieg
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            {item.training_date ? new Date(item.training_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Heute'} • {item.target_goals} Tore Ziel • {item.darts_thrown} Darts
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="font-mono font-black text-white text-sm">
-                            {item.goals_scored} : {item.goals_conceded}
-                          </div>
-                          <div className="text-[9px] text-emerald-400 font-bold">
-                            ✓ Lokal gesichert
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       ) : (
 
@@ -1105,7 +1020,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
             <div className="grid grid-cols-3 items-center gap-2">
               {/* Team 1 */}
               <div className="text-left flex flex-col">
-                <span className="text-xs sm:text-sm font-black text-white truncate max-w-[140px] sm:max-w-[200px]">
+                <span data-ui-id="FUSSBALL.MATCH.P1_NAME" className="text-xl sm:text-3xl font-black text-white truncate max-w-[140px] sm:max-w-[260px]">
                   {p1Name}
                 </span>
                 <span className="text-[10px] text-sky-400 font-semibold">
@@ -1119,7 +1034,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               </div>
 
               {/* Tore Center */}
-              <div className="flex items-center justify-center gap-3">
+              <div data-ui-id="FUSSBALL.MATCH.GOALS_DISPLAY" className="flex items-center justify-center gap-3">
                 <span className="text-4xl sm:text-6xl font-black text-white font-mono drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]">
                   {p1Goals}
                 </span>
@@ -1131,7 +1046,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
 
               {/* Team 2 */}
               <div className="text-right flex flex-col items-end">
-                <span className="text-xs sm:text-sm font-black text-white truncate max-w-[140px] sm:max-w-[200px]">
+                <span data-ui-id="FUSSBALL.MATCH.P2_NAME" className="text-xl sm:text-3xl font-black text-white truncate max-w-[140px] sm:max-w-[260px]">
                   {getP2DisplayName()}
                 </span>
                 <span className="text-[10px] text-amber-400 font-semibold">
@@ -1172,7 +1087,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Aktuell am Board
                 </span>
-                <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                <h3 data-ui-id="FUSSBALL.MATCH.THROWER_NAME" className="text-2xl sm:text-3xl font-black text-white flex flex-wrap items-center gap-2">
                   <span className="text-emerald-400">🎯</span>
                   <span>{currentWerferName}</span>
                   {currentWerferHasBall ? (
@@ -1196,8 +1111,8 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                   let badgeColor = 'bg-slate-800 text-slate-500 border-white/5';
                   if (shot) {
                     if (shot.type === 'goal') badgeColor = 'bg-emerald-600 text-white border-emerald-400 font-bold';
-                    else if (shot.type === 'bull_hit') badgeColor = 'bg-sky-600 text-white border-sky-400 font-bold';
-                    else badgeColor = 'bg-rose-950/80 text-rose-300 border-rose-600/40 font-bold';
+                    else if (shot.type === 'bull_hit') badgeColor = 'bg-emerald-500 text-white border-emerald-300 font-bold';
+                    else badgeColor = 'bg-red-950/80 text-red-300 border-red-600/60 font-bold';
                   } else if (isCurrent) {
                     badgeColor = 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-400/50 scale-105';
                   }
@@ -1268,11 +1183,11 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                           type="button"
                           onClick={() => recordDartAction('goal_miss')}
                           data-ui-id="FUSSBALL.MATCH.GOAL_MISS_BTN"
-                          className="py-6 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/50 hover:to-zinc-900 active:scale-95 border-2 border-zinc-700 hover:border-red-600/70 text-zinc-300 hover:text-red-300 font-bold text-lg flex flex-col items-center justify-center gap-1 shadow-xl shadow-red-950/20 transition-all cursor-pointer group"
+                          className="py-6 rounded-2xl bg-gradient-to-b from-red-950/80 to-zinc-900 hover:from-red-900/70 hover:to-zinc-900 active:scale-95 border-2 border-red-600/80 hover:border-red-500 text-red-300 hover:text-red-200 font-bold text-lg flex flex-col items-center justify-center gap-1 shadow-xl shadow-red-950/20 transition-all cursor-pointer group"
                         >
                           <span className="text-2xl group-hover:scale-110 transition-transform">❌</span>
                           <span className="group-hover:text-red-300 transition-colors">Daneben</span>
-                          <span className="text-[10px] text-zinc-400 group-hover:text-red-400/80 uppercase tracking-widest font-semibold">
+                          <span className="text-[10px] text-red-400/90 group-hover:text-red-300 uppercase tracking-widest font-semibold">
                             Ballbesitz bleibt erhalten
                           </span>
                         </button>
@@ -1284,11 +1199,11 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                           type="button"
                           onClick={() => recordDartAction('bull_hit')}
                           data-ui-id="FUSSBALL.MATCH.BULL_HIT_BTN"
-                          className="py-6 rounded-2xl bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 hover:from-sky-500 hover:to-indigo-600 border-2 border-sky-400 text-white font-black text-xl flex flex-col items-center justify-center gap-1 shadow-xl shadow-sky-900/40 active:scale-95 transition-all cursor-pointer"
+                          className="py-6 rounded-2xl bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 border-2 border-emerald-400 text-white font-black text-xl flex flex-col items-center justify-center gap-1 shadow-xl shadow-emerald-900/40 active:scale-95 transition-all cursor-pointer"
                         >
                           <span className="text-3xl">🎯</span>
                           <span>BULL GETROFFEN!</span>
-                          <span className="text-[10px] text-sky-200 uppercase tracking-widest font-bold">
+                          <span className="text-[10px] text-emerald-200 uppercase tracking-widest font-bold">
                             Ball geholt! Sofort Torchance!
                           </span>
                         </button>
@@ -1297,11 +1212,11 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                           type="button"
                           onClick={() => recordDartAction('bull_miss')}
                           data-ui-id="FUSSBALL.MATCH.BULL_MISS_BTN"
-                          className="py-6 rounded-2xl bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-red-950/50 hover:to-zinc-900 active:scale-95 border-2 border-zinc-700 hover:border-red-600/70 text-zinc-300 hover:text-red-300 font-bold text-lg flex flex-col items-center justify-center gap-1 shadow-xl shadow-red-950/20 transition-all cursor-pointer group"
+                          className="py-6 rounded-2xl bg-gradient-to-b from-red-950/80 to-zinc-900 hover:from-red-900/70 hover:to-zinc-900 active:scale-95 border-2 border-red-600/80 hover:border-red-500 text-red-300 hover:text-red-200 font-bold text-lg flex flex-col items-center justify-center gap-1 shadow-xl shadow-red-950/20 transition-all cursor-pointer group"
                         >
                           <span className="text-2xl group-hover:scale-110 transition-transform">❌</span>
                           <span className="group-hover:text-red-300 transition-colors">Kein Bull</span>
-                          <span className="text-[10px] text-zinc-400 group-hover:text-red-400/80 uppercase tracking-widest font-semibold">
+                          <span className="text-[10px] text-red-400/90 group-hover:text-red-300 uppercase tracking-widest font-semibold">
                             Balleroberung verfehlt
                           </span>
                         </button>
@@ -1365,20 +1280,9 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               </div>
             )}
 
-            {/* Live Ticker */}
-            <div data-ui-id="FUSSBALL.MATCH.TICKER" className="bg-slate-950/80 rounded-2xl p-3 border border-white/5 space-y-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Live Stadion-Ticker</span>
-              </div>
-              <p className="text-xs font-bold text-slate-200">
-                {tickerMessage}
-              </p>
-            </div>
-
             {/* Spiel-Aktionen: Wurf korrigieren & Spiel abbrechen */}
             {!gameOver && (
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
+              <div data-ui-id="FUSSBALL.MATCH.ACTIONS_BAR" className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
                 <button
                   type="button"
                   onClick={handleAbortMatch}
@@ -1406,7 +1310,8 @@ export default function FussballClient({ players, initialHistory, currentUser }:
 
           </div>
 
-          {/* Match-Statistiken */}
+          {/* Match-Statistiken (nur nach Spielabschluss sichtbar) */}
+          {gameOver && (
           <div data-ui-id="FUSSBALL.MATCH.STATS_CARD" className="grid grid-cols-2 gap-3 text-xs">
             <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3.5 space-y-2">
               <span className="font-black text-sky-400 block truncate">{p1Name}</span>
@@ -1452,6 +1357,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
               </div>
             </div>
           </div>
+          )}
 
         </div>
       )}
