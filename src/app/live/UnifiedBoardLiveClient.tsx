@@ -161,32 +161,16 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
             <span className="text-xl sm:text-2xl font-black tracking-wider text-cyan-400 font-mono">
               BOARD {boardId}
             </span>
-            <span className="text-xs uppercase px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-bold">
-              SMART TV MONITOR
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-sm sm:text-base font-mono text-slate-400 tracking-widest">{currentTime}</span>
-            <button
-              onClick={toggleFullscreen}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
-            >
-              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-            </button>
           </div>
         </div>
 
-        <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-8 my-auto">
-          <div className="relative w-44 h-44 sm:w-60 sm:h-60 filter drop-shadow-[0_0_45px_rgba(6,182,212,0.4)]">
-            <Image src="/lions-logo.png" alt="Lions Weyhausen" fill sizes="240px" className="object-contain" priority />
+        <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 my-auto">
+          <div className="relative w-48 h-48 sm:w-64 sm:h-64 filter drop-shadow-[0_0_50px_rgba(6,182,212,0.5)]">
+            <Image src="/logo.png" alt="Lions Weyhausen" fill sizes="260px" className="object-contain" priority />
           </div>
 
           <div className="space-y-3 max-w-xl">
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white uppercase drop-shadow-md">
-              LIONS WEYHAUSEN · LIVE
-            </h1>
-            <p className="text-base sm:text-lg text-cyan-300 font-mono tracking-widest animate-pulse">
+            <p className="text-lg sm:text-2xl text-cyan-300 font-mono tracking-widest animate-pulse font-bold">
               Warte auf Spielbeginn am Board {boardId}...
             </p>
             <span className="text-xs text-slate-400 block pt-1">
