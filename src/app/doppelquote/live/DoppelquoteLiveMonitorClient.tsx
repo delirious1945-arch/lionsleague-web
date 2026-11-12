@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import HolographicDartboard from '@/components/HolographicDartboard';
 
 export interface DoppelquoteLiveState {
   status: 'idle' | 'playing' | 'completed';
@@ -571,137 +572,11 @@ export default function DoppelquoteLiveMonitorClient({ initialBoardId = '1' }: D
           {/* Äußerer Leuchtring */}
           <div className="absolute -inset-6 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none animate-pulse" />
 
-          {/* SVG HOLOGRAPHIC RADAR DARTBOARD (EXAKT WIE IM SOLL-BILD) */}
-          <div className="relative w-72 h-72 sm:w-96 sm:h-96 lg:w-[420px] lg:h-[420px] flex items-center justify-center">
-            <svg
-              viewBox="0 0 400 400"
-              className="w-full h-full drop-shadow-[0_0_50px_rgba(0,229,255,0.5)] select-none pointer-events-none"
-            >
-              {/* Definitionen für Verläufe und Glow-Filter */}
-              <defs>
-                <filter id="cyanGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="6" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-                <filter id="coralGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="8" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-                <linearGradient id="glassSweep" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.4" />
-                  <stop offset="50%" stopColor="#ffffff" stopOpacity="0.05" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.15" />
-                </linearGradient>
-              </defs>
-
-              {/* 1. Äußerer Haupt-Ring in leuchtendem Cyan */}
-              <circle
-                cx="200"
-                cy="200"
-                r="185"
-                fill="none"
-                stroke="#00e5ff"
-                strokeWidth="5"
-                filter="url(#cyanGlow)"
-              />
-              <circle
-                cx="200"
-                cy="200"
-                r="180"
-                fill="rgba(5, 12, 28, 0.7)"
-                stroke="#00e5ff"
-                strokeWidth="1.5"
-                strokeOpacity="0.5"
-              />
-
-              {/* 2. Konzentrische Ringe (wie eine echte Dartscheibe) */}
-              <circle cx="200" cy="200" r="150" fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.4" />
-              <circle cx="200" cy="200" r="135" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.3" />
-              <circle cx="200" cy="200" r="100" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.35" />
-              <circle cx="200" cy="200" r="85" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.25" />
-
-              {/* 3. Radiale Segment-Linien (20 Speichen im 18°-Abstand) */}
-              {Array.from({ length: 20 }).map((_, i) => {
-                const angle = (i * 18 * Math.PI) / 180;
-                const x1 = 200 + 85 * Math.sin(angle);
-                const y1 = 200 - 85 * Math.cos(angle);
-                const x2 = 200 + 180 * Math.sin(angle);
-                const y2 = 200 - 180 * Math.cos(angle);
-                return (
-                  <line
-                    key={i}
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke="#00e5ff"
-                    strokeWidth="1"
-                    strokeOpacity="0.25"
-                  />
-                );
-              })}
-
-              {/* 4. Das AKTIVE DOPPEL-SEGMENT (rotiert in Echtzeit auf das geworfene Doppel!) */}
-              <g
-                style={{
-                  transformOrigin: '200px 200px',
-                  transform: `rotate(${targetInfo.angle}deg)`,
-                  transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                }}
-              >
-                {/* Ein trapezförmiger Doppel-Ring-Ausschnitt für das aktive Doppel */}
-                <path
-                  d="M 186 21 A 180 180 0 0 1 214 21 L 211 50 A 150 150 0 0 0 189 50 Z"
-                  fill="#ff3366"
-                  filter="url(#coralGlow)"
-                />
-                <path
-                  d="M 186 21 A 180 180 0 0 1 214 21 L 211 50 A 150 150 0 0 0 189 50 Z"
-                  fill="none"
-                  stroke="#ff6699"
-                  strokeWidth="2.5"
-                />
-                {/* Weisser Präzisions-Marker in der Mitte des Doppelfeldes */}
-                <line x1="200" y1="18" x2="200" y2="52" stroke="#ffffff" strokeWidth="2.5" />
-              </g>
-
-              {/* 5. Gläserne Licht-Reflexion (Diagonaler weißer Bogen oben rechts) */}
-              <path
-                d="M 80 80 A 170 170 0 0 1 320 80"
-                fill="none"
-                stroke="url(#glassSweep)"
-                strokeWidth="6"
-                strokeLinecap="round"
-                opacity="0.6"
-              />
-
-              {/* 6. Zentraler Kreis für die Typografie */}
-              <circle
-                cx="200"
-                cy="200"
-                r="70"
-                fill="rgba(4, 9, 22, 0.85)"
-                stroke="#00e5ff"
-                strokeWidth="2"
-                strokeOpacity="0.8"
-                filter="url(#cyanGlow)"
-              />
-            </svg>
-
-            {/* ZENTRALE TYPOGRAFIE "D20" (EXAKT ZWEIFARBIG WIE IM SOLL-BILD) */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span
-                className="text-6xl sm:text-7xl lg:text-8xl font-black font-mono tracking-tight"
-                style={{
-                  color: '#ffffff',
-                  WebkitTextStroke: '2.5px #00e5ff',
-                  textShadow: '0 0 30px rgba(0, 229, 255, 0.9), 0 0 60px rgba(255, 51, 102, 0.6)',
-                }}
-              >
-                {curTarget}
-              </span>
-            </div>
-          </div>
+          {/* DETAILREICHES HOLOGRAFISCHES TURNIER-DARTBOARD */}
+          <HolographicDartboard
+            target={curTarget}
+            className="w-80 h-80 sm:w-[400px] sm:h-[400px] lg:w-[460px] lg:h-[460px]"
+          />
         </div>
 
         {/* ----------------------------------------------------------------- */}

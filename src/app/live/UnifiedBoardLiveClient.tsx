@@ -6,6 +6,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { UnifiedLiveState } from '@/app/api/live/board/route';
 import HolographicStellenCheckenCockpit from '@/components/HolographicStellenCheckenCockpit';
 import HolographicFussballCockpit from '@/components/HolographicFussballCockpit';
+import HolographicDartboard from '@/components/HolographicDartboard';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -278,36 +279,11 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
               </div>
             </div>
 
-            {/* Zentrum: Holografisches Dartboard mit rotierendem Segment */}
-            <div className="relative z-20 w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] md:w-[420px] md:h-[420px] shrink-0 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-2 border-cyan-400/80 shadow-[0_0_60px_rgba(6,182,212,0.6),inset_0_0_40px_rgba(6,182,212,0.4)] animate-pulse" />
-              <svg viewBox="0 0 400 400" className="w-full h-full">
-                <defs>
-                  <filter id="cBlueGlow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="6" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                  </filter>
-                </defs>
-                <circle cx="200" cy="200" r="180" fill="rgba(5, 12, 28, 0.7)" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.5" />
-                <circle cx="200" cy="200" r="150" fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.4" />
-                <circle cx="200" cy="200" r="85" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.25" />
-                {Array.from({ length: 20 }).map((_, i) => {
-                  const angle = (i * 18 * Math.PI) / 180;
-                  return (
-                    <line key={i} x1={200 + 85 * Math.sin(angle)} y1={200 - 85 * Math.cos(angle)} x2={200 + 180 * Math.sin(angle)} y2={200 - 180 * Math.cos(angle)} stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.25" />
-                  );
-                })}
-                <g style={{ transformOrigin: '200px 200px', transform: `rotate(${targetInfo.angle}deg)`, transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
-                  <path d="M 186 21 A 180 180 0 0 1 214 21 L 211 50 A 150 150 0 0 0 189 50 Z" fill="#ff3366" filter="url(#cBlueGlow)" />
-                </g>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-slate-950/90 border-2 border-cyan-400/80 shadow-[0_0_35px_rgba(6,182,212,0.5)] flex flex-col items-center justify-center">
-                  <span className="text-[10px] sm:text-xs font-mono font-bold tracking-widest text-slate-400 uppercase">DOPPEL</span>
-                  <span className="text-4xl sm:text-6xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_20px_rgba(0,229,255,0.8)]">{curTarget}</span>
-                </div>
-              </div>
-            </div>
+            {/* Zentrum: Detailreiches Holografisches Turnier-Dartboard */}
+            <HolographicDartboard
+              target={curTarget}
+              className="relative z-20 w-[320px] h-[320px] sm:w-[400px] sm:h-[400px] md:w-[450px] md:h-[450px] shrink-0"
+            />
 
             {/* Rechter Flügel */}
             <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -ml-8">
