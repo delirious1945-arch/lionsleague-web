@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { StellenCheckenLiveState } from '@/app/api/live/stellen-checken/route';
+import HolographicStellenCheckenCockpit from '@/components/HolographicStellenCheckenCockpit';
 
 interface StellenCheckenLiveMonitorProps {
   initialBoardId?: string;
@@ -256,202 +257,20 @@ export default function StellenCheckenLiveMonitorClient({ initialBoardId = '1' }
     );
   }
 
-  // ACTIVE PLAYING SCREEN
+  // ACTIVE PLAYING SCREEN (1:1 EXAKT SOLL-BILD)
   return (
-    <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-8 overflow-hidden select-none font-sans">
-      {/* 1. Volumetrische God Rays & Cyber-Gitter */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 left-[18%] w-[26vw] h-[130vh] bg-gradient-to-b from-cyan-400/25 via-cyan-500/05 to-transparent rotate-[18deg] blur-2xl opacity-60" />
-        <div className="absolute -top-32 right-[18%] w-[26vw] h-[130vh] bg-gradient-to-b from-cyan-400/25 via-cyan-500/05 to-transparent -rotate-[18deg] blur-2xl opacity-60" />
-        <div className="absolute top-[35%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-cyan-600/15 rounded-full blur-[130px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:48px_48px] opacity-35" />
-      </div>
-
-      {/* 2. Top Header mit zentrierter Glass-Kapsel */}
-      <div className="relative z-20 flex items-center justify-between w-full px-2">
-        <div className="w-32 hidden sm:block">
-          <span className="text-xs font-mono text-slate-400">STELLEN & CHECKEN</span>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3 px-5 py-2 rounded-full bg-slate-900/60 backdrop-blur-2xl border border-cyan-400/40 shadow-[0_0_25px_rgba(6,182,212,0.3)]">
-          <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-cyan-300">
-            BOARD {boardId}
-          </span>
-          <span className="text-slate-500">•</span>
-          <span className="text-xs sm:text-sm font-black tracking-wider text-white uppercase">
-            LIONS WEYHAUSEN
-          </span>
-          <span className="text-slate-500">•</span>
-          <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-amber-300">
-            AUFNAHME {currentVisit}/{totalVisits}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="text-xs sm:text-sm font-mono text-slate-400 tracking-widest">{currentTime}</span>
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
-
-      {/* 3. Zentrales Cockpit */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-2 sm:px-6">
-        <div className="relative flex items-center justify-center w-full max-w-6xl">
-          
-          {/* LINKER FLÜGEL: Spieler-Panel */}
-          <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -mr-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-400/10 border border-amber-400/40 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
-                <span className="text-xl">🦁</span>
-              </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-cyan-300 font-mono">
-                {is1vs1 ? `SPIELER ${activePlayer} · AM OCHE` : 'SPIELER AM OCHE'}
-              </span>
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-none drop-shadow-md">
-                {activeName}
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/60 text-cyan-300 font-mono text-xs font-black tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                <span>🎯 AM WURF</span>
-              </span>
-            </div>
-          </div>
-
-          {/* ZENTRUM: HOLOGRAFISCHE TAKTIK-MATRIX */}
-          <div className="relative z-20 w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] md:w-[420px] md:h-[420px] shrink-0 flex items-center justify-center">
-            {/* Äußerer Leuchtring */}
-            <div className="absolute inset-0 rounded-full border-2 border-cyan-400/80 shadow-[0_0_60px_rgba(6,182,212,0.6),inset_0_0_40px_rgba(6,182,212,0.4)] animate-pulse" />
-            
-            {/* SVG Radar Dartboard */}
-            <svg viewBox="0 0 400 400" className="w-full h-full">
-              <defs>
-                <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="6" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-
-              <circle cx="200" cy="200" r="185" fill="rgba(4, 7, 17, 0.75)" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.4" />
-              <circle cx="200" cy="200" r="150" fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.3" />
-              <circle cx="200" cy="200" r="110" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.25" />
-              <circle cx="200" cy="200" r="85" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.25" />
-
-              {/* Speichen */}
-              {Array.from({ length: 20 }).map((_, i) => {
-                const angle = (i * 18 * Math.PI) / 180;
-                return (
-                  <line
-                    key={i}
-                    x1={200 + 85 * Math.sin(angle)}
-                    y1={200 - 85 * Math.cos(angle)}
-                    x2={200 + 185 * Math.sin(angle)}
-                    y2={200 - 185 * Math.cos(angle)}
-                    stroke="#00e5ff"
-                    strokeWidth="1"
-                    strokeOpacity="0.2"
-                  />
-                );
-              })}
-
-              {/* Taktische Zielsegmente */}
-              <path
-                d="M 270 95 A 185 185 0 0 1 310 135 L 285 150 A 150 150 0 0 0 250 115 Z"
-                fill="#ff5533"
-                filter="url(#routeGlow)"
-              />
-              <path
-                d="M 125 305 A 185 185 0 0 1 160 330 L 170 295 A 150 150 0 0 0 140 275 Z"
-                fill="#ff3366"
-                filter="url(#routeGlow)"
-              />
-            </svg>
-
-            {/* Mittlere Restpunktzahl & Routen-Pill */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-slate-950/90 border-2 border-cyan-400/80 shadow-[0_0_35px_rgba(6,182,212,0.5)] flex flex-col items-center justify-center">
-                <span className="text-[10px] sm:text-xs font-mono font-bold tracking-widest text-slate-400 uppercase">
-                  REST
-                </span>
-                <span className="text-4xl sm:text-6xl font-black font-mono tracking-tight text-cyan-300 drop-shadow-[0_0_20px_rgba(0,229,255,0.8)]">
-                  {currentNumber}
-                </span>
-              </div>
-
-              {/* Schwebende Routen-Pill direkt unter dem Zentrum */}
-              <div className="mt-3 px-4 py-1.5 rounded-full bg-slate-950/90 border border-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-amber-300">
-                  {recommendedRoute}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* RECHTER FLÜGEL: Checks & Erfolgsquote */}
-          <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -ml-8">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 font-mono">
-                CHECKS & QUOTE
-              </span>
-              <span className="text-xs font-mono text-slate-400">
-                15 AUFNAHMEN
-              </span>
-            </div>
-
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl sm:text-5xl lg:text-6xl font-black font-mono text-[#00ff88] tracking-tight drop-shadow-[0_0_25px_rgba(0,255,136,0.6)]">
-                {checksCount} <span className="text-xl sm:text-2xl text-slate-400 font-normal">/ 15</span>
-              </span>
-              <span className="text-lg sm:text-xl font-bold font-mono text-amber-300">
-                ({checkPct}%)
-              </span>
-            </div>
-
-            {/* 15 Fortschritts-Dots */}
-            <div className="space-y-1.5 pt-2 border-t border-white/10">
-              <div className="flex items-center justify-between gap-1">
-                {Array.from({ length: 15 }).map((_, i) => {
-                  const isPast = i < currentVisit - 1;
-                  const isCurrent = i === currentVisit - 1;
-                  return (
-                    <div
-                      key={i}
-                      className={`h-2 flex-1 rounded-full transition-all ${
-                        isPast
-                          ? i < checksCount
-                            ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
-                            : 'bg-rose-500/50'
-                          : isCurrent
-                          ? 'bg-amber-400 animate-pulse'
-                          : 'bg-white/10'
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* 4. Bottom Bar */}
-      <div className="relative z-20 flex items-center justify-between w-full px-2 text-xs text-slate-400 font-mono">
-        <span>LIONS WEYHAUSEN · LIVE TELEMETRY</span>
-        <span>BOARD {boardId} · STELLEN & CHECKEN</span>
-      </div>
-    </div>
+    <HolographicStellenCheckenCockpit
+      boardId={boardId}
+      activeName={activeName}
+      is1vs1={is1vs1}
+      activePlayer={activePlayer}
+      currentVisit={currentVisit}
+      totalVisits={totalVisits}
+      currentNumber={currentNumber}
+      recommendedRoute={recommendedRoute}
+      checksCount={checksCount}
+      isFullscreen={isFullscreen}
+      onToggleFullscreen={toggleFullscreen}
+    />
   );
 }
