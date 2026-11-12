@@ -27,11 +27,21 @@ export interface HolographicFussballProps {
   onToggleFullscreen?: () => void;
 }
 
-// Hilfsfunktion: Spielername in 2 Zeilen aufteilen für monumentale Typografie
+// Hilfsfunktion: Spielername in 2 Zeilen aufteilen
 function splitName(fullName: string) {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 1) return { first: parts[0], last: '' };
   return { first: parts[0], last: parts.slice(1).join(' ') };
+}
+
+// Dynamische Schriftgröße anhand der längsten Zeile, damit kein Name jemals über den Glasflügel-Rand ragt
+function getNameSizeClass(first: string, last: string) {
+  const maxLen = Math.max(first.length, last.length);
+  if (maxLen <= 8) return 'text-[clamp(1.6rem,3.0vw,3.0rem)]';
+  if (maxLen <= 11) return 'text-[clamp(1.4rem,2.4vw,2.4rem)]';
+  if (maxLen <= 14) return 'text-[clamp(1.15rem,1.9vw,1.95rem)]';
+  if (maxLen <= 18) return 'text-[clamp(1.0rem,1.55vw,1.6rem)]';
+  return 'text-[clamp(0.9rem,1.3vw,1.35rem)]';
 }
 
 export default function HolographicFussballCockpit({
@@ -47,6 +57,8 @@ export default function HolographicFussballCockpit({
 }: HolographicFussballProps) {
   const p1 = splitName(p1Name);
   const p2 = splitName(p2Name);
+  const p1SizeClass = getNameSizeClass(p1.first, p1.last);
+  const p2SizeClass = getNameSizeClass(p2.first, p2.last);
   const isP1Possession = ballPossession === 1;
   const isP2Possession = ballPossession === 2;
 
@@ -93,32 +105,36 @@ export default function HolographicFussballCockpit({
       </header>
 
       {/* =================================================================== */}
-      {/* 3. MITTELBEREICH: EXAKT AUF DIE BEIDEN 29%-GLASFLÜGEL AUSGERICHTET  */}
+      {/* 3. MITTELBEREICH: EXAKT MITTIG IN DEN INNEREN GLASFLÜGEL-RAHMEN     */}
       {/* =================================================================== */}
-      <main className="my-auto w-full grid grid-cols-1 md:grid-cols-[29%_42%_29%] items-center relative z-20">
+      <main className="my-auto w-full grid grid-cols-1 md:grid-cols-[27%_46%_27%] items-center relative z-20">
         {/* ----------------------------------------------------------------- */}
-        {/* LINKER FLÜGEL (0% - 29%): SPIELER 1 PASSIG ZENTRIERT              */}
+        {/* LINKER FLÜGEL: ZENTRIERT MIT SICHERHEITSABSTAND ZUM INNENRAND     */}
         {/* ----------------------------------------------------------------- */}
-        <div className="flex flex-col items-center justify-center text-center px-3 sm:px-6 min-w-0">
-          <span className="text-3xl sm:text-4xl lg:text-5xl xl:text-[54px] font-black text-white tracking-tight leading-[1.06] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] max-w-full break-words">
+        <div className="flex flex-col items-center justify-center text-center pl-4 pr-6 md:pl-[2vw] md:pr-[3.5vw] min-w-0 overflow-hidden">
+          <span
+            className={`${p1SizeClass} font-black text-white tracking-tight leading-[1.08] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] whitespace-nowrap`}
+          >
             {p1.first}
           </span>
           {p1.last && (
-            <span className="text-3xl sm:text-4xl lg:text-5xl xl:text-[54px] font-black text-white tracking-tight leading-[1.06] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] mt-1 max-w-full break-words">
+            <span
+              className={`${p1SizeClass} font-black text-white tracking-tight leading-[1.08] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] mt-1 whitespace-nowrap`}
+            >
               {p1.last}
             </span>
           )}
 
-          {/* Großes Ballbesitz-Schild */}
-          <div className="mt-5 sm:mt-6">
+          {/* Ballbesitz-Schild */}
+          <div className="mt-4 sm:mt-5">
             {isP1Possession ? (
-              <span className="inline-flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full bg-[#062c1e]/95 border-2 border-[#00ff88] text-[#00ff88] font-mono text-sm sm:text-base lg:text-lg font-black tracking-widest shadow-[0_0_28px_rgba(0,255,136,0.55)]">
-                <span className="text-lg sm:text-xl leading-none">⚽</span>
+              <span className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2 rounded-full bg-[#062c1e]/95 border-2 border-[#00ff88] text-[#00ff88] font-mono text-xs sm:text-sm lg:text-base font-black tracking-widest shadow-[0_0_28px_rgba(0,255,136,0.55)]">
+                <span className="text-base sm:text-lg leading-none">⚽</span>
                 <span>BALLBESITZ</span>
               </span>
             ) : (
-              <span className="inline-flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full bg-slate-900/80 border-2 border-slate-600/70 text-slate-300 font-mono text-sm sm:text-base lg:text-lg font-black tracking-widest">
-                <span className="text-lg sm:text-xl leading-none">🛡️</span>
+              <span className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2 rounded-full bg-slate-900/80 border-2 border-slate-600/70 text-slate-300 font-mono text-xs sm:text-sm lg:text-base font-black tracking-widest">
+                <span className="text-base sm:text-lg leading-none">🛡️</span>
                 <span>ABWEHR</span>
               </span>
             )}
@@ -126,33 +142,37 @@ export default function HolographicFussballCockpit({
         </div>
 
         {/* ----------------------------------------------------------------- */}
-        {/* ZENTRUM (29% - 71%): KOMPLETT FREIER RAUM FÜR DAS 3D-TOR          */}
+        {/* ZENTRUM: KOMPLETT FREIER RAUM FÜR DAS 3D-TOR                      */}
         {/* ----------------------------------------------------------------- */}
         <div className="hidden md:block w-full h-[240px] pointer-events-none" />
 
         {/* ----------------------------------------------------------------- */}
-        {/* RECHTER FLÜGEL (71% - 100%): GEGNER PASSIG ZENTRIERT              */}
+        {/* RECHTER FLÜGEL: ZENTRIERT MIT SICHERHEITSABSTAND ZUM INNENRAND    */}
         {/* ----------------------------------------------------------------- */}
-        <div className="flex flex-col items-center justify-center text-center px-3 sm:px-6 min-w-0">
-          <span className="text-3xl sm:text-4xl lg:text-5xl xl:text-[54px] font-black text-white tracking-tight leading-[1.06] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] max-w-full break-words">
+        <div className="flex flex-col items-center justify-center text-center pl-6 pr-4 md:pl-[3.5vw] md:pr-[2vw] min-w-0 overflow-hidden">
+          <span
+            className={`${p2SizeClass} font-black text-white tracking-tight leading-[1.08] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] whitespace-nowrap`}
+          >
             {p2.first}
           </span>
           {p2.last && (
-            <span className="text-3xl sm:text-4xl lg:text-5xl xl:text-[54px] font-black text-slate-200 tracking-tight leading-[1.06] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] mt-1 max-w-full break-words">
+            <span
+              className={`${p2SizeClass} font-black text-slate-200 tracking-tight leading-[1.08] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] mt-1 whitespace-nowrap`}
+            >
               {p2.last}
             </span>
           )}
 
-          {/* Großes Ballbesitz-Schild für Gegner */}
-          <div className="mt-5 sm:mt-6">
+          {/* Ballbesitz-Schild für Gegner */}
+          <div className="mt-4 sm:mt-5">
             {isP2Possession ? (
-              <span className="inline-flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full bg-[#062c1e]/95 border-2 border-[#00ff88] text-[#00ff88] font-mono text-sm sm:text-base lg:text-lg font-black tracking-widest shadow-[0_0_28px_rgba(0,255,136,0.55)]">
-                <span className="text-lg sm:text-xl leading-none">⚽</span>
+              <span className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2 rounded-full bg-[#062c1e]/95 border-2 border-[#00ff88] text-[#00ff88] font-mono text-xs sm:text-sm lg:text-base font-black tracking-widest shadow-[0_0_28px_rgba(0,255,136,0.55)]">
+                <span className="text-base sm:text-lg leading-none">⚽</span>
                 <span>BALLBESITZ</span>
               </span>
             ) : (
-              <span className="inline-flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full bg-slate-900/80 border-2 border-slate-600/70 text-slate-300 font-mono text-sm sm:text-base lg:text-lg font-black tracking-widest">
-                <span className="text-lg sm:text-xl leading-none">🛡️</span>
+              <span className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2 rounded-full bg-slate-900/80 border-2 border-slate-600/70 text-slate-300 font-mono text-xs sm:text-sm lg:text-base font-black tracking-widest">
+                <span className="text-base sm:text-lg leading-none">🛡️</span>
                 <span>ABWEHR</span>
               </span>
             )}
