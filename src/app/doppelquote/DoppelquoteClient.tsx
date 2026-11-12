@@ -1164,30 +1164,6 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              data-ui-id="CHECKOUT.NAV.SOUND_BTN"
-              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                soundEnabled
-                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                  : 'bg-zinc-800 text-zinc-500 border-zinc-700'
-              }`}
-              title={soundEnabled ? 'Ton an' : 'Ton aus'}
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-
-            <Link
-              href="/doppelquote/live"
-              target="_blank"
-              data-ui-id="CHECKOUT.NAV.TV_BTN"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 text-xs font-bold transition-all shadow-sm cursor-pointer"
-              title="TV Live-Board öffnen"
-            >
-              <Tv className="w-3.5 h-3.5" />
-              <span>TV Live-Board</span>
-            </Link>
-
-            <button
               onClick={resetGame}
               data-ui-id="CHECKOUT.NAV.RESET_BTN"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all cursor-pointer"
