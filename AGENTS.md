@@ -140,7 +140,7 @@ Prädiktive Analysen und What-if-Szenarien dürfen Liga-Daten und Trainingsdaten
    - Autonome Identifikation technischer Lücken (z. B. fehlende Kalibrierungs-Distanz, Kamera-FPS) und Formulierung als konkreter Handlungsbedarf an den Admin.
 7. **Obligatorische Integration neuer Trainingsmodule (4-Core-Sync-Pflicht):**
    - Sobald ein neues Trainingsspiel implementiert oder erweitert wird, MUSS das Agenten-Netzwerk dieses vollautomatisch in den **4 Core-Verwaltungs- und TV-Ansichten** synchronisieren:
-     1. `src/lib/trainingLottery.ts` (Zählweise +1 pro regulärem Spiel für den 20-Spiele-Lostopf)
+     1. `src/lib/trainingLottery.ts` (Zählweise +1 pro regulärem Spiel für den Monatsverlosungs-Lostopf: ab Nov. 2026 40 Spiele, vorher 20)
      2. `src/components/AdminTrainingOverview.tsx` (Eigene Tabellenspalte, Tooltip, Spieler-Aufklapphistorie)
      3. `src/app/verwaltung/page.tsx` & `src/app/verwaltung/VerwaltungClient.tsx` (Datenabfrage, KPI-Zusammenfassung, Filter-Pills, Quick-Links und Session-Card mit aufklappbaren Detailwerten)
      4. Live-Boards / TV-Ansichten (TV-Board-Kompatibilität und Live-Ticker).
