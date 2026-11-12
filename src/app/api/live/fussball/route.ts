@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export interface FussballLiveState {
   status: 'idle' | 'playing' | 'completed';
   boardId?: string;
-  gameMode?: 'bot' | '1vs1';
+  gameMode?: 'bot' | '1vs1' | '1vsComputer' | 'solo';
   p1Name?: string;
   p2Name?: string;
   activePlayer?: 1 | 2;
@@ -17,6 +17,7 @@ export interface FussballLiveState {
   activeTarget?: string;
   roundNumber?: number;
   lastEvent?: string;
+  fussballStats?: any;
   winner?: string;
   updatedAt?: number;
 }

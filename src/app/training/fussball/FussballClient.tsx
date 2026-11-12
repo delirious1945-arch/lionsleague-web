@@ -264,6 +264,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       scoreP1: p1Goals,
       scoreP2: p2Goals,
       targetGoals,
+      fussballStats: stats,
       currentAction: tickerMessage || (ballPossession ? 'Torversuch' : 'Zweikampf'),
       winner: gameOver ? (p1Goals >= targetGoals ? p1Name : (gameMode === '1vsComputer' ? 'Computer' : p2Name)) : undefined,
       updatedAt: Date.now(),
@@ -303,6 +304,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     p2Goals,
     targetGoals,
     tickerMessage,
+    stats,
   ]);
 
   // Aktiven Spielstand im Cache sichern (Schutz vor versehentlichem Tab-Schließen)
@@ -462,6 +464,10 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       scoreP1: 0,
       scoreP2: 0,
       targetGoals,
+      fussballStats: {
+        p1Darts: 0, p1BullAttempts: 0, p1BullHits: 0, p1DoubleAttempts: 0, p1DoubleHits: 0,
+        p2Darts: 0, p2BullAttempts: 0, p2BullHits: 0, p2DoubleAttempts: 0, p2DoubleHits: 0,
+      },
       currentAction: 'Anpfiff! Match gestartet',
       updatedAt: Date.now(),
     };

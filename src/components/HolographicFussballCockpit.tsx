@@ -6,14 +6,23 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 
 export interface HolographicFussballProps {
   boardId: string;
-  activeName: string;
+  p1Name?: string;
+  p2Name?: string;
+  activeName?: string;
   is1vs1?: boolean;
   activePlayer?: 1 | 2;
   scoreP1: number;
   scoreP2: number;
   targetGoals?: number;
   ballPossession?: 1 | 2;
-  activeTarget?: 'OBEN_L' | 'OBEN_R' | 'MITTE' | 'UNTEN_L' | 'UNTEN_R' | string;
+  fussballStats?: {
+    p1Darts?: number;
+    p1DoubleHits?: number;
+    p1DoubleAttempts?: number;
+    p1BullHits?: number;
+    p1BullAttempts?: number;
+  };
+  activeTarget?: string;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
 }
@@ -67,25 +76,46 @@ function GoldenLionHead({ className = 'w-16 h-16' }: { className?: string }) {
   );
 }
 
+// Hilfsfunktion: Spielername in 2 Zeilen aufteilen für monumentale Typografie
+function splitName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) return { first: parts[0], last: '' };
+  return { first: parts[0], last: parts.slice(1).join(' ') };
+}
+
 export default function HolographicFussballCockpit({
   boardId,
+  p1Name = 'Sebastian Kirste',
+  p2Name = 'Bot-Gegner',
   activeName,
   is1vs1 = true,
   scoreP1,
   scoreP2,
   targetGoals = 5,
+  ballPossession = 1,
+  fussballStats,
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicFussballProps) {
-  // Name in Vorname und Nachname aufteilen für zweizeilige monumentale Typografie
-  const nameParts = activeName.trim().split(/\s+/);
-  const firstName = nameParts[0] || 'Sebastian';
-  const lastName = nameParts.slice(1).join(' ') || 'Kirsch';
+  // Spieler 1 Name
+  const p1 = splitName(p1Name);
+  // Spieler 2 Name (Gegner)
+  const p2 = splitName(p2Name);
+
+  // Ballbesitz-Flags
+  const isP1Possession = ballPossession === 1;
+  const isP2Possession = ballPossession === 2;
+
+  // Solo-Statistiken
+  const doubleAttempts = fussballStats?.p1DoubleAttempts ?? 0;
+  const doubleHits = fussballStats?.p1DoubleHits ?? scoreP1;
+  const doublePct = doubleAttempts > 0 ? Math.round((doubleHits / doubleAttempts) * 100) : 0;
+  const totalDarts = fussballStats?.p1Darts ?? 0;
 
   return (
     <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-hidden select-none font-sans">
       {/* =================================================================== */}
-      {/* 1. PHOTOREALISTISCHE 3D-BÜHNE (1:1 RENDERING DES SOLL-BILDS 1)      */}
+      {/* 1. PHOTOREALISTISCHE 3D-BÜHNE (3D TOR, GOD RAYS, GLASFLÜGEL)        */}
       {/* =================================================================== */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <Image
@@ -99,7 +129,7 @@ export default function HolographicFussballCockpit({
       </div>
 
       {/* =================================================================== */}
-      {/* 2. ZENTRIERTE SCHWEBENDE GLASS-KAPSEL IM HEADER (1:1 SOLL-BILD 1) */}
+      {/* 2. ZENTRIERTE SCHWEBENDE GLASS-KAPSEL IM HEADER                     */}
       {/* =================================================================== */}
       <header className="relative z-30 w-full flex items-center justify-center pt-2 sm:pt-4">
         <div className="flex items-center justify-center gap-2.5 sm:gap-4 px-8 sm:px-14 py-2 sm:py-2.5 rounded-full bg-slate-900/75 backdrop-blur-3xl border-2 border-slate-600/60 shadow-[0_10px_35px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.4),0_0_25px_rgba(6,182,212,0.3)] text-xs sm:text-sm font-black font-mono tracking-widest text-white uppercase">
@@ -109,7 +139,7 @@ export default function HolographicFussballCockpit({
           <span className="text-slate-500 font-bold">•</span>
           <span className="text-white">FUßBALL DARTS</span>
           <span className="text-slate-500 font-bold">•</span>
-          <span className="text-cyan-300">{is1vs1 ? '1 VS 1 DUELL' : 'SOLO-MODUS'}</span>
+          <span className="text-cyan-300">{is1vs1 ? '1 VS 1 DUELL' : 'EINZELSPIELERMODUS'}</span>
         </div>
 
         {/* Dezent versteckter Vollbild-Button oben rechts */}
@@ -125,86 +155,151 @@ export default function HolographicFussballCockpit({
       </header>
 
       {/* =================================================================== */}
-      {/* 3. DAS COCKPIT-HERZ: 3 HORIZONTALE ELEMENTE (1:1 PARITÄT ZUM SOLL) */}
+      {/* 3. COCKPIT-BÜHNE: KEINE VORDERGRUND-KACHELN, REINE PROJEKTION      */}
       {/* =================================================================== */}
-      <main className="my-auto w-full max-w-7xl mx-auto flex items-center justify-center relative z-20 px-2 sm:px-4">
-        <div className="relative flex items-center justify-center w-full">
-          {/* --------------------------------------------------------------- */}
-          {/* LINKER FLÜGEL: SPIELER-CARD MIT LÖWEN-WAPPEN & BALLBESITZ */}
-          {/* --------------------------------------------------------------- */}
-          <div
-            className="relative z-10 w-[340px] sm:w-[400px] lg:w-[440px] h-[250px] sm:h-[280px] lg:h-[300px] rounded-[2.5rem] bg-slate-950/85 backdrop-blur-3xl border-2 border-slate-700/60 shadow-[0_25px_60px_rgba(0,0,0,0.95),inset_0_1px_2px_rgba(255,255,255,0.35),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex items-center gap-5 -mr-12 overflow-hidden"
-          >
-            {/* Oberer feiner Lichtglanzstreifen */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
+      <main className="my-auto w-full max-w-[1440px] mx-auto flex items-center justify-between relative z-20 px-4 sm:px-8 lg:px-12">
+        {/* ----------------------------------------------------------------- */}
+        {/* LINKER FLÜGEL: SPIELER 1 (DIREKT IN DEN GLASFLÜGEL PROJIZIERT)   */}
+        {/* ----------------------------------------------------------------- */}
+        <div className="w-[300px] sm:w-[360px] lg:w-[410px] flex items-center gap-4 sm:gap-6">
+          {/* Golden Lion Crest */}
+          <div className="shrink-0 drop-shadow-[0_0_30px_rgba(255,215,0,0.6)]">
+            <GoldenLionHead className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24" />
+          </div>
 
-            {/* Golden Lion Crest Wappen */}
-            <div className="shrink-0 drop-shadow-[0_0_25px_rgba(255,215,0,0.5)]">
-              <GoldenLionHead className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24" />
-            </div>
-
-            {/* Spielername & Status Badge */}
-            <div className="flex flex-col justify-center min-w-0">
-              <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)]">
-                {firstName}
+          {/* Spielername & Status Badge */}
+          <div className="flex flex-col justify-center min-w-0">
+            <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)]">
+              {p1.first}
+            </span>
+            {p1.last && (
+              <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)] mt-1 sm:mt-1.5">
+                {p1.last}
               </span>
-              <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)] mt-1 sm:mt-1.5">
-                {lastName}
-              </span>
+            )}
 
-              {/* Status Badge: ⚽ BALLBESITZ in Smaragdgrün */}
-              <div className="mt-4 sm:mt-5">
-                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border-2 border-[#00ff88] shadow-[0_0_20px_rgba(0,255,136,0.6)] text-[#00ff88] font-mono text-xs sm:text-sm font-black tracking-widest">
+            {/* Status: ⚽ BALLBESITZ (wenn Spieler 1 am Ball ist) */}
+            <div className="mt-4 sm:mt-5">
+              {isP1Possession ? (
+                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border-2 border-[#00ff88] shadow-[0_0_25px_rgba(0,255,136,0.7)] text-[#00ff88] font-mono text-xs sm:text-sm font-black tracking-widest animate-pulse">
                   <span className="text-base sm:text-lg">⚽</span>
                   <span>BALLBESITZ</span>
                 </span>
-              </div>
+              ) : (
+                <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900/60 border border-slate-700/60 text-slate-400 font-mono text-xs font-bold tracking-wider">
+                  <span>ABWEHR</span>
+                </span>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* --------------------------------------------------------------- */}
-          {/* ZENTRUM: 3D HOLOGRAPHISCHES WIREFRAME-TOR (AUS DEM 3D-ASSET)   */}
-          {/* --------------------------------------------------------------- */}
-          <div className="relative z-20 w-[420px] h-[340px] sm:w-[500px] sm:h-[400px] lg:w-[600px] lg:h-[450px] shrink-0 pointer-events-none select-none flex items-center justify-center">
-            {/* Freier Durchblick auf das raytraced 3D-Tor & Cyber-Ball im Hintergrund */}
-            <div className="w-full h-full" />
-          </div>
+        {/* ----------------------------------------------------------------- */}
+        {/* ZENTRUM: 3D-TOR (HINTERGRUND) + ERGEBNIS IM GROSSFORMAT UNTER DEM TOR */}
+        {/* ----------------------------------------------------------------- */}
+        <div className="flex-1 flex flex-col items-center justify-center max-w-[560px] mx-2">
+          {/* Freiraum für das 3D-Tor im Hintergrund (damit Tor & Cyberball frei sichtbar bleiben) */}
+          <div className="w-full h-[220px] sm:h-[260px] lg:h-[290px] pointer-events-none" />
 
-          {/* --------------------------------------------------------------- */}
-          {/* RECHTER FLÜGEL: SPIELSTAND & ZIEL-TORE (1:1 SOLL-BILD 1) */}
-          {/* --------------------------------------------------------------- */}
-          <div
-            className="relative z-10 w-[340px] sm:w-[400px] lg:w-[440px] h-[250px] sm:h-[280px] lg:h-[300px] rounded-[2.5rem] bg-slate-950/85 backdrop-blur-3xl border-2 border-slate-700/60 shadow-[0_25px_60px_rgba(0,0,0,0.95),inset_0_1px_2px_rgba(255,255,255,0.35),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-center text-center -ml-12 overflow-hidden"
-          >
-            {/* Oberer feiner Lichtglanzstreifen */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
-
-            {/* Score & Zielbereich komplett zentriert */}
-            <div className="flex flex-col items-center justify-center my-auto w-full">
-              {/* Gigantischer Spielstand: dynamisch synchronisiert */}
-              <div className="flex items-baseline justify-center gap-3 sm:gap-4">
-                <span className="text-7xl sm:text-8xl lg:text-9xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.85)]">
+          {/* GROSSFORMATIGES ERGEBNIS UNTER DEM TOR */}
+          <div className="flex flex-col items-center justify-center -mt-4 sm:-mt-6 lg:-mt-8 z-30">
+            {is1vs1 ? (
+              /* 1 vs 1 Duell Score: 3 : 1 */
+              <div className="flex items-baseline justify-center gap-4 sm:gap-6 px-8 sm:px-12 py-2 sm:py-3 rounded-3xl bg-slate-950/80 backdrop-blur-2xl border-2 border-cyan-400/50 shadow-[0_0_50px_rgba(6,182,212,0.45),inset_0_1px_2px_rgba(255,255,255,0.4)]">
+                <span className="text-6xl sm:text-8xl lg:text-9xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.9)]">
                   {scoreP1}
                 </span>
-                <span className="text-5xl sm:text-6xl lg:text-7xl font-bold font-mono text-cyan-300 leading-none">
+                <span className="text-4xl sm:text-6xl lg:text-7xl font-bold font-mono text-cyan-300 leading-none">
                   :
                 </span>
-                <span className="text-7xl sm:text-8xl lg:text-9xl font-black font-mono text-[#00f0ff] leading-none drop-shadow-[0_0_35px_rgba(0,240,255,0.85)]">
+                <span className="text-6xl sm:text-8xl lg:text-9xl font-black font-mono text-[#00f0ff] leading-none drop-shadow-[0_0_35px_rgba(0,240,255,0.9)]">
                   {scoreP2}
                 </span>
               </div>
+            ) : (
+              /* Einzelspieler-Score: 3 / 5 Tore */
+              <div className="flex items-baseline justify-center gap-3 px-8 sm:px-12 py-2 sm:py-3 rounded-3xl bg-slate-950/80 backdrop-blur-2xl border-2 border-cyan-400/50 shadow-[0_0_50px_rgba(6,182,212,0.45),inset_0_1px_2px_rgba(255,255,255,0.4)]">
+                <span className="text-6xl sm:text-8xl lg:text-9xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.9)]">
+                  {scoreP1}
+                </span>
+                <span className="text-3xl sm:text-5xl lg:text-6xl font-bold font-mono text-slate-400 leading-none">
+                  / {targetGoals}
+                </span>
+              </div>
+            )}
 
-              {/* Ziel: 5 Tore */}
-              <span className="text-xl sm:text-2xl font-bold font-mono text-slate-300 tracking-wider pt-3 sm:pt-4 block drop-shadow-md">
-                Ziel: {targetGoals} Tore
-              </span>
-            </div>
+            {/* Zielvorgabe dezent & edel darunter */}
+            <span className="text-sm sm:text-base lg:text-lg font-bold font-mono text-slate-300 tracking-widest uppercase pt-2.5 drop-shadow-md">
+              Ziel: {targetGoals} Tore
+            </span>
           </div>
+        </div>
+
+        {/* ----------------------------------------------------------------- */}
+        {/* RECHTER FLÜGEL: GEGNER (1vs1) ODER STATISTIK / QUOTE (SOLO)       */}
+        {/* ----------------------------------------------------------------- */}
+        <div className="w-[300px] sm:w-[360px] lg:w-[410px] flex items-center justify-end">
+          {is1vs1 ? (
+            /* ============================================================= */
+            /* 1 VS 1 MODUS: RECHTS STEHT DER GEGNER (KEINE STATISTIK)      */
+            /* ============================================================= */
+            <div className="flex flex-col items-end text-right min-w-0">
+              <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)]">
+                {p2.first}
+              </span>
+              {p2.last && (
+                <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)] mt-1 sm:mt-1.5">
+                  {p2.last}
+                </span>
+              )}
+
+              {/* Status: ⚽ BALLBESITZ (wenn Spieler 2 am Ball ist) */}
+              <div className="mt-4 sm:mt-5">
+                {isP2Possession ? (
+                  <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border-2 border-[#00ff88] shadow-[0_0_25px_rgba(0,255,136,0.7)] text-[#00ff88] font-mono text-xs sm:text-sm font-black tracking-widest animate-pulse">
+                    <span className="text-base sm:text-lg">⚽</span>
+                    <span>BALLBESITZ</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900/60 border border-slate-700/60 text-slate-400 font-mono text-xs font-bold tracking-wider">
+                    <span>ABWEHR</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* ============================================================= */
+            /* EINZELSPIELERMODUS: RECHTS STEHEN QUOTEN & TREFFER            */
+            /* ============================================================= */
+            <div className="flex flex-col items-end text-right min-w-0">
+              {/* Treffer & Doppelquote im Großformat */}
+              <div className="flex flex-col items-end">
+                <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.85)]">
+                  {doublePct}%
+                </span>
+                <span className="text-[11px] sm:text-xs font-mono font-black uppercase tracking-widest text-emerald-400/90 pt-1">
+                  DOPPELQUOTE
+                </span>
+              </div>
+
+              {/* Treffer bei Versuchen */}
+              <div className="pt-3 sm:pt-4 flex flex-col items-end">
+                <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 drop-shadow-[0_0_15px_rgba(251,191,36,0.7)]">
+                  {doubleHits} / {doubleAttempts} Treffer
+                </span>
+                {totalDarts > 0 && (
+                  <span className="text-xs font-mono text-slate-400 pt-0.5">
+                    {totalDarts} Darts geworfen
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
       {/* =================================================================== */}
-      {/* 4. FOOTER: SAUBER & ABLENKUNGSFREI */}
+      {/* 4. FOOTER: SAUBER & ABLENKUNGSFREI                                  */}
       {/* =================================================================== */}
       <footer className="relative z-20 h-4" />
     </div>

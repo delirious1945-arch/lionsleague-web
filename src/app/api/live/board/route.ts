@@ -17,6 +17,7 @@ export interface UnifiedLiveState {
   doppelquoteData?: any;
   pdcData?: any;
   fussballData?: any;
+  fussballStats?: any;
   stellenCheckenData?: any;
   // Direct access fields for UI components
   currentTarget?: string;

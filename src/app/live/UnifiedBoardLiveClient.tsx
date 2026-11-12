@@ -439,17 +439,21 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     const targetGoals = liveState.targetGoals ?? 5;
     const ballPossession = liveState.ballPossession || 1;
     const activeFootballName = ballPossession === 1 ? p1Name : p2Name;
+    const isFussball1vs1 = liveState.gameMode === '1vs1' || liveState.gameMode === '1vsComputer' || liveState.gameMode === 'bot' || (liveState.gameMode !== 'solo' && !!liveState.p2Name);
 
     return (
       <HolographicFussballCockpit
         boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name}
         activeName={activeFootballName}
-        is1vs1={is1vs1}
+        is1vs1={isFussball1vs1}
         activePlayer={activePlayer}
         scoreP1={scoreP1}
         scoreP2={scoreP2}
         targetGoals={targetGoals}
         ballPossession={ballPossession as 1 | 2}
+        fussballStats={liveState.fussballStats || liveState.fussballData?.stats}
         activeTarget={liveState.currentTarget}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}

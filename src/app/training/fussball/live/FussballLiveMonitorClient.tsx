@@ -124,7 +124,7 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
   const targetGoals = liveState.targetGoals ?? 5;
   const ballPossession = liveState.ballPossession || 1;
   const activeName = ballPossession === 1 ? rawP1Name : rawP2Name;
-  const is1vs1 = liveState.gameMode === '1vs1' || liveState.gameMode === 'bot' || !!liveState.p2Name;
+  const is1vs1 = liveState.gameMode === '1vs1' || liveState.gameMode === 'bot' || liveState.gameMode === '1vsComputer' || (liveState.gameMode !== 'solo' && !!liveState.p2Name);
 
   // STANDBY SCREEN
   if (liveState.status === 'idle') {
@@ -250,6 +250,8 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
   return (
     <HolographicFussballCockpit
       boardId={boardId}
+      p1Name={rawP1Name}
+      p2Name={rawP2Name}
       activeName={activeName}
       is1vs1={is1vs1}
       activePlayer={ballPossession as 1 | 2}
@@ -257,6 +259,7 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
       scoreP2={scoreP2}
       targetGoals={targetGoals}
       ballPossession={ballPossession as 1 | 2}
+      fussballStats={liveState.fussballStats}
       activeTarget={liveState.activeTarget}
       isFullscreen={isFullscreen}
       onToggleFullscreen={toggleFullscreen}
