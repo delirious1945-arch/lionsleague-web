@@ -37,17 +37,21 @@ function splitName(fullName: string) {
 export default function HolographicFussballCockpit({
   boardId,
   p1Name = 'Sebastian Kirste',
+  p2Name = 'Gegner',
   is1vs1 = true,
   scoreP1,
+  scoreP2,
   targetGoals = 5,
   ballPossession = 1,
   fussballStats,
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicFussballProps) {
-  // Spieler 1 Name (z. B. Sebastian Kirste)
+  // Spieler 1 & Spieler 2 Namen (z. B. Sebastian Kirste vs. Dirk Ostermann)
   const p1 = splitName(p1Name);
+  const p2 = splitName(p2Name);
   const isP1Possession = ballPossession === 1;
+  const isP2Possession = ballPossession === 2;
 
   // Live-Statistiken für die rechte Anzeige
   const doubleAttempts = fussballStats?.p1DoubleAttempts ?? 0;
@@ -139,44 +143,74 @@ export default function HolographicFussballCockpit({
         <div className="hidden md:block min-w-[360px] lg:min-w-[520px] h-[240px] pointer-events-none" />
 
         {/* ----------------------------------------------------------------- */}
-        {/* RECHTER FLÜGEL: LIVE-STATISTIKEN                                  */}
+        {/* RECHTER FLÜGEL: GEGNER (1vs1) ODER LIVE-STATISTIKEN (SOLO)        */}
         {/* ----------------------------------------------------------------- */}
         <div className="flex items-center justify-end pr-4 sm:pr-8 lg:pr-14">
-          <div className="flex flex-col items-end text-right min-w-0">
-            {/* Doppelquote im Großformat */}
-            <div className="flex flex-col items-end">
-              <span className="text-5xl sm:text-6xl lg:text-7xl font-mono font-black text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.85)] tabular-nums">
-                {doublePct}%
+          {is1vs1 ? (
+            /* 1-VS-1-MODUS: ANSTELLE DER STATISTIK DER NAME DES GEGNERS */
+            <div className="flex flex-col justify-center items-end text-right min-w-0">
+              <span className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.05] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)]">
+                {p2.first}
               </span>
-              <span className="text-[11px] sm:text-xs font-mono font-black uppercase tracking-widest text-emerald-400/90 pt-1.5">
-                DOPPELQUOTE
-              </span>
-            </div>
+              {p2.last && (
+                <span className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-200 tracking-tight leading-[1.05] drop-shadow-[0_4px_28px_rgba(0,0,0,0.95)] mt-1">
+                  {p2.last}
+                </span>
+              )}
 
-            {/* Treffer & geworfene Darts */}
-            <div className="pt-3.5 flex flex-col items-end">
-              <span className="text-base sm:text-lg lg:text-xl font-mono font-bold text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)] tabular-nums">
-                {doubleHits} / {doubleAttempts} Treffer
-              </span>
-              <span className="text-xs sm:text-sm font-mono text-slate-300 pt-0.5 tabular-nums">
-                {totalDarts} Darts geworfen
-              </span>
+              {/* Großes Ballbesitz-Schild für Gegner */}
+              <div className="mt-5 sm:mt-6">
+                {isP2Possession ? (
+                  <span className="inline-flex items-center gap-2.5 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full bg-[#062c1e]/95 border-2 border-[#00ff88] text-[#00ff88] font-mono text-sm sm:text-base lg:text-lg font-black tracking-widest shadow-[0_0_28px_rgba(0,255,136,0.55)]">
+                    <span className="text-lg sm:text-xl leading-none">⚽</span>
+                    <span>BALLBESITZ</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2.5 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full bg-slate-900/80 border-2 border-slate-600/70 text-slate-300 font-mono text-sm sm:text-base lg:text-lg font-black tracking-widest">
+                    <span className="text-lg sm:text-xl leading-none">🛡️</span>
+                    <span>ABWEHR</span>
+                  </span>
+                )}
+              </div>
             </div>
+          ) : (
+            /* SOLO-MODUS (EINGEFROREN): LIVE-STATISTIKEN */
+            <div className="flex flex-col items-end text-right min-w-0">
+              {/* Doppelquote im Großformat */}
+              <div className="flex flex-col items-end">
+                <span className="text-5xl sm:text-6xl lg:text-7xl font-mono font-black text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.85)] tabular-nums">
+                  {doublePct}%
+                </span>
+                <span className="text-[11px] sm:text-xs font-mono font-black uppercase tracking-widest text-emerald-400/90 pt-1.5">
+                  DOPPELQUOTE
+                </span>
+              </div>
 
-            {/* 15 Aufnahmen-Dots */}
-            <div className="flex items-center gap-1.5 pt-3.5">
-              {Array.from({ length: 15 }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    i < doubleHits
-                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
-                      : 'bg-slate-700/60'
-                  }`}
-                />
-              ))}
+              {/* Treffer & geworfene Darts */}
+              <div className="pt-3.5 flex flex-col items-end">
+                <span className="text-base sm:text-lg lg:text-xl font-mono font-bold text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)] tabular-nums">
+                  {doubleHits} / {doubleAttempts} Treffer
+                </span>
+                <span className="text-xs sm:text-sm font-mono text-slate-300 pt-0.5 tabular-nums">
+                  {totalDarts} Darts geworfen
+                </span>
+              </div>
+
+              {/* 15 Aufnahmen-Dots */}
+              <div className="flex items-center gap-1.5 pt-3.5">
+                {Array.from({ length: 15 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      i < doubleHits
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                        : 'bg-slate-700/60'
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
 
@@ -190,8 +224,19 @@ export default function HolographicFussballCockpit({
             <span className="text-[#00ff88] drop-shadow-[0_0_25px_rgba(0,255,136,0.9)]">
               {scoreP1}
             </span>
-            <span className="text-slate-400 font-bold">/</span>
-            <span className="text-white">{targetGoals}</span>
+            {is1vs1 ? (
+              <>
+                <span className="text-slate-400 font-bold">:</span>
+                <span className="text-[#00e5ff] drop-shadow-[0_0_25px_rgba(0,229,255,0.9)]">
+                  {scoreP2}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-slate-400 font-bold">/</span>
+                <span className="text-white">{targetGoals}</span>
+              </>
+            )}
           </div>
 
           {/* Untertitel exakt mittig darunter */}
