@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { UnifiedLiveState } from '@/app/api/live/board/route';
 import HolographicStellenCheckenCockpit from '@/components/HolographicStellenCheckenCockpit';
+import HolographicFussballCockpit from '@/components/HolographicFussballCockpit';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -430,7 +431,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
   }
 
   // =========================================================================
-  // 4. SPIEL: FUßBALL DARTS
+  // 4. SPIEL: FUßBALL DARTS (1:1 EXAKT SOLL-BILD 1)
   // =========================================================================
   if (liveState.gameType === 'fussball') {
     const scoreP1 = liveState.scoreP1 ?? 0;
@@ -440,94 +441,19 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     const activeFootballName = ballPossession === 1 ? p1Name : p2Name;
 
     return (
-      <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-8 overflow-hidden select-none font-sans">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-32 left-[18%] w-[26vw] h-[130vh] bg-gradient-to-b from-emerald-400/25 via-emerald-500/05 to-transparent rotate-[18deg] blur-2xl opacity-60" />
-          <div className="absolute -top-32 right-[18%] w-[26vw] h-[130vh] bg-gradient-to-b from-cyan-400/25 via-cyan-500/05 to-transparent -rotate-[18deg] blur-2xl opacity-60" />
-          <div className="absolute top-[35%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-emerald-600/15 rounded-full blur-[130px]" />
-          <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:48px_48px] opacity-35" />
-        </div>
-
-        <div className="relative z-20 flex items-center justify-between w-full px-2">
-          <div className="w-32 hidden sm:block"><span className="text-xs font-mono text-slate-400">FUßBALL DARTS</span></div>
-          <div className="flex items-center gap-2 sm:gap-3 px-5 py-2 rounded-full bg-slate-900/60 backdrop-blur-2xl border border-emerald-400/40 shadow-[0_0_25px_rgba(16,185,129,0.3)]">
-            <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-emerald-300">BOARD {boardId}</span>
-            <span className="text-slate-500">•</span>
-            <span className="text-xs sm:text-sm font-black tracking-wider text-white uppercase">LIONS WEYHAUSEN</span>
-            <span className="text-slate-500">•</span>
-            <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-amber-300">{liveState.currentAction || 'DUELL UM BALLBESITZ'}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs sm:text-sm font-mono text-slate-400 tracking-widest">{currentTime}</span>
-            <button onClick={toggleFullscreen} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer">
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-
-        <div className="relative z-10 flex-1 flex items-center justify-center px-2 sm:px-6">
-          <div className="relative flex items-center justify-center w-full max-w-6xl">
-            {/* Linker Flügel */}
-            <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -mr-8">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-400/10 border border-amber-400/40 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
-                  <span className="text-xl">🦁</span>
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300 font-mono">AM BALL</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-none drop-shadow-md">{activeFootballName}</h2>
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 font-mono text-xs font-black tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.4)]">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span>⚽ BALLBESITZ</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Zentrum: Holografisches Tor */}
-            <div className="relative z-20 w-[300px] h-[240px] sm:w-[380px] sm:h-[300px] md:w-[420px] md:h-[330px] shrink-0 flex items-center justify-center">
-              <div className="w-full h-full rounded-3xl bg-slate-950/80 border-2 border-cyan-400/80 shadow-[0_0_50px_rgba(6,182,212,0.5),inset_0_0_30px_rgba(6,182,212,0.3)] p-4 flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute inset-2 border border-cyan-500/30 rounded-2xl bg-[linear-gradient(to_right,#00e5ff15_1px,transparent_1px),linear-gradient(to_bottom,#00e5ff15_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-                <div className="relative z-10 flex justify-between">
-                  <div className="w-12 h-12 rounded-full border-2 border-cyan-400/70 flex items-center justify-center text-[10px] font-mono text-cyan-200">OBEN L</div>
-                  <div className="w-12 h-12 rounded-full border-2 border-amber-400/90 shadow-[0_0_20px_rgba(251,191,36,0.6)] flex items-center justify-center text-[10px] font-mono text-amber-200 font-bold animate-pulse">D20 TOR</div>
-                  <div className="w-12 h-12 rounded-full border-2 border-cyan-400/70 flex items-center justify-center text-[10px] font-mono text-cyan-200">OBEN R</div>
-                </div>
-                <div className="relative z-10 flex items-center justify-center my-auto">
-                  <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-300 shadow-[0_0_25px_rgba(6,182,212,0.8)] flex items-center justify-center text-3xl animate-bounce">
-                    ⚽
-                  </div>
-                </div>
-                <div className="relative z-10 flex justify-between">
-                  <div className="w-12 h-12 rounded-full border-2 border-cyan-400/70 flex items-center justify-center text-[10px] font-mono text-cyan-200">UNTEN L</div>
-                  <div className="w-12 h-12 rounded-full border-2 border-cyan-400/70 flex items-center justify-center text-[10px] font-mono text-cyan-200">UNTEN R</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Rechter Flügel: Spielstand */}
-            <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -ml-8">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 font-mono">SPIELSTAND</span>
-                <span className="text-xs font-mono text-slate-400">ZIEL: {targetGoals} TORE</span>
-              </div>
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-[#00ff88] tracking-tight drop-shadow-[0_0_25px_rgba(0,255,136,0.6)]">{scoreP1}</span>
-                <span className="text-3xl sm:text-4xl font-bold font-mono text-slate-500">:</span>
-                <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-cyan-400 tracking-tight drop-shadow-[0_0_25px_rgba(6,182,212,0.6)]">{scoreP2}</span>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs font-mono text-slate-300">
-                <span className="truncate max-w-[120px]">{p1Name}</span>
-                <span className="text-slate-500">vs</span>
-                <span className="truncate max-w-[120px]">{p2Name}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Bar: Sauber ohne Corner-Clutter */}
-        <div className="relative z-20 h-4" />
-      </div>
+      <HolographicFussballCockpit
+        boardId={boardId}
+        activeName={activeFootballName}
+        is1vs1={is1vs1}
+        activePlayer={activePlayer}
+        scoreP1={scoreP1}
+        scoreP2={scoreP2}
+        targetGoals={targetGoals}
+        ballPossession={ballPossession as 1 | 2}
+        activeTarget={liveState.currentTarget}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
     );
   }
 

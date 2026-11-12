@@ -448,6 +448,43 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     statsRef.current = initialStats;
     playWhistle();
     addTicker(`Anpfiff! Erstes Team bei ${targetGoals} Toren gewinnt. ${p1Name} hat die 1. Aufnahme.`);
+
+    // Sofortiger 0ms Live-Broadcast an Master-Monitor
+    const startPayload = {
+      boardId: activeBoard,
+      status: 'playing',
+      gameType: 'fussball',
+      gameMode,
+      p1Name,
+      p2Name: gameMode === '1vsComputer' ? `Computer (${DIFFICULTY_CONFIGS[computerDifficulty].name})` : p2Name,
+      activePlayer: 1,
+      ballPossession: 1,
+      scoreP1: 0,
+      scoreP2: 0,
+      targetGoals,
+      currentAction: 'Anpfiff! Match gestartet',
+      updatedAt: Date.now(),
+    };
+    try {
+      liveBroadcastRef.current?.postMessage(startPayload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+        masterBc.postMessage(startPayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_fussball_live_sync_${activeBoard}`, JSON.stringify(startPayload));
+      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(startPayload));
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(startPayload),
+      }).catch(() => {});
+      fetch('/api/live/fussball', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(startPayload),
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   // Spielername für Anzeige
