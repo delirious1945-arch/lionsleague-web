@@ -23,18 +23,18 @@ export interface DoppelquoteLiveState {
 
 const TARGETS = ['D20', 'D10', 'D16', 'D8', 'D4'];
 
-// Winkel für die 5 Doppel auf einer Standard-Dartscheibe (0° ist oben bei 12 Uhr)
+// Exakte Winkel für die 5 Doppel auf einer Standard-Dartscheibe (20 Segmente à 18°, 0° = oben bei 12 Uhr)
 // D20 = 0° (oben)
-// D10 = 144° (unten rechts)
-// D16 = 234° (unten links)
-// D8 = 270° (links)
-// D4 = 72° (rechts oben)
+// D4  = 54° (rechts oben)
+// D10 = 108° (rechts unten)
+// D16 = 234° (links unten)
+// D8  = 252° (links)
 const TARGET_ANGLES: Record<string, { angle: number; color: string; label: string }> = {
-  D20: { angle: 0, color: '#ff3366', label: 'D20' },
-  D10: { angle: 144, color: '#00e5ff', label: 'D10' },
-  D16: { angle: 234, color: '#00ff88', label: 'D16' },
-  D8: { angle: 270, color: '#ffaa00', label: 'D8' },
-  D4: { angle: 72, color: '#cc44ff', label: 'D4' },
+  D20: { angle: 0, color: '#ff3366', label: 'Tops · Doppel 20' },
+  D10: { angle: 108, color: '#ff3366', label: 'Halb-Tops · Doppel 10' },
+  D16: { angle: 234, color: '#ff3366', label: 'Favorit · Doppel 16' },
+  D8: { angle: 252, color: '#ff3366', label: 'Halb-16 · Doppel 8' },
+  D4: { angle: 54, color: '#ff3366', label: 'Finish-Doppel · Doppel 4' },
 };
 
 interface DoppelquoteLiveMonitorProps {
@@ -641,24 +641,29 @@ export default function DoppelquoteLiveMonitorClient({ initialBoardId = '1' }: D
                 );
               })}
 
-              {/* 4. Das AKTIVE DOPPEL-SEGMENT (Oben bei 12 Uhr für D20 rot hervorgehoben wie im Soll-Bild!) */}
-              {/* Ein trapezförmiger Ring-Ausschnitt bei 0° (D20) */}
-              <path
-                d="M 186 21 A 180 180 0 0 1 214 21 L 211 50 A 150 150 0 0 0 189 50 Z"
-                fill="#ff3366"
-                filter="url(#coralGlow)"
-              />
-              <path
-                d="M 186 21 A 180 180 0 0 1 214 21 L 211 50 A 150 150 0 0 0 189 50 Z"
-                fill="none"
-                stroke="#ff6699"
-                strokeWidth="2"
-              />
-
-              {/* Rote/Koralle Akzent-Ticks auf dem Ring */}
-              <line x1="200" y1="20" x2="200" y2="50" stroke="#ffffff" strokeWidth="2" />
-              <line x1="160" y1="200" x2="150" y2="200" stroke="#ff3366" strokeWidth="2" filter="url(#coralGlow)" />
-              <line x1="240" y1="200" x2="250" y2="200" stroke="#ff3366" strokeWidth="2" filter="url(#coralGlow)" />
+              {/* 4. Das AKTIVE DOPPEL-SEGMENT (rotiert in Echtzeit auf das geworfene Doppel!) */}
+              <g
+                style={{
+                  transformOrigin: '200px 200px',
+                  transform: `rotate(${targetInfo.angle}deg)`,
+                  transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+              >
+                {/* Ein trapezförmiger Doppel-Ring-Ausschnitt für das aktive Doppel */}
+                <path
+                  d="M 186 21 A 180 180 0 0 1 214 21 L 211 50 A 150 150 0 0 0 189 50 Z"
+                  fill="#ff3366"
+                  filter="url(#coralGlow)"
+                />
+                <path
+                  d="M 186 21 A 180 180 0 0 1 214 21 L 211 50 A 150 150 0 0 0 189 50 Z"
+                  fill="none"
+                  stroke="#ff6699"
+                  strokeWidth="2.5"
+                />
+                {/* Weisser Präzisions-Marker in der Mitte des Doppelfeldes */}
+                <line x1="200" y1="18" x2="200" y2="52" stroke="#ffffff" strokeWidth="2.5" />
+              </g>
 
               {/* 5. Gläserne Licht-Reflexion (Diagonaler weißer Bogen oben rechts) */}
               <path
