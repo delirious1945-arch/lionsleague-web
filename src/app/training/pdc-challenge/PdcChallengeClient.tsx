@@ -267,16 +267,16 @@ export default function PdcChallengeClient({
       : p1Stats.totalDartsThrown >= 57 && p2Stats.totalDartsThrown >= 57;
 
   const hasStarted = p1Stats.totalDartsThrown > 0 || p2Stats.totalDartsThrown > 0;
-  const isPlaying = (isMatchStarted || hasStarted) && !isCompleted;
-  const isGameActive = hasStarted && !isCompleted;
+  const isPlaying = isMatchStarted && !isCompleted;
+  const isGameActive = isMatchStarted && hasStarted && !isCompleted;
 
-  // 1. Lokalen Geräte-Cache beim Start wiederherstellen
+  // 1. Lokalen Geräte-Cache beim Start wiederherstellen (Setup-Einstellungen, aber Spiel nicht automatisch starten)
   useEffect(() => {
     try {
       const cachedStr = localStorage.getItem(CACHE_KEY);
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
-        if (cached && cached.stateP1) {
+        if (cached) {
           setGameMode(cached.gameMode || 'solo');
           if (!isBoardUser && userPlayerMatch && cached.gameMode === 'solo') {
             setP1Name(userPlayerMatch.name);
@@ -284,15 +284,6 @@ export default function PdcChallengeClient({
             setP1Name(cached.p1Name);
           }
           if (cached.p2Name) setP2Name(cached.p2Name);
-          setStateP1(cached.stateP1);
-          if (cached.stateP2) setStateP2(cached.stateP2);
-          setStage(cached.stage || 'part1');
-          setCurrentTargetIndex(cached.currentTargetIndex ?? 0);
-          setActivePlayer(cached.activePlayer || 1);
-          setNotes(cached.notes || '');
-          if (cached.gameSessionId) setGameSessionId(cached.gameSessionId);
-          if (cached.isSavedInCloud) setIsSavedInCloud(true);
-          if (cached.isMatchStarted) setIsMatchStarted(true);
         }
       }
     } catch (e) {
@@ -975,7 +966,7 @@ export default function PdcChallengeClient({
       )}
 
       {/* VORGELAGERTE SETUP-ANSICHT (WENN NOCH KEIN MATCH GESTARTET WURDE) */}
-      {!isPlaying && activeTab === 'game' && (
+      {!isPlaying && !isCompleted && (
         <div className="space-y-5" data-ui-id="PDC.SETUP.CARD">
           <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">

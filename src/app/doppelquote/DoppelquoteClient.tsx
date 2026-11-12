@@ -159,40 +159,24 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     : (TARGETS.every(t => scoresP1[t].every(s => s !== null)) && TARGETS.every(t => scoresP2[t].every(s => s !== null)))
   );
   const hasStarted = (p1Stats.thrown > 0 || p2Stats.thrown > 0);
-  const isPlaying = (isMatchStarted || hasStarted) && !isCompleted;
-  const isGameActive = hasStarted && !isCompleted;
+  const isPlaying = isMatchStarted && !isCompleted;
+  const isGameActive = isMatchStarted && hasStarted && !isCompleted;
 
-  // 1. Lokalen Geräte-Cache beim Start wiederherstellen
+  // 1. Lokalen Geräte-Cache beim Start wiederherstellen (Setup-Einstellungen, aber Spiel nicht automatisch starten)
   useEffect(() => {
     try {
       const cachedStr = localStorage.getItem(CACHE_KEY);
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
-        if (cached && cached.scoresP1) {
-          const hasScores = TARGETS.some(t => 
-            (cached.scoresP1[t] && cached.scoresP1[t].some((s: any) => s !== null)) ||
-            (cached.scoresP2 && cached.scoresP2[t] && cached.scoresP2[t].some((s: any) => s !== null))
-          );
-          if (hasScores || cached.isMatchStarted) {
-            const restoredMode = cached.gameMode || 'solo';
-            setGameMode(restoredMode);
-            if (!isBoardUser && userPlayerMatch && restoredMode === 'solo') {
-              setP1Name(userPlayerMatch.name);
-            } else if (cached.p1Name) {
-              setP1Name(cached.p1Name);
-            }
-            if (cached.p2Name) setP2Name(cached.p2Name);
-            setScoresP1(cached.scoresP1);
-            if (cached.scoresP2) setScoresP2(cached.scoresP2);
-            setCurrentTargetIndex(cached.currentTargetIndex ?? 0);
-            setCurrentShotIndex(cached.currentShotIndex ?? 0);
-            setActivePlayer(cached.activePlayer || 1);
-            setNotes(cached.notes || '');
-            if (cached.gameSessionId) setGameSessionId(cached.gameSessionId);
-            if (cached.isSavedInCloud) setIsSavedInCloud(true);
-            setRestoredFromCache(true);
-            setIsMatchStarted(true);
+        if (cached) {
+          const restoredMode = cached.gameMode || 'solo';
+          setGameMode(restoredMode);
+          if (!isBoardUser && userPlayerMatch && restoredMode === 'solo') {
+            setP1Name(userPlayerMatch.name);
+          } else if (cached.p1Name) {
+            setP1Name(cached.p1Name);
           }
+          if (cached.p2Name) setP2Name(cached.p2Name);
         }
       }
     } catch (e) {
@@ -1227,7 +1211,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       )}
 
       {/* VORGELAGERTES MATCH-SETUP (VOR SPIELSTART) */}
-      {!isPlaying && !isCompleted && activeTab === 'board' && (
+      {!isPlaying && !isCompleted && (
         <div className="space-y-5 animate-fadeIn" data-ui-id="CHECKOUT.SETUP.CARD">
           <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
