@@ -236,12 +236,39 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   ]);
 
   // 2b. Realtime Live-Synchronisation für den externen TV-Monitor (/doppelquote/live)
+  const [activeBoard, setActiveBoard] = useState<string>('1');
   const liveBroadcastRef = useRef<BroadcastChannel | null>(null);
+
+  useEffect(() => {
+    try {
+      const savedBoard = localStorage.getItem('lions_active_board');
+      if (savedBoard && ['1', '2', '3', '4', '5'].includes(savedBoard)) {
+        setActiveBoard(savedBoard);
+      }
+    } catch (e) {}
+  }, []);
+
+  const handleSelectBoard = (b: string) => {
+    setActiveBoard(b);
+    try {
+      localStorage.setItem('lions_active_board', b);
+    } catch (e) {}
+    // Sofortigen Standby-Sync für das neu gewählte Board senden, falls Spiel noch nicht gestartet
+    if (!isPlaying && !isCompleted) {
+      try {
+        fetch('/api/live/doppelquote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ boardId: b, status: 'idle', reset: true }),
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
-        liveBroadcastRef.current = new BroadcastChannel('lions_doppelquote_live_sync');
+        liveBroadcastRef.current = new BroadcastChannel(`lions_doppelquote_live_sync_${activeBoard}`);
       } catch (e) {}
     }
     return () => {
@@ -249,12 +276,26 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
         liveBroadcastRef.current?.close();
       } catch (e) {}
     };
-  }, []);
+  }, [activeBoard]);
+
+  // Initialer Sync: Wenn noch kein Spiel läuft, Monitor auf Standby setzen
+  useEffect(() => {
+    if (!isPlaying && !isCompleted) {
+      try {
+        fetch('/api/live/doppelquote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true }),
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  }, [isPlaying, isCompleted, activeBoard]);
 
   useEffect(() => {
     if (!isGameInitialized) return;
 
     const payload = {
+      boardId: activeBoard,
       status: isCompleted ? 'completed' : isPlaying ? 'playing' : 'idle',
       gameMode,
       p1Name,
@@ -277,7 +318,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
     // 2. localStorage Event (0ms Sync zwischen Tabs/Fenstern)
     try {
-      localStorage.setItem('lions_doppelquote_live_sync', JSON.stringify(payload));
+      localStorage.setItem(`lions_doppelquote_live_sync_${activeBoard}`, JSON.stringify(payload));
     } catch (e) {}
 
     // 3. API Sync (für externe Smart-TVs / separate Geräte)
@@ -289,6 +330,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       }).catch(() => {});
     } catch (e) {}
   }, [
+    activeBoard,
     isGameInitialized,
     isPlaying,
     isCompleted,
@@ -845,12 +887,12 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     setSaveStatus(null);
     localStorage.removeItem(CACHE_KEY);
     try {
-      liveBroadcastRef.current?.postMessage({ status: 'idle', updatedAt: Date.now() });
-      localStorage.setItem('lions_doppelquote_live_sync', JSON.stringify({ status: 'idle', updatedAt: Date.now() }));
+      liveBroadcastRef.current?.postMessage({ status: 'idle', boardId: activeBoard, updatedAt: Date.now() });
+      localStorage.setItem(`lions_doppelquote_live_sync_${activeBoard}`, JSON.stringify({ status: 'idle', boardId: activeBoard, updatedAt: Date.now() }));
       fetch('/api/live/doppelquote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'idle' }),
+        body: JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true }),
       }).catch(() => {});
     } catch (e) {}
     setRestoredFromCache(false);
@@ -1279,6 +1321,36 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
               </div>
               <div className="text-xs text-zinc-400 font-mono">
                 Offizielles Checkout Battle (150 Darts)
+              </div>
+            </div>
+
+            {/* TV-Monitor / Oche Board Zuweisung (Multi-Screen) */}
+            <div className="space-y-2 p-3.5 sm:p-4 rounded-2xl bg-zinc-950/80 border border-cyan-500/30 shadow-[inset_0_1px_0_0_rgba(6,182,212,0.2)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                  <span>📺</span>
+                  <span>Externer TV-Monitor / Oche-Scheibe:</span>
+                </label>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  Dieses Tablet steuert <strong className="text-cyan-300 font-bold">TV-Board {activeBoard}</strong>
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-2 pt-1">
+                {['1', '2', '3', '4', '5'].map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => handleSelectBoard(b)}
+                    className={`py-2 px-2 rounded-xl font-mono text-xs font-black transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                      activeBoard === b
+                        ? 'bg-cyan-500/25 text-cyan-300 border-2 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)] scale-[1.02]'
+                        : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800 hover:text-white'
+                    }`}
+                  >
+                    <span>Board {b}</span>
+                    <span className="text-[10px] opacity-75 font-normal">Scheibe {b}</span>
+                  </button>
+                ))}
               </div>
             </div>
 

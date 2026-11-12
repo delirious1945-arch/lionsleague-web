@@ -2,6 +2,12 @@ import DoppelquoteLiveMonitorClient from './DoppelquoteLiveMonitorClient';
 
 export const dynamic = 'force-dynamic';
 
-export default function DoppelquoteLivePage() {
-  return <DoppelquoteLiveMonitorClient />;
+interface PageProps {
+  searchParams: Promise<{ board?: string }>;
+}
+
+export default async function DoppelquoteLivePage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const boardId = params?.board || '1';
+  return <DoppelquoteLiveMonitorClient initialBoardId={boardId} />;
 }

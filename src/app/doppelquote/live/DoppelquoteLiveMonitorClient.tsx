@@ -61,8 +61,13 @@ const TARGET_THEMES: Record<string, { ring: string; glow: string; text: string; 
   },
 };
 
-export default function DoppelquoteLiveMonitorClient() {
-  const [liveState, setLiveState] = useState<DoppelquoteLiveState>({ status: 'idle' });
+interface DoppelquoteLiveMonitorProps {
+  initialBoardId?: string;
+}
+
+export default function DoppelquoteLiveMonitorClient({ initialBoardId = '1' }: DoppelquoteLiveMonitorProps) {
+  const [boardId, setBoardId] = useState<string>(initialBoardId);
+  const [liveState, setLiveState] = useState<DoppelquoteLiveState>({ status: 'idle', boardId: initialBoardId });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<string>('');
 
@@ -107,7 +112,7 @@ export default function DoppelquoteLiveMonitorClient() {
     let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
-        bc = new BroadcastChannel('lions_doppelquote_live_sync');
+        bc = new BroadcastChannel(`lions_doppelquote_live_sync_${boardId}`);
         bc.onmessage = (event) => {
           if (event.data && typeof event.data === 'object') {
             setLiveState(event.data);
@@ -118,12 +123,13 @@ export default function DoppelquoteLiveMonitorClient() {
     return () => {
       bc?.close();
     };
-  }, []);
+  }, [boardId]);
 
   // 2. localStorage Event Listener (Sync zwischen Browser-Tabs)
   useEffect(() => {
+    const storageKey = `lions_doppelquote_live_sync_${boardId}`;
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'lions_doppelquote_live_sync' && e.newValue) {
+      if (e.key === storageKey && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           setLiveState(parsed);
@@ -133,25 +139,25 @@ export default function DoppelquoteLiveMonitorClient() {
     window.addEventListener('storage', handleStorage);
 
     try {
-      const raw = localStorage.getItem('lions_doppelquote_live_sync');
+      const raw = localStorage.getItem(storageKey);
       if (raw) {
         setLiveState(JSON.parse(raw));
       }
     } catch (err) {}
 
     return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  }, [boardId]);
 
-  // 3. API Polling (für Fire TV Stick / externe Displays alle 1.2s)
+  // 3. API Polling (für Fire TV Stick / externe Displays alle 1.2s für das ausgewählte Board)
   useEffect(() => {
     const pollApi = async () => {
       try {
-        const res = await fetch('/api/live/doppelquote', { cache: 'no-store' });
+        const res = await fetch(`/api/live/doppelquote?board=${boardId}`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data && data.updatedAt) {
             setLiveState((prev) => {
-              if (!prev.updatedAt || data.updatedAt > prev.updatedAt) {
+              if (!prev.updatedAt || data.updatedAt > prev.updatedAt || data.status === 'idle') {
                 return data;
               }
               return prev;
@@ -164,7 +170,19 @@ export default function DoppelquoteLiveMonitorClient() {
     pollApi();
     const timer = setInterval(pollApi, 1200);
     return () => clearInterval(timer);
-  }, []);
+  }, [boardId]);
+
+  // Reset-Funktion für den Standby
+  const handleResetBoard = async () => {
+    try {
+      await fetch('/api/live/doppelquote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boardId, status: 'idle', reset: true }),
+      });
+      setLiveState({ status: 'idle', boardId });
+    } catch (e) {}
+  };
 
   const curTarget = liveState.currentTarget || 'D20';
   const theme = TARGET_THEMES[curTarget] || TARGET_THEMES.D20;
@@ -234,7 +252,7 @@ export default function DoppelquoteLiveMonitorClient() {
           <div className="space-y-3 pt-2">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 font-mono text-xs font-bold tracking-wider">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-              <span>BOARD 1 · BEREIT AM OCHE</span>
+              <span>BOARD {boardId} · BEREIT AM OCHE</span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white uppercase">
@@ -243,6 +261,30 @@ export default function DoppelquoteLiveMonitorClient() {
             <p className="text-xs sm:text-sm text-slate-400 font-mono">
               Wähle am Tablet dein Spiel und drücke auf „Spiel starten“
             </p>
+
+            {/* Board-Schnellwahl für den TV-Monitor */}
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <span className="text-[11px] font-mono text-slate-500 mr-1">Monitor-Kanal:</span>
+              {['1', '2', '3', '4', '5'].map((b) => (
+                <button
+                  key={b}
+                  onClick={() => {
+                    setBoardId(b);
+                    setLiveState({ status: 'idle', boardId: b });
+                    if (typeof window !== 'undefined') {
+                      window.history.replaceState(null, '', `?board=${b}`);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                    b === boardId
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                      : 'bg-white/[0.04] text-slate-400 border border-white/10 hover:bg-white/[0.08] hover:text-white'
+                  }`}
+                >
+                  Board {b}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -520,7 +562,7 @@ export default function DoppelquoteLiveMonitorClient() {
         <div className="flex items-center gap-3.5">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 font-mono text-xs font-bold">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-            <span>BOARD 1</span>
+            <span>BOARD {boardId}</span>
           </div>
 
           <span className="text-sm font-mono font-bold text-slate-300 hidden md:inline">
