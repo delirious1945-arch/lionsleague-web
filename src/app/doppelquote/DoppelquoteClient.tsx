@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Player } from '@/lib/data';
@@ -233,6 +233,75 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     currentShotIndex,
     activePlayer,
     notes,
+  ]);
+
+  // 2b. Realtime Live-Synchronisation für den externen TV-Monitor (/doppelquote/live)
+  const liveBroadcastRef = useRef<BroadcastChannel | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        liveBroadcastRef.current = new BroadcastChannel('lions_doppelquote_live_sync');
+      } catch (e) {}
+    }
+    return () => {
+      try {
+        liveBroadcastRef.current?.close();
+      } catch (e) {}
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isGameInitialized) return;
+
+    const payload = {
+      status: isCompleted ? 'completed' : isPlaying ? 'playing' : 'idle',
+      gameMode,
+      p1Name,
+      p2Name,
+      activePlayer,
+      currentTarget: TARGETS[currentTargetIndex],
+      currentTargetIndex,
+      currentRound: currentShotIndex + 1,
+      p1Stats,
+      p2Stats,
+      scoresP1,
+      scoresP2,
+      updatedAt: Date.now(),
+    };
+
+    // 1. BroadcastChannel (0ms Sync am selben Gerät / DeX)
+    try {
+      liveBroadcastRef.current?.postMessage(payload);
+    } catch (e) {}
+
+    // 2. localStorage Event (0ms Sync zwischen Tabs/Fenstern)
+    try {
+      localStorage.setItem('lions_doppelquote_live_sync', JSON.stringify(payload));
+    } catch (e) {}
+
+    // 3. API Sync (für externe Smart-TVs / separate Geräte)
+    try {
+      fetch('/api/live/doppelquote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    } catch (e) {}
+  }, [
+    isGameInitialized,
+    isPlaying,
+    isCompleted,
+    gameMode,
+    p1Name,
+    p2Name,
+    activePlayer,
+    currentTargetIndex,
+    currentShotIndex,
+    p1Stats,
+    p2Stats,
+    scoresP1,
+    scoresP2,
   ]);
 
   // 3. Refresh-Schutz (F5, Strg+R, Tab schliessen) während aktivem Spiel
@@ -775,6 +844,15 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     setIsSavedInCloud(false);
     setSaveStatus(null);
     localStorage.removeItem(CACHE_KEY);
+    try {
+      liveBroadcastRef.current?.postMessage({ status: 'idle', updatedAt: Date.now() });
+      localStorage.setItem('lions_doppelquote_live_sync', JSON.stringify({ status: 'idle', updatedAt: Date.now() }));
+      fetch('/api/live/doppelquote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'idle' }),
+      }).catch(() => {});
+    } catch (e) {}
     setRestoredFromCache(false);
     setIsMatchStarted(false);
     setShowSetupSettings(false);

@@ -1,7 +1,7 @@
-import { redirect } from 'next/navigation';
+import DoppelquoteLiveMonitorClient from './DoppelquoteLiveMonitorClient';
 
 export const dynamic = 'force-dynamic';
 
 export default function DoppelquoteLivePage() {
-  redirect('/training/live?view=doppelquote');
+  return <DoppelquoteLiveMonitorClient />;
 }
