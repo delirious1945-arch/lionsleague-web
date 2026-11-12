@@ -8,8 +8,8 @@ import {
 } from './types';
 import { saveFussballSessionAction } from './actions';
 import { 
-  ArrowLeft, Volume2, VolumeX, RotateCcw, Save, Trophy, 
-  HelpCircle, Sparkles, RefreshCw, CheckCircle2, Bot, User, Users, Flame
+  ArrowLeft, ArrowRight, Volume2, VolumeX, RotateCcw, Save, Trophy, 
+  HelpCircle, Sparkles, RefreshCw, CheckCircle2, Bot, User, Users, Flame, Tv
 } from 'lucide-react';
 
 interface FussballClientProps {
@@ -187,6 +187,104 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   const [gameOver, setGameOver] = useState<boolean>(false);
   const [winner, setWinner] = useState<1 | 2 | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Realtime Live-Synchronisation für den externen TV-Monitor (/training/fussball/live)
+  const [activeBoard, setActiveBoard] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lions_active_board_fussball') || localStorage.getItem('lions_active_board') || '1';
+    }
+    return '1';
+  });
+
+  const liveBroadcastRef = useRef<BroadcastChannel | null>(null);
+
+  const handleSelectBoard = (b: string) => {
+    setActiveBoard(b);
+    try {
+      localStorage.setItem('lions_active_board_fussball', b);
+      localStorage.setItem('lions_active_board', b);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    try {
+      liveBroadcastRef.current = new BroadcastChannel(`lions_fussball_live_sync_${activeBoard}`);
+    } catch (e) {}
+    return () => {
+      liveBroadcastRef.current?.close();
+    };
+  }, [activeBoard]);
+
+  // Standby-Reset beim Verlassen
+  useEffect(() => {
+    const sendStandby = () => {
+      try {
+        const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/live/fussball', new Blob([payload], { type: 'application/json' }));
+        } else {
+          fetch('/api/live/fussball', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('beforeunload', sendStandby);
+    return () => {
+      window.removeEventListener('beforeunload', sendStandby);
+      sendStandby();
+    };
+  }, [activeBoard]);
+
+  // Live Sync Push
+  useEffect(() => {
+    if (!isGameStarted && !gameOver) return;
+
+    const payload = {
+      boardId: activeBoard,
+      status: gameOver ? 'completed' : isGameStarted ? 'playing' : 'idle',
+      gameMode,
+      p1Name,
+      p2Name: gameMode === '1vsComputer' ? `Computer (${DIFFICULTY_CONFIGS[computerDifficulty].name})` : p2Name,
+      activePlayer: currentTurn,
+      ballPossession: ballPossession ?? 1,
+      scoreP1: p1Goals,
+      scoreP2: p2Goals,
+      targetGoals,
+      currentAction: tickerMessage || (ballPossession ? 'Torversuch' : 'Zweikampf'),
+      winner: gameOver ? (p1Goals >= targetGoals ? p1Name : (gameMode === '1vsComputer' ? 'Computer' : p2Name)) : undefined,
+      updatedAt: Date.now(),
+    };
+
+    try {
+      liveBroadcastRef.current?.postMessage(payload);
+      localStorage.setItem(`lions_fussball_live_sync_${activeBoard}`, JSON.stringify(payload));
+      fetch('/api/live/fussball', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    } catch (e) {}
+  }, [
+    isGameStarted,
+    gameOver,
+    activeBoard,
+    gameMode,
+    p1Name,
+    p2Name,
+    computerDifficulty,
+    currentTurn,
+    ballPossession,
+    p1Goals,
+    p2Goals,
+    targetGoals,
+    tickerMessage,
+  ]);
 
   // Aktiven Spielstand im Cache sichern (Schutz vor versehentlichem Tab-Schließen)
   useEffect(() => {
@@ -985,6 +1083,42 @@ export default function FussballClient({ players, initialHistory, currentUser }:
                 ⚠️ <strong>Hinweis Warm-up:</strong> Ein Spiel auf 3 Tore gilt als kurzes Warm-up und wird <strong>nicht</strong> in das offizielle Leistungsranking bzw. die Monatsverlosung aufgenommen. Wähle mindestens 5 Tore für die Ranglistenwertung.
               </p>
             )}
+          </div>
+
+          {/* Oche / Board-Auswahl für Mehrscheiben-Betrieb */}
+          <div className="space-y-2 pt-2 border-t border-white/10">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <span>📺 Oche / TV-Monitor zuweisen:</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono">
+                  Board {activeBoard}
+                </span>
+              </label>
+              <Link
+                href={`/training/fussball/live?board=${activeBoard}`}
+                target="_blank"
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 underline underline-offset-2"
+              >
+                <span>Monitor öffnen</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {['1', '2', '3', '4', '5'].map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => handleSelectBoard(b)}
+                  className={`py-2 px-3 rounded-xl border text-xs font-mono font-black transition-all cursor-pointer ${
+                    activeBoard === b
+                      ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/30 scale-[1.02]'
+                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-white/10'
+                  }`}
+                >
+                  Board {b}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Start Button */}

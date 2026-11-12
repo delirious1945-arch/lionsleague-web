@@ -1,7 +1,14 @@
-import { redirect } from 'next/navigation';
+import PdcLiveMonitorClient from './PdcLiveMonitorClient';
 
 export const dynamic = 'force-dynamic';
 
-export default function PdcLivePage() {
-  redirect('/training/live?view=pdc');
+interface PageProps {
+  searchParams: Promise<{ board?: string }>;
+}
+
+export default async function PdcLivePage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const initialBoardId = params?.board || '1';
+
+  return <PdcLiveMonitorClient initialBoardId={initialBoardId} />;
 }

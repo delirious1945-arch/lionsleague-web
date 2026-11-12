@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Player } from '@/lib/data';
@@ -269,6 +269,117 @@ export default function PdcChallengeClient({
   const hasStarted = p1Stats.totalDartsThrown > 0 || p2Stats.totalDartsThrown > 0;
   const isPlaying = isMatchStarted && !isCompleted;
   const isGameActive = isMatchStarted && hasStarted && !isCompleted;
+
+  // Realtime Live-Synchronisation für den externen TV-Monitor (/training/pdc-challenge/live)
+  const [activeBoard, setActiveBoard] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lions_active_board_pdc') || localStorage.getItem('lions_active_board') || '1';
+    }
+    return '1';
+  });
+
+  const liveBroadcastRef = useRef<BroadcastChannel | null>(null);
+
+  const handleSelectBoard = (b: string) => {
+    setActiveBoard(b);
+    try {
+      localStorage.setItem('lions_active_board_pdc', b);
+      localStorage.setItem('lions_active_board', b);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    try {
+      liveBroadcastRef.current = new BroadcastChannel(`lions_pdc_challenge_live_sync_${activeBoard}`);
+    } catch (e) {}
+    return () => {
+      liveBroadcastRef.current?.close();
+    };
+  }, [activeBoard]);
+
+  // Standby-Reset beim Verlassen
+  useEffect(() => {
+    const sendStandby = () => {
+      try {
+        const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/live/pdc-challenge', new Blob([payload], { type: 'application/json' }));
+        } else {
+          fetch('/api/live/pdc-challenge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('beforeunload', sendStandby);
+    return () => {
+      window.removeEventListener('beforeunload', sendStandby);
+      sendStandby();
+    };
+  }, [activeBoard]);
+
+  // Live Sync Push
+  useEffect(() => {
+    if (!isPlaying && !isCompleted) return;
+
+    const currentPartNum = stage === 'part1' ? 1 : stage === 'part2' ? 2 : stage === 'part3' ? 3 : 1;
+    const currentTargetStr =
+      stage === 'part1'
+        ? `10 bis 15 (#${PART1_TARGETS[currentTargetIndex] ?? 10})`
+        : stage === 'part2'
+        ? PART2_TARGETS[currentTargetIndex] ?? 'D20'
+        : `15 bis 20 (#${PART3_TARGETS[currentTargetIndex] ?? 20})`;
+
+    const currentVisitNum =
+      stage === 'part1'
+        ? currentTargetIndex + 1
+        : stage === 'part2'
+        ? 6 + currentTargetIndex + 1
+        : 6 + 21 + currentTargetIndex + 1;
+
+    const payload = {
+      boardId: activeBoard,
+      status: isCompleted ? 'completed' : isPlaying ? 'playing' : 'idle',
+      gameMode,
+      p1Name,
+      p2Name,
+      activePlayer,
+      currentPart: currentPartNum,
+      currentTarget: currentTargetStr,
+      currentVisit: Math.min(26, currentVisitNum),
+      totalVisits: 26,
+      p1Score: p1Stats.totalScore,
+      p2Score: p2Stats.totalScore,
+      updatedAt: Date.now(),
+    };
+
+    try {
+      liveBroadcastRef.current?.postMessage(payload);
+      localStorage.setItem(`lions_pdc_challenge_live_sync_${activeBoard}`, JSON.stringify(payload));
+      fetch('/api/live/pdc-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    } catch (e) {}
+  }, [
+    isPlaying,
+    isCompleted,
+    activeBoard,
+    gameMode,
+    p1Name,
+    p2Name,
+    activePlayer,
+    stage,
+    currentTargetIndex,
+    p1Stats.totalScore,
+    p2Stats.totalScore,
+  ]);
 
   // 1. Lokalen Geräte-Cache beim Start wiederherstellen (Setup-Einstellungen, aber Spiel nicht automatisch starten)
   useEffect(() => {
@@ -1086,6 +1197,42 @@ export default function PdcChallengeClient({
               ) : null}
             </div>
 
+            {/* Oche / Board-Auswahl für Mehrscheiben-Betrieb */}
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                  <span>📺 Oche / TV-Monitor zuweisen:</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-mono">
+                    Board {activeBoard}
+                  </span>
+                </label>
+                <Link
+                  href={`/training/pdc-challenge/live?board=${activeBoard}`}
+                  target="_blank"
+                  className="text-xs text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 underline underline-offset-2"
+                >
+                  <span>Monitor öffnen</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {['1', '2', '3', '4', '5'].map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => handleSelectBoard(b)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-mono font-black transition-all cursor-pointer ${
+                      activeBoard === b
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-md shadow-cyan-500/30 scale-[1.02]'
+                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
+                    }`}
+                  >
+                    Board {b}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Großer prominenter Gold-Start-Button */}
             <div className="pt-3">
               <button
@@ -1837,7 +1984,7 @@ export default function PdcChallengeClient({
               </h3>
             </div>
             <Link
-              href="/training/pdc-challenge/live"
+              href={`/training/pdc-challenge/live?board=${activeBoard}`}
               target="_blank"
               className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
             >
