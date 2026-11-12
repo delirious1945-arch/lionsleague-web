@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Maximize2, Minimize2, Trophy } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 export interface DoppelquoteLiveState {
   status: 'idle' | 'playing' | 'completed';
@@ -181,18 +181,35 @@ export default function DoppelquoteLiveMonitorClient() {
   const currentRound = liveState.currentRound ?? 1;
   const currentTargetIdx = liveState.currentTargetIndex ?? 0;
 
+  // Hilfsfunktion: Detailwerte pro Doppel
+  const calcTargetStats = (scores?: Record<string, (number | null)[]>) => {
+    return TARGETS.map((t) => {
+      const sc = scores?.[t] || [];
+      const hits = sc.filter((s) => s !== null).reduce((a, b) => (a ?? 0) + (b ?? 0), 0) ?? 0;
+      const thrown = sc.filter((s) => s !== null).length * 3;
+      const quote = thrown > 0 ? (hits / thrown) * 100 : 0;
+      return { target: t, hits, thrown, quote };
+    });
+  };
+
+  const p1TargetStats = calcTargetStats(liveState.scoresP1);
+  const p2TargetStats = calcTargetStats(liveState.scoresP2);
+
+  // Stärkstes & schwächstes Doppel für P1
+  const validP1Stats = p1TargetStats.filter((s) => s.thrown > 0);
+  const bestP1Target = validP1Stats.length > 0 ? [...validP1Stats].sort((a, b) => b.quote - a.quote)[0] : null;
+  const weakestP1Target = validP1Stats.length > 0 ? [...validP1Stats].sort((a, b) => a.quote - b.quote)[0] : null;
+
   // =========================================================================
   // PHASE 1: STANDBY / RUHEZUSTAND (Edles Lions Wappen mit Cyber-Glow)
   // =========================================================================
   if (liveState.status === 'idle') {
     return (
-      <div className="w-screen h-screen min-h-screen bg-[#040711] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
-        {/* Schwebende Ambient-Lichter im Hintergrund */}
+      <div className="w-screen h-screen min-h-screen bg-[#040711] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden select-none font-sans">
         <div className="absolute top-[20%] left-[25%] w-[500px] h-[500px] bg-cyan-500/[0.07] rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-[20%] right-[25%] w-[500px] h-[500px] bg-amber-500/[0.06] rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(4,7,17,0.85)_100%)] pointer-events-none" />
 
-        {/* Vollbild-Button */}
         <div className="absolute top-8 right-8 z-20">
           <button
             onClick={toggleFullscreen}
@@ -203,7 +220,6 @@ export default function DoppelquoteLiveMonitorClient() {
           </button>
         </div>
 
-        {/* Zentrales Lions-Wappen & Standby-Status */}
         <div className="text-center space-y-7 relative z-10 max-w-xl mx-auto flex flex-col items-center">
           <div className="relative w-52 h-52 sm:w-72 sm:h-72 drop-shadow-[0_0_60px_rgba(6,182,212,0.35)] animate-pulse">
             <Image
@@ -234,51 +250,219 @@ export default function DoppelquoteLiveMonitorClient() {
   }
 
   // =========================================================================
-  // PHASE 3: SIEGEREHRUNG / ABSCHLUSS
+  // PHASE 3: NÜCHTERNES FEEDBACK BEI SPIELENDE (KEIN POKAL, KEINE TOP-KACHEL)
   // =========================================================================
   if (liveState.status === 'completed') {
-    const isP1Winner = !is1vs1 || p1Hits >= p2Hits;
-    const winnerName = isP1Winner ? p1Name : p2Name;
-    const winnerQuote = isP1Winner ? p1Quote : p2Quote;
-    const winnerHits = isP1Winner ? p1Hits : p2Hits;
-
     return (
-      <div className="w-screen h-screen min-h-screen bg-[#040711] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-amber-500/[0.12] rounded-full blur-[160px] pointer-events-none" />
+      <div className="w-screen h-screen min-h-screen bg-[#040711] text-white flex flex-col justify-between p-5 sm:p-8 relative overflow-hidden select-none font-sans">
+        {/* Subtile Hintergrund-Lichter */}
+        <div className="absolute top-1/4 left-1/3 w-[650px] h-[650px] bg-emerald-500/[0.05] rounded-full blur-[160px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/3 w-[650px] h-[650px] bg-cyan-500/[0.05] rounded-full blur-[160px] pointer-events-none" />
 
-        <div className="text-center space-y-7 relative z-10 max-w-4xl mx-auto">
-          <div className="w-28 h-28 sm:w-36 sm:h-36 mx-auto rounded-3xl bg-amber-400/15 border border-amber-400/50 flex items-center justify-center text-6xl sm:text-7xl shadow-[0_0_60px_rgba(251,191,36,0.35)] backdrop-blur-2xl">
-            🏆
+        {/* Schlanker Header ohne klobige Box */}
+        <div className="flex items-center justify-between border-b border-white/[0.08] pb-4 relative z-20">
+          <div className="flex items-center gap-3">
+            <div className="relative w-8 h-8 drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]">
+              <Image src="/logo.png" alt="Lions" fill className="object-contain" priority />
+            </div>
+            <div>
+              <h1 className="text-sm sm:text-base font-black tracking-widest text-white uppercase font-mono">
+                Trainings-Auswertung · Checkout Battle
+              </h1>
+              <p className="text-[11px] text-slate-400 font-mono">
+                150 Darts · 5 Doppel (D20, D10, D16, D8, D4)
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-3">
-            <span className="text-xs sm:text-sm font-black tracking-widest uppercase text-amber-400 block font-mono">
-              Match beendet · Offizielle Auswertung
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono font-bold text-slate-400">
+              {currentTime}
             </span>
-            <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight">
-              {is1vs1 ? `${winnerName} gewinnt!` : `Glückwunsch, ${p1Name}!`}
-            </h1>
-            <p className="text-xl sm:text-3xl text-emerald-300 font-mono font-black">
-              Endergebnis: <strong className="text-amber-300">{winnerHits} Treffer</strong> ({winnerQuote.toFixed(1)}%)
-            </p>
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+              title="Vollbild"
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
           </div>
+        </div>
 
-          {/* 1vs1 Endstand */}
-          {is1vs1 && (
-            <div className="grid grid-cols-2 gap-5 max-w-2xl mx-auto pt-4 text-center">
-              <div className="p-6 rounded-3xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 shadow-xl">
-                <span className="text-lg font-black text-white block truncate">{p1Name}</span>
-                <span className="text-4xl font-black font-mono text-emerald-400 mt-2 block">{p1Quote.toFixed(1)}%</span>
-                <span className="text-xs text-slate-400 mt-1 block font-mono">{p1Hits} Treffer · 150 Darts</span>
+        {/* Haupt-Feedback-Bereich (Nüchtern & Analytisch) */}
+        <main className="my-auto max-w-7xl mx-auto w-full relative z-10 py-4">
+          {is1vs1 ? (
+            /* =============================================================== */
+            /* 1VS1 VERGLEICHENDE AUSWERTUNG */
+            /* =============================================================== */
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* SPIELER 1 */}
+              <div className="rounded-3xl p-6 sm:p-8 bg-white/[0.025] backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] space-y-5">
+                <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                  <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight truncate">
+                    {p1Name}
+                  </h2>
+                  <span className="text-xs font-mono text-slate-400 uppercase">Spieler 1</span>
+                </div>
+
+                <div className="flex items-baseline gap-4">
+                  <div className="text-5xl sm:text-6xl font-black font-mono text-emerald-400 tracking-tight">
+                    {p1Quote.toFixed(1)}%
+                  </div>
+                  <div className="text-sm font-mono text-slate-300 font-semibold">
+                    {p1Hits} Treffer / {p1Thrown} Darts
+                  </div>
+                </div>
+
+                {/* Doppel-Aufschlüsselung */}
+                <div className="space-y-2 pt-2 border-t border-white/[0.08]">
+                  <span className="text-[11px] font-mono uppercase text-slate-400 font-bold block">
+                    Aufschlüsselung nach Doppeln
+                  </span>
+                  <div className="grid grid-cols-5 gap-2 text-center font-mono text-xs">
+                    {p1TargetStats.map((st) => (
+                      <div key={st.target} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <span className="font-black text-white block text-sm">{st.target}</span>
+                        <span className="text-emerald-400 font-bold block mt-1">{st.quote.toFixed(0)}%</span>
+                        <span className="text-[10px] text-slate-500 block">{st.hits}/30</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="p-6 rounded-3xl bg-white/[0.04] backdrop-blur-2xl border border-white/10 shadow-xl">
-                <span className="text-lg font-black text-white block truncate">{p2Name}</span>
-                <span className="text-4xl font-black font-mono text-emerald-400 mt-2 block">{p2Quote.toFixed(1)}%</span>
-                <span className="text-xs text-slate-400 mt-1 block font-mono">{p2Hits} Treffer · 150 Darts</span>
+
+              {/* SPIELER 2 */}
+              <div className="rounded-3xl p-6 sm:p-8 bg-white/[0.025] backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] space-y-5">
+                <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                  <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight truncate">
+                    {p2Name}
+                  </h2>
+                  <span className="text-xs font-mono text-slate-400 uppercase">Spieler 2</span>
+                </div>
+
+                <div className="flex items-baseline gap-4">
+                  <div className="text-5xl sm:text-6xl font-black font-mono text-emerald-400 tracking-tight">
+                    {p2Quote.toFixed(1)}%
+                  </div>
+                  <div className="text-sm font-mono text-slate-300 font-semibold">
+                    {p2Hits} Treffer / {p2Thrown} Darts
+                  </div>
+                </div>
+
+                {/* Doppel-Aufschlüsselung */}
+                <div className="space-y-2 pt-2 border-t border-white/[0.08]">
+                  <span className="text-[11px] font-mono uppercase text-slate-400 font-bold block">
+                    Aufschlüsselung nach Doppeln
+                  </span>
+                  <div className="grid grid-cols-5 gap-2 text-center font-mono text-xs">
+                    {p2TargetStats.map((st) => (
+                      <div key={st.target} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <span className="font-black text-white block text-sm">{st.target}</span>
+                        <span className="text-emerald-400 font-bold block mt-1">{st.quote.toFixed(0)}%</span>
+                        <span className="text-[10px] text-slate-500 block">{st.hits}/30</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* =============================================================== */
+            /* SOLO-TRAINING NÜCHTERNES ANALYTIK-FEEDBACK */
+            /* =============================================================== */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              {/* LINKE SPALTE: GESAMTERGEBNIS & WERFER */}
+              <div className="lg:col-span-5 rounded-3xl p-7 sm:p-9 bg-white/[0.025] backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] flex flex-col justify-between space-y-6">
+                <div>
+                  <span className="text-xs font-mono uppercase text-slate-400 font-bold block">
+                    Werfer am Oche
+                  </span>
+                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight mt-1">
+                    {p1Name}
+                  </h2>
+                </div>
+
+                <div>
+                  <span className="text-xs font-mono uppercase tracking-wider text-slate-400 block">
+                    Gesamt-Doppelquote
+                  </span>
+                  <div className="text-6xl sm:text-7xl font-black font-mono text-emerald-400 mt-1 tracking-tight drop-shadow-[0_0_30px_rgba(16,185,129,0.35)]">
+                    {p1Quote.toFixed(1)}%
+                  </div>
+                  <div className="text-base font-mono text-slate-300 font-semibold mt-2">
+                    {p1Hits} Treffer / {p1Thrown} Darts
+                  </div>
+                </div>
+
+                {/* Nüchternes Kurz-Fazit */}
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/[0.08] text-xs font-mono">
+                  <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Stärkstes Feld</span>
+                    <span className="text-emerald-300 font-black text-base mt-0.5 block">
+                      {bestP1Target ? `${bestP1Target.target} (${bestP1Target.quote.toFixed(0)}%)` : '–'}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Fokusbereich</span>
+                    <span className="text-amber-300 font-black text-base mt-0.5 block">
+                      {weakestP1Target ? `${weakestP1Target.target} (${weakestP1Target.quote.toFixed(0)}%)` : '–'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* RECHTE SPALTE: DETAILLIERTE MATRIX ALLER 5 DOPPEL */}
+              <div className="lg:col-span-7 rounded-3xl p-7 sm:p-9 bg-white/[0.025] backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] flex flex-col justify-between space-y-4">
+                <span className="text-xs font-mono uppercase text-slate-400 font-bold block">
+                  Detail-Statistik aller 5 Doppel (je 10 Aufnahmen / 30 Darts)
+                </span>
+
+                <div className="space-y-3">
+                  {p1TargetStats.map((st) => {
+                    const isBest = bestP1Target && st.target === bestP1Target.target && st.thrown > 0;
+                    return (
+                      <div
+                        key={st.target}
+                        className={`p-3.5 sm:p-4 rounded-2xl border transition-all font-mono flex items-center justify-between ${
+                          isBest
+                            ? 'bg-emerald-500/[0.08] border-emerald-400/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                            : 'bg-white/[0.02] border-white/[0.06]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <span className="text-xl sm:text-2xl font-black text-white w-12">{st.target}</span>
+                          <div className="text-xs text-slate-400">
+                            <span>{st.hits} von 30 Darts</span>
+                            {isBest && (
+                              <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold uppercase">
+                                Bestwert
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-2xl sm:text-3xl font-black text-emerald-400">
+                            {st.quote.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
-        </div>
+        </main>
+
+        {/* Schlanker Footer */}
+        <footer className="flex items-center justify-between text-xs text-slate-500 border-t border-white/[0.06] pt-3 relative z-20 font-mono">
+          <span>Lions Weyhausen · Leistungsdiagnostik</span>
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+            <span>Bereit für nächste Session</span>
+          </span>
+        </footer>
       </div>
     );
   }
@@ -288,14 +472,12 @@ export default function DoppelquoteLiveMonitorClient() {
   // =========================================================================
   return (
     <div className="w-screen h-screen min-h-screen bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-7 relative overflow-hidden select-none font-sans">
-      {/* Sanfte Ambient-Lichter passend zum aktuellen Zielfeld */}
       <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[850px] ${theme.bgGlow} rounded-full blur-[170px] pointer-events-none transition-all duration-700`} />
       <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-cyan-500/[0.05] rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[450px] h-[450px] bg-emerald-500/[0.05] rounded-full blur-[140px] pointer-events-none" />
 
       {/* 1. TOP HEADER (Edle Glas-Leiste mit Board-Status, Aufnahme & Digitaluhr) */}
       <header className="flex items-center justify-between gap-4 px-6 py-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_12px_32px_rgba(0,0,0,0.5)] relative z-20">
-        {/* Links: Vereins-Branding */}
         <div className="flex items-center gap-3.5">
           <div className="relative w-9 h-9 drop-shadow-[0_0_15px_rgba(6,182,212,0.4)]">
             <Image src="/logo.png" alt="Lions" fill className="object-contain" priority />
@@ -315,7 +497,6 @@ export default function DoppelquoteLiveMonitorClient() {
           </div>
         </div>
 
-        {/* Mitte: Aufnahme-Fortschritt mit animierten Segment-Dots */}
         <div className="flex flex-col items-center">
           <div className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-300">
             Aufnahme {currentRound} von 10
@@ -336,7 +517,6 @@ export default function DoppelquoteLiveMonitorClient() {
           </div>
         </div>
 
-        {/* Rechts: Board-Badge, Uhrzeit & Vollbild */}
         <div className="flex items-center gap-3.5">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 font-mono text-xs font-bold">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
@@ -357,12 +537,9 @@ export default function DoppelquoteLiveMonitorClient() {
         </div>
       </header>
 
-      {/* 2. MAIN COCKPIT (Holografisches Zentrum & Spieler-Panels) */}
+      {/* 2. MAIN COCKPIT */}
       <main className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-7 my-auto items-center relative z-10 max-w-7xl mx-auto w-full">
-        
-        {/* =================================================================== */}
-        {/* SPIELER 1 (LINKS: 4-Spalten bei 1vs1, 4-Spalten bei Solo) */}
-        {/* =================================================================== */}
+        {/* SPIELER 1 */}
         <div
           className={`lg:col-span-4 rounded-3xl p-6 sm:p-8 backdrop-blur-2xl transition-all duration-500 relative overflow-hidden ${
             activePlayer === 1
@@ -370,7 +547,6 @@ export default function DoppelquoteLiveMonitorClient() {
               : 'bg-white/[0.025] border border-white/[0.08] opacity-65 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]'
           }`}
         >
-          {/* Kopfzeile der Spieler-Karte */}
           <div className="flex items-center justify-between gap-2 mb-3">
             <span className="text-xs font-black uppercase tracking-widest text-slate-400 font-mono">
               {is1vs1 ? 'Spieler 1 (Heim)' : 'Spieler am Oche'}
@@ -386,12 +562,10 @@ export default function DoppelquoteLiveMonitorClient() {
             )}
           </div>
 
-          {/* Vollständiger Name – kein Abschneiden! */}
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight min-h-[2.5rem] flex items-center">
             {p1Name}
           </h2>
 
-          {/* Riesige Smaragdgrün-Quote */}
           <div className="mt-5 pt-5 border-t border-white/[0.08]">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block font-mono">
               Doppelquote
@@ -407,20 +581,15 @@ export default function DoppelquoteLiveMonitorClient() {
           </div>
         </div>
 
-        {/* =================================================================== */}
-        {/* ZENTRUM: HOLOGRAFISCHER ZIELFELD-RING (D20 HERO) */}
-        {/* =================================================================== */}
+        {/* ZENTRUM: HOLOGRAFISCHER ZIELFELD-RING */}
         <div className="lg:col-span-4 flex flex-col items-center justify-center text-center space-y-4">
           <span className="text-xs font-black uppercase tracking-widest text-slate-400 font-mono">
             Aktuelles Zielfeld ({currentTargetIdx + 1}/5)
           </span>
 
-          {/* Der holografische Glass-Ring */}
           <div className="relative group">
-            {/* Äußerer Halo-Ring */}
             <div className={`absolute -inset-2 rounded-full ${theme.ring} opacity-75 blur-md animate-pulse pointer-events-none`} />
 
-            {/* Haupt-Zielfeld-Container */}
             <div
               className={`relative w-48 h-48 sm:w-56 sm:h-56 rounded-full border-4 ${theme.ring} bg-gradient-to-b from-white/[0.08] to-white/[0.02] backdrop-blur-2xl flex flex-col items-center justify-center shadow-[inset_0_2px_8px_rgba(255,255,255,0.25)] transition-all duration-500`}
             >
@@ -438,12 +607,9 @@ export default function DoppelquoteLiveMonitorClient() {
           </div>
         </div>
 
-        {/* =================================================================== */}
-        {/* RECHTS: SPIELER 2 (BEI 1VS1) ODER GLASS-PROGRESS (BEI SOLO) */}
-        {/* =================================================================== */}
+        {/* RECHTS: SPIELER 2 ODER MATRIX */}
         <div className="lg:col-span-4">
           {is1vs1 ? (
-            /* SPIELER 2 IM 1VS1 */
             <div
               className={`rounded-3xl p-6 sm:p-8 backdrop-blur-2xl transition-all duration-500 relative overflow-hidden ${
                 activePlayer === 2
@@ -485,14 +651,13 @@ export default function DoppelquoteLiveMonitorClient() {
               </div>
             </div>
           ) : (
-            /* SOLO-MODUS: ELEGANTE GLASS-STATUSLEISTE ALLER 5 DOPPEL */
             <div className="rounded-3xl p-5 sm:p-6 bg-white/[0.025] backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] space-y-3">
               <span className="text-xs font-black uppercase tracking-widest text-slate-400 block font-mono">
                 Trainings-Fortschritt (5 Doppel)
               </span>
 
               <div className="space-y-2">
-                {TARGETS.map((t, idx) => {
+                {TARGETS.map((t) => {
                   const isCur = t === curTarget;
                   const scores = liveState.scoresP1?.[t] || [];
                   const hitsOnT = scores.filter((s) => s !== null).reduce((a, b) => (a ?? 0) + (b ?? 0), 0) ?? 0;
@@ -534,10 +699,9 @@ export default function DoppelquoteLiveMonitorClient() {
             </div>
           )}
         </div>
-
       </main>
 
-      {/* 3. FOOTER (Disziplin, Board-Info & Slogan) */}
+      {/* 3. FOOTER */}
       <footer className="flex items-center justify-between text-xs text-slate-500 border-t border-white/[0.06] pt-3 relative z-20 font-mono">
         <span>Lions Weyhausen · SCW Dartsport 2.0</span>
         <span className="flex items-center gap-2">
