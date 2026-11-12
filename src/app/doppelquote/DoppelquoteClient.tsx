@@ -54,6 +54,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [isGameInitialized, setIsGameInitialized] = useState<boolean>(false);
   const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
+  const [cachedSessionToResume, setCachedSessionToResume] = useState<any | null>(null);
   const [gameSessionId, setGameSessionId] = useState<string>(() => 'dq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
   const [isSavedInCloud, setIsSavedInCloud] = useState<boolean>(false);
   const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
@@ -162,13 +163,23 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const isPlaying = isMatchStarted && !isCompleted;
   const isGameActive = isMatchStarted && hasStarted && !isCompleted;
 
-  // 1. Lokalen Geräte-Cache beim Start wiederherstellen (Setup-Einstellungen, aber Spiel nicht automatisch starten)
+  // 1. Lokalen Geräte-Cache beim Start prüfen (Crash- & Wisch-Schutz)
   useEffect(() => {
     try {
       const cachedStr = localStorage.getItem(CACHE_KEY);
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
         if (cached) {
+          // Prüfen, ob das abgebrochene Spiel echte Würfe/Fortschritt enthält
+          const p1Scores = cached.scoresP1 ? Object.values(cached.scoresP1).flat().filter((s: any) => s !== null) : [];
+          const p2Scores = cached.scoresP2 ? Object.values(cached.scoresP2).flat().filter((s: any) => s !== null) : [];
+          const hasScores = p1Scores.length > 0 || p2Scores.length > 0;
+
+          if (hasScores && cached.isMatchStarted) {
+            // Unvollendetes Spiel gefunden! Dialog zum Fortsetzen anbieten
+            setCachedSessionToResume(cached);
+          }
+
           const restoredMode = cached.gameMode || 'solo';
           setGameMode(restoredMode);
           if (!isBoardUser && userPlayerMatch && restoredMode === 'solo') {
@@ -290,6 +301,32 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       } catch (e) {}
     }
   }, [isPlaying, isCompleted, activeBoard]);
+
+  // Standby-Sync garantieren: Sobald Seite verlassen, Tab geschlossen oder zurückgegangen wird, schaltet TV sofort auf Standby zurück!
+  useEffect(() => {
+    const sendStandby = () => {
+      try {
+        const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/live/doppelquote', new Blob([payload], { type: 'application/json' }));
+        } else {
+          fetch('/api/live/doppelquote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('beforeunload', sendStandby);
+
+    return () => {
+      window.removeEventListener('beforeunload', sendStandby);
+      sendStandby();
+    };
+  }, [activeBoard]);
 
   useEffect(() => {
     if (!isGameInitialized) return;
@@ -518,6 +555,52 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     } else {
       setModalError(res.error || 'Fehler beim Speichern in der Datenbank');
     }
+  };
+
+  // Crash- & Wisch-Schutz: Unterbrochenes Spiel nahtlos fortsetzen
+  const handleResumeCachedSession = () => {
+    if (!cachedSessionToResume) return;
+    const c = cachedSessionToResume;
+    if (c.scoresP1) setScoresP1(c.scoresP1);
+    if (c.scoresP2) setScoresP2(c.scoresP2);
+    if (typeof c.currentTargetIndex === 'number') setCurrentTargetIndex(c.currentTargetIndex);
+    if (typeof c.currentShotIndex === 'number') setCurrentShotIndex(c.currentShotIndex);
+    if (c.activePlayer) setActivePlayer(c.activePlayer);
+    if (c.gameMode) setGameMode(c.gameMode);
+    if (c.p1Name) setP1Name(c.p1Name);
+    if (c.p2Name) setP2Name(c.p2Name);
+    if (c.gameSessionId) setGameSessionId(c.gameSessionId);
+    if (c.boardId && ['1', '2', '3', '4', '5'].includes(c.boardId)) {
+      setActiveBoard(c.boardId);
+    }
+    setIsMatchStarted(true);
+    setRestoredFromCache(true);
+    setCachedSessionToResume(null);
+    setShowSetupSettings(false);
+  };
+
+  // Unterbrochenes Spiel verwerfen & frisches Spiel vorbereiten
+  const handleDiscardCachedSession = () => {
+    localStorage.removeItem(CACHE_KEY);
+    setCachedSessionToResume(null);
+    setRestoredFromCache(false);
+    const empty = () => ({
+      D20: Array(10).fill(null), D10: Array(10).fill(null),
+      D16: Array(10).fill(null), D8:  Array(10).fill(null),
+      D4:  Array(10).fill(null),
+    });
+    setScoresP1(empty());
+    setScoresP2(empty());
+    setCurrentTargetIndex(0);
+    setCurrentShotIndex(0);
+    setActivePlayer(1);
+    try {
+      fetch('/api/live/doppelquote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true }),
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   // Expliziter Startbutton-Handler
@@ -1310,6 +1393,49 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       {!isPlaying && !isCompleted && (
         <div className="space-y-5 animate-fadeIn" data-ui-id="CHECKOUT.SETUP.CARD">
           <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
+            
+            {/* Crash- & Wisch-Schutz: Auffälliger Wiederherstellungs-Dialog */}
+            {cachedSessionToResume && (
+              <div className="p-5 rounded-3xl bg-amber-500/15 border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.3)] space-y-4 animate-fadeIn">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-amber-500/20">
+                      ⚠️
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 font-mono">
+                        Unterbrochenes Spiel gefunden!
+                      </span>
+                      <h3 className="text-base sm:text-lg font-black text-white">
+                        {cachedSessionToResume.p1Name} · Ziel {TARGETS[cachedSessionToResume.currentTargetIndex ?? 0]} (Aufnahme {(cachedSessionToResume.currentShotIndex ?? 0) + 1}/10)
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Dieses Spiel wurde vor Kurzem unterbrochen (z. B. durch versehentliches Schließen, Wischen oder App-Verlassen). Möchtest du an genau dieser Stelle weiterspielen oder ein neues Spiel beginnen?
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResumeCachedSession}
+                    className="py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs font-mono tracking-wider uppercase flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 cursor-pointer transition-all"
+                  >
+                    <span>▶ Spiel jetzt fortsetzen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscardCachedSession}
+                    className="py-3.5 px-5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-rose-300 hover:text-white border border-rose-500/40 font-black text-xs font-mono uppercase flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  >
+                    <span>✕ Spiel verwerfen & Neu beginnen</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
               <div>
                 <span className="text-xs font-black uppercase tracking-widest text-amber-400">
