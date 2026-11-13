@@ -302,11 +302,11 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     }
   }, [isPlaying, isCompleted, activeBoard]);
 
-  // Standby-Sync garantieren: Sobald Seite verlassen, Tab geschlossen oder zurückgegangen wird, schaltet TV sofort auf Standby zurück!
+  // Standby-Sync garantieren: Sobald Seite verlassen oder Tab geschlossen wird, schaltet TV sauber auf Standby zurück!
   useEffect(() => {
     const sendStandby = () => {
       try {
-        const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
+        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
           navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
           navigator.sendBeacon('/api/live/doppelquote', new Blob([payload], { type: 'application/json' }));
@@ -331,15 +331,15 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
     return () => {
       window.removeEventListener('beforeunload', sendStandby);
-      sendStandby();
     };
-  }, [activeBoard]);
+  }, [activeBoard, gameSessionId]);
 
   useEffect(() => {
     if (!isGameInitialized) return;
 
     const payload = {
       boardId: activeBoard,
+      sessionId: gameSessionId,
       status: isCompleted ? 'completed' : isPlaying ? 'playing' : 'idle',
       gameType: 'doppelquote' as const,
       gameMode,
@@ -984,17 +984,30 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       });
     }
 
-    setGameSessionId('dq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+    const nextSessionId = 'dq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    setGameSessionId(nextSessionId);
     setIsSavedInCloud(false);
     setSaveStatus(null);
     localStorage.removeItem(CACHE_KEY);
     try {
-      liveBroadcastRef.current?.postMessage({ status: 'idle', boardId: activeBoard, updatedAt: Date.now() });
-      localStorage.setItem(`lions_doppelquote_live_sync_${activeBoard}`, JSON.stringify({ status: 'idle', boardId: activeBoard, updatedAt: Date.now() }));
+      const idlePayload = { status: 'idle', boardId: activeBoard, sessionId: gameSessionId, reset: true, updatedAt: Date.now() };
+      liveBroadcastRef.current?.postMessage(idlePayload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+        masterBc.postMessage(idlePayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_doppelquote_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
+      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(idlePayload),
+      }).catch(() => {});
       fetch('/api/live/doppelquote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true }),
+        body: JSON.stringify(idlePayload),
       }).catch(() => {});
     } catch (e) {}
     setRestoredFromCache(false);

@@ -302,7 +302,7 @@ export default function PdcChallengeClient({
   useEffect(() => {
     const sendStandby = () => {
       try {
-        const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
+        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
           navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
           navigator.sendBeacon('/api/live/pdc-challenge', new Blob([payload], { type: 'application/json' }));
@@ -326,9 +326,8 @@ export default function PdcChallengeClient({
     window.addEventListener('beforeunload', sendStandby);
     return () => {
       window.removeEventListener('beforeunload', sendStandby);
-      sendStandby();
     };
-  }, [activeBoard]);
+  }, [activeBoard, gameSessionId]);
 
   // Live Sync Push
   useEffect(() => {
@@ -351,6 +350,7 @@ export default function PdcChallengeClient({
 
     const payload = {
       boardId: activeBoard,
+      sessionId: gameSessionId,
       status: isCompleted ? 'completed' : isPlaying ? 'playing' : 'idle',
       gameType: 'pdc_challenge' as const,
       gameMode,
@@ -885,7 +885,29 @@ export default function PdcChallengeClient({
     }
 
     localStorage.removeItem(CACHE_KEY);
-    setGameSessionId('pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+    const nextSessionId = 'pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    setGameSessionId(nextSessionId);
+    try {
+      const idlePayload = { status: 'idle', boardId: activeBoard, sessionId: gameSessionId, reset: true, updatedAt: Date.now() };
+      liveBroadcastRef.current?.postMessage(idlePayload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+        masterBc.postMessage(idlePayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_pdc_challenge_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
+      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(idlePayload),
+      }).catch(() => {});
+      fetch('/api/live/pdc-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(idlePayload),
+      }).catch(() => {});
+    } catch (e) {}
     setIsSavedInCloud(false);
     setStateP1(createInitialPlayerState());
     setStateP2(createInitialPlayerState());

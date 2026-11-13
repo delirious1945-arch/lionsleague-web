@@ -21,6 +21,25 @@ const TARGET_ANGLES: Record<string, { angle: number; color: string; label: strin
   D4: { angle: 54, color: '#ff3366', label: 'Finish-Doppel · Doppel 4' },
 };
 
+// Hilfsfunktion zur Verhinderung von Race-Conditions und veralteten Geister-Paketen
+function mergeIncomingLiveState(prev: UnifiedLiveState, incoming: UnifiedLiveState): UnifiedLiveState {
+  if (!incoming || typeof incoming !== 'object') return prev;
+
+  // 1. Wenn incoming älter ist als der aktuellste Zeitstempel -> veraltetes Paket verwerfen!
+  if (prev.updatedAt && incoming.updatedAt && incoming.updatedAt < prev.updatedAt) {
+    return prev;
+  }
+
+  // 2. Schutz vor verspäteten Standby-Beacons alter Sessions:
+  if (prev.status === 'playing' && incoming.status === 'idle') {
+    if (incoming.sessionId && prev.sessionId && incoming.sessionId !== prev.sessionId) {
+      return prev;
+    }
+  }
+
+  return incoming;
+}
+
 export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: UnifiedBoardLiveProps) {
   const [boardId, setBoardId] = useState<string>(initialBoardId);
   const [liveState, setLiveState] = useState<UnifiedLiveState>({
@@ -73,7 +92,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         bc = new BroadcastChannel(`lions_board_live_sync_${boardId}`);
         bc.onmessage = (event) => {
           if (event.data && typeof event.data === 'object') {
-            setLiveState(event.data);
+            setLiveState((prev) => mergeIncomingLiveState(prev, event.data));
           }
         };
       } catch (e) {}
@@ -90,14 +109,14 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
       if (e.key === storageKey && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          setLiveState(parsed);
+          setLiveState((prev) => mergeIncomingLiveState(prev, parsed));
         } catch (err) {}
       }
     };
     window.addEventListener('storage', handleStorage);
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) setLiveState(JSON.parse(raw));
+      if (raw) setLiveState((prev) => mergeIncomingLiveState(prev, JSON.parse(raw)));
     } catch (err) {}
     return () => window.removeEventListener('storage', handleStorage);
   }, [boardId]);
@@ -116,21 +135,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         if (res.ok) {
           const data = await res.json();
           if (data) {
-            setLiveState((prev) => {
-              // 1. Wenn ein Spiel läuft: IMMER sofort umschalten!
-              if (data.status === 'playing' || (data.gameType && data.gameType !== 'idle' && data.status !== 'idle')) {
-                return data;
-              }
-              // 2. Wenn das Spiel beendet ist:
-              if (data.status === 'completed') {
-                return data;
-              }
-              // 3. Wenn Standby:
-              if (data.status === 'idle') {
-                return data;
-              }
-              return data;
-            });
+            setLiveState((prev) => mergeIncomingLiveState(prev, data));
           }
         }
       } catch (e) {}

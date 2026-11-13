@@ -11,6 +11,7 @@ import {
   ArrowLeft, ArrowRight, Volume2, VolumeX, RotateCcw, Save, Trophy, 
   HelpCircle, Sparkles, RefreshCw, CheckCircle2, Bot, User, Users, Flame, Tv
 } from 'lucide-react';
+import { generateSessionId } from '@/lib/liveSession';
 
 interface FussballClientProps {
   players: Player[];
@@ -196,6 +197,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     return '1';
   });
 
+  const [gameSessionId, setGameSessionId] = useState<string>(() => generateSessionId('fussball', activeBoard));
   const liveBroadcastRef = useRef<BroadcastChannel | null>(null);
 
   const handleSelectBoard = (b: string) => {
@@ -220,7 +222,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   useEffect(() => {
     const sendStandby = () => {
       try {
-        const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
+        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
           navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
           navigator.sendBeacon('/api/live/fussball', new Blob([payload], { type: 'application/json' }));
@@ -244,9 +246,8 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     window.addEventListener('beforeunload', sendStandby);
     return () => {
       window.removeEventListener('beforeunload', sendStandby);
-      sendStandby();
     };
-  }, [activeBoard]);
+  }, [activeBoard, gameSessionId]);
 
   // Live Sync Push
   useEffect(() => {
@@ -254,6 +255,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
 
     const payload = {
       boardId: activeBoard,
+      sessionId: gameSessionId,
       status: gameOver ? 'completed' : isGameStarted ? 'playing' : 'idle',
       gameType: 'fussball' as const,
       gameMode,
@@ -415,6 +417,27 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     if (confirm('Möchtest du das laufende Spiel wirklich abbrechen? Der bisherige Spielstand geht verloren.')) {
       clearActiveGameCache();
       setIsGameStarted(false);
+      try {
+        const idlePayload = { status: 'idle', boardId: activeBoard, sessionId: gameSessionId, reset: true, updatedAt: Date.now() };
+        liveBroadcastRef.current?.postMessage(idlePayload);
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+          masterBc.postMessage(idlePayload);
+          masterBc.close();
+        }
+        localStorage.setItem(`lions_fussball_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
+        localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
+        fetch('/api/live/board', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(idlePayload),
+        }).catch(() => {});
+        fetch('/api/live/fussball', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(idlePayload),
+        }).catch(() => {});
+      } catch (e) {}
     }
   };
 
@@ -431,6 +454,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     }, 600);
 
     clearActiveGameCache();
+    setGameSessionId(generateSessionId('fussball', activeBoard));
     setIsGameStarted(true);
     setP1Goals(0);
     setP2Goals(0);

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,6 +7,7 @@ export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | '
 
 export interface UnifiedLiveState {
   boardId: string;
+  sessionId?: string;
   status: 'idle' | 'playing' | 'completed';
   gameType: GameType;
   gameTitle?: string;
@@ -45,8 +47,9 @@ export interface UnifiedLiveState {
   updatedAt: number;
 }
 
-const defaultState = (boardId: string): UnifiedLiveState => ({
+const defaultState = (boardId: string, sessionId?: string): UnifiedLiveState => ({
   boardId,
+  sessionId: sessionId || 'idle',
   status: 'idle',
   gameType: 'idle',
   gameTitle: 'Warte auf Spielbeginn...',
@@ -55,7 +58,8 @@ const defaultState = (boardId: string): UnifiedLiveState => ({
   updatedAt: Date.now(),
 });
 
-const boardsState: Record<string, UnifiedLiveState> = {
+// Schneller In-Memory Fallback
+const inMemoryFallback: Record<string, UnifiedLiveState> = {
   '1': defaultState('1'),
   '2': defaultState('2'),
   '3': defaultState('3'),
@@ -68,11 +72,45 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const boardId = searchParams.get('board') || '1';
 
-    if (!boardsState[boardId]) {
-      boardsState[boardId] = defaultState(boardId);
+    try {
+      const rows = await sql`
+        SELECT session_id, game_type, status, payload, updated_at
+        FROM board_live_sessions
+        WHERE board_id = ${boardId}
+        LIMIT 1;
+      `;
+
+      if (rows.length > 0) {
+        const row = rows[0];
+        const updatedAt = Number(row.updated_at);
+        const ageMs = Date.now() - updatedAt;
+
+        // Auto-Standby: Wenn älter als 60 Minuten ohne Aktivität -> sauberes Standby
+        if (ageMs > 60 * 60 * 1000 || row.status === 'idle') {
+          return NextResponse.json(defaultState(boardId, row.session_id), {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            },
+          });
+        }
+
+        const payload =
+          typeof row.payload === 'object' && row.payload !== null
+            ? row.payload
+            : JSON.parse(row.payload);
+
+        return NextResponse.json(payload, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+        });
+      }
+    } catch (dbErr) {
+      console.error('Database read error in /api/live/board, using fallback:', dbErr);
     }
 
-    return NextResponse.json(boardsState[boardId], {
+    const fallback = inMemoryFallback[boardId] || defaultState(boardId);
+    return NextResponse.json(fallback, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       },
@@ -86,23 +124,67 @@ export async function POST(req: Request) {
   try {
     const data = await req.json();
     const boardId = String(data.boardId || data.board || '1');
+    const sessionId = String(data.sessionId || 'legacy');
+    const gameType = String(data.gameType || 'idle');
+    const status = String(data.status || 'playing');
+    const now = Date.now();
 
-    if (!boardsState[boardId]) {
-      boardsState[boardId] = defaultState(boardId);
-    }
-
-    if (data.status === 'idle' || data.reset === true) {
-      boardsState[boardId] = defaultState(boardId);
-    } else {
-      boardsState[boardId] = {
-        ...boardsState[boardId],
-        ...data,
-        boardId,
-        updatedAt: Date.now(),
+    // 1. Wenn ein Standby / Reset übermittelt wird
+    if (status === 'idle' || data.reset === true) {
+      const idlePayload = {
+        ...defaultState(boardId, sessionId),
+        updatedAt: now,
       };
+
+      try {
+        await sql`
+          INSERT INTO board_live_sessions (board_id, session_id, game_type, status, payload, updated_at)
+          VALUES (${boardId}, ${sessionId}, 'idle', 'idle', ${JSON.stringify(idlePayload)}::jsonb, ${now})
+          ON CONFLICT (board_id) DO UPDATE SET
+            session_id = EXCLUDED.session_id,
+            game_type = 'idle',
+            status = 'idle',
+            payload = EXCLUDED.payload,
+            updated_at = EXCLUDED.updated_at
+          WHERE board_live_sessions.session_id = ${sessionId} 
+             OR board_live_sessions.status = 'idle'
+             OR board_live_sessions.updated_at <= ${now};
+        `;
+      } catch (dbErr) {
+        console.error('Database write error in /api/live/board (idle):', dbErr);
+      }
+
+      inMemoryFallback[boardId] = idlePayload;
+      return NextResponse.json({ ok: true, state: idlePayload });
     }
 
-    return NextResponse.json({ ok: true, state: boardsState[boardId] });
+    // 2. Aktives Spiel-Update mit sauberem Snapshot (kein Vermischen mit alten Spieldaten!)
+    const payload: UnifiedLiveState = {
+      ...data,
+      boardId,
+      sessionId,
+      gameType: gameType as GameType,
+      status: status as 'playing' | 'completed',
+      updatedAt: now,
+    };
+
+    try {
+      await sql`
+        INSERT INTO board_live_sessions (board_id, session_id, game_type, status, payload, updated_at)
+        VALUES (${boardId}, ${sessionId}, ${gameType}, ${status}, ${JSON.stringify(payload)}::jsonb, ${now})
+        ON CONFLICT (board_id) DO UPDATE SET
+          session_id = EXCLUDED.session_id,
+          game_type = EXCLUDED.game_type,
+          status = EXCLUDED.status,
+          payload = EXCLUDED.payload,
+          updated_at = EXCLUDED.updated_at;
+      `;
+    } catch (dbErr) {
+      console.error('Database write error in /api/live/board:', dbErr);
+    }
+
+    inMemoryFallback[boardId] = payload;
+    return NextResponse.json({ ok: true, state: payload });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err?.message || 'Invalid payload' }, { status: 400 });
   }

@@ -36,6 +36,7 @@ import {
   Shuffle,
   Target,
 } from 'lucide-react';
+import { generateSessionId } from '@/lib/liveSession';
 
 interface StellenCheckenClientProps {
   players: Player[];
@@ -108,6 +109,7 @@ export default function StellenCheckenClient({
     return '1';
   });
 
+  const [gameSessionId, setGameSessionId] = useState<string>(() => generateSessionId('stellen_checken', activeBoard));
   const liveBroadcastRef = useRef<BroadcastChannel | null>(null);
 
   const handleSelectBoard = (b: string) => {
@@ -132,7 +134,7 @@ export default function StellenCheckenClient({
   useEffect(() => {
     const sendStandby = () => {
       try {
-        const payload = JSON.stringify({ boardId: activeBoard, status: 'idle', reset: true });
+        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
           navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
           navigator.sendBeacon('/api/live/stellen-checken', new Blob([payload], { type: 'application/json' }));
@@ -156,9 +158,8 @@ export default function StellenCheckenClient({
     window.addEventListener('beforeunload', sendStandby);
     return () => {
       window.removeEventListener('beforeunload', sendStandby);
-      sendStandby();
     };
-  }, [activeBoard]);
+  }, [activeBoard, gameSessionId]);
 
   // Live-Sync State-Broadcaster: Sendet sofort & verzögerungsfrei an /api/live/board
   const broadcastLiveState = (
@@ -168,7 +169,8 @@ export default function StellenCheckenClient({
     rIdx: number,
     p1R: StellenCheckenRoundDetail[],
     p2R: StellenCheckenRoundDetail[],
-    actPlayer: 1 | 2
+    actPlayer: 1 | 2,
+    overrideSessionId?: string
   ) => {
     if (!started && !finished) return;
 
@@ -183,6 +185,7 @@ export default function StellenCheckenClient({
 
     const payload = {
       boardId: activeBoard,
+      sessionId: overrideSessionId || gameSessionId,
       status: finished ? 'completed' : 'playing',
       gameType: 'stellen_checken' as const,
       gameMode,
@@ -353,10 +356,12 @@ export default function StellenCheckenClient({
     setSaveError(null);
     setIsGameFinished(false);
     setIsGameStarted(true);
+    const nextSessionId = generateSessionId('stellen_checken', activeBoard);
+    setGameSessionId(nextSessionId);
     playSound('start');
 
     // Sofortiger Live-Push an den TV-Monitor (ohne 1 Frame Verzögerung!)
-    broadcastLiveState(true, false, chosenId, 0, [], [], 1);
+    broadcastLiveState(true, false, chosenId, 0, [], [], 1, nextSessionId);
   };
 
   const triggerAutoSave = async (
