@@ -422,18 +422,32 @@ export default function PdcChallengeClient({
         const cached = JSON.parse(cachedStr);
         if (cached) {
           // Prüfen, ob das abgebrochene Spiel echte Würfe/Fortschritt enthält
-          const p1HasThrows =
-            cached.stateP1 &&
-            (cached.stateP1.part1?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
-              cached.stateP1.part2?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
-              cached.stateP1.part3?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0));
-          const p2HasThrows =
-            cached.stateP2 &&
-            (cached.stateP2.part1?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
-              cached.stateP2.part2?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
-              cached.stateP2.part3?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0));
+          let hasThrows = false;
+          try {
+            if (cached.stateP1) {
+              const s1 = calculatePlayerStats(cached.stateP1);
+              if (s1.totalDartsThrown > 0) hasThrows = true;
+            }
+            if (cached.stateP2) {
+              const s2 = calculatePlayerStats(cached.stateP2);
+              if (s2.totalDartsThrown > 0) hasThrows = true;
+            }
+          } catch (e) {
+            // Fallback: Prüfe Object-Values von part1Rounds, part2Hits, part3Rounds
+            const p1HasAny =
+              cached.stateP1 &&
+              (Object.values(cached.stateP1.part1Rounds || {}).some((v) => v !== null) ||
+                Object.values(cached.stateP1.part2Hits || {}).some((v) => v !== null) ||
+                Object.values(cached.stateP1.part3Rounds || {}).some((v) => v !== null));
+            const p2HasAny =
+              cached.stateP2 &&
+              (Object.values(cached.stateP2.part1Rounds || {}).some((v) => v !== null) ||
+                Object.values(cached.stateP2.part2Hits || {}).some((v) => v !== null) ||
+                Object.values(cached.stateP2.part3Rounds || {}).some((v) => v !== null));
+            if (p1HasAny || p2HasAny) hasThrows = true;
+          }
 
-          if ((p1HasThrows || p2HasThrows) && cached.isMatchStarted) {
+          if (hasThrows && (cached.isMatchStarted || cached.stage !== 'part1' || cached.currentTargetIndex > 0)) {
             setCachedSessionToResume(cached);
           }
 
@@ -494,10 +508,11 @@ export default function PdcChallengeClient({
     }
   }, [gameMode, isBoardUser, userPlayerMatch]);
 
-  // 2. Automatisches Caching auf dem Endgerät
+  // 2. Automatisches Caching auf dem Endgerät (Crash- & Wisch-Schutz)
   useEffect(() => {
     if (!isGameInitialized) return;
 
+    // Nur speichern, wenn ein Spiel aktiv ist oder echte Würfe vorliegen, und noch nicht beendet ist
     if ((isMatchStarted || hasStarted) && !isCompleted) {
       const sessionData = {
         isMatchStarted,
@@ -511,12 +526,13 @@ export default function PdcChallengeClient({
         activePlayer,
         notes,
         gameSessionId,
+        activeBoard,
         isSavedInCloud,
         updatedAt: Date.now(),
       };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(sessionData));
-    } else if (!hasStarted && !isMatchStarted) {
-      localStorage.removeItem(CACHE_KEY);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(sessionData));
+      } catch (e) {}
     }
   }, [
     isGameInitialized,
@@ -524,6 +540,7 @@ export default function PdcChallengeClient({
     hasStarted,
     isCompleted,
     gameSessionId,
+    activeBoard,
     isSavedInCloud,
     gameMode,
     p1Name,
@@ -906,10 +923,10 @@ export default function PdcChallengeClient({
     }
   };
 
-  // Sichere Navigation bei laufendem Spiel
+  // Sichere Navigation bei laufendem Spiel (Spielstand bleibt für Auto-Resume im Cache gesichert)
   const handleSafeNavigation = async (targetUrl: string) => {
     if (isGameActive) {
-      if (!confirm('Möchtest du das aktuelle Spiel wirklich abbrechen?')) return;
+      if (!confirm('Möchtest du das aktuelle Spiel wirklich unterbrechen und verlassen? Dein Spielstand bleibt im lokalen Cache gesichert.')) return;
 
       await recordAbortedPdcAction({
         session_id: gameSessionId,
@@ -922,8 +939,6 @@ export default function PdcChallengeClient({
         part3_score: p1Stats.scorePart3,
         reason: 'Vorzeitige Navigation / Seite verlassen',
       });
-
-      localStorage.removeItem(CACHE_KEY);
     }
     router.push(targetUrl);
   };
@@ -931,7 +946,7 @@ export default function PdcChallengeClient({
   // Spiel zurücksetzen
   const resetGame = async () => {
     if (isGameActive) {
-      if (!confirm('Möchtest du das aktuelle Spiel wirklich abbrechen?')) return;
+      if (!confirm('Möchtest du das aktuelle Spiel wirklich unterbrechen? Du kannst es im Match-Setup sofort fortsetzen oder verwerfen.')) return;
 
       await recordAbortedPdcAction({
         session_id: gameSessionId,
@@ -942,11 +957,11 @@ export default function PdcChallengeClient({
         part1_score: p1Stats.scorePart1,
         part2_score: p1Stats.scorePart2,
         part3_score: p1Stats.scorePart3,
-        reason: 'Manueller Abbruch über "Neu" Button',
+        reason: 'Unterbrechung über "Neu" Button',
       });
     }
 
-    localStorage.removeItem(CACHE_KEY);
+    setIsMatchStarted(false);
     const nextSessionId = 'pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     setGameSessionId(nextSessionId);
     try {
@@ -1397,6 +1412,16 @@ export default function PdcChallengeClient({
                 type="button"
                 data-ui-id="PDC.SETUP.START_BTN"
                 onClick={() => {
+                  try {
+                    localStorage.removeItem(CACHE_KEY);
+                  } catch (e) {}
+                  setCachedSessionToResume(null);
+                  setRestoredFromCache(false);
+                  setStateP1(createInitialPlayerState());
+                  setStateP2(createInitialPlayerState());
+                  setStage('part1');
+                  setCurrentTargetIndex(0);
+                  setActivePlayer(1);
                   setIsMatchStarted(true);
                 }}
                 className="w-full min-h-[64px] py-5 sm:py-6 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 active:scale-[0.99] text-slate-950 font-black text-lg sm:text-xl shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-3 cursor-pointer"
