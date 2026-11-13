@@ -130,16 +130,24 @@ export default function HolographicStellenCheckenCockpit({
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicStellenCheckenProps) {
-  // Name in 2 Zeilen aufteilen (wie "Sebastian Kirsch" im Soll-Bild)
+  // Name in 2 Zeilen aufteilen und dynamisch skalieren
   const nameParts = activeName.trim().split(' ');
   const firstName = nameParts[0] || 'Sebastian';
-  const lastName = nameParts.slice(1).join(' ') || 'Kirsch';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  const maxNameLen = Math.max(firstName.length, lastName.length);
+  const nameSizeClass =
+    maxNameLen > 14
+      ? 'text-2xl sm:text-3xl lg:text-4xl'
+      : maxNameLen > 10
+      ? 'text-3xl sm:text-4xl lg:text-5xl'
+      : 'text-3xl sm:text-5xl lg:text-6xl';
 
   // Prozentquote: Exakt wie im Soll-Bild (5/15 = 33.3%)
   const checkPct = totalVisits > 0 ? ((checksCount / totalVisits) * 100).toFixed(1) : '0.0';
 
   // Route parsen
   const { primary, secondary, primaryTokens } = parseRoute(recommendedRoute);
+  const activeRouteNumbers = new Set(primary.map((p) => p.number));
 
   // Dartboard Geometrie (500 x 500 ViewBox, Zentrum 250, 250)
   const cx = 250;
@@ -245,19 +253,21 @@ export default function HolographicStellenCheckenCockpit({
           {/* LINKER FLÜGEL: SPIELER-CARD (PERFEKT ZENTRIERT & EDEL) */}
           {/* --------------------------------------------------------------- */}
           <div
-            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-center text-center -mr-8 overflow-hidden"
+            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] py-6 pl-6 pr-10 sm:py-8 sm:pl-8 sm:pr-12 flex flex-col items-center justify-center text-center -mr-8 overflow-hidden"
           >
             {/* Oberer Lichtglanz */}
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
             {/* Spielername zentriert in monumentaler Typografie */}
-            <div className="flex flex-col items-center justify-center">
-              <span className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)]">
+            <div className="flex flex-col items-center justify-center max-w-full">
+              <span className={`${nameSizeClass} font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)] truncate max-w-full`}>
                 {firstName}
               </span>
-              <span className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)] mt-1 sm:mt-1.5">
-                {lastName}
-              </span>
+              {lastName && (
+                <span className={`${nameSizeClass} font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)] mt-1 sm:mt-1.5 truncate max-w-full`}>
+                  {lastName}
+                </span>
+              )}
             </div>
 
             {/* Status Badge */}
@@ -292,59 +302,112 @@ export default function HolographicStellenCheckenCockpit({
                 </filter>
               </defs>
 
-              {/* Äußere HUD Rahmen-Kreise & Ticks */}
+              {/* Äußere HUD Rahmen-Kreise & 72 Grad-Ticks (alle 5°) */}
               <circle
                 cx={cx}
                 cy={cy}
-                r="242"
+                r="245"
                 fill="none"
                 stroke="#00e5ff"
-                strokeWidth="1.5"
-                strokeOpacity="0.3"
-                strokeDasharray="4 8"
+                strokeWidth="0.9"
+                strokeOpacity="0.25"
+                strokeDasharray="6 6"
               />
+              <circle
+                cx={cx}
+                cy={cy}
+                r="238"
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth="1.2"
+                strokeOpacity="0.35"
+                strokeDasharray="48 16 12 16"
+              />
+              {Array.from({ length: 72 }).map((_, i) => {
+                const deg = i * 5;
+                const rad = (deg * Math.PI) / 180;
+                const isMajor = deg % 90 === 0;
+                const isSectorCenter = deg % 18 === 0;
+                const r1 = isMajor ? 248 : isSectorCenter ? 242 : 239;
+                const r2 = isMajor ? 216 : isSectorCenter ? 235 : 236;
+                return (
+                  <line
+                    key={`hud-tick-${i}`}
+                    x1={cx + r1 * Math.sin(rad)}
+                    y1={cy - r1 * Math.cos(rad)}
+                    x2={cx + r2 * Math.sin(rad)}
+                    y2={cy - r2 * Math.cos(rad)}
+                    stroke="#00e5ff"
+                    strokeWidth={isMajor ? 2 : isSectorCenter ? 1.1 : 0.7}
+                    strokeOpacity={isMajor ? 0.85 : isSectorCenter ? 0.45 : 0.22}
+                  />
+                );
+              })}
               <circle
                 cx={cx}
                 cy={cy}
                 r="214"
-                fill="none"
+                fill="rgba(2, 7, 18, 0.92)"
                 stroke="#00e5ff"
-                strokeWidth="2"
-                strokeOpacity="0.4"
+                strokeWidth="2.2"
+                strokeOpacity="0.65"
+                filter="url(#cyanNeonGlow)"
               />
-
-              {/* Fadenkreuz-Markierungen (0°, 90°, 180°, 270°) */}
-              <line x1={cx} y1="2" x2={cx} y2="18" stroke="#00e5ff" strokeWidth="2.5" strokeOpacity="0.8" />
-              <line x1={cx} y1="482" x2={cx} y2="498" stroke="#00e5ff" strokeWidth="2.5" strokeOpacity="0.8" />
-              <line x1="2" y1={cy} x2="18" y2={cy} stroke="#00e5ff" strokeWidth="2.5" strokeOpacity="0.8" />
-              <line x1="482" y1={cy} x2="498" y2={cy} stroke="#00e5ff" strokeWidth="2.5" strokeOpacity="0.8" />
 
               {/* 20 DARTBOARD NUMMERN ENTLANG DES ÄUSSEREN KREISES */}
               {DARTBOARD_NUMBERS.map((num, i) => {
                 const ang = i * 18;
                 const rad = (ang * Math.PI) / 180;
-                const numX = cx + 228 * Math.sin(rad);
-                const numY = cy - 228 * Math.cos(rad);
+                const numX = cx + 225 * Math.sin(rad);
+                const numY = cy - 225 * Math.cos(rad);
+                const isRouteNum = activeRouteNumbers.has(num);
                 return (
-                  <text
-                    key={num}
-                    x={numX}
-                    y={numY}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill="#00e5ff"
-                    fontSize="13"
-                    fontFamily="monospace"
-                    fontWeight="900"
-                    fillOpacity="0.85"
-                  >
-                    {num}
-                  </text>
+                  <g key={num}>
+                    {isRouteNum && (
+                      <circle
+                        cx={numX}
+                        cy={numY}
+                        r="11.5"
+                        fill="rgba(255, 51, 102, 0.25)"
+                        stroke="#ff3366"
+                        strokeWidth="1.2"
+                      />
+                    )}
+                    <text
+                      x={numX}
+                      y={numY}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill={isRouteNum ? '#ff85a1' : '#bae6fd'}
+                      fontSize={isRouteNum ? '15.5' : '13.5'}
+                      fontFamily="monospace"
+                      fontWeight="900"
+                      fillOpacity={isRouteNum ? '1' : '0.88'}
+                      style={isRouteNum ? { filter: 'drop-shadow(0 0 8px rgba(255, 51, 102, 0.95))' } : undefined}
+                    >
+                      {num}
+                    </text>
+                  </g>
                 );
               })}
 
-              {/* Dartboard-Dunkler Hintergrund */}
-              <circle cx={cx} cy={cy} r={rDoubleOut} fill="rgba(4, 7, 17, 0.85)" />
+              {/* Alternierende Segment-Füllungen (Carbon-Navy vs. Cyan-Glas) */}
+              {DARTBOARD_NUMBERS.map((num, i) => {
+                const startAng = i * 18 - 9;
+                const endAng = i * 18 + 9;
+                const isEven = i % 2 === 0;
+                const singleFill = isEven ? 'rgba(7, 16, 34, 0.92)' : 'rgba(18, 46, 78, 0.42)';
+                const ringFill = isEven ? 'rgba(0, 229, 255, 0.16)' : 'rgba(14, 116, 144, 0.28)';
+
+                return (
+                  <g key={`bg-sec-${num}`}>
+                    <path d={getAnnularSectorPath(cx, cy, rDoubleIn, rDoubleOut, startAng, endAng)} fill={ringFill} />
+                    <path d={getAnnularSectorPath(cx, cy, rTripleOut, rDoubleIn, startAng, endAng)} fill={singleFill} />
+                    <path d={getAnnularSectorPath(cx, cy, rTripleIn, rTripleOut, startAng, endAng)} fill={ringFill} />
+                    <path d={getAnnularSectorPath(cx, cy, rSingleInnerIn, rTripleIn, startAng, endAng)} fill={singleFill} />
+                  </g>
+                );
+              })}
 
               {/* 20 Radiale Speichenlinien */}
               {Array.from({ length: 20 }).map((_, i) => {
@@ -361,19 +424,19 @@ export default function HolographicStellenCheckenCockpit({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="#00e5ff"
+                    stroke="#67e8f9"
                     strokeWidth="1"
-                    strokeOpacity="0.25"
+                    strokeOpacity="0.45"
                   />
                 );
               })}
 
               {/* Konzentrische Drähte / Ringe */}
-              <circle cx={cx} cy={cy} r={rDoubleOut} fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.4" />
-              <circle cx={cx} cy={cy} r={rDoubleIn} fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.4" />
-              <circle cx={cx} cy={cy} r={rTripleOut} fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.35" />
-              <circle cx={cx} cy={cy} r={rTripleIn} fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.35" />
-              <circle cx={cx} cy={cy} r={rSingleInnerIn} fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.3" />
+              <circle cx={cx} cy={cy} r={rDoubleOut} fill="none" stroke="#38bdf8" strokeWidth="1.8" strokeOpacity="0.75" />
+              <circle cx={cx} cy={cy} r={rDoubleIn} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.5" />
+              <circle cx={cx} cy={cy} r={rTripleOut} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.5" />
+              <circle cx={cx} cy={cy} r={rTripleIn} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.5" />
+              <circle cx={cx} cy={cy} r={rSingleInnerIn} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.4" />
 
               {/* ============================================================= */}
               {/* TARGET HIGHLIGHTS: Primäre Zielsegmente (T16 & D8) */}

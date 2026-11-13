@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Maximize2, Minimize2, Target, CheckCircle2 } from 'lucide-react';
 import { PdcChallengeLiveState } from '@/app/api/live/pdc-challenge/route';
+import HolographicDartboard from '@/components/HolographicDartboard';
 
 interface PdcLiveMonitorProps {
   initialBoardId?: string;
@@ -345,65 +346,12 @@ export default function PdcLiveMonitorClient({ initialBoardId = '1' }: PdcLiveMo
             </div>
           </div>
 
-          {/* ZENTRUM: HOLOGRAFISCHES 3D-CYBER-DARTBOARD */}
-          <div className="relative z-20 w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] md:w-[420px] md:h-[420px] shrink-0 flex items-center justify-center">
-            {/* Äußerer Leuchtring */}
-            <div className="absolute inset-0 rounded-full border-2 border-cyan-400/80 shadow-[0_0_60px_rgba(6,182,212,0.6),inset_0_0_40px_rgba(6,182,212,0.4)] animate-pulse" />
-            
-            {/* SVG Radar Dartboard */}
-            <svg viewBox="0 0 400 400" className="w-full h-full">
-              <defs>
-                <filter id="pdcGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="6" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-
-              <circle cx="200" cy="200" r="185" fill="rgba(4, 7, 17, 0.75)" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.4" />
-              <circle cx="200" cy="200" r="150" fill="none" stroke="#00e5ff" strokeWidth="1.5" strokeOpacity="0.3" />
-              <circle cx="200" cy="200" r="110" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.25" />
-              <circle cx="200" cy="200" r="85" fill="none" stroke="#00e5ff" strokeWidth="1" strokeOpacity="0.25" />
-
-              {/* Speichen */}
-              {Array.from({ length: 20 }).map((_, i) => {
-                const angle = (i * 18 * Math.PI) / 180;
-                return (
-                  <line
-                    key={i}
-                    x1={200 + 85 * Math.sin(angle)}
-                    y1={200 - 85 * Math.cos(angle)}
-                    x2={200 + 185 * Math.sin(angle)}
-                    y2={200 - 185 * Math.cos(angle)}
-                    stroke="#00e5ff"
-                    strokeWidth="1"
-                    strokeOpacity="0.2"
-                  />
-                );
-              })}
-
-              {/* Aktives Leucht-Segment (oben) */}
-              <path
-                d="M 186 16 A 185 185 0 0 1 214 16 L 211 50 A 150 150 0 0 0 189 50 Z"
-                fill="#ff3366"
-                filter="url(#pdcGlow)"
-              />
-            </svg>
-
-            {/* Mittlerer Zielfeld-Kreis mit Typografie */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-slate-950/90 border-2 border-cyan-400/80 shadow-[0_0_35px_rgba(6,182,212,0.5)] flex flex-col items-center justify-center">
-                <span className="text-[10px] sm:text-xs font-mono font-bold tracking-widest text-slate-400 uppercase">
-                  ZIELFELD
-                </span>
-                <span className="text-4xl sm:text-6xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_20px_rgba(0,229,255,0.8)]">
-                  {currentTarget}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* ZENTRUM: DETAILREICHES HOLOGRAFISCHES TURNIER-DARTBOARD */}
+          <HolographicDartboard
+            target={currentTarget}
+            badgeLabel="ZIELFELD"
+            className="relative z-20 w-[320px] h-[320px] sm:w-[400px] sm:h-[400px] md:w-[450px] md:h-[450px] shrink-0"
+          />
 
           {/* RECHTER FLÜGEL: Punkte- & Aufnahmen-Panel */}
           <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -ml-8">

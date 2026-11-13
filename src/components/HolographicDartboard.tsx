@@ -8,8 +8,10 @@ const BOARD_NUMBERS = [
 ] as const;
 
 interface HolographicDartboardProps {
-  /** Aktuelles Ziel, z. B. "D20", "D16", "D8", "D10", "D4" oder "BULL" */
+  /** Aktuelles Ziel, z. B. "D20", "T20", "D16", "25" oder "BULL" */
   target: string;
+  /** Optionales Label über dem Ziel im Zentrum (z. B. "DOPPEL" oder "ZIELFELD") */
+  badgeLabel?: string;
   /** Optionale Größe / Klassen für den Container */
   className?: string;
 }
@@ -51,19 +53,33 @@ function describeSectorRing(
   ].join(' ');
 }
 
+type TargetRing = 'double' | 'triple' | 'single' | 'outer_bull' | 'bull';
+
 /**
  * Ermittelt Zielnummer, Ringtyp und exakten Winkel (0° = oben) aus dem Zielstring.
  */
-function parseTarget(target: string): { number: number | null; angle: number; isBull: boolean } {
+function parseTarget(target: string): {
+  number: number | null;
+  ring: TargetRing;
+  angle: number;
+  isBull: boolean;
+} {
   const normalized = target.trim().toUpperCase();
   if (normalized === 'BULL' || normalized === 'DBULL' || normalized === '50') {
-    return { number: null, angle: 0, isBull: true };
+    return { number: null, ring: 'bull', angle: 0, isBull: true };
   }
-  const match = normalized.match(/^[DT]?(\d{1,2})$/);
-  const num = match ? parseInt(match[1], 10) : 20;
+  if (normalized === '25' || normalized === 'OBULL' || normalized === 'SBULL') {
+    return { number: null, ring: 'outer_bull', angle: 0, isBull: true };
+  }
+  const match = normalized.match(/^([DTS])?(\d{1,2})$/);
+  const prefix = match?.[1] || 'S';
+  const num = match ? parseInt(match[2], 10) : 20;
+  const ring: TargetRing =
+    prefix === 'T' ? 'triple' : prefix === 'D' ? 'double' : 'single';
   const idx = BOARD_NUMBERS.indexOf(num as (typeof BOARD_NUMBERS)[number]);
   return {
     number: idx >= 0 ? num : 20,
+    ring,
     angle: idx >= 0 ? idx * 18 : 0,
     isBull: false,
   };
@@ -71,10 +87,11 @@ function parseTarget(target: string): { number: number | null; angle: number; is
 
 export default function HolographicDartboard({
   target,
+  badgeLabel,
   className = '',
 }: HolographicDartboardProps) {
   const uid = useId().replace(/:/g, '');
-  const { number: activeNum, angle: activeAngle, isBull } = parseTarget(target);
+  const { number: activeNum, ring: activeRing, angle: activeAngle, isBull } = parseTarget(target);
 
   const cx = 250;
   const cy = 250;
@@ -270,19 +287,20 @@ export default function HolographicDartboard({
           cx={cx}
           cy={cy}
           r={rOuterBull}
-          fill="rgba(16, 185, 129, 0.25)"
-          stroke="#34d399"
-          strokeWidth="1.4"
-          strokeOpacity="0.7"
+          fill={activeRing === 'outer_bull' ? '#ff3366' : 'rgba(16, 185, 129, 0.25)'}
+          stroke={activeRing === 'outer_bull' ? '#ffe4e6' : '#34d399'}
+          strokeWidth={activeRing === 'outer_bull' ? '2' : '1.4'}
+          strokeOpacity={activeRing === 'outer_bull' ? '1' : '0.7'}
+          filter={activeRing === 'outer_bull' ? `url(#${uid}-targetGlow)` : undefined}
         />
         <circle
           cx={cx}
           cy={cy}
           r={rInnerBull}
-          fill={isBull ? '#ff3366' : 'rgba(244, 63, 94, 0.45)'}
+          fill={activeRing === 'bull' ? '#ff3366' : 'rgba(244, 63, 94, 0.45)'}
           stroke="#fda4af"
           strokeWidth="1.5"
-          filter={isBull ? `url(#${uid}-targetGlow)` : undefined}
+          filter={activeRing === 'bull' ? `url(#${uid}-targetGlow)` : undefined}
         />
 
         {/* 7. Zahlenring mit allen 20 echten Board-Zahlen (aufrecht & gestochen scharf) */}
@@ -325,56 +343,71 @@ export default function HolographicDartboard({
           );
         })}
 
-        {/* 8. Aktives Ziel-Segment (rotierender Laser-Marker auf dem Ziel-Doppel) */}
-        {!isBull && (
-          <g
-            style={{
-              transformOrigin: `${cx}px ${cy}px`,
-              transform: `rotate(${activeAngle}deg)`,
-              transition: 'transform 0.75s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            }}
-          >
-            {/* Leuchtendes Double-Feld */}
-            <path
-              d={describeSectorRing(cx, cy, rDoubleInner, rDoubleOuter, -9, 9)}
-              fill="#ff3366"
-              fillOpacity="0.92"
-              filter={`url(#${uid}-targetGlow)`}
-            />
-            <path
-              d={describeSectorRing(cx, cy, rDoubleInner, rDoubleOuter, -9, 9)}
-              fill="none"
-              stroke="#ffe4e6"
-              strokeWidth="2"
-            />
-            {/* Subtiler Zielstrahl vom Center zum Double */}
-            <line
-              x1={cx}
-              y1={cy - rOuterBull - 4}
-              x2={cx}
-              y2={cy - rDoubleInner}
-              stroke="#ff3366"
-              strokeWidth="1.4"
-              strokeOpacity="0.45"
-              strokeDasharray="4 4"
-            />
-            {/* Präzisions-Marker am äußeren Ring */}
-            <polygon
-              points={`${cx},${cy - rCatchOuter - 2} ${cx - 5},${cy - rCatchOuter - 10} ${cx + 5},${cy - rCatchOuter - 10}`}
-              fill="#ff3366"
-              filter={`url(#${uid}-targetGlow)`}
-            />
-            <line
-              x1={cx}
-              y1={cy - rDoubleOuter - 3}
-              x2={cx}
-              y2={cy - rDoubleInner + 3}
-              stroke="#ffffff"
-              strokeWidth="2"
-              strokeOpacity="0.9"
-            />
-          </g>
-        )}
+        {/* 8. Aktives Ziel-Segment (rotierender Laser-Marker auf Double, Treble oder Single) */}
+        {!isBull && (() => {
+          const ringInner =
+            activeRing === 'triple'
+              ? rTrebleInner
+              : activeRing === 'double'
+              ? rDoubleInner
+              : rOuterBull;
+          const ringOuter =
+            activeRing === 'triple'
+              ? rTrebleOuter
+              : activeRing === 'double'
+              ? rDoubleOuter
+              : rDoubleInner;
+
+          return (
+            <g
+              style={{
+                transformOrigin: `${cx}px ${cy}px`,
+                transform: `rotate(${activeAngle}deg)`,
+                transition: 'transform 0.75s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+            >
+              {/* Leuchtendes Zielfeld */}
+              <path
+                d={describeSectorRing(cx, cy, ringInner, ringOuter, -9, 9)}
+                fill="#ff3366"
+                fillOpacity={activeRing === 'single' ? 0.52 : 0.92}
+                filter={`url(#${uid}-targetGlow)`}
+              />
+              <path
+                d={describeSectorRing(cx, cy, ringInner, ringOuter, -9, 9)}
+                fill="none"
+                stroke="#ffe4e6"
+                strokeWidth="2"
+              />
+              {/* Subtiler Zielstrahl vom Center zum Zielring */}
+              <line
+                x1={cx}
+                y1={cy - rOuterBull - 4}
+                x2={cx}
+                y2={cy - ringInner}
+                stroke="#ff3366"
+                strokeWidth="1.4"
+                strokeOpacity="0.45"
+                strokeDasharray="4 4"
+              />
+              {/* Präzisions-Marker am äußeren Ring */}
+              <polygon
+                points={`${cx},${cy - rCatchOuter - 2} ${cx - 5},${cy - rCatchOuter - 10} ${cx + 5},${cy - rCatchOuter - 10}`}
+                fill="#ff3366"
+                filter={`url(#${uid}-targetGlow)`}
+              />
+              <line
+                x1={cx}
+                y1={cy - ringOuter - 3}
+                x2={cx}
+                y2={cy - ringInner + 3}
+                stroke="#ffffff"
+                strokeWidth="2"
+                strokeOpacity="0.9"
+              />
+            </g>
+          );
+        })()}
 
         {/* 9. Dezente gläserne Lichtreflexion */}
         <circle
@@ -390,7 +423,7 @@ export default function HolographicDartboard({
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-slate-950/90 backdrop-blur-md border-2 border-cyan-400/80 shadow-[0_0_32px_rgba(6,182,212,0.55),inset_0_0_18px_rgba(6,182,212,0.25)] flex flex-col items-center justify-center">
           <span className="text-[9px] sm:text-[10px] font-mono font-bold tracking-[0.22em] text-cyan-300/80 uppercase">
-            {isBull ? 'ZIEL' : 'DOPPEL'}
+            {badgeLabel || (isBull ? 'ZIEL' : 'DOPPEL')}
           </span>
           <span className="text-3xl sm:text-4xl md:text-5xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_16px_rgba(0,229,255,0.85)] leading-none mt-0.5">
             {target}
