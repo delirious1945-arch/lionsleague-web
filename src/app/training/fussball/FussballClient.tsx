@@ -93,6 +93,10 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   const [localArchive, setLocalArchive] = useState<FussballSessionSavePayload[]>([]);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
+  // Crash- & Wisch-Schutz: Unterbrochenes Spiel nahtlos fortsetzen
+  const [cachedSessionToResume, setCachedSessionToResume] = useState<any | null>(null);
+  const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
+
   const loadLocalCacheState = () => {
     if (typeof window === 'undefined') return;
     try {
@@ -103,6 +107,22 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       const hRaw = localStorage.getItem(LOCAL_HISTORY_KEY);
       const h = hRaw ? JSON.parse(hRaw) : [];
       setLocalArchive(Array.isArray(h) ? h : []);
+
+      // Crash- & Wisch-Schutz: Aktives Spiel im Cache prüfen
+      const cachedActiveRaw = localStorage.getItem(ACTIVE_GAME_KEY);
+      if (cachedActiveRaw) {
+        const cached = JSON.parse(cachedActiveRaw);
+        if (
+          cached &&
+          (cached.stats?.p1Darts > 0 ||
+            cached.stats?.p2Darts > 0 ||
+            cached.p1Goals > 0 ||
+            cached.p2Goals > 0 ||
+            (Array.isArray(cached.historyStack) && cached.historyStack.length > 0))
+        ) {
+          setCachedSessionToResume(cached);
+        }
+      }
     } catch (e) {}
   };
 
@@ -309,27 +329,122 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     stats,
   ]);
 
-  // Aktiven Spielstand im Cache sichern (Schutz vor versehentlichem Tab-Schließen)
+  // Aktiven Spielstand im Cache sichern (Schutz vor versehentlichem Tab-Schließen / Crash-Schutz)
   useEffect(() => {
     if (isGameStarted && !gameOver && (stats.p1Darts > 0 || stats.p2Darts > 0)) {
       try {
-        localStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify({
-          gameMode,
-          p1Name,
-          p2Name,
-          computerDifficulty,
-          targetGoals,
-          p1Goals,
-          p2Goals,
-          ballPossession,
-          currentTurn,
-          currentDart,
-          stats,
-          updatedAt: Date.now()
-        }));
+        localStorage.setItem(
+          ACTIVE_GAME_KEY,
+          JSON.stringify({
+            gameMode,
+            p1Name,
+            p2Name,
+            computerDifficulty,
+            targetGoals,
+            p1Goals,
+            p2Goals,
+            ballPossession,
+            currentTurn,
+            currentDart,
+            stats,
+            gameSessionId,
+            activeBoard,
+            currentTurnShots,
+            historyStack,
+            tickerMessage,
+            tickerHistory,
+            updatedAt: Date.now(),
+          })
+        );
       } catch (e) {}
     }
-  }, [isGameStarted, gameOver, stats, p1Goals, p2Goals, ballPossession, currentTurn, currentDart, gameMode, p1Name, p2Name, computerDifficulty, targetGoals]);
+  }, [
+    isGameStarted,
+    gameOver,
+    stats,
+    p1Goals,
+    p2Goals,
+    ballPossession,
+    currentTurn,
+    currentDart,
+    gameMode,
+    p1Name,
+    p2Name,
+    computerDifficulty,
+    targetGoals,
+    gameSessionId,
+    activeBoard,
+    currentTurnShots,
+    historyStack,
+    tickerMessage,
+    tickerHistory,
+  ]);
+
+  // Crash- & Wisch-Schutz: Unterbrochenes Spiel nahtlos fortsetzen
+  const handleResumeCachedSession = () => {
+    if (!cachedSessionToResume) return;
+    const c = cachedSessionToResume;
+    if (c.gameMode) setGameMode(c.gameMode);
+    if (c.p1Name) setP1Name(c.p1Name);
+    if (c.p2Name) setP2Name(c.p2Name);
+    if (c.computerDifficulty) setComputerDifficulty(c.computerDifficulty);
+    if (typeof c.targetGoals === 'number') setTargetGoals(c.targetGoals);
+    if (typeof c.p1Goals === 'number') setP1Goals(c.p1Goals);
+    if (typeof c.p2Goals === 'number') setP2Goals(c.p2Goals);
+    if (c.ballPossession !== undefined) setBallPossession(c.ballPossession);
+    if (c.currentTurn) setCurrentTurn(c.currentTurn);
+    if (c.currentDart) setCurrentDart(c.currentDart);
+    if (c.stats) setStats(c.stats);
+    if (c.gameSessionId) setGameSessionId(c.gameSessionId);
+    if (c.activeBoard && ['1', '2', '3', '4', '5'].includes(c.activeBoard)) {
+      setActiveBoard(c.activeBoard);
+    }
+    if (Array.isArray(c.currentTurnShots)) setCurrentTurnShots(c.currentTurnShots);
+    if (Array.isArray(c.historyStack)) setHistoryStack(c.historyStack);
+    if (c.tickerMessage) setTickerMessage(c.tickerMessage);
+    if (Array.isArray(c.tickerHistory)) setTickerHistory(c.tickerHistory);
+
+    setIsGameStarted(true);
+    setGameOver(false);
+    setWinner(null);
+    setRestoredFromCache(true);
+    setCachedSessionToResume(null);
+
+    // Live-State sofort an TV-Monitor & Supabase pushen
+    try {
+      const resumePayload = {
+        boardId: c.activeBoard || activeBoard,
+        sessionId: c.gameSessionId || gameSessionId,
+        status: 'playing',
+        gameType: 'fussball' as const,
+        gameMode: c.gameMode || gameMode,
+        p1Name: c.p1Name || p1Name,
+        p2Name: c.p2Name || p2Name,
+        activePlayer: c.currentTurn || 1,
+        scoreP1: c.p1Goals ?? 0,
+        scoreP2: c.p2Goals ?? 0,
+        targetGoals: c.targetGoals ?? targetGoals,
+        ballPossession: c.ballPossession ?? 1,
+        currentRound: 1,
+        currentAction: c.tickerMessage || 'Spiel fortgesetzt',
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem(`lions_fussball_live_sync_${c.activeBoard || activeBoard}`, JSON.stringify(resumePayload));
+      localStorage.setItem(`lions_board_live_sync_${c.activeBoard || activeBoard}`, JSON.stringify(resumePayload));
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resumePayload),
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  // Unterbrochenes Spiel verwerfen & frisches Spiel vorbereiten
+  const handleDiscardCachedSession = () => {
+    clearActiveGameCache();
+    setCachedSessionToResume(null);
+    setRestoredFromCache(false);
+  };
 
   // Sound Synthesizer (Web Audio API)
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -924,6 +1039,11 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         </div>
 
         <div className="flex items-center gap-2">
+          {restoredFromCache && isGameStarted && !gameOver && (
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 font-mono text-[11px] font-bold">
+              <span>⚡</span> Aus Cache fortgesetzt
+            </span>
+          )}
           {!isGameStarted ? (
             <>
               <button
@@ -967,6 +1087,48 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       {/* SETUP SCREEN (VOR DEM ANPFIFF) */}
       {!isGameStarted ? (
         <div data-ui-id="FUSSBALL.SETUP.CARD" className="bg-slate-900/95 border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
+          {/* Crash- & Wisch-Schutz: Auffälliger Wiederherstellungs-Dialog */}
+          {cachedSessionToResume && (
+            <div className="p-5 rounded-3xl bg-amber-500/15 border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.3)] space-y-4 animate-fadeIn">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-amber-500/20">
+                    ⚠️
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 font-mono">
+                      Unterbrochenes Spiel gefunden!
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      {cachedSessionToResume.p1Name} vs. {cachedSessionToResume.p2Name} · Spielstand: {cachedSessionToResume.p1Goals ?? 0}:{cachedSessionToResume.p2Goals ?? 0} (Ziel: {cachedSessionToResume.targetGoals ?? 5} Tore)
+                    </h3>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Dieses Fußball-Darts-Match wurde vor Kurzem unterbrochen (z. B. durch versehentliches Schließen, Wischen oder App-Verlassen). Möchtest du an genau dieser Stelle weiterspielen oder ein neues Spiel beginnen?
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResumeCachedSession}
+                  className="py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs font-mono tracking-wider uppercase flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 cursor-pointer transition-all"
+                >
+                  <span>▶ Spiel jetzt fortsetzen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscardCachedSession}
+                  className="py-3.5 px-5 rounded-2xl bg-slate-950 hover:bg-slate-800 text-rose-300 hover:text-white border border-rose-500/40 font-black text-xs font-mono uppercase flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <span>✕ Spiel verwerfen & Neu beginnen</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div data-ui-id="FUSSBALL.SETUP.HEADER" className="text-center space-y-1">
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest block">
               Match-Konfiguration

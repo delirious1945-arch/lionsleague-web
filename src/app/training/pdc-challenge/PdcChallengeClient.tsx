@@ -135,6 +135,10 @@ export default function PdcChallengeClient({
   const [expandedSessionKey, setExpandedSessionKey] = useState<string | number | null>(null);
   const [adminPlayerFilter, setAdminPlayerFilter] = useState<string>('all');
 
+  // Crash- & Wisch-Schutz: Unterbrochenes Spiel nahtlos fortsetzen
+  const [cachedSessionToResume, setCachedSessionToResume] = useState<any | null>(null);
+  const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
+
   // Web Audio Synthesizer
   const playSound = (freq: number, type: OscillatorType = 'sine', duration: number = 0.1) => {
     if (!soundEnabled || typeof window === 'undefined') return;
@@ -410,13 +414,29 @@ export default function PdcChallengeClient({
     p2Stats.totalScore,
   ]);
 
-  // 1. Lokalen Geräte-Cache beim Start wiederherstellen (Setup-Einstellungen, aber Spiel nicht automatisch starten)
+  // 1. Lokalen Geräte-Cache beim Start wiederherstellen (Setup-Einstellungen & Crash-/Wisch-Schutz)
   useEffect(() => {
     try {
       const cachedStr = localStorage.getItem(CACHE_KEY);
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
         if (cached) {
+          // Prüfen, ob das abgebrochene Spiel echte Würfe/Fortschritt enthält
+          const p1HasThrows =
+            cached.stateP1 &&
+            (cached.stateP1.part1?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
+              cached.stateP1.part2?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
+              cached.stateP1.part3?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0));
+          const p2HasThrows =
+            cached.stateP2 &&
+            (cached.stateP2.part1?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
+              cached.stateP2.part2?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0) ||
+              cached.stateP2.part3?.some((r: any) => Array.isArray(r.scores) && r.scores.length > 0));
+
+          if ((p1HasThrows || p2HasThrows) && cached.isMatchStarted) {
+            setCachedSessionToResume(cached);
+          }
+
           setGameMode(cached.gameMode || 'solo');
           if (!isBoardUser && userPlayerMatch && cached.gameMode === 'solo') {
             setP1Name(userPlayerMatch.name);
@@ -432,6 +452,40 @@ export default function PdcChallengeClient({
       setIsGameInitialized(true);
     }
   }, []);
+
+  // Crash- & Wisch-Schutz: Unterbrochenes Spiel nahtlos fortsetzen
+  const handleResumeCachedSession = () => {
+    if (!cachedSessionToResume) return;
+    const c = cachedSessionToResume;
+    if (c.stateP1) setStateP1(c.stateP1);
+    if (c.stateP2) setStateP2(c.stateP2);
+    if (c.stage) setStage(c.stage);
+    if (typeof c.currentTargetIndex === 'number') setCurrentTargetIndex(c.currentTargetIndex);
+    if (c.activePlayer) setActivePlayer(c.activePlayer);
+    if (c.gameMode) setGameMode(c.gameMode);
+    if (c.p1Name) setP1Name(c.p1Name);
+    if (c.p2Name) setP2Name(c.p2Name);
+    if (c.gameSessionId) setGameSessionId(c.gameSessionId);
+    if (c.activeBoard && ['1', '2', '3', '4', '5'].includes(c.activeBoard)) {
+      setActiveBoard(c.activeBoard);
+    }
+    setIsMatchStarted(true);
+    setRestoredFromCache(true);
+    setCachedSessionToResume(null);
+    setShowSetupSettings(false);
+  };
+
+  // Unterbrochenes Spiel verwerfen & frisches Spiel vorbereiten
+  const handleDiscardCachedSession = () => {
+    localStorage.removeItem(CACHE_KEY);
+    setCachedSessionToResume(null);
+    setRestoredFromCache(false);
+    setStateP1(createInitialPlayerState());
+    setStateP2(createInitialPlayerState());
+    setStage('part1');
+    setCurrentTargetIndex(0);
+    setActivePlayer(1);
+  };
 
   // Automatische Fixierung auf eigenen Account im Solo-Modus
   useEffect(() => {
@@ -1120,6 +1174,17 @@ export default function PdcChallengeClient({
         </div>
       )}
 
+      {/* Crash- & Wisch-Schutz: Lokaler Wiederherstellungs-Hinweis */}
+      {restoredFromCache && isPlaying && (
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-500/10 border border-amber-400/30 text-amber-300 text-xs font-mono animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span>⚡</span>
+            <span className="font-bold">Unterbrochenes Spiel aus dem lokalen Cache wiederhergestellt.</span>
+          </div>
+          <span className="text-[10px] font-mono font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 text-amber-400">Lokal gesichert</span>
+        </div>
+      )}
+
       {/* Shanghai Fanfare Toast */}
       {shanghaiNotice && (
         <div className="p-4 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 border-2 border-zinc-900 rounded-2xl text-zinc-950 font-black text-center text-sm sm:text-base shadow-2xl shadow-amber-500/30 animate-pulse">
@@ -1131,6 +1196,48 @@ export default function PdcChallengeClient({
       {!isPlaying && !isCompleted && (
         <div className="space-y-5" data-ui-id="PDC.SETUP.CARD">
           <div className="bg-zinc-900 border border-zinc-700/80 rounded-3xl p-5 sm:p-7 space-y-6 shadow-2xl">
+            {/* Crash- & Wisch-Schutz: Auffälliger Wiederherstellungs-Dialog */}
+            {cachedSessionToResume && (
+              <div className="p-5 rounded-3xl bg-amber-500/15 border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.3)] space-y-4 animate-fadeIn">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-amber-500/20">
+                      ⚠️
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 font-mono">
+                        Unterbrochenes Spiel gefunden!
+                      </span>
+                      <h3 className="text-base sm:text-lg font-black text-white">
+                        {cachedSessionToResume.p1Name} · Phase {cachedSessionToResume.stage === 'part1' ? '1 (Doppel)' : cachedSessionToResume.stage === 'part2' ? '2 (Bullseye)' : '3 (Shanghai)'} · Ziel {cachedSessionToResume.currentTargetIndex !== undefined ? `#${cachedSessionToResume.currentTargetIndex + 1}` : ''}
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Dieses PDC-Challenge-Match wurde vor Kurzem unterbrochen (z. B. durch versehentliches Schließen, Wischen oder App-Verlassen). Möchtest du an genau dieser Stelle weiterspielen oder ein neues Spiel beginnen?
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResumeCachedSession}
+                    className="py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs font-mono tracking-wider uppercase flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 cursor-pointer transition-all"
+                  >
+                    <span>▶ Spiel jetzt fortsetzen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscardCachedSession}
+                    className="py-3.5 px-5 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-rose-300 hover:text-white border border-rose-500/40 font-black text-xs font-mono uppercase flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  >
+                    <span>✕ Spiel verwerfen & Neu beginnen</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
               <div>
                 <span className="text-xs font-black uppercase tracking-widest text-amber-400">

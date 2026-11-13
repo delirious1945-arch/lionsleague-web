@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { generateSessionId } from '@/lib/liveSession';
 
+const CACHE_KEY = 'lions_active_stellen_checken_session_v1';
+
 interface StellenCheckenClientProps {
   players: Player[];
   initialHistory: StellenCheckenHistoryItem[];
@@ -72,6 +74,10 @@ export default function StellenCheckenClient({
   const [gameMode, setGameMode] = useState<'solo' | '1vs1'>('solo');
   const [p1Name, setP1Name] = useState<string>(defaultP1);
   const [p2Name, setP2Name] = useState<string>(validPlayers[1]?.name || 'Dirk Ostermann');
+
+  // Crash- & Wisch-Schutz: Unterbrochenes Spiel nahtlos fortsetzen
+  const [cachedSessionToResume, setCachedSessionToResume] = useState<any | null>(null);
+  const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
 
   // Arretierung von Spieler 1 im Solo-Modus auf den angemeldeten Benutzer
   useEffect(() => {
@@ -129,6 +135,79 @@ export default function StellenCheckenClient({
       liveBroadcastRef.current?.close();
     };
   }, [activeBoard]);
+
+  // Crash- & Wisch-Schutz: 1. Lokalen Geräte-Cache beim Start prüfen
+  useEffect(() => {
+    try {
+      const cachedStr = localStorage.getItem(CACHE_KEY);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        if (
+          cached &&
+          cached.isGameStarted &&
+          !cached.isGameFinished &&
+          (Array.isArray(cached.p1Rounds) && cached.p1Rounds.length > 0 ||
+            Array.isArray(cached.p2Rounds) && cached.p2Rounds.length > 0 ||
+            cached.roundIdx > 0)
+        ) {
+          setCachedSessionToResume(cached);
+        }
+      }
+    } catch (e) {
+      console.error('Fehler beim Laden des Stellen & Checken Caches:', e);
+    }
+  }, []);
+
+  // Crash- & Wisch-Schutz: 2. Unterbrochenes Spiel nahtlos fortsetzen
+  const handleResumeCachedSession = () => {
+    if (!cachedSessionToResume) return;
+    const c = cachedSessionToResume;
+    if (c.gameMode) setGameMode(c.gameMode);
+    if (c.p1Name) setP1Name(c.p1Name);
+    if (c.p2Name) setP2Name(c.p2Name);
+    if (c.presetMode) setPresetMode(c.presetMode);
+    if (typeof c.selectedPresetId === 'number') setSelectedPresetId(c.selectedPresetId);
+    if (typeof c.activePresetId === 'number') setActivePresetId(c.activePresetId);
+    if (typeof c.roundIdx === 'number') setRoundIdx(c.roundIdx);
+    if (c.activePlayer) setActivePlayer(c.activePlayer);
+    if (Array.isArray(c.p1Rounds)) setP1Rounds(c.p1Rounds);
+    if (Array.isArray(c.p2Rounds)) setP2Rounds(c.p2Rounds);
+    if (Array.isArray(c.undoStack)) setUndoStack(c.undoStack);
+    if (c.gameSessionId) setGameSessionId(c.gameSessionId);
+    if (c.activeBoard && ['1', '2', '3', '4', '5'].includes(c.activeBoard)) {
+      setActiveBoard(c.activeBoard);
+    }
+    setIsGameStarted(true);
+    setIsGameFinished(false);
+    setRestoredFromCache(true);
+    setCachedSessionToResume(null);
+
+    // Live-State sofort an den TV-Monitor pushen
+    broadcastLiveState(
+      true,
+      false,
+      c.activePresetId || activePresetId,
+      c.roundIdx ?? roundIdx,
+      c.p1Rounds || p1Rounds,
+      c.p2Rounds || p2Rounds,
+      c.activePlayer || activePlayer,
+      c.gameSessionId || gameSessionId
+    );
+  };
+
+  // Unterbrochenes Spiel verwerfen & frisches Spiel vorbereiten
+  const handleDiscardCachedSession = () => {
+    localStorage.removeItem(CACHE_KEY);
+    setCachedSessionToResume(null);
+    setRestoredFromCache(false);
+    setRoundIdx(0);
+    setActivePlayer(1);
+    setP1Rounds([]);
+    setP2Rounds([]);
+    setUndoStack([]);
+    setIsGameStarted(false);
+    setIsGameFinished(false);
+  };
 
   // Standby-Reset beim Verlassen
   useEffect(() => {
@@ -319,6 +398,51 @@ export default function StellenCheckenClient({
     }
   };
 
+  // Crash- & Wisch-Schutz: 3. Aktiven Spielstand im lokalen Cache sichern
+  useEffect(() => {
+    if (isGameStarted && !isGameFinished && (p1Rounds.length > 0 || p2Rounds.length > 0 || roundIdx > 0)) {
+      try {
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            isGameStarted,
+            isGameFinished,
+            gameMode,
+            p1Name,
+            p2Name,
+            presetMode,
+            selectedPresetId,
+            activePresetId,
+            roundIdx,
+            activePlayer,
+            p1Rounds,
+            p2Rounds,
+            undoStack,
+            gameSessionId,
+            activeBoard,
+            updatedAt: Date.now(),
+          })
+        );
+      } catch (e) {}
+    }
+  }, [
+    isGameStarted,
+    isGameFinished,
+    gameMode,
+    p1Name,
+    p2Name,
+    presetMode,
+    selectedPresetId,
+    activePresetId,
+    roundIdx,
+    activePlayer,
+    p1Rounds,
+    p2Rounds,
+    undoStack,
+    gameSessionId,
+    activeBoard,
+  ]);
+
   const activePreset = getPresetById(activePresetId);
   const currentTarget = activePreset.targets[roundIdx] ?? 40;
   const currentTier = getTargetTierInfo(currentTarget);
@@ -338,6 +462,12 @@ export default function StellenCheckenClient({
       alert('Bitte wähle zwei unterschiedliche Spieler für das 1 vs. 1 Duell aus.');
       return;
     }
+
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch (e) {}
+    setRestoredFromCache(false);
+    setCachedSessionToResume(null);
 
     const chosenId =
       overridePresetId !== undefined
@@ -455,6 +585,10 @@ export default function StellenCheckenClient({
 
     if (res.success) {
       setIsSaved(true);
+      try {
+        localStorage.removeItem(CACHE_KEY);
+      } catch (e) {}
+      setRestoredFromCache(false);
       const nowIso = new Date().toISOString();
       const newHistItems: StellenCheckenHistoryItem[] = payloads.map((p, i) => ({
         id: Date.now() + i,
@@ -648,6 +782,48 @@ export default function StellenCheckenClient({
       {!isGameStarted && (
         <div data-ui-id="STELLEN.SETUP.CONTAINER" className="space-y-6">
           <div data-ui-id="STELLEN.SETUP.CARD" className="bg-slate-900/90 border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
+            {/* Crash- & Wisch-Schutz: Auffälliger Wiederherstellungs-Dialog */}
+            {cachedSessionToResume && (
+              <div className="p-5 rounded-3xl bg-amber-500/15 border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.3)] space-y-4 animate-fadeIn">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-amber-500/20">
+                      ⚠️
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 font-mono">
+                        Unterbrochenes Spiel gefunden!
+                      </span>
+                      <h3 className="text-base sm:text-lg font-black text-white">
+                        {cachedSessionToResume.p1Name} · Aufnahme {(cachedSessionToResume.roundIdx ?? 0) + 1}/15 (Sequenz #{String(cachedSessionToResume.activePresetId ?? 1).padStart(3, '0')})
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Dieses Stellen & Checken Spiel wurde vor Kurzem unterbrochen (z. B. durch versehentliches Schließen, Wischen oder App-Verlassen). Möchtest du an genau dieser Stelle weiterspielen oder ein neues Spiel beginnen?
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResumeCachedSession}
+                    className="py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs font-mono tracking-wider uppercase flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 cursor-pointer transition-all"
+                  >
+                    <span>▶ Spiel jetzt fortsetzen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscardCachedSession}
+                    className="py-3.5 px-5 rounded-2xl bg-slate-950 hover:bg-slate-800 text-rose-300 hover:text-white border border-rose-500/40 font-black text-xs font-mono uppercase flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  >
+                    <span>✕ Spiel verwerfen & Neu beginnen</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Punkteschlüssel Übersicht */}
             <div data-ui-id="STELLEN.SETUP.POINTS_OVERVIEW" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-2xl bg-emerald-950/40 border border-emerald-500/40 p-3.5 flex items-center justify-between">
@@ -953,6 +1129,16 @@ export default function StellenCheckenClient({
       {/* =====================================================================
           2. ACTIVE GAME SCREEN (WÄHREND DER 15 AUFNAHMEN)
       ===================================================================== */}
+      {restoredFromCache && isGameStarted && !isGameFinished && (
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-500/10 border border-amber-400/30 text-amber-300 text-xs font-mono animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span>⚡</span>
+            <span className="font-bold">Unterbrochenes Spiel aus dem lokalen Cache wiederhergestellt.</span>
+          </div>
+          <span className="text-[10px] font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-amber-400">Lokal gesichert</span>
+        </div>
+      )}
+
       {isGameStarted && !isGameFinished && (
         <div data-ui-id="STELLEN.MATCH.CONTAINER" className="space-y-5">
           {/* Status-Bar: Sequenz-ID, Aufnahme X/15, Korrektur & Abbrechen */}
