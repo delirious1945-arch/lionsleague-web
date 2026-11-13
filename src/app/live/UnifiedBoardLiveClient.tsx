@@ -258,9 +258,9 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
 
         {/* Zentrales Cockpit */}
         <div className="relative z-10 flex-1 flex items-center justify-center px-2 sm:px-6">
-          <div className="relative flex items-center justify-center w-full max-w-6xl">
+          <div className="relative flex items-center justify-center gap-6 sm:gap-10 lg:gap-14 w-full max-w-7xl">
             {/* Linker Flügel */}
-            <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -mr-8">
+            <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-amber-400/10 border border-amber-400/40 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
                   <span className="text-xl">🦁</span>
@@ -287,9 +287,11 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
             />
 
             {/* Rechter Flügel */}
-            <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between -ml-8">
-              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 font-mono">DOPPELQUOTE</span>
-              <div className="flex items-baseline gap-1">
+            <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between">
+              <div className="w-full flex justify-end">
+                <span className="text-sm sm:text-base font-black uppercase tracking-wider text-emerald-400 font-mono">DOPPELQUOTE</span>
+              </div>
+              <div className="w-full flex items-baseline justify-center my-auto">
                 <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-[#00ff88] tracking-tight drop-shadow-[0_0_25px_rgba(0,255,136,0.6)]">
                   {curQuote.toFixed(1)}%
                 </span>
