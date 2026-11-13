@@ -334,6 +334,13 @@ export default function PdcChallengeClient({
     if (!isPlaying && !isCompleted) return;
 
     const currentPartNum = stage === 'part1' ? 1 : stage === 'part2' ? 2 : stage === 'part3' ? 3 : 1;
+    const currentTargetToken =
+      stage === 'part1'
+        ? String(PART1_TARGETS[currentTargetIndex] ?? 10)
+        : stage === 'part2'
+        ? PART2_TARGETS[currentTargetIndex] ?? 'D20'
+        : String(PART3_TARGETS[currentTargetIndex] ?? 20);
+
     const currentTargetStr =
       stage === 'part1'
         ? `10 bis 15 (#${PART1_TARGETS[currentTargetIndex] ?? 10})`
@@ -358,7 +365,8 @@ export default function PdcChallengeClient({
       p2Name,
       activePlayer,
       currentPart: currentPartNum,
-      currentTarget: currentTargetStr,
+      currentTarget: currentTargetToken,
+      targetDescription: currentTargetStr,
       currentVisit: Math.min(26, currentVisitNum),
       totalVisits: 26,
       scoreP1: p1Stats.totalScore,

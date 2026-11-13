@@ -116,7 +116,7 @@ export default function HolographicPdcChallengeCockpit({
             className="relative z-20 w-[320px] h-[320px] sm:w-[400px] sm:h-[400px] md:w-[450px] md:h-[450px] shrink-0"
           />
 
-          {/* Rechter Flügel: Punktestand für PDC Challenge */}
+          {/* Rechter Flügel: Punktestand für PDC Challenge (100% Unified zu Bild 2) */}
           <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between">
             <div className="w-full flex justify-end">
               <span className="text-sm sm:text-base font-black uppercase tracking-wider text-emerald-400 font-mono">
@@ -124,21 +124,16 @@ export default function HolographicPdcChallengeCockpit({
               </span>
             </div>
 
-            <div className="w-full flex items-baseline justify-center gap-2 my-auto">
-              <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-[#00ff88] tracking-tight drop-shadow-[0_0_25px_rgba(0,255,136,0.6)]">
+            <div className="w-full flex items-baseline justify-center my-auto">
+              <span className="text-6xl sm:text-7xl lg:text-8xl font-black font-mono text-[#00ff88] tracking-tight drop-shadow-[0_0_35px_rgba(0,255,136,0.8)]">
                 {currentScore}
               </span>
-              <span className="text-xl sm:text-2xl font-bold font-mono text-amber-300">
+              <span className="text-xl sm:text-2xl font-bold font-mono text-slate-400/80 ml-2">
                 / 100
               </span>
             </div>
 
-            <div className="w-full h-1.5 bg-slate-800/80 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.6)] transition-all duration-500"
-                style={{ width: `${Math.max(6, visitPct)}%` }}
-              />
-            </div>
+            <div className="h-1.5 w-full bg-amber-400/40 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
           </div>
         </div>
       </div>

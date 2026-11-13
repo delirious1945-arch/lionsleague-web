@@ -72,15 +72,44 @@ function parseTarget(target: string): {
     return { number: null, ring: 'outer_bull', angle: 0, isBull: true };
   }
   const match = normalized.match(/^([DTS])?(\d{1,2})$/);
-  const prefix = match?.[1] || 'S';
-  const num = match ? parseInt(match[2], 10) : 20;
-  const ring: TargetRing =
-    prefix === 'T' ? 'triple' : prefix === 'D' ? 'double' : 'single';
-  const idx = BOARD_NUMBERS.indexOf(num as (typeof BOARD_NUMBERS)[number]);
+  if (match) {
+    const prefix = match[1] || 'S';
+    const num = parseInt(match[2], 10);
+    const ring: TargetRing =
+      prefix === 'T' ? 'triple' : prefix === 'D' ? 'double' : 'single';
+    const idx = BOARD_NUMBERS.indexOf(num as (typeof BOARD_NUMBERS)[number]);
+    return {
+      number: idx >= 0 ? num : 20,
+      ring,
+      angle: idx >= 0 ? idx * 18 : 0,
+      isBull: false,
+    };
+  }
+
+  // Fallback: Wenn zusammengesetzter String übergeben wird (z.B. "#10" oder "(#10)")
+  const hashMatch = normalized.match(/#(\d{1,2})/);
+  if (hashMatch) {
+    const num = parseInt(hashMatch[1], 10);
+    const idx = BOARD_NUMBERS.indexOf(num as (typeof BOARD_NUMBERS)[number]);
+    if (idx >= 0) {
+      return { number: num, ring: 'single', angle: idx * 18, isBull: false };
+    }
+  }
+
+  // Fallback: Einzelne Zahl im String suchen
+  const numMatch = normalized.match(/\b(\d{1,2})\b/);
+  if (numMatch) {
+    const num = parseInt(numMatch[1], 10);
+    const idx = BOARD_NUMBERS.indexOf(num as (typeof BOARD_NUMBERS)[number]);
+    if (idx >= 0) {
+      return { number: num, ring: 'single', angle: idx * 18, isBull: false };
+    }
+  }
+
   return {
-    number: idx >= 0 ? num : 20,
-    ring,
-    angle: idx >= 0 ? idx * 18 : 0,
+    number: 20,
+    ring: 'single',
+    angle: 0,
     isBull: false,
   };
 }
@@ -423,10 +452,10 @@ export default function HolographicDartboard({
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-slate-950/90 backdrop-blur-md border-2 border-cyan-400/80 shadow-[0_0_32px_rgba(6,182,212,0.55),inset_0_0_18px_rgba(6,182,212,0.25)] flex flex-col items-center justify-center">
           <span className="text-[9px] sm:text-[10px] font-mono font-bold tracking-[0.22em] text-cyan-300/80 uppercase">
-            {badgeLabel || (isBull ? 'ZIEL' : 'DOPPEL')}
+            {badgeLabel || (isBull ? 'ZIEL' : activeRing === 'double' ? 'DOPPEL' : activeRing === 'triple' ? 'TRIPLE' : 'ZIELFELD')}
           </span>
           <span className="text-3xl sm:text-4xl md:text-5xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_16px_rgba(0,229,255,0.85)] leading-none mt-0.5">
-            {target}
+            {isBull ? 'BULL' : activeNum !== null ? (activeRing === 'double' ? `D${activeNum}` : activeRing === 'triple' ? `T${activeNum}` : String(activeNum)) : target}
           </span>
         </div>
       </div>

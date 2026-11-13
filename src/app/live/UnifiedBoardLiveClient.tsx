@@ -294,10 +294,12 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
             {/* Rechter Flügel */}
             <div className="relative z-10 w-[280px] sm:w-[320px] md:w-[360px] h-[210px] sm:h-[240px] rounded-3xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.2)] p-6 sm:p-7 flex flex-col justify-between">
               <div className="w-full flex justify-end">
-                <span className="text-sm sm:text-base font-black uppercase tracking-wider text-emerald-400 font-mono">DOPPELQUOTE</span>
+                <span className="text-sm sm:text-base font-black uppercase tracking-wider text-emerald-400 font-mono">
+                  DOPPELQUOTE
+                </span>
               </div>
               <div className="w-full flex items-baseline justify-center my-auto">
-                <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-[#00ff88] tracking-tight drop-shadow-[0_0_25px_rgba(0,255,136,0.6)]">
+                <span className="text-6xl sm:text-7xl lg:text-8xl font-black font-mono text-[#00ff88] tracking-tight drop-shadow-[0_0_35px_rgba(0,255,136,0.8)]">
                   {curQuote.toFixed(1)}%
                 </span>
               </div>
@@ -327,6 +329,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         activeName={activeName}
         is1vs1={is1vs1}
         activePlayer={activePlayer}
+        currentPart={(liveState.currentPart as 1 | 2 | 3) || 1}
         currentTarget={curTarget}
         currentScore={curScore}
         currentVisit={curVisit}
