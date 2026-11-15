@@ -64,8 +64,13 @@ function calcQuote(hits: number, darts: number): number {
 
 export async function getAllPlayersTrainingDoublesStats(): Promise<Record<string, PlayerTrainingDoublesStats>> {
   try {
-    const [doublesRows, fussballRows, pdcRows, stellenRows] = await Promise.all([
-      sql`
+    let doublesRows: any[] = [];
+    let fussballRows: any[] = [];
+    let pdcRows: any[] = [];
+    let stellenRows: any[] = [];
+
+    try {
+      doublesRows = await sql`
         SELECT 
           player_name,
           count(*)::int as games_count,
@@ -78,8 +83,13 @@ export async function getAllPlayersTrainingDoublesStats(): Promise<Record<string
           sum(d4_hits)::int as d4_hits, sum(d4_darts)::int as d4_darts
         FROM training_doubles
         GROUP BY player_name
-      `.catch(() => []),
-      sql`
+      `;
+    } catch {
+      doublesRows = [];
+    }
+
+    try {
+      fussballRows = await sql`
         SELECT
           player_name,
           count(*)::int as games_count,
@@ -89,16 +99,26 @@ export async function getAllPlayersTrainingDoublesStats(): Promise<Record<string
           sum(bull_attempts)::int as bull_attempts
         FROM training_fussball
         GROUP BY player_name
-      `.catch(() => []),
-      sql`
+      `;
+    } catch {
+      fussballRows = [];
+    }
+
+    try {
+      pdcRows = await sql`
         SELECT
           player_name,
           count(*)::int as games_count,
           sum(doubles_hit)::int as hits
         FROM training_pdc_challenge
         GROUP BY player_name
-      `.catch(() => []),
-      sql`
+      `;
+    } catch {
+      pdcRows = [];
+    }
+
+    try {
+      stellenRows = await sql`
         SELECT
           player_name,
           count(*)::int as games_count,
@@ -106,8 +126,10 @@ export async function getAllPlayersTrainingDoublesStats(): Promise<Record<string
           sum(total_rounds)::int as rounds
         FROM training_stellen_checken
         GROUP BY player_name
-      `.catch(() => [])
-    ]);
+      `;
+    } catch {
+      stellenRows = [];
+    }
 
     const statsMap: Record<string, PlayerTrainingDoublesStats> = {};
 

@@ -25,6 +25,9 @@ export const sql =
     idle_timeout: 10,
     max_lifetime: 60 * 5,
     connect_timeout: 15,
+    // Verhindert Query-Pipelining von Unnamed Statements (prepare: false) über den
+    // Supabase Transaction Pooler (:6543 / Supavisor), was sonst bei >max parallelen Queries zum Deadlock führt.
+    ...({ max_pipeline: 0 } as Record<string, unknown>),
   });
 
 if (process.env.NODE_ENV !== 'production') {

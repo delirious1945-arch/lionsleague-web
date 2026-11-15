@@ -106,7 +106,13 @@ export async function getUnifiedTvBoardDataAction(options?: {
       sql`SELECT * FROM training_doubles ORDER BY created_at ASC`,
       sql`SELECT * FROM training_pdc_challenge ORDER BY created_at ASC`,
       sql`SELECT * FROM training_fussball ORDER BY created_at ASC`,
-      sql`SELECT * FROM training_stellen_checken ORDER BY created_at ASC`.catch(() => []),
+      (async () => {
+        try {
+          return await sql`SELECT * FROM training_stellen_checken ORDER BY created_at ASC`;
+        } catch {
+          return [];
+        }
+      })(),
     ]);
 
     // Streng reguläre Spiele filtern (Abgebrochene Spiele rausnehmen)
