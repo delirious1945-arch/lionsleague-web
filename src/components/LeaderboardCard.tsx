@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import PlayerAvatar from './PlayerAvatar';
 import { LeaderboardEntry } from '@/lib/data';
 import { getShortName } from '@/lib/scoring';
@@ -56,9 +57,10 @@ export default function LeaderboardCard({ leaderboard }: LeaderboardCardProps) {
       {/* Player List */}
       <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 mt-2 custom-scrollbar max-h-[380px]">
         {filtered.map((player) => (
-          <div
+          <Link
             key={player.player_name}
-            className="flex items-center p-2 rounded-xl border border-cyan-500/10 bg-white/[0.02] hover:bg-white/[0.05] transition-colors"
+            href={`/spieler?player=${encodeURIComponent(player.player_name)}`}
+            className="flex items-center p-2 rounded-xl border border-cyan-500/10 bg-white/[0.02] hover:bg-white/[0.08] hover:border-cyan-400/30 transition-all cursor-pointer group"
           >
             {/* Rank */}
             <span className="w-6 font-black text-sm text-cyan-400 shrink-0">
@@ -66,7 +68,7 @@ export default function LeaderboardCard({ leaderboard }: LeaderboardCardProps) {
             </span>
 
             {/* Avatar */}
-            <div className="w-8 shrink-0">
+            <div className="w-8 shrink-0 group-hover:scale-105 transition-transform">
               <PlayerAvatar
                 name={player.player_name}
                 size={28}
@@ -77,7 +79,7 @@ export default function LeaderboardCard({ leaderboard }: LeaderboardCardProps) {
             {/* Name */}
             <div className="flex-1 min-w-0 pl-1.5">
               <div
-                className="text-xs font-bold text-white truncate"
+                className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate"
                 title={player.player_name}
               >
                 {getShortName(player.player_name)}
@@ -96,7 +98,7 @@ export default function LeaderboardCard({ leaderboard }: LeaderboardCardProps) {
             <span className="w-14 text-right text-sm font-black text-cyan-400 shrink-0">
               {Number(player.final_rating).toFixed(2)}
             </span>
-          </div>
+          </Link>
         ))}
 
         {filtered.length === 0 && (

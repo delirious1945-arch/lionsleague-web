@@ -44,6 +44,7 @@ export default function PlayerClient({
   doublesByPlayer,
   availableSeasons,
   selectedSeason,
+  initialPlayerName,
   trainingDoublesStats,
 }: {
   players: PlayerProfile[];
@@ -51,6 +52,7 @@ export default function PlayerClient({
   doublesByPlayer: Record<string, DoubleSpecialItem[]>;
   availableSeasons: string[];
   selectedSeason: string;
+  initialPlayerName?: string;
   trainingDoublesStats?: Record<string, PlayerTrainingDoublesStats>;
 }) {
   const [teamFilter, setTeamFilter] = useState<'all' | 'A-Team' | 'B-Team'>('all');
@@ -60,9 +62,15 @@ export default function PlayerClient({
     return p.team === teamFilter;
   });
 
-  const [selectedPlayerName, setSelectedPlayerName] = useState<string>(
-    filteredPlayers.length > 0 ? filteredPlayers[0].name : players[0]?.name || ''
-  );
+  const [selectedPlayerName, setSelectedPlayerName] = useState<string>(() => {
+    if (initialPlayerName) {
+      const match = players.find(
+        (p) => p.name.trim().toLowerCase() === initialPlayerName.trim().toLowerCase()
+      );
+      if (match) return match.name;
+    }
+    return filteredPlayers.length > 0 ? filteredPlayers[0].name : players[0]?.name || '';
+  });
 
   const currentPlayer =
     players.find((p) => p.name === selectedPlayerName) ||

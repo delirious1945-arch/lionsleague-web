@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import PlayerAvatar from './PlayerAvatar';
 import { LeaderboardEntry } from '@/lib/data';
 import { getShortName } from '@/lib/scoring';
@@ -31,19 +32,22 @@ export default function Podium({ topMonth }: PodiumProps) {
       {/* Podium Stage */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3 items-end pt-3 pb-1">
         {/* 2. Platz (Silber) */}
-        <div className="flex flex-col items-center text-center">
+        <Link
+          href={`/spieler?player=${encodeURIComponent(p2.player_name)}`}
+          className="flex flex-col items-center text-center group cursor-pointer"
+        >
           <PlayerAvatar
             name={p2.player_name}
             size={72}
             borderColor="#CBD5E1"
-            className="hover:scale-105 transition-transform"
+            className="group-hover:scale-105 transition-transform"
           />
-          <div className="w-full mt-3 p-2.5 rounded-xl bg-slate-400/10 border border-slate-400/20 shadow-sm">
+          <div className="w-full mt-3 p-2.5 rounded-xl bg-slate-400/10 border border-slate-400/20 group-hover:border-slate-300/40 shadow-sm transition-all">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
               2. Platz
             </div>
             <div
-              className="text-xs font-bold text-white truncate mt-0.5"
+              className="text-xs font-bold text-white group-hover:text-cyan-300 truncate mt-0.5 transition-colors"
               title={p2.player_name}
             >
               {getShortName(p2.player_name)}
@@ -52,10 +56,13 @@ export default function Podium({ topMonth }: PodiumProps) {
               {Number(p2.final_rating).toFixed(2)} Pkt
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* 1. Platz (Gold) - Elevated */}
-        <div className="flex flex-col items-center text-center -mt-3">
+        <Link
+          href={`/spieler?player=${encodeURIComponent(p1.player_name)}`}
+          className="flex flex-col items-center text-center -mt-3 group cursor-pointer"
+        >
           <div className="relative">
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full shadow-lg">
               👑 WINNER
@@ -64,15 +71,15 @@ export default function Podium({ topMonth }: PodiumProps) {
               name={p1.player_name}
               size={88}
               borderColor="#F59E0B"
-              className="hover:scale-105 transition-transform shadow-amber-500/30"
+              className="group-hover:scale-105 transition-transform shadow-amber-500/30"
             />
           </div>
-          <div className="w-full mt-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 shadow-md">
+          <div className="w-full mt-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 group-hover:border-amber-400/60 shadow-md transition-all">
             <div className="text-xs font-black uppercase tracking-wider text-amber-400">
               1. Platz
             </div>
             <div
-              className="text-sm font-black text-white truncate mt-0.5"
+              className="text-sm font-black text-white group-hover:text-amber-300 truncate mt-0.5 transition-colors"
               title={p1.player_name}
             >
               {getShortName(p1.player_name)}
@@ -81,22 +88,25 @@ export default function Podium({ topMonth }: PodiumProps) {
               {Number(p1.final_rating).toFixed(2)} Pkt
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* 3. Platz (Bronze) */}
-        <div className="flex flex-col items-center text-center">
+        <Link
+          href={`/spieler?player=${encodeURIComponent(p3.player_name)}`}
+          className="flex flex-col items-center text-center group cursor-pointer"
+        >
           <PlayerAvatar
             name={p3.player_name}
             size={72}
             borderColor="#D97706"
-            className="hover:scale-105 transition-transform"
+            className="group-hover:scale-105 transition-transform"
           />
-          <div className="w-full mt-3 p-2.5 rounded-xl bg-amber-700/10 border border-amber-700/25 shadow-sm">
+          <div className="w-full mt-3 p-2.5 rounded-xl bg-amber-700/10 border border-amber-700/25 group-hover:border-amber-500/40 shadow-sm transition-all">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600">
               3. Platz
             </div>
             <div
-              className="text-xs font-bold text-white truncate mt-0.5"
+              className="text-xs font-bold text-white group-hover:text-cyan-300 truncate mt-0.5 transition-colors"
               title={p3.player_name}
             >
               {getShortName(p3.player_name)}
@@ -105,7 +115,7 @@ export default function Podium({ topMonth }: PodiumProps) {
               {Number(p3.final_rating).toFixed(2)} Pkt
             </div>
           </div>
-        </div>
+        </Link>
       </div>
     </div>
   );

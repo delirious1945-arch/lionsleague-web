@@ -7,7 +7,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
 import { getAvailableSeasons } from "@/lib/data";
-import { UserSession } from "./actions";
+import { UserSession, parseUserSession } from "@/lib/session";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,15 +48,7 @@ export default async function RootLayout({
 }) {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get("lions_session");
-  let user: UserSession | null = null;
-
-  if (sessionCookie?.value) {
-    try {
-      user = JSON.parse(sessionCookie.value) as UserSession;
-    } catch (e) {
-      user = null;
-    }
-  }
+  const user: UserSession | null = parseUserSession(sessionCookie?.value);
 
   const isAuthenticated = Boolean(user && user.name);
   const seasons = isAuthenticated ? await getAvailableSeasons() : ["2026/2027"];

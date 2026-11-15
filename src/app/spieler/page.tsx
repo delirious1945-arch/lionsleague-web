@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function SpielerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; player?: string }>;
 }) {
   const session = await getSessionAction();
   if (!session) {
@@ -27,6 +27,7 @@ export default async function SpielerPage({
   const seasons = await getAvailableSeasons();
 
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
+  const initialPlayerName = params.player || '';
 
   const [players, matches, doubles, settings, trainingDoublesStats] = await Promise.all([
     getPlayers(),
@@ -142,6 +143,7 @@ export default async function SpielerPage({
         doublesByPlayer={doublesByPlayer}
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
+        initialPlayerName={initialPlayerName}
         trainingDoublesStats={trainingDoublesStats}
       />
     </div>

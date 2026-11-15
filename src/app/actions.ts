@@ -3,20 +3,16 @@
 import { sql } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
+import { UserSession, parseUserSession } from '@/lib/session';
 
-export interface UserSession {
-  id: number;
-  name: string;
-  role: string;
-  team: string;
-}
+export type { UserSession };
 
 export async function getSessionAction(): Promise<UserSession | null> {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('lions_session');
     if (sessionCookie?.value) {
-      return JSON.parse(sessionCookie.value) as UserSession;
+      return parseUserSession(sessionCookie.value);
     }
   } catch {}
   return null;
