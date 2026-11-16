@@ -1,8 +1,11 @@
 import React from 'react';
 import AnalyticsClient from './AnalyticsClient';
 import {
+  getAllDoublesMatches,
+  getAllMatches,
   getAnalyticsMatches,
   getAvailableSeasons,
+  getDoublesSpecials,
   getPlayers,
   getTop26Players,
   getAllAnalyticsLegVisits,
@@ -29,12 +32,24 @@ export default async function AnalyticsPage({
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
   const initialPlayerName = params.player || session.name || '';
 
-  const [matches, players, top26, allLegVisits, trainingDoublesStats] = await Promise.all([
+  const [
+    matches,
+    players,
+    top26,
+    allLegVisits,
+    trainingDoublesStats,
+    leagueMatches,
+    leagueDoublesMatches,
+    doublesSpecials,
+  ] = await Promise.all([
     getAnalyticsMatches(selectedSeason),
     getPlayers(),
     getTop26Players(selectedSeason),
     getAllAnalyticsLegVisits(selectedSeason),
     getAllPlayersTrainingDoublesStats(),
+    getAllMatches(selectedSeason),
+    getAllDoublesMatches(selectedSeason),
+    getDoublesSpecials(selectedSeason),
   ]);
 
   return (
@@ -48,6 +63,9 @@ export default async function AnalyticsPage({
         selectedSeason={selectedSeason}
         isAdmin={session?.role === 'admin'}
         trainingDoublesStats={trainingDoublesStats}
+        leagueMatches={leagueMatches}
+        leagueDoublesMatches={leagueDoublesMatches}
+        doublesSpecials={doublesSpecials}
         initialPlayerName={initialPlayerName}
         loggedInPlayerName={session.name}
       />

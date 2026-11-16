@@ -2,7 +2,15 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { AnalyticsMatchItem, Player, Top26Player, RawLegVisit } from '@/lib/data';
+import {
+  AnalyticsMatchItem,
+  DoublesMatchRow,
+  DoublesSpecialRow,
+  MatchRow,
+  Player,
+  Top26Player,
+  RawLegVisit,
+} from '@/lib/data';
 import {
   computePlayerAnalytics,
   generateSimulatedLegVisits,
@@ -14,8 +22,10 @@ import DartsToWinWidget from '@/components/analytics/DartsToWinWidget';
 import LegAnatomyWidget from '@/components/analytics/LegAnatomyWidget';
 import WhatIfSimulatorWidget from '@/components/analytics/WhatIfSimulatorWidget';
 import PlayerAvatar from '@/components/PlayerAvatar';
+import PlayerPulseAmpel from '@/components/PlayerPulseAmpel';
 import { PlayerTrainingDoublesStats } from '@/lib/playerDoublesStats';
-import { Target } from 'lucide-react';
+import { computePlayerPulse, getPlayerDoublesHistory } from '@/lib/playerKeyFacts';
+import { Target, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface AnalyticsClientProps {
   matches: AnalyticsMatchItem[];
@@ -26,6 +36,9 @@ interface AnalyticsClientProps {
   selectedSeason: string;
   isAdmin?: boolean;
   trainingDoublesStats?: Record<string, PlayerTrainingDoublesStats>;
+  leagueMatches?: MatchRow[];
+  leagueDoublesMatches?: DoublesMatchRow[];
+  doublesSpecials?: DoublesSpecialRow[];
   initialPlayerName?: string;
   loggedInPlayerName?: string;
 }
@@ -37,6 +50,9 @@ export default function AnalyticsClient({
   selectedSeason,
   isAdmin = false,
   trainingDoublesStats,
+  leagueMatches = [],
+  leagueDoublesMatches = [],
+  doublesSpecials = [],
   initialPlayerName,
   loggedInPlayerName,
 }: AnalyticsClientProps) {
@@ -66,6 +82,31 @@ export default function AnalyticsClient({
   const [simTargetAvg, setSimTargetAvg] = useState<number>(48);
   const [scoutingTone, setScoutingTone] = useState<'scout' | 'coach'>('scout');
   const [selectedGradeIdx, setSelectedGradeIdx] = useState<number | null>(0);
+  const [openDeepDives, setOpenDeepDives] = useState<{
+    doubles: boolean;
+    visits: boolean;
+    mental: boolean;
+  }>({
+    doubles: false,
+    visits: false,
+    mental: false,
+  });
+
+  const toggleDeepDive = (key: 'doubles' | 'visits' | 'mental') => {
+    setOpenDeepDives((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const allDeepDivesOpen =
+    openDeepDives.doubles && openDeepDives.visits && (!isAdmin || openDeepDives.mental);
+
+  const toggleAllDeepDives = () => {
+    const next = !allDeepDivesOpen;
+    setOpenDeepDives({
+      doubles: next,
+      visits: next,
+      mental: isAdmin ? next : false,
+    });
+  };
 
   // H2H Tab
   const [h2hPlayerId1, setH2hPlayerId1] = useState<number>(defaultPlayerId);
@@ -117,6 +158,36 @@ export default function AnalyticsClient({
     const key = currentPlayer.name.trim().toLowerCase();
     return trainingDoublesStats[key] || null;
   }, [currentPlayer, trainingDoublesStats]);
+
+  // 6 Key Facts & Ampel (Vorschlag 3 + Option C) inkl. Liga-Einzel, Doppel-Werferdaten & Visit-Diagnose
+  const currentPulse = useMemo(() => {
+    const pName = currentPlayer?.name || '';
+    const norm = pName.normalize('NFC').trim().toLowerCase();
+    const pSingles = leagueMatches.filter(
+      (m) => m.player_id === selectedPlayerId || m.player_name.normalize('NFC').trim().toLowerCase() === norm
+    );
+    const pDoublesHist = getPlayerDoublesHistory(selectedPlayerId, pName, leagueDoublesMatches);
+    const pSpecialsCount = doublesSpecials.filter(
+      (d) => d.player_id === selectedPlayerId || d.player_name.normalize('NFC').trim().toLowerCase() === norm
+    ).length;
+
+    return computePlayerPulse({
+      playerName: pName,
+      singleMatches: pSingles,
+      doublesHistory: pDoublesHist,
+      doublesSpecialsCount: pSpecialsCount,
+      trainingStats: currentDoublesStats,
+      daeAnalytics: singleAna,
+    });
+  }, [
+    currentPlayer,
+    selectedPlayerId,
+    leagueMatches,
+    leagueDoublesMatches,
+    doublesSpecials,
+    currentDoublesStats,
+    singleAna,
+  ]);
 
   // H2H Spieler
   const h2hAna1 = useMemo(() => {
@@ -280,8 +351,17 @@ export default function AnalyticsClient({
               </div>
             </div>
 
-            {/* Status / Simulation Badge */}
-            <div className="flex items-center gap-3">
+            {/* Status / Simulation Badge + Option B Link zum Spieler-Steckbrief */}
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {currentPlayer && (
+                <Link
+                  href={`/spieler?player=${encodeURIComponent(currentPlayer.name)}`}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-cyan-500/15 border border-white/15 hover:border-cyan-400/40 text-slate-200 hover:text-cyan-200 font-bold text-xs transition-all"
+                >
+                  <span>👤 Zum Spieler-Steckbrief &amp; Match-Logbuch →</span>
+                </Link>
+              )}
+
               {singleAna.isSimulated ? (
                 <div className="bg-amber-500/15 border border-amber-400/50 rounded-xl p-2.5 text-xs text-amber-300 flex flex-col items-end">
                   <span className="font-extrabold flex items-center gap-1">
@@ -313,88 +393,122 @@ export default function AnalyticsClient({
             </div>
           </div>
 
-          {/* KPI-Kacheln */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {/* Match Average */}
-            <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
-              <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
-                Match Average
-              </span>
-              <div className="text-3xl font-black text-white mt-1">
-                {singleAna.visit_stats.match_average.toFixed(1)}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">3-Dart Schnitt</div>
-            </div>
+          {/* COCKPIT 1: 3-Säulen-Ampel & 6 Key Facts (Vorschlag 3 + Option C) */}
+          <PlayerPulseAmpel
+            playerName={singleAna.playerName}
+            columns={currentPulse.columns}
+            sourceNote="Visit-by-Visit-Diagnose (43.000+ Aufnahmen) kombiniert mit Liga-Einzel, Doppel-Werferdaten & Training."
+          />
 
-            {/* First-9 Average */}
-            <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
-              <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
-                First-9 Average
-              </span>
-              <div className="text-3xl font-black text-white mt-1">
-                {singleAna.first_n.first_9_avg.toFixed(1)}
+          {/* COCKPIT 2: KERN-VISUALISIERUNG (Skill-Radar + Chronologischer Leg-Trend) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            {/* LINKS: Radar Chart (Herzstück!) */}
+            <div className="lg:col-span-5 bg-gradient-to-b from-[#091630] to-[#050c1e] border border-cyan-500/30 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-between">
+              <div className="w-full flex items-center justify-between border-b border-white/10 pb-3 mb-2">
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    <span>🎯</span> 6-Achsen Skill-Radar
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Deterministische Leistungs-Dimensionen (0–100 Punkte)
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-black text-cyan-400 block">
+                    Overall Skill
+                  </span>
+                  <span className="text-lg font-black text-white">
+                    {singleAna.radar_metrics.overall_skill}
+                    <span className="text-xs text-slate-400 font-normal"> / 100</span>
+                  </span>
+                </div>
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Erste 3 Aufnahmen</div>
-            </div>
 
-            {/* Darts / Leg */}
-            <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
-              <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
-                Darts / Leg
-              </span>
-              <div className="text-3xl font-black text-white mt-1">
-                {singleAna.visit_stats.darts_per_leg > 0
-                  ? singleAna.visit_stats.darts_per_leg.toFixed(1)
-                  : '-'}
+              <div className="py-2">
+                <RadarChart
+                  dimensions={singleAna.radar_metrics.dimensions}
+                  playerName={singleAna.playerName}
+                  size={360}
+                />
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Bei Leg-Gewinn</div>
-            </div>
 
-            {/* Bestes Leg */}
-            <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
-              <span className="text-[11px] text-amber-300 font-extrabold uppercase">
-                Bestes Leg
-              </span>
-              <div className="text-3xl font-black text-amber-400 mt-1">
-                {singleAna.visit_stats.best_leg_darts > 0
-                  ? `${singleAna.visit_stats.best_leg_darts}`
-                  : '-'}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Darts zum Checkout</div>
-            </div>
-
-            {/* Wurfkonstanz */}
-            <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
-              <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
-                Wurfkonstanz
-              </span>
-              <div
-                className="text-lg font-black mt-2 px-2 py-0.5 rounded-lg inline-block"
-                style={{
-                  color: singleAna.visit_stats.konstanz_color,
-                  backgroundColor: `${singleAna.visit_stats.konstanz_color}18`,
-                  border: `1px solid ${singleAna.visit_stats.konstanz_color}44`,
-                }}
-              >
-                {singleAna.visit_stats.konstanz_label}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-1">
-                Streuung: ±{singleAna.visit_stats.volatility_std.toFixed(1)}
+              {/* Kompakte Dimensions-Tabelle */}
+              <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 border-t border-white/10 text-xs">
+                {singleAna.radar_metrics.dimensions.map((d) => (
+                  <div key={d.key} className="bg-white/[0.02] border border-white/5 rounded-lg p-2">
+                    <div className="text-[10px] text-slate-400">{d.dim}</div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="font-black text-cyan-300">{d.value}</span>
+                      <span className="text-[10px] font-bold text-slate-300">{d.label}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Leistungs-Korridor */}
-            <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
-              <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
-                Leistungs-Korridor
-              </span>
-              <div className="text-xl font-black text-cyan-300 mt-1.5">
-                {singleAna.visit_stats.korridor_min} – {singleAna.visit_stats.korridor_max}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-1">Standard-Korridor</div>
+            {/* RECHTS: Chronologischer Leg-Trend mit Korridor */}
+            <div className="lg:col-span-7 flex flex-col justify-between">
+              <LegTrendChart
+                trendData={singleAna.leg_trend}
+                matchAvg={singleAna.visit_stats.match_average}
+                korridorMin={singleAna.visit_stats.korridor_min}
+                korridorMax={singleAna.visit_stats.korridor_max}
+                playerName={singleAna.playerName}
+              />
             </div>
           </div>
 
+          {/* OPTION A: DEEP-DIVE AUF KLICK (Steuerleiste) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/10">
+            <div>
+              <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
+                <span>🔬</span> Detail-Diagnostik &amp; Experten-Labor (Deep-Dive auf Klick)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Alle Rohdaten, Segment-Splits und Formeln liegen aufgeräumt hinter diesen 3 Tiefen-Modulen.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleAllDeepDives}
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/35 text-cyan-300 text-xs font-extrabold transition-all self-start sm:self-auto"
+            >
+              {allDeepDivesOpen ? '▲ Alle Deep-Dives einklappen' : '▼ Alle Deep-Dives ausklappen'}
+            </button>
+          </div>
+
+          {/* DEEP-DIVE 1: EMPIRISCHE DOPPEL-DNA & 4 TRAININGSMODULE */}
+          <div className="bg-[#071022] border border-amber-400/30 rounded-2xl overflow-hidden shadow-lg">
+            <button
+              type="button"
+              onClick={() => toggleDeepDive('doubles')}
+              className="w-full px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-white/[0.03] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <span className="p-2 rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300">
+                  {openDeepDives.doubles ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </span>
+                <div>
+                  <div className="text-sm font-black text-white flex items-center gap-2">
+                    <span>🎯 Empirische Doppel-DNA &amp; 4 Trainingsmodule im Detail</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30 text-[10px] text-amber-300 font-bold">
+                      D20–D4
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    {currentDoublesStats && currentDoublesStats.hasTrainingData
+                      ? `${currentDoublesStats.totalDoubleQuote.toFixed(1)}% Gesamtquote (${currentDoublesStats.totalDoubleHits}/${currentDoublesStats.totalDoubleDarts} Darts · ${currentDoublesStats.totalTrainingGames} Spiele)`
+                      : 'Noch keine absolvierten Doppel-Trainingsspiele erfasst'}
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-amber-300 whitespace-nowrap">
+                {openDeepDives.doubles ? 'Zuklappen ▲' : 'Details öffnen ▼'}
+              </span>
+            </button>
+
+            {openDeepDives.doubles && (
+              <div className="px-4 pb-5 pt-1 border-t border-white/10">
           {/* ========================================================
               🎯 EMPIRISCHE DOPPEL-DNA (MODELL A: ALLE TRAININGS-SPIELE)
               ======================================================== */}
@@ -676,140 +790,226 @@ export default function AnalyticsClient({
               </div>
             )}
           </div>
+              </div>
+            )}
+          </div>
 
-          {/* VISUELLE HIGHLIGHTS: Radar + Grafik 1 (Leg-Trend) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* LINKS: Radar Chart (Herzstück!) */}
-            <div className="lg:col-span-5 bg-gradient-to-b from-[#091630] to-[#050c1e] border border-cyan-500/30 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-between">
-              <div className="w-full flex items-center justify-between border-b border-white/10 pb-3 mb-2">
+          {/* DEEP-DIVE 2: VISIT-DIAGNOSTIK (KPIs, START, PHASEN, DARTS-TO-WIN & ANATOMIE) */}
+          <div className="bg-[#071022] border border-cyan-500/25 rounded-2xl overflow-hidden shadow-lg">
+            <button
+              type="button"
+              onClick={() => toggleDeepDive('visits')}
+              className="w-full px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-white/[0.03] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <span className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300">
+                  {openDeepDives.visits ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </span>
                 <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2">
-                    <span>🎯</span> 6-Achsen Skill-Radar
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Deterministische Leistungs-Dimensionen (0–100 Punkte)
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-black text-cyan-400 block">
-                    Overall Skill
-                  </span>
-                  <span className="text-lg font-black text-white">
-                    {singleAna.radar_metrics.overall_skill}
-                    <span className="text-xs text-slate-400 font-normal"> / 100</span>
-                  </span>
-                </div>
-              </div>
-
-              <div className="py-2">
-                <RadarChart
-                  dimensions={singleAna.radar_metrics.dimensions}
-                  playerName={singleAna.playerName}
-                  size={360}
-                />
-              </div>
-
-              {/* Kompakte Dimensions-Tabelle */}
-              <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 border-t border-white/10 text-xs">
-                {singleAna.radar_metrics.dimensions.map((d) => (
-                  <div key={d.key} className="bg-white/[0.02] border border-white/5 rounded-lg p-2">
-                    <div className="text-[10px] text-slate-400">{d.dim}</div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="font-black text-cyan-300">{d.value}</span>
-                      <span className="text-[10px] font-bold text-slate-300">{d.label}</span>
-                    </div>
+                  <div className="text-sm font-black text-white">
+                    🧬 Visit-Diagnostik: Start-Analyse, Leg-Phasen (Early/Mid/Late), Darts-to-Win &amp; Leg-Anatomie
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* RECHTS: Grafik 1 (Chronologischer Leg-Trend mit Korridor) */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
-              <LegTrendChart
-                trendData={singleAna.leg_trend}
-                matchAvg={singleAna.visit_stats.match_average}
-                korridorMin={singleAna.visit_stats.korridor_min}
-                korridorMax={singleAna.visit_stats.korridor_max}
-                playerName={singleAna.playerName}
-              />
-
-              {/* Phasen & Start Kacheln */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Start-Analyse */}
-                <div className="bg-[#091630] border border-cyan-500/20 rounded-2xl p-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
-                    <span className="text-xs font-black text-white flex items-center gap-1.5">
-                      <span>🏹</span> Start-Analyse (Visits 1–3)
-                    </span>
-                    <span className="text-xs font-black text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-400/30">
-                      Start-Index: {singleAna.start_data.start_index}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div className="bg-white/5 rounded-xl p-2">
-                      <div className="text-[10px] text-slate-400">Visit 1</div>
-                      <div className="text-base font-black text-white mt-0.5">
-                        {singleAna.start_data.avg_visit_1}
-                      </div>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-2">
-                      <div className="text-[10px] text-slate-400">Visit 2</div>
-                      <div className="text-base font-black text-white mt-0.5">
-                        {singleAna.start_data.avg_visit_2}
-                      </div>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-2">
-                      <div className="text-[10px] text-slate-400">Visit 3</div>
-                      <div className="text-base font-black text-white mt-0.5">
-                        {singleAna.start_data.avg_visit_3}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Phasen-Verlauf */}
-                <div className="bg-[#091630] border border-cyan-500/20 rounded-2xl p-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
-                    <span className="text-xs font-black text-white flex items-center gap-1.5">
-                      <span>⏳</span> Leg-Phasen Trend
-                    </span>
-                    <span className="text-[10px] font-bold text-amber-300 truncate max-w-[140px]">
-                      {singleAna.phases.phase_trend}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div className="bg-white/5 rounded-xl p-2">
-                      <div className="text-[10px] text-slate-400">Early (V1-3)</div>
-                      <div className="text-base font-black text-cyan-300 mt-0.5">
-                        {singleAna.phases.opening.average}
-                      </div>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-2">
-                      <div className="text-[10px] text-slate-400">Mid (V4-6)</div>
-                      <div className="text-base font-black text-cyan-300 mt-0.5">
-                        {singleAna.phases.mid_game.average}
-                      </div>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-2">
-                      <div className="text-[10px] text-slate-400">Late (V7+)</div>
-                      <div className="text-base font-black text-cyan-300 mt-0.5">
-                        {singleAna.phases.finish.average}
-                      </div>
-                    </div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    Match-Ø {singleAna.visit_stats.match_average.toFixed(1)} · First-9 {singleAna.first_n.first_9_avg.toFixed(1)} · {singleAna.visit_stats.darts_per_leg > 0 ? `${singleAna.visit_stats.darts_per_leg.toFixed(1)} Darts/Leg` : 'Darts/Leg offen'} · 100+ {(singleAna.dist_data.thresholds['100+']?.pct || 0).toFixed(1)}%
                   </div>
                 </div>
               </div>
-            </div>
+              <span className="text-xs font-bold text-cyan-300 whitespace-nowrap">
+                {openDeepDives.visits ? 'Zuklappen ▲' : 'Details öffnen ▼'}
+              </span>
+            </button>
+
+            {openDeepDives.visits && (
+              <div className="px-4 pb-5 pt-3 border-t border-white/10 space-y-6">
+                {/* KPI-Kacheln */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {/* Match Average */}
+                  <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
+                    <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
+                      Match Average
+                    </span>
+                    <div className="text-3xl font-black text-white mt-1">
+                      {singleAna.visit_stats.match_average.toFixed(1)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">3-Dart Schnitt</div>
+                  </div>
+
+                  {/* First-9 Average */}
+                  <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
+                    <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
+                      First-9 Average
+                    </span>
+                    <div className="text-3xl font-black text-white mt-1">
+                      {singleAna.first_n.first_9_avg.toFixed(1)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Erste 3 Aufnahmen</div>
+                  </div>
+
+                  {/* Darts / Leg */}
+                  <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
+                    <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
+                      Darts / Leg
+                    </span>
+                    <div className="text-3xl font-black text-white mt-1">
+                      {singleAna.visit_stats.darts_per_leg > 0
+                        ? singleAna.visit_stats.darts_per_leg.toFixed(1)
+                        : '-'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Bei Leg-Gewinn</div>
+                  </div>
+
+                  {/* Bestes Leg */}
+                  <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
+                    <span className="text-[11px] text-amber-300 font-extrabold uppercase">
+                      Bestes Leg
+                    </span>
+                    <div className="text-3xl font-black text-amber-400 mt-1">
+                      {singleAna.visit_stats.best_leg_darts > 0
+                        ? `${singleAna.visit_stats.best_leg_darts}`
+                        : '-'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Darts zum Checkout</div>
+                  </div>
+
+                  {/* Wurfkonstanz */}
+                  <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
+                    <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
+                      Wurfkonstanz
+                    </span>
+                    <div
+                      className="text-lg font-black mt-2 px-2 py-0.5 rounded-lg inline-block"
+                      style={{
+                        color: singleAna.visit_stats.konstanz_color,
+                        backgroundColor: `${singleAna.visit_stats.konstanz_color}18`,
+                        border: `1px solid ${singleAna.visit_stats.konstanz_color}44`,
+                      }}
+                    >
+                      {singleAna.visit_stats.konstanz_label}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      Streuung: ±{singleAna.visit_stats.volatility_std.toFixed(1)}
+                    </div>
+                  </div>
+
+                  {/* Leistungs-Korridor */}
+                  <div className="bg-gradient-to-b from-[#0e1d3d] to-[#071126] border border-cyan-500/30 rounded-2xl p-4 shadow-lg text-center">
+                    <span className="text-[11px] text-cyan-300 font-extrabold uppercase">
+                      Leistungs-Korridor
+                    </span>
+                    <div className="text-xl font-black text-cyan-300 mt-1.5">
+                      {singleAna.visit_stats.korridor_min} – {singleAna.visit_stats.korridor_max}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1">Standard-Korridor</div>
+                  </div>
+                </div>
+
+                {/* Phasen & Start Kacheln */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Start-Analyse */}
+                  <div className="bg-[#091630] border border-cyan-500/20 rounded-2xl p-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <span>🏹</span> Start-Analyse (Visits 1–3)
+                      </span>
+                      <span className="text-xs font-black text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-400/30">
+                        Start-Index: {singleAna.start_data.start_index}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-white/5 rounded-xl p-2">
+                        <div className="text-[10px] text-slate-400">Visit 1</div>
+                        <div className="text-base font-black text-white mt-0.5">
+                          {singleAna.start_data.avg_visit_1}
+                        </div>
+                      </div>
+                      <div className="bg-white/5 rounded-xl p-2">
+                        <div className="text-[10px] text-slate-400">Visit 2</div>
+                        <div className="text-base font-black text-white mt-0.5">
+                          {singleAna.start_data.avg_visit_2}
+                        </div>
+                      </div>
+                      <div className="bg-white/5 rounded-xl p-2">
+                        <div className="text-[10px] text-slate-400">Visit 3</div>
+                        <div className="text-base font-black text-white mt-0.5">
+                          {singleAna.start_data.avg_visit_3}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phasen-Verlauf */}
+                  <div className="bg-[#091630] border border-cyan-500/20 rounded-2xl p-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <span>⏳</span> Leg-Phasen Trend
+                      </span>
+                      <span className="text-[10px] font-bold text-amber-300 truncate max-w-[140px]">
+                        {singleAna.phases.phase_trend}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-white/5 rounded-xl p-2">
+                        <div className="text-[10px] text-slate-400">Early (V1-3)</div>
+                        <div className="text-base font-black text-cyan-300 mt-0.5">
+                          {singleAna.phases.opening.average}
+                        </div>
+                      </div>
+                      <div className="bg-white/5 rounded-xl p-2">
+                        <div className="text-[10px] text-slate-400">Mid (V4-6)</div>
+                        <div className="text-base font-black text-cyan-300 mt-0.5">
+                          {singleAna.phases.mid_game.average}
+                        </div>
+                      </div>
+                      <div className="bg-white/5 rounded-xl p-2">
+                        <div className="text-[10px] text-slate-400">Late (V7+)</div>
+                        <div className="text-base font-black text-cyan-300 mt-0.5">
+                          {singleAna.phases.finish.average}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Darts-to-Win + Leg-Anatomie */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <DartsToWinWidget efficiency={singleAna.darts_to_win} />
+                  <LegAnatomyWidget anatomy={singleAna.leg_anatomy} />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* ZWEITE REIHE: Grafik 2 (Darts-to-Win) + Grafik 3 (Leg-Anatomie) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <DartsToWinWidget efficiency={singleAna.darts_to_win} />
-            <LegAnatomyWidget anatomy={singleAna.leg_anatomy} />
-          </div>
-
-          {/* DRITTE REIHE: DAE 2.0 PSYCHOLOGIE & SCOUTING PROFIL (Exklusiv für Admin/Captains) */}
+          {/* DEEP-DIVE 3: DAE 2.0 PSYCHOLOGIE & SCOUTING PROFIL (Exklusiv für Admin/Captains) */}
           {isAdmin && (
+            <div className="bg-[#071022] border border-cyan-500/35 rounded-2xl overflow-hidden shadow-lg">
+              <button
+                type="button"
+                onClick={() => toggleDeepDive('mental')}
+                className="w-full px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left hover:bg-white/[0.03] transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300">
+                    {openDeepDives.mental ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </span>
+                  <div>
+                    <div className="text-sm font-black text-white flex flex-wrap items-center gap-2">
+                      <span>🧠 DAE 2.0 Kapitäns- &amp; Mental-Analyse (Noten-Zeugnis &amp; Aufstellung)</span>
+                      <span className="text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded font-mono">
+                        🔒 ADMIN
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {singleAna.ai_profile.dual_archetype?.mental_type || singleAna.ai_profile.archetype} · Team-Rolle: {singleAna.ai_profile.dual_archetype?.team_role || 'Punktegarant'} · Clutch-Delta {singleAna.ai_profile.mental_metrics.clutch_delta >= 0 ? '+' : ''}{singleAna.ai_profile.mental_metrics.clutch_delta.toFixed(1)} Pkt
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-cyan-300 whitespace-nowrap">
+                  {openDeepDives.mental ? 'Zuklappen ▲' : 'Details öffnen ▼'}
+                </span>
+              </button>
+
+              {openDeepDives.mental && (
+                <div className="px-4 pb-5 pt-1 border-t border-white/10">
             <div className="bg-gradient-to-r from-[#091736] via-[#0b1d44] to-[#08132d] border border-cyan-500/40 rounded-2xl p-6 shadow-2xl shadow-cyan-950/40 space-y-6">
             {/* Header: Dual-Archetyp + Tonalitäts-Schalter */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-white/10 pb-5 gap-4">
@@ -1267,6 +1467,9 @@ export default function AnalyticsClient({
               </div>
             )}
           </div>
+                </div>
+              )}
+            </div>
         )}
         </div>
       )}

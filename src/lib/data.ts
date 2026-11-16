@@ -59,6 +59,22 @@ export interface DoublesMatchRow {
   p1_name: string;
   player_team: string;
   p2_name: string;
+  player1_darts?: number | null;
+  player2_darts?: number | null;
+  player1_avg?: number | null;
+  player2_avg?: number | null;
+  player1_first9_avg?: number | null;
+  player2_first9_avg?: number | null;
+  player1_scores_80?: number | null;
+  player2_scores_80?: number | null;
+  player1_scores_100?: number | null;
+  player2_scores_100?: number | null;
+  player1_scores_140?: number | null;
+  player2_scores_140?: number | null;
+  player1_scores_180?: number | null;
+  player2_scores_180?: number | null;
+  player1_checkouts?: number | null;
+  player2_checkouts?: number | null;
 }
 
 export interface DoublesSpecialRow {
@@ -718,6 +734,103 @@ export async function getDoublesSpecials(season?: string): Promise<DoublesSpecia
     }));
   } catch (err) {
     console.error('Error fetching doubles specials:', err);
+    return [];
+  }
+}
+
+function toNullableNum(val: unknown): number | null {
+  if (val === null || val === undefined || val === '') return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function getAllDoublesMatches(season?: string): Promise<DoublesMatchRow[]> {
+  try {
+    const rows = season && season !== 'Alle Saisons'
+      ? await sql`
+          SELECT m.id, m.player1_id, m.player2_id, m.match_date, m.opponent, m.legs_won, m.legs_lost,
+                 m.avg_total, m.avg_9, m.avg_18, m.scores_80, m.scores_100, m.scores_140,
+                 m.scores_180, m.high_finishes, m.short_legs, m.specials_count, m.season,
+                 COALESCE(m.team, p1.team) as team,
+                 p1.name as p1_name, p1.team as player_team, p2.name as p2_name,
+                 m.player1_darts, m.player2_darts,
+                 m.player1_avg, m.player2_avg,
+                 m.player1_first9_avg, m.player2_first9_avg,
+                 m.player1_scores_80, m.player2_scores_80,
+                 m.player1_scores_100, m.player2_scores_100,
+                 m.player1_scores_140, m.player2_scores_140,
+                 m.player1_scores_180, m.player2_scores_180,
+                 m.player1_checkouts, m.player2_checkouts
+          FROM doubles_matches m
+          JOIN players p1 ON m.player1_id = p1.id
+          JOIN players p2 ON m.player2_id = p2.id
+          WHERE m.season = ${season}
+            AND (p1.team IN ('A-Team', 'B-Team') OR p2.team IN ('A-Team', 'B-Team'))
+          ORDER BY m.match_date DESC, m.id DESC
+        `
+      : await sql`
+          SELECT m.id, m.player1_id, m.player2_id, m.match_date, m.opponent, m.legs_won, m.legs_lost,
+                 m.avg_total, m.avg_9, m.avg_18, m.scores_80, m.scores_100, m.scores_140,
+                 m.scores_180, m.high_finishes, m.short_legs, m.specials_count, m.season,
+                 COALESCE(m.team, p1.team) as team,
+                 p1.name as p1_name, p1.team as player_team, p2.name as p2_name,
+                 m.player1_darts, m.player2_darts,
+                 m.player1_avg, m.player2_avg,
+                 m.player1_first9_avg, m.player2_first9_avg,
+                 m.player1_scores_80, m.player2_scores_80,
+                 m.player1_scores_100, m.player2_scores_100,
+                 m.player1_scores_140, m.player2_scores_140,
+                 m.player1_scores_180, m.player2_scores_180,
+                 m.player1_checkouts, m.player2_checkouts
+          FROM doubles_matches m
+          JOIN players p1 ON m.player1_id = p1.id
+          JOIN players p2 ON m.player2_id = p2.id
+          WHERE (p1.team IN ('A-Team', 'B-Team') OR p2.team IN ('A-Team', 'B-Team'))
+          ORDER BY m.match_date DESC, m.id DESC
+        `;
+
+    return rows.map((r) => ({
+      id: Number(r.id),
+      player1_id: Number(r.player1_id),
+      player2_id: Number(r.player2_id),
+      match_date: String(r.match_date),
+      opponent: String(r.opponent),
+      legs_won: Number(r.legs_won),
+      legs_lost: Number(r.legs_lost),
+      avg_total: Number(r.avg_total),
+      avg_9: Number(r.avg_9),
+      avg_18: Number(r.avg_18),
+      scores_80: Number(r.scores_80),
+      scores_100: Number(r.scores_100),
+      scores_140: Number(r.scores_140),
+      scores_180: Number(r.scores_180),
+      high_finishes: Number(r.high_finishes),
+      short_legs: Number(r.short_legs),
+      specials_count: Number(r.specials_count || 0),
+      season: String(r.season),
+      team: String(r.team).trim(),
+      p1_name: String(r.p1_name).trim(),
+      player_team: String(r.player_team).trim(),
+      p2_name: String(r.p2_name).trim(),
+      player1_darts: toNullableNum(r.player1_darts),
+      player2_darts: toNullableNum(r.player2_darts),
+      player1_avg: toNullableNum(r.player1_avg),
+      player2_avg: toNullableNum(r.player2_avg),
+      player1_first9_avg: toNullableNum(r.player1_first9_avg),
+      player2_first9_avg: toNullableNum(r.player2_first9_avg),
+      player1_scores_80: toNullableNum(r.player1_scores_80),
+      player2_scores_80: toNullableNum(r.player2_scores_80),
+      player1_scores_100: toNullableNum(r.player1_scores_100),
+      player2_scores_100: toNullableNum(r.player2_scores_100),
+      player1_scores_140: toNullableNum(r.player1_scores_140),
+      player2_scores_140: toNullableNum(r.player2_scores_140),
+      player1_scores_180: toNullableNum(r.player1_scores_180),
+      player2_scores_180: toNullableNum(r.player2_scores_180),
+      player1_checkouts: toNullableNum(r.player1_checkouts),
+      player2_checkouts: toNullableNum(r.player2_checkouts),
+    }));
+  } catch (err) {
+    console.error('Error fetching all doubles matches:', err);
     return [];
   }
 }

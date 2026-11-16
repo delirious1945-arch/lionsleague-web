@@ -1,6 +1,7 @@
 import React from 'react';
 import PlayerClient from './PlayerClient';
 import {
+  getAllDoublesMatches,
   getAllMatches,
   getAvailableSeasons,
   getDoublesSpecials,
@@ -29,9 +30,10 @@ export default async function SpielerPage({
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
   const initialPlayerName = params.player || session.name || '';
 
-  const [players, matches, doubles, settings, trainingDoublesStats] = await Promise.all([
+  const [players, matches, doublesMatches, doubles, settings, trainingDoublesStats] = await Promise.all([
     getPlayers(),
     getAllMatches(selectedSeason),
+    getAllDoublesMatches(selectedSeason),
     getDoublesSpecials(selectedSeason),
     getSettings(),
     getAllPlayersTrainingDoublesStats(),
@@ -53,6 +55,11 @@ export default async function SpielerPage({
       avg_18: number;
       specials_count: number;
       scores_total: number;
+      scores_80: number;
+      scores_100: number;
+      scores_140: number;
+      scores_180: number;
+      short_legs: number;
       high_finish: number;
     }[]
   > = {};
@@ -94,6 +101,11 @@ export default async function SpielerPage({
       avg_18: m.avg_18,
       specials_count: m.specials_count,
       scores_total: scoresTotal,
+      scores_80: m.scores_80,
+      scores_100: m.scores_100,
+      scores_140: m.scores_140,
+      scores_180: m.scores_180,
+      short_legs: m.short_legs,
       high_finish: m.high_finishes,
     };
 
@@ -140,6 +152,7 @@ export default async function SpielerPage({
       <PlayerClient
         players={players}
         matchesByPlayer={matchesByPlayer}
+        doublesMatches={doublesMatches}
         doublesByPlayer={doublesByPlayer}
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
