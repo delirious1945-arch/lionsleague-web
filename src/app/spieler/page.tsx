@@ -27,7 +27,7 @@ export default async function SpielerPage({
   const seasons = await getAvailableSeasons();
 
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
-  const initialPlayerName = params.player || '';
+  const initialPlayerName = params.player || session.name || '';
 
   const [players, matches, doubles, settings, trainingDoublesStats] = await Promise.all([
     getPlayers(),
@@ -144,6 +144,7 @@ export default async function SpielerPage({
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
         initialPlayerName={initialPlayerName}
+        loggedInPlayerName={session.name}
         trainingDoublesStats={trainingDoublesStats}
       />
     </div>

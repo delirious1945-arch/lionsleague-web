@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; player?: string }>;
 }) {
   const session = await getSessionAction();
   if (!session) {
@@ -27,6 +27,7 @@ export default async function AnalyticsPage({
   const seasons = await getAvailableSeasons();
 
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
+  const initialPlayerName = params.player || session.name || '';
 
   const [matches, players, top26, allLegVisits, trainingDoublesStats] = await Promise.all([
     getAnalyticsMatches(selectedSeason),
@@ -47,6 +48,8 @@ export default async function AnalyticsPage({
         selectedSeason={selectedSeason}
         isAdmin={session?.role === 'admin'}
         trainingDoublesStats={trainingDoublesStats}
+        initialPlayerName={initialPlayerName}
+        loggedInPlayerName={session.name}
       />
     </div>
   );

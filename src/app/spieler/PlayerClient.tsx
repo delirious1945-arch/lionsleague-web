@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import { PlayerTrainingDoublesStats } from '@/lib/playerDoublesStats';
@@ -45,6 +45,7 @@ export default function PlayerClient({
   availableSeasons,
   selectedSeason,
   initialPlayerName,
+  loggedInPlayerName,
   trainingDoublesStats,
 }: {
   players: PlayerProfile[];
@@ -53,6 +54,7 @@ export default function PlayerClient({
   availableSeasons: string[];
   selectedSeason: string;
   initialPlayerName?: string;
+  loggedInPlayerName?: string;
   trainingDoublesStats?: Record<string, PlayerTrainingDoublesStats>;
 }) {
   const [teamFilter, setTeamFilter] = useState<'all' | 'A-Team' | 'B-Team'>('all');
@@ -62,15 +64,33 @@ export default function PlayerClient({
     return p.team === teamFilter;
   });
 
-  const [selectedPlayerName, setSelectedPlayerName] = useState<string>(() => {
-    if (initialPlayerName) {
-      const match = players.find(
-        (p) => p.name.trim().toLowerCase() === initialPlayerName.trim().toLowerCase()
-      );
+  const normalizeName = (name: string) => name.normalize('NFC').trim().toLowerCase();
+
+  const resolveTargetPlayerName = (target?: string): string => {
+    for (const candidate of [target, initialPlayerName, loggedInPlayerName]) {
+      if (!candidate) continue;
+      const norm = normalizeName(candidate);
+      const match = players.find((p) => normalizeName(p.name) === norm);
       if (match) return match.name;
     }
     return filteredPlayers.length > 0 ? filteredPlayers[0].name : players[0]?.name || '';
-  });
+  };
+
+  const [selectedPlayerName, setSelectedPlayerName] = useState<string>(() =>
+    resolveTargetPlayerName(initialPlayerName)
+  );
+
+  useEffect(() => {
+    const targetName = resolveTargetPlayerName(initialPlayerName);
+    if (targetName) {
+      const targetPlayer = players.find((p) => p.name === targetName);
+      if (targetPlayer && teamFilter !== 'all' && targetPlayer.team !== teamFilter) {
+        setTeamFilter('all');
+      }
+      setSelectedPlayerName(targetName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPlayerName]);
 
   const currentPlayer =
     players.find((p) => p.name === selectedPlayerName) ||
@@ -178,7 +198,19 @@ export default function PlayerClient({
                     : p.team === t
                 );
                 if (nextPlayers.length > 0) {
-                  setSelectedPlayerName(nextPlayers[0].name);
+                  const keepCurrent = nextPlayers.find(
+                    (p) => normalizeName(p.name) === normalizeName(selectedPlayerName)
+                  );
+                  if (keepCurrent) {
+                    setSelectedPlayerName(keepCurrent.name);
+                  } else {
+                    const keepLoggedIn = loggedInPlayerName
+                      ? nextPlayers.find(
+                          (p) => normalizeName(p.name) === normalizeName(loggedInPlayerName)
+                        )
+                      : undefined;
+                    setSelectedPlayerName(keepLoggedIn ? keepLoggedIn.name : nextPlayers[0].name);
+                  }
                 }
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -249,7 +281,7 @@ export default function PlayerClient({
                       <span>Empirische Doppelquote: <strong className="text-white">{dStats.totalDoubleQuote.toFixed(1)}%</strong> ({dStats.totalDoubleHits}/{dStats.totalDoubleDarts} Darts)</span>
                     </span>
                     <Link
-                      href="/analytics"
+                      href={`/analytics?player=${encodeURIComponent(currentPlayer.name)}`}
                       className="text-[11px] text-cyan-300 hover:text-cyan-200 underline underline-offset-2 transition-colors font-bold ml-1"
                     >
                       Zur Doppel-DNA Analyse →

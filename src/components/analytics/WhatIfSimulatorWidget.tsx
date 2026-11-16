@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Player, RawLegVisit } from '@/lib/data';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import {
@@ -26,6 +26,12 @@ export default function WhatIfSimulatorWidget({
   const [selectedPlayerId, setSelectedPlayerId] = useState<number>(
     initialPlayerId || (players.length > 0 ? players[0].id : 0)
   );
+
+  useEffect(() => {
+    if (initialPlayerId) {
+      setSelectedPlayerId(initialPlayerId);
+    }
+  }, [initialPlayerId]);
 
   const selectedPlayer = useMemo(
     () => players.find((p) => p.id === selectedPlayerId) || players[0],

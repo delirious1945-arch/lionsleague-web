@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { AnalyticsMatchItem, Player, Top26Player, RawLegVisit } from '@/lib/data';
 import {
@@ -26,6 +26,8 @@ interface AnalyticsClientProps {
   selectedSeason: string;
   isAdmin?: boolean;
   trainingDoublesStats?: Record<string, PlayerTrainingDoublesStats>;
+  initialPlayerName?: string;
+  loggedInPlayerName?: string;
 }
 
 export default function AnalyticsClient({
@@ -35,25 +37,42 @@ export default function AnalyticsClient({
   selectedSeason,
   isAdmin = false,
   trainingDoublesStats,
+  initialPlayerName,
+  loggedInPlayerName,
 }: AnalyticsClientProps) {
   // Tabs: 'single' | 'h2h' | 'matrix' | 'whatif'
   const [activeTab, setActiveTab] = useState<'single' | 'h2h' | 'matrix' | 'whatif'>('single');
 
+  const defaultPlayerId = useMemo(() => {
+    const normalizeName = (s: string) => s.normalize('NFC').trim().toLowerCase();
+    for (const candidate of [initialPlayerName, loggedInPlayerName]) {
+      if (!candidate) continue;
+      const norm = normalizeName(candidate);
+      const match = players.find((p) => normalizeName(p.name) === norm);
+      if (match) return match.id;
+    }
+    return players.length > 0 ? players[0].id : 0;
+  }, [players, initialPlayerName, loggedInPlayerName]);
+
   // Single Player Tab
-  const [selectedPlayerId, setSelectedPlayerId] = useState<number>(
-    players.length > 0 ? players[0].id : 0
-  );
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number>(defaultPlayerId);
+
+  useEffect(() => {
+    if (defaultPlayerId) {
+      setSelectedPlayerId(defaultPlayerId);
+    }
+  }, [defaultPlayerId]);
+
   const [simTargetAvg, setSimTargetAvg] = useState<number>(48);
   const [scoutingTone, setScoutingTone] = useState<'scout' | 'coach'>('scout');
   const [selectedGradeIdx, setSelectedGradeIdx] = useState<number | null>(0);
 
   // H2H Tab
-  const [h2hPlayerId1, setH2hPlayerId1] = useState<number>(
-    players.length > 0 ? players[0].id : 0
-  );
-  const [h2hPlayerId2, setH2hPlayerId2] = useState<number>(
-    players.length > 1 ? players[1].id : players[0]?.id || 0
-  );
+  const [h2hPlayerId1, setH2hPlayerId1] = useState<number>(defaultPlayerId);
+  const [h2hPlayerId2, setH2hPlayerId2] = useState<number>(() => {
+    const other = players.find((p) => p.id !== defaultPlayerId);
+    return other ? other.id : players[0]?.id || 0;
+  });
 
   // Matrix Filter
   const [matrixTeamFilter, setMatrixTeamFilter] = useState<'all' | 'A-Team' | 'B-Team'>('all');
