@@ -3,6 +3,7 @@ import PlayerClient from './PlayerClient';
 import {
   getAllDoublesMatches,
   getAllMatches,
+  getAllPlayerSpecials,
   getAvailableSeasons,
   getDoublesSpecials,
   getPlayers,
@@ -30,11 +31,20 @@ export default async function SpielerPage({
   const selectedSeason = params.season || (seasons.length > 0 ? seasons[0] : '2026/2027');
   const initialPlayerName = params.player || session.name || '';
 
-  const [players, matches, doublesMatches, doubles, settings, trainingDoublesStats] = await Promise.all([
+  const [
+    players,
+    matches,
+    doublesMatches,
+    doubles,
+    allSpecialsByPlayer,
+    settings,
+    trainingDoublesStats,
+  ] = await Promise.all([
     getPlayers(),
     getAllMatches(selectedSeason),
     getAllDoublesMatches(selectedSeason),
     getDoublesSpecials(selectedSeason),
+    getAllPlayerSpecials(selectedSeason),
     getSettings(),
     getAllPlayersTrainingDoublesStats(),
   ]);
@@ -154,6 +164,7 @@ export default async function SpielerPage({
         matchesByPlayer={matchesByPlayer}
         doublesMatches={doublesMatches}
         doublesByPlayer={doublesByPlayer}
+        allSpecialsByPlayer={allSpecialsByPlayer}
         availableSeasons={seasons}
         selectedSeason={selectedSeason}
         initialPlayerName={initialPlayerName}

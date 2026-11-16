@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import PlayerAvatar from '@/components/PlayerAvatar';
 import PlayerPulseAmpel from '@/components/PlayerPulseAmpel';
-import type { DoublesMatchRow } from '@/lib/data';
+import type { DoublesMatchRow, PlayerSpecialItem } from '@/lib/data';
 import { PlayerTrainingDoublesStats } from '@/lib/playerDoublesStats';
 import { computePlayerPulse, getPlayerDoublesHistory } from '@/lib/playerKeyFacts';
 import { Target } from 'lucide-react';
@@ -51,6 +51,7 @@ export default function PlayerClient({
   matchesByPlayer,
   doublesMatches,
   doublesByPlayer,
+  allSpecialsByPlayer,
   availableSeasons,
   selectedSeason,
   initialPlayerName,
@@ -61,6 +62,7 @@ export default function PlayerClient({
   matchesByPlayer: Record<string, MatchHistoryItem[]>;
   doublesMatches: DoublesMatchRow[];
   doublesByPlayer: Record<string, DoubleSpecialItem[]>;
+  allSpecialsByPlayer?: Record<string, PlayerSpecialItem[]>;
   availableSeasons: string[];
   selectedSeason: string;
   initialPlayerName?: string;
@@ -115,6 +117,35 @@ export default function PlayerClient({
     () => (currentPlayer ? doublesByPlayer[currentPlayer.name] || [] : []),
     [currentPlayer, doublesByPlayer]
   );
+
+  const pAllSpecials = useMemo(
+    () =>
+      currentPlayer && allSpecialsByPlayer
+        ? allSpecialsByPlayer[currentPlayer.name.trim()] || []
+        : [],
+    [currentPlayer, allSpecialsByPlayer]
+  );
+
+  const specialCategoryCounts = useMemo(() => {
+    let count180 = 0;
+    let countHighScore = 0;
+    let countHighFinish = 0;
+    let countShortLeg = 0;
+    for (const s of pAllSpecials) {
+      if (s.category === '180') count180++;
+      else if (s.category === 'high_score') countHighScore++;
+      else if (s.category === 'high_finish') countHighFinish++;
+      else if (s.category === 'short_leg') countShortLeg++;
+    }
+    return {
+      total: pAllSpecials.length,
+      bonusPoints: pAllSpecials.reduce((acc, s) => acc + s.bonus_points, 0),
+      count180,
+      countHighScore,
+      countHighFinish,
+      countShortLeg,
+    };
+  }, [pAllSpecials]);
 
   const pDoublesHistory = useMemo(
     () =>
@@ -615,48 +646,92 @@ export default function PlayerClient({
             )}
           </div>
 
-          {/* Doppel Specials Table */}
-          {pDoubles.length > 0 && (
-            <div className="space-y-4 pt-4">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>⭐</span> Im Doppel geworfene Specials (+0,5 Pkt Bonus)
-              </h3>
+          {/* Alle geworfenen Saison-Specials (Einzel & Doppel) */}
+          <div className="space-y-4 pt-2">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>⭐</span> Alle geworfenen Saison-Specials (Einzel & Doppel)
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Lückenlose Übersicht aller offiziellen High Scores, 180er, Short Games (≤ 18 Darts) und High Finishes (101+).
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                  Gesamt: {specialCategoryCounts.total} ({specialCategoryCounts.bonusPoints > 0 ? `+${specialCategoryCounts.bonusPoints.toFixed(1).replace('.', ',')}` : '0,0'} Pkt)
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/5 text-slate-200 border border-white/10">
+                  🎯 180er: {specialCategoryCounts.count180}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/5 text-slate-200 border border-white/10">
+                  💥 141–177: {specialCategoryCounts.countHighScore}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/5 text-slate-200 border border-white/10">
+                  🏁 High Finish: {specialCategoryCounts.countHighFinish}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/5 text-slate-200 border border-white/10">
+                  ⚡ Short Game: {specialCategoryCounts.countShortLeg}
+                </span>
+              </div>
+            </div>
+
+            {pAllSpecials.length === 0 ? (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center text-slate-400 text-sm">
+                Für diesen Spieler liegen in der Saison {selectedSeason} noch keine geworfenen Specials vor.
+              </div>
+            ) : (
               <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#081022]">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="bg-white/5 border-b border-white/10 text-xs font-bold text-amber-400">
                       <th className="p-3">Datum</th>
-                      <th className="p-3">Special Type</th>
-                      <th className="p-3">Teampartner</th>
-                      <th className="p-3">Gegner Team</th>
-                      <th className="p-3">Anmerkungen</th>
+                      <th className="p-3">Modus</th>
+                      <th className="p-3">Special-Kategorie</th>
+                      <th className="p-3">Exakter Wert / Leg</th>
+                      <th className="p-3">Gegner</th>
+                      <th className="p-3 text-right">Bonus</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {pDoubles.map((d) => (
-                      <tr key={d.id} className="hover:bg-white/5 transition-colors">
-                        <td className="p-3 text-slate-300 whitespace-nowrap">
-                          {d.match_date}
+                    {pAllSpecials.map((s) => (
+                      <tr key={s.id} className="hover:bg-white/5 transition-colors">
+                        <td className="p-3 text-slate-300 font-medium whitespace-nowrap">
+                          {s.formatted_date}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          {s.mode === 'Einzel' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-xs font-bold">
+                              🎯 Einzel
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-bold">
+                              🤝 Doppel · Partner: {s.partner_name}
+                            </span>
+                          )}
                         </td>
                         <td className="p-3 font-bold text-amber-300 whitespace-nowrap">
-                          {d.special_type}
+                          {s.badge_label}
                         </td>
-                        <td className="p-3 font-semibold text-white whitespace-nowrap">
-                          {d.partner_name}
+                        <td className="p-3 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded bg-white/10 text-white font-mono text-xs font-extrabold border border-white/15">
+                            {s.value_label}
+                          </span>
                         </td>
-                        <td className="p-3 text-slate-400 whitespace-nowrap">
-                          {d.opponent_team}
+                        <td className="p-3 text-slate-300 whitespace-nowrap">
+                          {s.opponent}
                         </td>
-                        <td className="p-3 text-slate-400 italic">
-                          {d.description || '-'}
+                        <td className="p-3 text-right font-black text-emerald-400 whitespace-nowrap">
+                          +{s.bonus_points.toFixed(1).replace('.', ',')} Pkt
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
     </div>

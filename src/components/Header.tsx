@@ -50,6 +50,7 @@ export default function Header({
   // darf die Liga-Navigationsleiste NICHT angezeigt werden.
   const isRankingMode =
     pathname.startsWith('/teams') ||
+    pathname.startsWith('/doppel') ||
     pathname.startsWith('/spieler') ||
     pathname.startsWith('/liga') ||
     pathname.startsWith('/analytics') ||
@@ -65,8 +66,8 @@ export default function Header({
 
   const mainNav = [
     { label: 'Dashboard', href: '/?mode=ranking' },
-    { label: 'Teams', href: '/teams' },
     { label: 'Spieler', href: '/spieler' },
+    { label: 'Doppel', href: '/doppel' },
     { label: 'Liga', href: '/liga' },
     { label: 'Dart Analytics Engine', href: '/analytics' },
     { label: 'Einstellungen', href: '/einstellungen' },

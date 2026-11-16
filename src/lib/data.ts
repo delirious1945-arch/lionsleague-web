@@ -90,6 +90,29 @@ export interface DoublesSpecialRow {
   team: string;
 }
 
+export type PlayerSpecialCategory =
+  | '180'
+  | 'high_score'
+  | 'high_finish'
+  | 'short_leg'
+  | 'other';
+
+export interface PlayerSpecialItem {
+  id: string;
+  player_name: string;
+  team: string;
+  match_date: string; // YYYY-MM-DD
+  formatted_date: string; // DD.MM.YYYY
+  mode: 'Einzel' | 'Doppel';
+  partner_name?: string;
+  opponent: string;
+  category: PlayerSpecialCategory;
+  badge_label: string;
+  value_label: string;
+  description: string;
+  bonus_points: number;
+}
+
 export interface Top26Player {
   player_id: number;
   player_name: string;
@@ -974,6 +997,418 @@ export async function getAllAnalyticsLegVisits(
     return result;
   } catch (err) {
     console.error('Error fetching all analytics leg visits:', err);
+    return {};
+  }
+}
+
+function formatIsoDateToDe(raw: string): string {
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const [y, m, d] = raw.slice(0, 10).split('-');
+    return `${d}.${m}.${y}`;
+  }
+  return raw;
+}
+
+export async function getAllPlayerSpecials(
+  season = '2026/2027'
+): Promise<Record<string, PlayerSpecialItem[]>> {
+  try {
+    const useSeasonFilter = Boolean(season && season !== 'Alle Saisons');
+
+    const [doublesSpecials, singleMatchesRows, specialLegsRows, highVisitRows] =
+      await Promise.all([
+        getDoublesSpecials(season),
+        useSeasonFilter
+          ? sql`
+              SELECT m.id, m.player_id, m.match_date, m.opponent, m.scores_180,
+                     m.high_finishes, m.short_legs, m.specials_count, m.season,
+                     COALESCE(m.team, p.team) as team, p.name as player_name
+              FROM matches m
+              JOIN players p ON m.player_id = p.id
+              WHERE m.season = ${season}
+                AND p.team IN ('A-Team', 'B-Team')
+                AND (m.specials_count > 0 OR m.scores_180 > 0 OR m.high_finishes > 0 OR m.short_legs > 0)
+              ORDER BY m.match_date DESC, m.id DESC
+            `
+          : sql`
+              SELECT m.id, m.player_id, m.match_date, m.opponent, m.scores_180,
+                     m.high_finishes, m.short_legs, m.specials_count, m.season,
+                     COALESCE(m.team, p.team) as team, p.name as player_name
+              FROM matches m
+              JOIN players p ON m.player_id = p.id
+              WHERE p.team IN ('A-Team', 'B-Team')
+                AND (m.specials_count > 0 OR m.scores_180 > 0 OR m.high_finishes > 0 OR m.short_legs > 0)
+              ORDER BY m.match_date DESC, m.id DESC
+            `,
+        useSeasonFilter
+          ? sql`
+              SELECT am.id as am_id, am.league_match_id, am.match_date,
+                     am.player_a_id, am.player_b_id, am.player_a_name, am.player_b_name,
+                     l.leg_num, l.winner_player_id, l.darts_thrown_a, l.darts_thrown_b,
+                     l.checkout_a, l.checkout_b
+              FROM analytics_legs l
+              JOIN analytics_matches am ON l.match_id = am.id
+              WHERE am.season = ${season}
+                AND am.player_a_name NOT LIKE '%&%'
+                AND am.player_b_name NOT LIKE '%&%'
+                AND (
+                  (l.darts_thrown_a > 0 AND l.darts_thrown_a <= 18)
+                  OR (l.darts_thrown_b > 0 AND l.darts_thrown_b <= 18)
+                  OR l.checkout_a >= 101
+                  OR l.checkout_b >= 101
+                )
+              ORDER BY l.leg_num ASC
+            `
+          : sql`
+              SELECT am.id as am_id, am.league_match_id, am.match_date,
+                     am.player_a_id, am.player_b_id, am.player_a_name, am.player_b_name,
+                     l.leg_num, l.winner_player_id, l.darts_thrown_a, l.darts_thrown_b,
+                     l.checkout_a, l.checkout_b
+              FROM analytics_legs l
+              JOIN analytics_matches am ON l.match_id = am.id
+              WHERE am.player_a_name NOT LIKE '%&%'
+                AND am.player_b_name NOT LIKE '%&%'
+                AND (
+                  (l.darts_thrown_a > 0 AND l.darts_thrown_a <= 18)
+                  OR (l.darts_thrown_b > 0 AND l.darts_thrown_b <= 18)
+                  OR l.checkout_a >= 101
+                  OR l.checkout_b >= 101
+                )
+              ORDER BY l.leg_num ASC
+            `,
+        useSeasonFilter
+          ? sql`
+              SELECT am.id as am_id, am.league_match_id, am.match_date,
+                     am.player_a_id, am.player_b_id, am.player_a_name, am.player_b_name,
+                     l.leg_num, v.player_id, v.score
+              FROM analytics_visits v
+              JOIN analytics_legs l ON v.leg_id = l.id
+              JOIN analytics_matches am ON l.match_id = am.id
+              WHERE am.season = ${season}
+                AND am.player_a_name NOT LIKE '%&%'
+                AND am.player_b_name NOT LIKE '%&%'
+                AND v.score >= 141
+              ORDER BY l.leg_num ASC, v.visit_order ASC
+            `
+          : sql`
+              SELECT am.id as am_id, am.league_match_id, am.match_date,
+                     am.player_a_id, am.player_b_id, am.player_a_name, am.player_b_name,
+                     l.leg_num, v.player_id, v.score
+              FROM analytics_visits v
+              JOIN analytics_legs l ON v.leg_id = l.id
+              JOIN analytics_matches am ON l.match_id = am.id
+              WHERE am.player_a_name NOT LIKE '%&%'
+                AND am.player_b_name NOT LIKE '%&%'
+                AND v.score >= 141
+              ORDER BY l.leg_num ASC, v.visit_order ASC
+            `,
+      ]);
+
+    const result: Record<string, PlayerSpecialItem[]> = {};
+    const addSpecial = (item: PlayerSpecialItem) => {
+      if (!result[item.player_name]) {
+        result[item.player_name] = [];
+      }
+      result[item.player_name].push(item);
+    };
+
+    // 1. Doppel-Specials aus doubles_specials
+    for (const d of doublesSpecials) {
+      const tLower = d.special_type.toLowerCase();
+      const dLower = d.description.toLowerCase();
+
+      let category: PlayerSpecialCategory = 'other';
+      let badgeLabel = d.special_type || 'Doppel-Special ⭐';
+      let valueLabel = d.description || d.special_type;
+
+      if (tLower.includes('180') || dLower.includes('180')) {
+        category = '180';
+        badgeLabel = '180er Maximum 🎯';
+        valueLabel = '180 Pkt';
+      } else if (
+        tLower.includes('high finish') ||
+        tLower.includes('101') ||
+        tLower.includes('bull') ||
+        dLower.includes('finish')
+      ) {
+        category = 'high_finish';
+        badgeLabel = 'High Finish 🏁';
+        const mFinish = d.description.match(/\b(1[0-7]\d)\b/);
+        valueLabel = mFinish ? `${mFinish[1]} Checkout` : 'High Finish (101+)';
+      } else if (tLower.includes('short') || dLower.includes('dart')) {
+        category = 'short_leg';
+        badgeLabel = 'Short Game ⚡';
+        const mDarts = d.description.match(/\b([9]|1[0-8])\b/);
+        valueLabel = mDarts ? `${mDarts[1]} Darts` : '≤ 18 Darts';
+      } else if (
+        tLower.includes('high score') ||
+        tLower.includes('141') ||
+        tLower.includes('171') ||
+        /\b1[4-7]\d\b/.test(dLower)
+      ) {
+        category = 'high_score';
+        badgeLabel = 'High Score 💥';
+        const mScore = d.description.match(/\b(1[4-7]\d)\b/);
+        valueLabel = mScore ? `${mScore[1]} Pkt` : 'High Score (141–177)';
+      }
+
+      addSpecial({
+        id: `d-${d.id}`,
+        player_name: d.player_name.trim(),
+        team: d.team.trim(),
+        match_date: String(d.match_date),
+        formatted_date: formatIsoDateToDe(String(d.match_date)),
+        mode: 'Doppel',
+        partner_name: d.partner_name.trim(),
+        opponent: d.opponent_team.trim(),
+        category,
+        badge_label: badgeLabel,
+        value_label: valueLabel,
+        description: d.description || `${valueLabel} im Doppel mit ${d.partner_name}`,
+        bonus_points: 0.5,
+      });
+    }
+
+    // Helper: Analytics-Zeile zu einem Einzelmatch zuordnen
+    const isRowForMatch = (
+      row: Record<string, unknown>,
+      matchId: number,
+      playerId: number,
+      matchDate: string,
+      opponent: string
+    ) => {
+      if (row.league_match_id != null && Number(row.league_match_id) === matchId) {
+        return true;
+      }
+      if (
+        String(row.match_date) === matchDate &&
+        (Number(row.player_a_id) === playerId || Number(row.player_b_id) === playerId)
+      ) {
+        const oppNorm = opponent.trim().toLowerCase();
+        const aNorm = String(row.player_a_name || '').trim().toLowerCase();
+        const bNorm = String(row.player_b_name || '').trim().toLowerCase();
+        return aNorm === oppNorm || bNorm === oppNorm;
+      }
+      return false;
+    };
+
+    // 2. Einzel-Specials aus matches + exakten Analytics-Legs/-Visits
+    for (const m of singleMatchesRows) {
+      const matchId = Number(m.id);
+      const playerId = Number(m.player_id);
+      const playerName = String(m.player_name).trim();
+      const team = String(m.team).trim();
+      const matchDate = String(m.match_date);
+      const formattedDate = formatIsoDateToDe(matchDate);
+      const opponent = String(m.opponent).trim();
+
+      const scores180 = Number(m.scores_180 || 0);
+      const highFinishes = Number(m.high_finishes || 0);
+      const shortLegs = Number(m.short_legs || 0);
+      const specialsCount = Number(m.specials_count || 0);
+
+      const matchLegs = specialLegsRows.filter((l) =>
+        isRowForMatch(l, matchId, playerId, matchDate, opponent)
+      );
+      const matchVisits = highVisitRows.filter(
+        (v) =>
+          Number(v.player_id) === playerId &&
+          isRowForMatch(v, matchId, playerId, matchDate, opponent)
+      );
+
+      const built: PlayerSpecialItem[] = [];
+
+      // a) 180er
+      const visits180 = matchVisits.filter((v) => Number(v.score) === 180);
+      for (let i = 0; i < visits180.length; i++) {
+        const v = visits180[i];
+        built.push({
+          id: `s-${matchId}-180-${i}`,
+          player_name: playerName,
+          team,
+          match_date: matchDate,
+          formatted_date: formattedDate,
+          mode: 'Einzel',
+          opponent,
+          category: '180',
+          badge_label: '180er Maximum 🎯',
+          value_label: `180 Pkt (Leg ${Number(v.leg_num)})`,
+          description: `Maximum 180 im Einzel gegen ${opponent} (Leg ${Number(v.leg_num)})`,
+          bonus_points: 0.5,
+        });
+      }
+      for (let i = visits180.length; i < scores180; i++) {
+        built.push({
+          id: `s-${matchId}-180-fb-${i}`,
+          player_name: playerName,
+          team,
+          match_date: matchDate,
+          formatted_date: formattedDate,
+          mode: 'Einzel',
+          opponent,
+          category: '180',
+          badge_label: '180er Maximum 🎯',
+          value_label: '180 Pkt',
+          description: `Maximum 180 im Einzel gegen ${opponent}`,
+          bonus_points: 0.5,
+        });
+      }
+
+      // b) High Finishes (>= 101)
+      const hfLegs = matchLegs.filter((l) => {
+        if (Number(l.winner_player_id) !== playerId) return false;
+        const isA = Number(l.player_a_id) === playerId;
+        const co = Number(isA ? l.checkout_a : l.checkout_b);
+        return co >= 101;
+      });
+      for (let i = 0; i < hfLegs.length; i++) {
+        const l = hfLegs[i];
+        const isA = Number(l.player_a_id) === playerId;
+        const co = Number(isA ? l.checkout_a : l.checkout_b);
+        built.push({
+          id: `s-${matchId}-hf-${i}`,
+          player_name: playerName,
+          team,
+          match_date: matchDate,
+          formatted_date: formattedDate,
+          mode: 'Einzel',
+          opponent,
+          category: 'high_finish',
+          badge_label: 'High Finish 🏁',
+          value_label: `${co} Checkout (Leg ${Number(l.leg_num)})`,
+          description: `${co}er High Finish im Einzel gegen ${opponent} (Leg ${Number(l.leg_num)})`,
+          bonus_points: 0.5,
+        });
+      }
+      if (hfLegs.length === 0 && highFinishes > 0) {
+        built.push({
+          id: `s-${matchId}-hf-fb`,
+          player_name: playerName,
+          team,
+          match_date: matchDate,
+          formatted_date: formattedDate,
+          mode: 'Einzel',
+          opponent,
+          category: 'high_finish',
+          badge_label: 'High Finish 🏁',
+          value_label: highFinishes >= 101 ? `${highFinishes} Checkout` : 'High Finish (101+)',
+          description:
+            highFinishes >= 101
+              ? `${highFinishes}er High Finish im Einzel gegen ${opponent}`
+              : `High Finish im Einzel gegen ${opponent}`,
+          bonus_points: 0.5,
+        });
+      }
+
+      // c) Short Legs (<= 18 Darts gewonnen)
+      const slLegs = matchLegs.filter((l) => {
+        if (Number(l.winner_player_id) !== playerId) return false;
+        const isA = Number(l.player_a_id) === playerId;
+        const darts = Number(isA ? l.darts_thrown_a : l.darts_thrown_b);
+        return darts > 0 && darts <= 18;
+      });
+      for (let i = 0; i < slLegs.length; i++) {
+        const l = slLegs[i];
+        const isA = Number(l.player_a_id) === playerId;
+        const darts = Number(isA ? l.darts_thrown_a : l.darts_thrown_b);
+        built.push({
+          id: `s-${matchId}-sl-${i}`,
+          player_name: playerName,
+          team,
+          match_date: matchDate,
+          formatted_date: formattedDate,
+          mode: 'Einzel',
+          opponent,
+          category: 'short_leg',
+          badge_label: 'Short Game ⚡',
+          value_label: `${darts} Darts (Leg ${Number(l.leg_num)})`,
+          description: `${darts}-Dart Short Leg im Einzel gegen ${opponent} (Leg ${Number(l.leg_num)})`,
+          bonus_points: 0.5,
+        });
+      }
+      for (let i = slLegs.length; i < shortLegs; i++) {
+        built.push({
+          id: `s-${matchId}-sl-fb-${i}`,
+          player_name: playerName,
+          team,
+          match_date: matchDate,
+          formatted_date: formattedDate,
+          mode: 'Einzel',
+          opponent,
+          category: 'short_leg',
+          badge_label: 'Short Game ⚡',
+          value_label: '≤ 18 Darts',
+          description: `Short Game im Einzel gegen ${opponent}`,
+          bonus_points: 0.5,
+        });
+      }
+
+      // d) High Scores 141-177 (nur wenn specials_count weitere Specials ausweist)
+      if (built.length < specialsCount) {
+        const hiScoreVisits = matchVisits
+          .filter((v) => {
+            const sc = Number(v.score);
+            return sc >= 141 && sc < 180;
+          })
+          .sort((a, b) => Number(b.score) - Number(a.score));
+
+        const needed = specialsCount - built.length;
+        for (let i = 0; i < Math.min(needed, hiScoreVisits.length); i++) {
+          const v = hiScoreVisits[i];
+          const sc = Number(v.score);
+          built.push({
+            id: `s-${matchId}-hs-${i}`,
+            player_name: playerName,
+            team,
+            match_date: matchDate,
+            formatted_date: formattedDate,
+            mode: 'Einzel',
+            opponent,
+            category: 'high_score',
+            badge_label: 'High Score 💥',
+            value_label: `${sc} Pkt (Leg ${Number(v.leg_num)})`,
+            description: `${sc}er High Score im Einzel gegen ${opponent} (Leg ${Number(v.leg_num)})`,
+            bonus_points: 0.5,
+          });
+        }
+      }
+
+      // e) Letzter Fallback, falls specials_count immer noch groesser ist
+      while (built.length < specialsCount) {
+        built.push({
+          id: `s-${matchId}-other-${built.length}`,
+          player_name: playerName,
+          team,
+          match_date: matchDate,
+          formatted_date: formattedDate,
+          mode: 'Einzel',
+          opponent,
+          category: 'other',
+          badge_label: 'Special ⭐',
+          value_label: 'Special im Einzel',
+          description: `Offizielles Special im Einzel gegen ${opponent}`,
+          bonus_points: 0.5,
+        });
+      }
+
+      for (const item of built) {
+        addSpecial(item);
+      }
+    }
+
+    // Chronologisch absteigend sortieren
+    for (const key of Object.keys(result)) {
+      result[key].sort((a, b) => {
+        const dateCmp = b.match_date.localeCompare(a.match_date);
+        if (dateCmp !== 0) return dateCmp;
+        return b.id.localeCompare(a.id);
+      });
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Error fetching all player specials:', err);
     return {};
   }
 }
