@@ -248,8 +248,8 @@ export default function DoppelquoteLiveMonitorClient({ initialBoardId = '1' }: D
         </div>
 
         <div className="text-center space-y-7 relative z-10 max-w-xl mx-auto flex flex-col items-center">
-          <div className="relative w-56 h-56 sm:w-72 sm:h-72 drop-shadow-[0_0_80px_rgba(6,182,212,0.5)] animate-pulse">
-            <Image src="/logo.png" alt="Lions Weyhausen" fill className="object-contain" priority />
+          <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-[400px] md:h-[400px] lg:w-[460px] lg:h-[460px] xl:w-[520px] xl:h-[520px] max-h-[48vh] drop-shadow-[0_0_80px_rgba(6,182,212,0.65)] animate-pulse">
+            <Image src="/logo.png" alt="Lions Weyhausen" fill sizes="(max-width: 640px) 256px, (max-width: 1024px) 400px, 520px" className="object-contain" priority />
           </div>
 
           <div className="space-y-4 pt-2">

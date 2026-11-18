@@ -157,9 +157,9 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
           </div>
         </div>
 
-        <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-8 my-auto">
-          <div className="relative w-48 h-48 sm:w-64 sm:h-64 filter drop-shadow-[0_0_50px_rgba(16,185,129,0.5)]">
-            <Image src="/logo.png" alt="Lions Weyhausen" fill sizes="260px" className="object-contain" priority />
+        <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 sm:space-y-8 my-auto">
+          <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-[400px] md:h-[400px] lg:w-[460px] lg:h-[460px] xl:w-[520px] xl:h-[520px] max-h-[48vh] filter drop-shadow-[0_0_70px_rgba(16,185,129,0.65)] transition-all">
+            <Image src="/logo.png" alt="Lions Weyhausen" fill sizes="(max-width: 640px) 256px, (max-width: 1024px) 400px, 520px" className="object-contain" priority />
           </div>
 
           <div className="space-y-4 max-w-xl">

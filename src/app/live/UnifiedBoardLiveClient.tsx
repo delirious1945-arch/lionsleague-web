@@ -224,16 +224,16 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
           </div>
         </div>
 
-        <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 my-auto">
-          <div className="relative w-48 h-48 sm:w-64 sm:h-64 filter drop-shadow-[0_0_50px_rgba(6,182,212,0.5)]">
-            <Image src="/logo.png" alt="Lions Weyhausen" fill sizes="260px" className="object-contain" priority />
+        <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-6 sm:space-y-8 my-auto">
+          <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-[400px] md:h-[400px] lg:w-[460px] lg:h-[460px] xl:w-[520px] xl:h-[520px] max-h-[48vh] filter drop-shadow-[0_0_70px_rgba(6,182,212,0.65)] transition-all">
+            <Image src="/logo.png" alt="Lions Weyhausen" fill sizes="(max-width: 640px) 256px, (max-width: 1024px) 400px, 520px" className="object-contain" priority />
           </div>
 
           <div className="space-y-3 max-w-xl">
-            <p className="text-lg sm:text-2xl text-cyan-300 font-mono tracking-widest animate-pulse font-bold">
+            <p className="text-xl sm:text-3xl text-cyan-300 font-mono tracking-widest animate-pulse font-black drop-shadow-[0_0_20px_rgba(6,182,212,0.5)]">
               Warte auf Spielbeginn am Board {boardId}...
             </p>
-            <span className="text-xs text-slate-400 block pt-1">
+            <span className="text-sm sm:text-base text-slate-300 block pt-1 font-medium">
               Starte einfach ein beliebiges Spiel am Tablet. Der Bildschirm schaltet automatisch um.
             </span>
           </div>
