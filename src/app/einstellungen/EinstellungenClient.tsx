@@ -2,7 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Sun, Moon, ShieldCheck, Tag, Trophy, RefreshCw } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Sun,
+  Moon,
+  ShieldCheck,
+  Tag,
+  Trophy,
+  RefreshCw,
+  Tv,
+  Tablet,
+  Copy,
+  Check,
+  ExternalLink,
+  Info,
+} from 'lucide-react';
 import { triggerManualLotteryDrawAction } from '@/app/actions/lotteryActions';
 
 interface EinstellungenClientProps {
@@ -15,6 +30,17 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
   const [lotteryRunning, setLotteryRunning] = useState<boolean>(false);
   const [lotteryStatus, setLotteryStatus] = useState<string | null>(null);
   const [mounted, setMounted] = useState<boolean>(false);
+  const [deviceTab, setDeviceTab] = useState<'monitore' | 'tablets'>('monitore');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [origin, setOrigin] = useState<string>('https://lionsweyhausen.vercel.app');
+
+  const copyToClipboard = (text: string, key: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
 
   const handleTriggerLottery = async () => {
     setLotteryRunning(true);
@@ -53,6 +79,10 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
       } else {
         document.documentElement.classList.remove('show-ui-labels');
       }
+
+      if (window.location.origin) {
+        setOrigin(window.location.origin);
+      }
     } catch (e) {}
     setMounted(true);
   }, []);
@@ -88,7 +118,7 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
   };
 
   return (
-    <div className="max-w-xl mx-auto py-6 sm:py-12 px-3 sm:px-6 space-y-8 animate-fadeIn select-none">
+    <div className="max-w-2xl mx-auto py-6 sm:py-12 px-3 sm:px-6 space-y-8 animate-fadeIn select-none">
       {/* Oben nur die Möglichkeit, zurück zur Startseite zu gehen */}
       <div>
         <Link
@@ -172,6 +202,193 @@ export default function EinstellungenClient({ isAdmin = false }: EinstellungenCl
           >
             {isLightMode ? 'An (Hellmodus)' : 'Aus (Dunkelmodus)'}
           </span>
+        </div>
+      </div>
+
+      {/* 2. Geräte-Links für Fire TV Sticks & Vereinsheim-Tablets */}
+      <div
+        data-ui-id="SETTINGS.DEVICE_LINKS.CARD"
+        className="bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-6"
+      >
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Tv className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Fire TV Sticks & Oche-Monitore
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Direkte URLs für die Browser der Fire TV Sticks (z. B. Amazon Silk) und Tablets im Vereinsheim.
+            </p>
+          </div>
+
+          {/* Umschalter zwischen Monitoren und Tablets */}
+          <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-2xl border border-white/10">
+            <button
+              type="button"
+              onClick={() => setDeviceTab('monitore')}
+              className={`px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                deviceTab === 'monitore'
+                  ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)] font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>TV-Monitore</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeviceTab('tablets')}
+              className={`px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                deviceTab === 'tablets'
+                  ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)] font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Tablet className="w-3.5 h-3.5" />
+              <span>Tablets</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Link-Karten */}
+        {deviceTab === 'monitore' ? (
+          <div className="space-y-3">
+            <div className="text-xs font-mono text-slate-400 flex items-center justify-between">
+              <span>BOARD-MONITORE (FÜR FIRE TV STICKS):</span>
+              <span className="text-[11px] text-cyan-400">Automatische Live-Umschaltung</span>
+            </div>
+
+            {[1, 2, 3, 4, 5].map((boardNum) => {
+              const relPath = `/board/${boardNum}`;
+              const fullUrl = `${origin}${relPath}`;
+              const isCopied = copiedKey === `board-${boardNum}`;
+
+              return (
+                <div
+                  key={boardNum}
+                  className="flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 hover:border-cyan-500/40 transition-all"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-mono text-xs font-black flex items-center justify-center shrink-0">
+                      B{boardNum}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">Board {boardNum} Monitor</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                          {relPath}
+                        </span>
+                      </div>
+                      <p className="text-xs font-mono text-slate-400 truncate">
+                        {fullUrl}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(fullUrl, `board-${boardNum}`)}
+                      className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                        isCopied
+                          ? 'bg-emerald-500 text-slate-950 font-black'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10'
+                      }`}
+                      title="URL in Zwischenablage kopieren"
+                    >
+                      {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{isCopied ? 'Kopiert!' : 'Kopieren'}</span>
+                    </button>
+                    <Link
+                      href={relPath}
+                      target="_blank"
+                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-white/10 transition-all"
+                      title="Im neuen Tab öffnen"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-xs font-mono text-slate-400 flex items-center justify-between">
+              <span>TABLET-GERÄTE-ARRETIERUNG:</span>
+              <span className="text-[11px] text-cyan-400">Einmalig aufrufen zum Arretieren</span>
+            </div>
+
+            {[1, 2, 3, 4, 5].map((boardNum) => {
+              const relPath = `/tablet/${boardNum}`;
+              const fullUrl = `${origin}${relPath}`;
+              const isCopied = copiedKey === `tablet-${boardNum}`;
+
+              return (
+                <div
+                  key={boardNum}
+                  className="flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 hover:border-cyan-500/40 transition-all"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-mono text-xs font-black flex items-center justify-center shrink-0">
+                      T{boardNum}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">Tablet für Board {boardNum}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                          {relPath}
+                        </span>
+                      </div>
+                      <p className="text-xs font-mono text-slate-400 truncate">
+                        {fullUrl}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(fullUrl, `tablet-${boardNum}`)}
+                      className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                        isCopied
+                          ? 'bg-emerald-500 text-slate-950 font-black'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10'
+                      }`}
+                      title="URL in Zwischenablage kopieren"
+                    >
+                      {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{isCopied ? 'Kopiert!' : 'Kopieren'}</span>
+                    </button>
+                    <Link
+                      href={relPath}
+                      target="_blank"
+                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-white/10 transition-all"
+                      title="Im neuen Tab öffnen"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Kurzanleitung für Fire TV Stick (Silk Browser) */}
+        <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/20 space-y-2 text-xs">
+          <div className="flex items-center gap-2 text-cyan-300 font-bold">
+            <Info className="w-4 h-4 shrink-0" />
+            <span>Kurzanleitung: Fire TV Stick einrichten (Amazon Silk Browser)</span>
+          </div>
+          <ol className="list-decimal list-inside space-y-1.5 text-slate-300 pl-1 leading-relaxed">
+            <li>Öffne auf dem Fire TV Stick die vorinstallierte App <strong>Amazon Silk Browser</strong> (oder lade sie im Amazon Appstore herunter).</li>
+            <li>Gib in die Adresszeile die Board-URL ein (z. B. <code className="bg-slate-900 px-1 py-0.5 rounded text-cyan-300 font-mono">{origin}/board/1</code>).</li>
+            <li>Drücke auf der Fire TV Fernbedienung die <strong>Menü-Taste</strong> (Taste mit den 3 Strichen ☰) und wähle <strong>„Zu Lesezeichen hinzufügen“</strong> oder <strong>„Als Startseite festlegen“</strong>.</li>
+            <li>Klicke oben rechts auf das <strong>Vollbild-Symbol</strong>, um randlos auf dem gesamten Fernseher zu spielen.</li>
+          </ol>
         </div>
       </div>
 
