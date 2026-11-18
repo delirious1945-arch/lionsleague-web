@@ -49,8 +49,10 @@ export default function HolographicScoringLeiterCockpit({
       ? 'text-3xl sm:text-4xl lg:text-5xl'
       : 'text-3xl sm:text-5xl lg:text-6xl';
 
-  const cx = 250;
-  const cy = 250;
+  // Sprossen von oben (140, Index 6) nach unten (41, Index 0)
+  const rungsTopToBottom = [...SCORING_LEITER_LEVELS]
+    .map((val, idx) => ({ val, idx }))
+    .reverse();
 
   return (
     <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 overflow-hidden select-none font-sans">
@@ -81,7 +83,7 @@ export default function HolographicScoringLeiterCockpit({
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] rounded-full pointer-events-none opacity-70"
           style={{
             background:
-              'radial-gradient(circle, rgba(0, 229, 255, 0.22) 0%, rgba(255, 51, 85, 0.15) 35%, transparent 70%)',
+              'radial-gradient(circle, rgba(0, 229, 255, 0.22) 0%, rgba(255, 51, 85, 0.12) 35%, transparent 70%)',
             filter: 'blur(60px)',
           }}
         />
@@ -117,11 +119,11 @@ export default function HolographicScoringLeiterCockpit({
         )}
       </header>
 
-      {/* 3. DAS COCKPIT-HERZ: 3 HORIZONTALE ELEMENTE (1:1 PARITÄT ZU STELLEN & CHECKEN) */}
-      <main className="my-auto w-full max-w-7xl mx-auto flex items-center justify-center relative z-20 px-2 sm:px-4">
-        <div className="relative flex items-center justify-center w-full">
+      {/* 3. DAS COCKPIT-HERZ: 3 HORIZONTALE ELEMENTE */}
+      <main className="my-auto w-full max-w-7xl mx-auto flex items-center justify-center relative z-20 px-2 sm:px-6">
+        <div className="relative flex items-center justify-center gap-6 sm:gap-10 lg:gap-12 w-full">
           {/* LINKER FLÜGEL: SPIELER-CARD */}
-          <div className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] py-6 pl-6 pr-10 sm:py-8 sm:pl-8 sm:pr-12 flex flex-col items-center justify-center text-center -mr-8 overflow-hidden">
+          <div className="relative z-10 w-[290px] sm:w-[340px] lg:w-[380px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-center text-center overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
             <div className="flex flex-col items-center justify-center max-w-full">
@@ -147,162 +149,86 @@ export default function HolographicScoringLeiterCockpit({
             </div>
           </div>
 
-          {/* ZENTRUM: HOLOGRAFISCHES STUFEN-RADAR */}
-          <div className="relative z-20 w-[360px] h-[360px] sm:w-[440px] sm:h-[440px] lg:w-[500px] lg:h-[500px] shrink-0 flex items-center justify-center select-none pointer-events-none">
-            <div className="absolute -inset-4 rounded-full bg-cyan-500/15 blur-2xl animate-pulse pointer-events-none" />
+          {/* ZENTRUM: SYMBOLISCHE HOLOGRAFISCHE 7-SPROSSEN-LEITER (41 UNTEN ➔ 140 OBEN) */}
+          <div className="relative z-20 w-[320px] sm:w-[370px] lg:w-[410px] shrink-0 flex flex-col items-center justify-center select-none">
+            {/* Leiter-Container mit zwei vertikalen Neon-Holmen */}
+            <div className="relative w-full px-6 py-4">
+              {/* Linker vertikaler Leiterholm */}
+              <div className="absolute left-4 top-0 bottom-0 w-3 rounded-full bg-gradient-to-b from-cyan-300 via-cyan-500 to-cyan-700 shadow-[0_0_25px_rgba(6,182,212,0.75)] border border-cyan-200/70" />
+              {/* Rechter vertikaler Leiterholm */}
+              <div className="absolute right-4 top-0 bottom-0 w-3 rounded-full bg-gradient-to-b from-cyan-300 via-cyan-500 to-cyan-700 shadow-[0_0_25px_rgba(6,182,212,0.75)] border border-cyan-200/70" />
 
-            <svg
-              viewBox="0 0 500 500"
-              className="w-full h-full drop-shadow-[0_0_50px_rgba(0,229,255,0.5)] select-none pointer-events-none"
-            >
-              <defs>
-                <filter id="slCyanGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="6" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
+              {/* 7 Horizontale Sprossen von 140 (oben) bis 41 (unten) */}
+              <div className="relative z-10 flex flex-col gap-3 sm:gap-3.5 py-2">
+                {rungsTopToBottom.map(({ val, idx }) => {
+                  const isDone = clearedAll || idx < currentLevelIndex;
+                  const isCurr = !clearedAll && !eliminated && idx === currentLevelIndex;
+                  const isElim = eliminated && idx === currentLevelIndex;
 
-              <circle cx={cx} cy={cy} r="245" fill="none" stroke="#00e5ff" strokeWidth="0.9" strokeOpacity="0.25" strokeDasharray="6 6" />
-              <circle cx={cx} cy={cy} r="238" fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.35" strokeDasharray="48 16 12 16" />
-
-              {Array.from({ length: 72 }).map((_, i) => {
-                const deg = i * 5;
-                const rad = (deg * Math.PI) / 180;
-                const isMajor = deg % 90 === 0;
-                const r1 = isMajor ? 248 : 240;
-                const r2 = isMajor ? 216 : 235;
-                return (
-                  <line
-                    key={`sl-tick-${i}`}
-                    x1={cx + r1 * Math.sin(rad)}
-                    y1={cy - r1 * Math.cos(rad)}
-                    x2={cx + r2 * Math.sin(rad)}
-                    y2={cy - r2 * Math.cos(rad)}
-                    stroke="#00e5ff"
-                    strokeWidth={isMajor ? 2 : 0.8}
-                    strokeOpacity={isMajor ? 0.85 : 0.25}
-                  />
-                );
-              })}
-
-              <circle
-                cx={cx}
-                cy={cy}
-                r="214"
-                fill="rgba(2, 7, 18, 0.92)"
-                stroke="#00e5ff"
-                strokeWidth="2.2"
-                strokeOpacity="0.65"
-                filter="url(#slCyanGlow)"
-              />
-              <circle cx={cx} cy={cy} r="158" fill="none" stroke="#38bdf8" strokeWidth="1.4" strokeOpacity="0.4" strokeDasharray="24 12" />
-
-              {/* Die 7 Stufen entlang des Radar-Rings */}
-              {SCORING_LEITER_LEVELS.map((val, idx) => {
-                const ang = (-90 + idx * (360 / 7)) * (Math.PI / 180);
-                const x = cx + 186 * Math.cos(ang);
-                const y = cy + 186 * Math.sin(ang);
-                const isDone = clearedAll || idx < currentLevelIndex;
-                const isCurr = !clearedAll && idx === currentLevelIndex;
-
-                return (
-                  <g key={val}>
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={isCurr ? 26 : 20}
-                      fill={
-                        isDone
-                          ? 'rgba(0, 255, 136, 0.2)'
-                          : isCurr
-                          ? 'rgba(255, 51, 102, 0.3)'
-                          : 'rgba(15, 23, 42, 0.8)'
-                      }
-                      stroke={isDone ? '#00ff88' : isCurr ? '#ff3366' : '#38bdf8'}
-                      strokeWidth={isCurr ? '2.5' : '1.2'}
-                      strokeOpacity={isCurr || isDone ? '1' : '0.4'}
-                    />
-                    <text
-                      x={x}
-                      y={y}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fill={isDone ? '#00ff88' : isCurr ? '#ffffff' : '#bae6fd'}
-                      fontSize={isCurr ? '19' : '15'}
-                      fontFamily="monospace"
-                      fontWeight="900"
-                    >
-                      {val}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Zentraler Kern */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r="92"
-                fill="rgba(4, 7, 17, 0.94)"
-                stroke="#00e5ff"
-                strokeWidth="4"
-                filter="url(#slCyanGlow)"
-              />
-              <circle cx={cx} cy={cy} r="83" fill="none" stroke="#ff3366" strokeWidth="2" strokeOpacity="0.75" />
-
-              <text
-                x={cx}
-                y={cy - 44}
-                textAnchor="middle"
-                fill="#67e8f9"
-                fontSize="15"
-                fontFamily="monospace"
-                fontWeight="800"
-              >
-                {clearedAll ? 'GESCHAFFT' : eliminated ? 'AUS BEI' : 'ZIEL ≥'}
-              </text>
-              <text
-                x={cx}
-                y={cy + 10}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill={clearedAll ? '#00ff88' : eliminated ? '#fb7185' : '#00f0ff'}
-                fontSize="68"
-                fontFamily="monospace"
-                fontWeight="900"
-                filter="url(#slCyanGlow)"
-              >
-                {clearedAll ? '140' : currentNumber}
-              </text>
-            </svg>
-
-            {/* Gedockter Leiter-Pod unten am Radar */}
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-slate-950/95 border-2 border-cyan-400/90 shadow-[0_0_30px_rgba(6,182,212,0.7)] flex items-center gap-2 z-30 pointer-events-auto whitespace-nowrap">
-              {SCORING_LEITER_LEVELS.map((val, i) => {
-                const isDone = clearedAll || i < currentLevelIndex;
-                const isCurr = !clearedAll && i === currentLevelIndex;
-                return (
-                  <React.Fragment key={val}>
-                    {i > 0 && <span className="text-slate-600 font-bold text-xs">➔</span>}
-                    <span
-                      className={`font-black font-mono text-sm sm:text-base ${
-                        isDone
-                          ? 'text-[#00ff88]'
-                          : isCurr
-                          ? 'text-[#ffd700] underline'
-                          : 'text-slate-500'
+                  return (
+                    <div
+                      key={val}
+                      className={`relative flex items-center justify-between px-5 sm:px-7 rounded-2xl border-2 transition-all duration-500 ${
+                        isCurr
+                          ? 'h-16 sm:h-20 bg-gradient-to-r from-slate-950 via-cyan-950/90 to-slate-950 border-cyan-300 shadow-[0_0_40px_rgba(0,229,255,0.65),inset_0_0_20px_rgba(0,229,255,0.25)] scale-[1.06] z-20'
+                          : isElim
+                          ? 'h-14 sm:h-16 bg-red-950/80 border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.5)] scale-[1.03] z-20'
+                          : isDone
+                          ? 'h-11 sm:h-12 bg-emerald-950/85 border-[#00ff88]/80 shadow-[0_0_20px_rgba(0,255,136,0.35)]'
+                          : 'h-11 sm:h-12 bg-slate-950/85 border-cyan-500/25 opacity-75'
                       }`}
                     >
-                      {val}
-                    </span>
-                  </React.Fragment>
-                );
-              })}
+                      {/* Linke Stufen-Nummer */}
+                      <span
+                        className={`text-xs font-mono font-bold uppercase tracking-wider ${
+                          isCurr
+                            ? 'text-cyan-300'
+                            : isElim
+                            ? 'text-red-300'
+                            : isDone
+                            ? 'text-emerald-300'
+                            : 'text-slate-500'
+                        }`}
+                      >
+                        Stufe {idx + 1}
+                      </span>
+
+                      {/* Sprossen-Zahl */}
+                      <span
+                        className={`font-mono font-black tracking-tight leading-none ${
+                          isCurr
+                            ? 'text-4xl sm:text-5xl text-[#00f0ff] drop-shadow-[0_0_20px_rgba(0,240,255,0.9)]'
+                            : isElim
+                            ? 'text-3xl sm:text-4xl text-red-300'
+                            : isDone
+                            ? 'text-2xl sm:text-3xl text-[#00ff88]'
+                            : 'text-2xl sm:text-3xl text-slate-400'
+                        }`}
+                      >
+                        {val}
+                      </span>
+
+                      {/* Rechtes Status-Icon */}
+                      <span className="w-16 text-right font-mono text-xs sm:text-sm font-black">
+                        {isDone ? (
+                          <span className="text-[#00ff88]">✓ OK</span>
+                        ) : isCurr ? (
+                          <span className="text-amber-300 animate-pulse">◀ ZIEL</span>
+                        ) : isElim ? (
+                          <span className="text-red-400">✕ AUS</span>
+                        ) : (
+                          <span className="text-slate-600">2×</span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           {/* RECHTER FLÜGEL: TREFFER FÜR AUFSTIEG & 10 AUFNAHMEN-KAPSELN */}
-          <div className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-between text-center -ml-8 overflow-hidden">
+          <div className="relative z-10 w-[290px] sm:w-[340px] lg:w-[380px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-between text-center overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
             <div className="flex flex-col items-center justify-center my-auto space-y-1 w-full">

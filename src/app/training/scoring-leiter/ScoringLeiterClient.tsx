@@ -251,10 +251,12 @@ export default function ScoringLeiterClient({
     };
   }, [sendStandbySignal]);
 
-  // 4s Heartbeat während aktiven Spiels
+  // 4s Heartbeat während aktiven Spiels (sendet vollständigen Snapshot, damit Namen & Stand nie überschrieben werden!)
   useEffect(() => {
     if (!isGameStarted || isGameFinished) return;
     const interval = setInterval(() => {
+      const activeState = activePlayer === 1 ? p1State : p2State;
+      const targetVal = SCORING_LEITER_LEVELS[activeState.levelIdx] ?? 140;
       fetch('/api/live/board', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,12 +265,24 @@ export default function ScoringLeiterClient({
           sessionId: gameSessionId,
           status: 'playing',
           gameType: 'scoring_leiter',
+          gameMode,
+          p1Name,
+          p2Name,
+          activePlayer,
+          currentNumber: targetVal,
+          currentLevelIndex: activeState.levelIdx,
+          hitsInLevel: activeState.hitsInLevel,
+          levelVisits: activeState.visitsInLevel,
+          currentVisit: Math.min(MAX_VISITS_PER_LEVEL, activeState.visitsInLevel.length + 1),
+          totalVisits: MAX_VISITS_PER_LEVEL,
+          eliminated: activeState.eliminated,
+          clearedAll: activeState.clearedAll,
           updatedAt: Date.now(),
         }),
       }).catch(() => {});
     }, 4000);
     return () => clearInterval(interval);
-  }, [isGameStarted, isGameFinished, activeBoard, gameSessionId]);
+  }, [isGameStarted, isGameFinished, activeBoard, gameSessionId, gameMode, p1Name, p2Name, activePlayer, p1State, p2State]);
 
   const broadcastLiveState = (
     started: boolean,
