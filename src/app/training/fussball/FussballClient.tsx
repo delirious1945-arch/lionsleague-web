@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Player } from '@/lib/data';
 import { 
@@ -252,36 +252,77 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     };
   }, [activeBoard]);
 
-  // Standby-Reset beim Verlassen
-  useEffect(() => {
-    const sendStandby = () => {
-      try {
-        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
-        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-          navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
-          navigator.sendBeacon('/api/live/fussball', new Blob([payload], { type: 'application/json' }));
-        } else {
-          fetch('/api/live/board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-          fetch('/api/live/fussball', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-        }
-      } catch (e) {}
-    };
+  // Standby-Reset Helfer (garantiert sofortige Rückkehr des Monitors zum Startbildschirm)
+  const sendStandbySignal = useCallback((bId = activeBoard, sId = gameSessionId) => {
+    try {
+      const idlePayload = {
+        boardId: bId,
+        sessionId: sId,
+        status: 'idle',
+        reset: true,
+        updatedAt: Date.now(),
+      };
+      liveBroadcastRef.current?.postMessage(idlePayload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${bId}`);
+        masterBc.postMessage(idlePayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_fussball_live_sync_${bId}`, JSON.stringify(idlePayload));
+      localStorage.setItem(`lions_board_live_sync_${bId}`, JSON.stringify(idlePayload));
 
-    window.addEventListener('beforeunload', sendStandby);
-    return () => {
-      window.removeEventListener('beforeunload', sendStandby);
-    };
+      const payloadStr = JSON.stringify(idlePayload);
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/live/board', new Blob([payloadStr], { type: 'application/json' }));
+        navigator.sendBeacon('/api/live/fussball', new Blob([payloadStr], { type: 'application/json' }));
+      } else {
+        fetch('/api/live/board', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+        fetch('/api/live/fussball', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch (e) {}
   }, [activeBoard, gameSessionId]);
+
+  // Standby-Reset beim Verlassen, Unmount oder Tab-Wechsel
+  useEffect(() => {
+    const handleUnload = () => sendStandbySignal();
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+      // Komponente unmountet (z. B. Navigation zu /training oder /) -> SOFORT Standby an Monitor senden!
+      sendStandbySignal();
+    };
+  }, [sendStandbySignal]);
+
+  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten
+  useEffect(() => {
+    if (!isGameStarted || gameOver) return;
+    const interval = setInterval(() => {
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          boardId: activeBoard,
+          sessionId: gameSessionId,
+          status: 'playing',
+          gameType: 'fussball',
+          updatedAt: Date.now(),
+        }),
+      }).catch(() => {});
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isGameStarted, gameOver, activeBoard, gameSessionId]);
 
   // Live Sync Push
   useEffect(() => {
@@ -540,33 +581,14 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     if (stats.p1Darts === 0 && stats.p2Darts === 0) {
       clearActiveGameCache();
       setIsGameStarted(false);
+      sendStandbySignal();
       return;
     }
 
     if (confirm('Möchtest du das laufende Spiel wirklich abbrechen? Der bisherige Spielstand geht verloren.')) {
       clearActiveGameCache();
       setIsGameStarted(false);
-      try {
-        const idlePayload = { status: 'idle', boardId: activeBoard, sessionId: gameSessionId, reset: true, updatedAt: Date.now() };
-        liveBroadcastRef.current?.postMessage(idlePayload);
-        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-          const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
-          masterBc.postMessage(idlePayload);
-          masterBc.close();
-        }
-        localStorage.setItem(`lions_fussball_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
-        localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
-        fetch('/api/live/board', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(idlePayload),
-        }).catch(() => {});
-        fetch('/api/live/fussball', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(idlePayload),
-        }).catch(() => {});
-      } catch (e) {}
+      sendStandbySignal();
     }
   };
 

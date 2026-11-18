@@ -85,8 +85,8 @@ export async function GET(req: Request) {
         const updatedAt = Number(row.updated_at);
         const ageMs = Date.now() - updatedAt;
 
-        // Auto-Standby: Wenn älter als 60 Minuten ohne Aktivität -> sauberes Standby
-        if (ageMs > 60 * 60 * 1000 || row.status === 'idle') {
+        // Auto-Standby: Wenn älter als 25 Sekunden ohne Aktivität oder status === 'idle' -> sauberes Standby
+        if (ageMs > 25 * 1000 || row.status === 'idle') {
           return NextResponse.json(defaultState(boardId, row.session_id), {
             headers: {
               'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -110,6 +110,14 @@ export async function GET(req: Request) {
     }
 
     const fallback = inMemoryFallback[boardId] || defaultState(boardId);
+    if (fallback.status !== 'idle' && Date.now() - fallback.updatedAt > 25 * 1000) {
+      inMemoryFallback[boardId] = defaultState(boardId);
+      return NextResponse.json(inMemoryFallback[boardId], {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      });
+    }
     return NextResponse.json(fallback, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -145,10 +153,7 @@ export async function POST(req: Request) {
             game_type = 'idle',
             status = 'idle',
             payload = EXCLUDED.payload,
-            updated_at = EXCLUDED.updated_at
-          WHERE board_live_sessions.session_id = ${sessionId} 
-             OR board_live_sessions.status = 'idle'
-             OR board_live_sessions.updated_at <= ${now};
+            updated_at = EXCLUDED.updated_at;
         `;
       } catch (dbErr) {
         console.error('Database write error in /api/live/board (idle):', dbErr);

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Player } from '@/lib/data';
@@ -315,37 +315,78 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     }
   }, [isPlaying, isCompleted, activeBoard]);
 
-  // Standby-Sync garantieren: Sobald Seite verlassen oder Tab geschlossen wird, schaltet TV sauber auf Standby zurück!
-  useEffect(() => {
-    const sendStandby = () => {
-      try {
-        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
-        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-          navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
-          navigator.sendBeacon('/api/live/doppelquote', new Blob([payload], { type: 'application/json' }));
-        } else {
-          fetch('/api/live/board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-          fetch('/api/live/doppelquote', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-        }
-      } catch (e) {}
-    };
+  // Standby-Reset Helfer (garantiert sofortige Rückkehr des Monitors zum Startbildschirm)
+  const sendStandbySignal = useCallback((bId = activeBoard, sId = gameSessionId) => {
+    try {
+      const idlePayload = {
+        boardId: bId,
+        sessionId: sId,
+        status: 'idle',
+        reset: true,
+        updatedAt: Date.now(),
+      };
+      liveBroadcastRef.current?.postMessage(idlePayload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${bId}`);
+        masterBc.postMessage(idlePayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_doppelquote_live_sync_${bId}`, JSON.stringify(idlePayload));
+      localStorage.setItem(`lions_board_live_sync_${bId}`, JSON.stringify(idlePayload));
 
-    window.addEventListener('beforeunload', sendStandby);
+      const payloadStr = JSON.stringify(idlePayload);
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/live/board', new Blob([payloadStr], { type: 'application/json' }));
+        navigator.sendBeacon('/api/live/doppelquote', new Blob([payloadStr], { type: 'application/json' }));
+      } else {
+        fetch('/api/live/board', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+        fetch('/api/live/doppelquote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  }, [activeBoard, gameSessionId]);
+
+  // Standby-Sync garantieren: Sobald Seite verlassen, unmounted oder Tab geschlossen wird
+  useEffect(() => {
+    const handleUnload = () => sendStandbySignal();
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
 
     return () => {
-      window.removeEventListener('beforeunload', sendStandby);
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+      // Komponente unmountet (z. B. Navigation zu /training oder /) -> SOFORT Standby an Monitor senden!
+      sendStandbySignal();
     };
-  }, [activeBoard, gameSessionId]);
+  }, [sendStandbySignal]);
+
+  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten
+  useEffect(() => {
+    if (!isPlaying || isCompleted) return;
+    const interval = setInterval(() => {
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          boardId: activeBoard,
+          sessionId: gameSessionId,
+          status: 'playing',
+          gameType: 'doppelquote',
+          updatedAt: Date.now(),
+        }),
+      }).catch(() => {});
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isPlaying, isCompleted, activeBoard, gameSessionId]);
 
   useEffect(() => {
     if (!isGameInitialized) return;
@@ -977,6 +1018,8 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
       localStorage.removeItem(CACHE_KEY);
       setRestoredFromCache(false);
     }
+    // Sofortiger Standby-Reset für den Monitor
+    sendStandbySignal();
     router.push(targetUrl);
   };
 
@@ -1002,27 +1045,7 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
     setIsSavedInCloud(false);
     setSaveStatus(null);
     localStorage.removeItem(CACHE_KEY);
-    try {
-      const idlePayload = { status: 'idle', boardId: activeBoard, sessionId: gameSessionId, reset: true, updatedAt: Date.now() };
-      liveBroadcastRef.current?.postMessage(idlePayload);
-      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
-        masterBc.postMessage(idlePayload);
-        masterBc.close();
-      }
-      localStorage.setItem(`lions_doppelquote_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
-      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
-      fetch('/api/live/board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(idlePayload),
-      }).catch(() => {});
-      fetch('/api/live/doppelquote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(idlePayload),
-      }).catch(() => {});
-    } catch (e) {}
+    sendStandbySignal(activeBoard, nextSessionId);
     setRestoredFromCache(false);
     setIsMatchStarted(false);
     setShowSetupSettings(false);

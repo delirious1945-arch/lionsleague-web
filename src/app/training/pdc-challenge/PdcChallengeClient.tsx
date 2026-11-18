@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Player } from '@/lib/data';
@@ -316,36 +316,77 @@ export default function PdcChallengeClient({
     };
   }, [activeBoard]);
 
-  // Standby-Reset beim Verlassen
-  useEffect(() => {
-    const sendStandby = () => {
-      try {
-        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
-        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-          navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
-          navigator.sendBeacon('/api/live/pdc-challenge', new Blob([payload], { type: 'application/json' }));
-        } else {
-          fetch('/api/live/board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-          fetch('/api/live/pdc-challenge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-        }
-      } catch (e) {}
-    };
+  // Standby-Reset Helfer (garantiert sofortige Rückkehr des Monitors zum Startbildschirm)
+  const sendStandbySignal = useCallback((bId = activeBoard, sId = gameSessionId) => {
+    try {
+      const idlePayload = {
+        boardId: bId,
+        sessionId: sId,
+        status: 'idle',
+        reset: true,
+        updatedAt: Date.now(),
+      };
+      liveBroadcastRef.current?.postMessage(idlePayload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${bId}`);
+        masterBc.postMessage(idlePayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_pdc_challenge_live_sync_${bId}`, JSON.stringify(idlePayload));
+      localStorage.setItem(`lions_board_live_sync_${bId}`, JSON.stringify(idlePayload));
 
-    window.addEventListener('beforeunload', sendStandby);
-    return () => {
-      window.removeEventListener('beforeunload', sendStandby);
-    };
+      const payloadStr = JSON.stringify(idlePayload);
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/live/board', new Blob([payloadStr], { type: 'application/json' }));
+        navigator.sendBeacon('/api/live/pdc-challenge', new Blob([payloadStr], { type: 'application/json' }));
+      } else {
+        fetch('/api/live/board', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+        fetch('/api/live/pdc-challenge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch (e) {}
   }, [activeBoard, gameSessionId]);
+
+  // Standby-Reset beim Verlassen, Unmount oder Tab-Wechsel
+  useEffect(() => {
+    const handleUnload = () => sendStandbySignal();
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+      // Komponente unmountet (z. B. Navigation zu /training oder /) -> SOFORT Standby an Monitor senden!
+      sendStandbySignal();
+    };
+  }, [sendStandbySignal]);
+
+  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten
+  useEffect(() => {
+    if (!isPlaying || isCompleted) return;
+    const interval = setInterval(() => {
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          boardId: activeBoard,
+          sessionId: gameSessionId,
+          status: 'playing',
+          gameType: 'pdc_challenge',
+          updatedAt: Date.now(),
+        }),
+      }).catch(() => {});
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isPlaying, isCompleted, activeBoard, gameSessionId]);
 
   // Live Sync Push
   useEffect(() => {
@@ -954,6 +995,8 @@ export default function PdcChallengeClient({
         reason: 'Vorzeitige Navigation / Seite verlassen',
       });
     }
+    // Sofortiger Standby-Reset für den Monitor
+    sendStandbySignal();
     router.push(targetUrl);
   };
 
@@ -978,27 +1021,7 @@ export default function PdcChallengeClient({
     setIsMatchStarted(false);
     const nextSessionId = 'pdc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     setGameSessionId(nextSessionId);
-    try {
-      const idlePayload = { status: 'idle', boardId: activeBoard, sessionId: gameSessionId, reset: true, updatedAt: Date.now() };
-      liveBroadcastRef.current?.postMessage(idlePayload);
-      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
-        masterBc.postMessage(idlePayload);
-        masterBc.close();
-      }
-      localStorage.setItem(`lions_pdc_challenge_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
-      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
-      fetch('/api/live/board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(idlePayload),
-      }).catch(() => {});
-      fetch('/api/live/pdc-challenge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(idlePayload),
-      }).catch(() => {});
-    } catch (e) {}
+    sendStandbySignal(activeBoard, nextSessionId);
     setIsSavedInCloud(false);
     setStateP1(createInitialPlayerState());
     setStateP2(createInitialPlayerState());

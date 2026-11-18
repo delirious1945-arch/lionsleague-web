@@ -25,16 +25,24 @@ const TARGET_ANGLES: Record<string, { angle: number; color: string; label: strin
 function mergeIncomingLiveState(prev: UnifiedLiveState, incoming: UnifiedLiveState): UnifiedLiveState {
   if (!incoming || typeof incoming !== 'object') return prev;
 
-  // 1. Wenn incoming älter ist als der aktuellste Zeitstempel -> veraltetes Paket verwerfen!
-  if (prev.updatedAt && incoming.updatedAt && incoming.updatedAt < prev.updatedAt) {
-    return prev;
+  const isIncomingIdle =
+    incoming.status === 'idle' ||
+    incoming.gameType === 'idle' ||
+    (incoming as any).reset === true;
+
+  // 1. Standby / Reset Befehle IMMER sofort annehmen!
+  if (isIncomingIdle) {
+    return {
+      ...incoming,
+      status: 'idle',
+      gameType: 'idle',
+      updatedAt: incoming.updatedAt || Date.now(),
+    };
   }
 
-  // 2. Schutz vor verspäteten Standby-Beacons alter Sessions:
-  if (prev.status === 'playing' && incoming.status === 'idle') {
-    if (incoming.sessionId && prev.sessionId && incoming.sessionId !== prev.sessionId) {
-      return prev;
-    }
+  // 2. Wenn incoming älter ist als der aktuellste Zeitstempel -> veraltetes Paket verwerfen!
+  if (prev.updatedAt && incoming.updatedAt && incoming.updatedAt < prev.updatedAt) {
+    return prev;
   }
 
   return incoming;
@@ -161,6 +169,32 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     pollApi();
     const interval = setInterval(pollApi, 1000);
     return () => clearInterval(interval);
+  }, [boardId]);
+
+  // 4. Client-Watchdog: Wenn seit mehr als 20 Sekunden keine Pakete mehr vom Tablet eintreffen -> Auto-Standby
+  useEffect(() => {
+    const watchdog = setInterval(() => {
+      setLiveState((prev) => {
+        if (
+          prev.status === 'playing' &&
+          prev.updatedAt &&
+          Date.now() - prev.updatedAt > 20000
+        ) {
+          return {
+            boardId,
+            sessionId: 'idle',
+            status: 'idle',
+            gameType: 'idle',
+            gameTitle: 'Warte auf Spielbeginn...',
+            scoreP1: 0,
+            scoreP2: 0,
+            updatedAt: Date.now(),
+          };
+        }
+        return prev;
+      });
+    }, 2000);
+    return () => clearInterval(watchdog);
   }, [boardId]);
 
   const p1Name = (liveState.p1Name || 'Sebastian Kirsch').trim();

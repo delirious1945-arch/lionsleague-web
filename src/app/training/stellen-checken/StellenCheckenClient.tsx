@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Player } from '@/lib/data';
 import {
@@ -223,36 +223,77 @@ export default function StellenCheckenClient({
     setIsGameFinished(false);
   };
 
-  // Standby-Reset beim Verlassen
-  useEffect(() => {
-    const sendStandby = () => {
-      try {
-        const payload = JSON.stringify({ boardId: activeBoard, sessionId: gameSessionId, status: 'idle', reset: true });
-        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-          navigator.sendBeacon('/api/live/board', new Blob([payload], { type: 'application/json' }));
-          navigator.sendBeacon('/api/live/stellen-checken', new Blob([payload], { type: 'application/json' }));
-        } else {
-          fetch('/api/live/board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-          fetch('/api/live/stellen-checken', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
-        }
-      } catch (e) {}
-    };
+  // Standby-Reset Helfer (garantiert sofortige Rückkehr des Monitors zum Startbildschirm)
+  const sendStandbySignal = useCallback((bId = activeBoard, sId = gameSessionId) => {
+    try {
+      const idlePayload = {
+        boardId: bId,
+        sessionId: sId,
+        status: 'idle',
+        reset: true,
+        updatedAt: Date.now(),
+      };
+      liveBroadcastRef.current?.postMessage(idlePayload);
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${bId}`);
+        masterBc.postMessage(idlePayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_stellen_checken_live_sync_${bId}`, JSON.stringify(idlePayload));
+      localStorage.setItem(`lions_board_live_sync_${bId}`, JSON.stringify(idlePayload));
 
-    window.addEventListener('beforeunload', sendStandby);
-    return () => {
-      window.removeEventListener('beforeunload', sendStandby);
-    };
+      const payloadStr = JSON.stringify(idlePayload);
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/live/board', new Blob([payloadStr], { type: 'application/json' }));
+        navigator.sendBeacon('/api/live/stellen-checken', new Blob([payloadStr], { type: 'application/json' }));
+      } else {
+        fetch('/api/live/board', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+        fetch('/api/live/stellen-checken', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch (e) {}
   }, [activeBoard, gameSessionId]);
+
+  // Standby-Reset beim Verlassen, Unmount oder Tab-Wechsel
+  useEffect(() => {
+    const handleUnload = () => sendStandbySignal();
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+      // Komponente unmountet (z. B. Navigation zu /training oder /) -> SOFORT Standby an Monitor senden!
+      sendStandbySignal();
+    };
+  }, [sendStandbySignal]);
+
+  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten
+  useEffect(() => {
+    if (!isGameStarted || isGameFinished) return;
+    const interval = setInterval(() => {
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          boardId: activeBoard,
+          sessionId: gameSessionId,
+          status: 'playing',
+          gameType: 'stellen_checken',
+          updatedAt: Date.now(),
+        }),
+      }).catch(() => {});
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isGameStarted, isGameFinished, activeBoard, gameSessionId]);
 
   // Live-Sync State-Broadcaster: Sendet sofort & verzögerungsfrei an /api/live/board
   const broadcastLiveState = (
@@ -1183,6 +1224,7 @@ export default function StellenCheckenClient({
                 onClick={() => {
                   if (confirm('Spiel wirklich abbrechen?')) {
                     setIsGameStarted(false);
+                    sendStandbySignal();
                   }
                 }}
                 data-ui-id="STELLEN.MATCH.ABORT_BTN"

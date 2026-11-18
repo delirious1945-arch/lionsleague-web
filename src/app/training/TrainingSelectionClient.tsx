@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { UserSession } from '@/app/actions';
 import {
@@ -51,6 +51,30 @@ export default function TrainingSelectionClient({
       window.history.replaceState(null, '', `/training?board=${b}`);
     }
   };
+
+  // Beim Aufruf der Trainingsauswahl: Standby-Signal an das Board senden, falls vorher ein Spiel abgebrochen/verlassen wurde
+  useEffect(() => {
+    try {
+      const idlePayload = {
+        boardId: activeBoard,
+        sessionId: 'idle',
+        status: 'idle',
+        reset: true,
+        updatedAt: Date.now(),
+      };
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+        masterBc.postMessage(idlePayload);
+        masterBc.close();
+      }
+      localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(idlePayload));
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(idlePayload),
+      }).catch(() => {});
+    } catch (e) {}
+  }, [activeBoard]);
 
   const completed = monthProgress?.completedGames ?? 0;
   const target = monthProgress?.targetGames ?? 20;
