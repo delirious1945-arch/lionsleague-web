@@ -74,6 +74,7 @@ export default function VerwaltungClient({
   trainingPdc = [],
   trainingFussball = [],
   trainingStellenChecken = [],
+  trainingScoringLeiter = [],
   trainingBiomechanics = [],
   adminTrainingOverview,
 }: {
@@ -83,6 +84,7 @@ export default function VerwaltungClient({
   trainingPdc?: any[];
   trainingFussball?: any[];
   trainingStellenChecken?: any[];
+  trainingScoringLeiter?: any[];
   trainingBiomechanics?: any[];
   adminTrainingOverview?: AdminTrainingOverviewData;
 }) {
@@ -96,7 +98,7 @@ export default function VerwaltungClient({
 
   const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'training'>(defaultTab);
   const [trainingGameType, setTrainingGameType] = useState<
-    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'biomechanics'
+    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'biomechanics'
   >('all');
   const [trainingPlayerFilter, setTrainingPlayerFilter] = useState<string>('all');
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
@@ -352,7 +354,7 @@ export default function VerwaltungClient({
               : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-transparent'
           }`}
         >
-          <span>📈</span> Trainingsleistungen ({trainingDoubles.length + trainingPdc.length + trainingFussball.length + trainingStellenChecken.length + trainingBiomechanics.length})
+          <span>📈</span> Trainingsleistungen ({trainingDoubles.length + trainingPdc.length + trainingFussball.length + trainingStellenChecken.length + trainingScoringLeiter.length + trainingBiomechanics.length})
         </button>
       </div>
 
@@ -544,6 +546,7 @@ export default function VerwaltungClient({
             ...trainingPdc.map((p: any) => p.player_name),
             ...trainingFussball.map((f: any) => f.player_name),
             ...trainingStellenChecken.map((s: any) => s.player_name),
+            ...trainingScoringLeiter.map((s: any) => s.player_name),
             ...trainingBiomechanics.map((b: any) => b.playerName),
           ].filter(Boolean))
         ).sort();
@@ -553,6 +556,7 @@ export default function VerwaltungClient({
           ...trainingPdc.map((p: any) => ({ ...p, gameType: 'pdc' })),
           ...trainingFussball.map((f: any) => ({ ...f, gameType: 'fussball' })),
           ...trainingStellenChecken.map((s: any) => ({ ...s, gameType: 'stellen_checken' })),
+          ...trainingScoringLeiter.map((s: any) => ({ ...s, gameType: 'scoring_leiter' })),
           ...trainingBiomechanics.map((b: any) => ({
             ...b,
             gameType: 'biomechanics',
@@ -636,6 +640,14 @@ export default function VerwaltungClient({
                   <ExternalLink size={12} />
                 </Link>
                 <Link
+                  href="/training/scoring-leiter"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_SCORING_LEITER"
+                  className="px-3 py-1.5 rounded-xl bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <span>🪜 Scoring-Leiter</span>
+                  <ExternalLink size={12} />
+                </Link>
+                <Link
                   href="/video"
                   data-ui-id="VERWALTUNG.TRAINING.LINK_VIDEO"
                   className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
@@ -669,7 +681,7 @@ export default function VerwaltungClient({
                   {combinedSessions.length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5">
-                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&C · {trainingBiomechanics.length} Video
+                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&C · {trainingScoringLeiter.length} SL · {trainingBiomechanics.length} Video
                 </div>
               </div>
 
@@ -758,6 +770,17 @@ export default function VerwaltungClient({
                   Stellen & Checken ({trainingStellenChecken.length})
                 </button>
                 <button
+                  onClick={() => setTrainingGameType('scoring_leiter')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_SCORING_LEITER_BTN"
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    trainingGameType === 'scoring_leiter'
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Scoring-Leiter ({trainingScoringLeiter.length})
+                </button>
+                <button
                   onClick={() => setTrainingGameType('biomechanics')}
                   data-ui-id="VERWALTUNG.TRAINING.FILTER_BIOMECHANICS_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
@@ -808,6 +831,7 @@ export default function VerwaltungClient({
                   const isPdc = s.gameType === 'pdc';
                   const isFussball = s.gameType === 'fussball';
                   const isStellenChecken = s.gameType === 'stellen_checken';
+                  const isScoringLeiter = s.gameType === 'scoring_leiter';
                   const isBiomechanics = s.gameType === 'biomechanics';
                   const isAborted = Boolean(s.is_aborted);
                   const sessionKey = s.session_id ? `${s.session_id}_${s.player_name}_${idx}` : `s_${idx}`;
@@ -850,6 +874,8 @@ export default function VerwaltungClient({
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                 : isStellenChecken
                                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                : isScoringLeiter
+                                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                                 : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                             }`}
                           >
@@ -861,6 +887,8 @@ export default function VerwaltungClient({
                               ? '⚽ Fußball Darts'
                               : isStellenChecken
                               ? '🎯 Stellen & Checken'
+                              : isScoringLeiter
+                              ? '🪜 Scoring-Leiter'
                               : '🎥 KI-Wurfanalyse'}
                           </span>
                           <span className="font-bold text-white text-sm">{s.player_name}</span>
@@ -927,6 +955,17 @@ export default function VerwaltungClient({
                               </span>
                               <div className="text-[10px] text-slate-400">
                                 {s.checks_count} / {s.total_rounds || 15} Checks ({((s.check_quote ?? 0) * 100).toFixed(1)}%)
+                              </div>
+                            </div>
+                          )}
+
+                          {isScoringLeiter && (
+                            <div className="text-right">
+                              <span className="text-teal-300 font-black text-sm font-mono">
+                                {s.levels_cleared_count >= 7 ? '140 Cleared 🏆' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : `Aus bei ${s.reached_level || 41}`}
+                              </span>
+                              <div className="text-[10px] text-slate-400">
+                                {s.total_score} Pkt. · {s.total_hits}/{s.total_visits} Hits
                               </div>
                             </div>
                           )}
@@ -1074,6 +1113,48 @@ export default function VerwaltungClient({
                                 }
                                 return null;
                               })()}
+                            </div>
+                          )}
+
+                          {isScoringLeiter && (
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Höchste geschaffte Stufe</div>
+                                  <div className="text-sm font-black text-teal-400">
+                                    {s.levels_cleared_count >= 7 ? '140 (Alle 7!)' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : 'Keine'}
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Leiter-Punkte & Quote</div>
+                                  <div className="text-sm font-black text-emerald-400">
+                                    {s.total_score} Pkt. ({((s.hit_quote ?? 0) * 100).toFixed(1)}%)
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Aufnahmen & Modus</div>
+                                  <div className="text-sm font-black text-amber-400">
+                                    {s.total_hits}/{s.total_visits} Hits · {s.game_mode === 'solo' ? 'Solo' : '1vs1'}
+                                  </div>
+                                </div>
+                              </div>
+                              {Array.isArray(s.level_details) && s.level_details.length > 0 && (
+                                <div className="grid grid-cols-7 gap-1 text-center">
+                                  {s.level_details.map((d: any, dIdx: number) => (
+                                    <div
+                                      key={dIdx}
+                                      className={`py-1 px-0.5 rounded border text-[10px] font-mono font-bold ${
+                                        d.cleared
+                                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                                          : 'bg-red-500/15 border-red-500/40 text-red-300'
+                                      }`}
+                                    >
+                                      <div className="text-white text-xs">{d.target}</div>
+                                      <div>{d.cleared ? `${d.hits}/${d.visits?.length || 0}` : '✕'}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1263,6 +1344,48 @@ export default function VerwaltungClient({
                                 }
                                 return null;
                               })()}
+                            </div>
+                          )}
+
+                          {isScoringLeiter && (
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Höchste geschaffte Stufe</div>
+                                  <div className="text-sm font-black text-teal-400">
+                                    {s.levels_cleared_count >= 7 ? '140 (Alle 7!)' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : 'Keine'}
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Leiter-Punkte & Quote</div>
+                                  <div className="text-sm font-black text-emerald-400">
+                                    {s.total_score} Pkt. ({((s.hit_quote ?? 0) * 100).toFixed(1)}%)
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Aufnahmen & Modus</div>
+                                  <div className="text-sm font-black text-amber-400">
+                                    {s.total_hits}/{s.total_visits} Hits · {s.game_mode === 'solo' ? 'Solo' : '1vs1'}
+                                  </div>
+                                </div>
+                              </div>
+                              {Array.isArray(s.level_details) && s.level_details.length > 0 && (
+                                <div className="grid grid-cols-7 gap-1 text-center">
+                                  {s.level_details.map((d: any, dIdx: number) => (
+                                    <div
+                                      key={dIdx}
+                                      className={`py-1 px-0.5 rounded border text-[10px] font-mono font-bold ${
+                                        d.cleared
+                                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                                          : 'bg-red-500/15 border-red-500/40 text-red-300'
+                                      }`}
+                                    >
+                                      <div className="text-white text-xs">{d.target}</div>
+                                      <div>{d.cleared ? `${d.hits}/${d.visits?.length || 0}` : '✕'}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
 

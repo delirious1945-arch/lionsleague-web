@@ -8,6 +8,7 @@ import HolographicStellenCheckenCockpit from '@/components/HolographicStellenChe
 import HolographicFussballCockpit from '@/components/HolographicFussballCockpit';
 import HolographicDartboard from '@/components/HolographicDartboard';
 import HolographicPdcChallengeCockpit from '@/components/HolographicPdcChallengeCockpit';
+import HolographicScoringLeiterCockpit from '@/components/HolographicScoringLeiterCockpit';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -257,7 +258,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
 
         <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 font-mono border-t border-white/10 pt-4">
           <span>AUTO-SWITCHING LIVE BOARD</span>
-          <span>CHECKOUT BATTLE · PDC CHALLENGE · FUßBALL · STELLEN & CHECKEN</span>
+          <span>CHECKOUT BATTLE · PDC CHALLENGE · FUßBALL · STELLEN & CHECKEN · SCORING-LEITER</span>
         </div>
       </div>
     );
@@ -443,6 +444,29 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         currentNumber={curNum}
         recommendedRoute={curRoute}
         checksCount={curChecks}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 6. SPIEL: SCORING-LEITER (41–140)
+  // =========================================================================
+  if (liveState.gameType === 'scoring_leiter') {
+    return (
+      <HolographicScoringLeiterCockpit
+        boardId={boardId}
+        activeName={activeName}
+        is1vs1={is1vs1}
+        activePlayer={activePlayer}
+        currentLevelIndex={liveState.currentLevelIndex ?? 0}
+        currentNumber={liveState.currentNumber ?? 41}
+        hitsInLevel={liveState.hitsInLevel ?? 0}
+        levelVisits={Array.isArray(liveState.levelVisits) ? liveState.levelVisits : []}
+        currentVisit={liveState.currentVisit ?? 1}
+        eliminated={Boolean(liveState.eliminated)}
+        clearedAll={Boolean(liveState.clearedAll)}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
       />

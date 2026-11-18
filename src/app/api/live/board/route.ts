@@ -3,7 +3,7 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken';
+export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter';
 
 export interface UnifiedLiveState {
   boardId: string;
@@ -41,6 +41,11 @@ export interface UnifiedLiveState {
   p1Points?: number;
   p2Checks?: number;
   p2Points?: number;
+  currentLevelIndex?: number;
+  hitsInLevel?: number;
+  levelVisits?: boolean[];
+  eliminated?: boolean;
+  clearedAll?: boolean;
   scoresP1?: any;
   scoresP2?: any;
   winner?: string;

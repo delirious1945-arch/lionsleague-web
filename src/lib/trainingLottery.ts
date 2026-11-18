@@ -191,6 +191,27 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
     // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
   }
 
+  // 5. Scoring-Leiter (41–140)
+  try {
+    const slRows = await sql`
+      SELECT player_name, player_id, count(*)::int as cnt
+      FROM training_scoring_leiter
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
+      GROUP BY player_name, player_id
+    `;
+
+    for (const r of slRows) {
+      const name = String(r.player_name).trim();
+      const current = playerStats.get(name) || { playerId: r.player_id ?? null, count: 0 };
+      current.count += Number(r.cnt);
+      if (r.player_id && !current.playerId) current.playerId = r.player_id;
+      playerStats.set(name, current);
+    }
+  } catch {
+    // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
+  }
+
   return playerStats;
 }
 
@@ -503,13 +524,16 @@ export interface PlayerMonthlyTrainingStat {
   stellenCheckenSolo: number;
   stellenChecken1vs1: number;
   totalStellenChecken: number;
+  scoringLeiterSolo: number;
+  scoringLeiter1vs1: number;
+  totalScoringLeiter: number;
   totalCompletedGames: number;
   isQualified: boolean;
   isBlockedByPastWin: boolean;
   isMonthWinner: boolean;
   gamesList: {
     id: number;
-    gameType: 'doubles' | 'pdc' | 'fussball' | 'stellen_checken';
+    gameType: 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter';
     gameMode: string;
     opponentName: string | null;
     date: string;
@@ -565,6 +589,18 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       monthSet.add(r.m);
     }
   }
+  try {
+    const slMonthRows = await sql`
+      SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
+      FROM training_scoring_leiter
+      WHERE is_aborted IS NULL OR is_aborted = 0;
+    `;
+    for (const r of slMonthRows) {
+      if (r.m && typeof r.m === 'string' && r.m.length === 7) {
+        monthSet.add(r.m);
+      }
+    }
+  } catch {}
 
   const availableMonths = Array.from(monthSet)
     .sort((a, b) => b.localeCompare(a))
@@ -640,6 +676,23 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     stellenCheckenSessions = [];
   }
 
+  let scoringLeiterSessions: any[] = [];
+  try {
+    scoringLeiterSessions = await sql`
+      SELECT 
+        id, session_id, player_name, opponent_name, game_mode,
+        highest_cleared_level, reached_level, levels_cleared_count,
+        total_score, total_hits, total_visits, hit_quote,
+        training_date, created_at, is_winner
+      FROM training_scoring_leiter
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+      ORDER BY COALESCE(training_date, created_at::text) DESC;
+    `;
+  } catch {
+    scoringLeiterSessions = [];
+  }
+
   // 4. Sperrfrist & Gewinner des Monats ermitteln
   const blockedPlayers = await getBlockedPlayersForMonth(selectedMonthKey);
   const winnerRows = await sql`
@@ -672,6 +725,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       stellenCheckenSolo: 0,
       stellenChecken1vs1: 0,
       totalStellenChecken: 0,
+      scoringLeiterSolo: 0,
+      scoringLeiter1vs1: 0,
+      totalScoringLeiter: 0,
       totalCompletedGames: 0,
       isQualified: false,
       isBlockedByPastWin: blockedPlayers.has(name),
@@ -701,6 +757,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         stellenCheckenSolo: 0,
         stellenChecken1vs1: 0,
         totalStellenChecken: 0,
+        scoringLeiterSolo: 0,
+        scoringLeiter1vs1: 0,
+        totalScoringLeiter: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -752,6 +811,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         stellenCheckenSolo: 0,
         stellenChecken1vs1: 0,
         totalStellenChecken: 0,
+        scoringLeiterSolo: 0,
+        scoringLeiter1vs1: 0,
+        totalScoringLeiter: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -803,6 +865,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         stellenCheckenSolo: 0,
         stellenChecken1vs1: 0,
         totalStellenChecken: 0,
+        scoringLeiterSolo: 0,
+        scoringLeiter1vs1: 0,
+        totalScoringLeiter: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -855,6 +920,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         stellenCheckenSolo: 0,
         stellenChecken1vs1: 0,
         totalStellenChecken: 0,
+        scoringLeiterSolo: 0,
+        scoringLeiter1vs1: 0,
+        totalScoringLeiter: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -881,6 +949,65 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       opponentName: s.opponent_name || null,
       date: s.training_date || s.created_at,
       summary: `Stellen & Checken (#${String(s.preset_id || 1).padStart(3, '0')}): ${s.points_scored}/${s.max_possible_points || 28} Pkt • ${s.checks_count}/15 (${qPct})`,
+      isWinner: Number(s.is_winner ?? 0),
+    });
+  }
+
+  // Scoring-Leiter zuweisen
+  for (const s of scoringLeiterSessions) {
+    const name = String(s.player_name).trim();
+    let stat = statsMap.get(name);
+    if (!stat) {
+      stat = {
+        playerName: name,
+        playerId: null,
+        team: 'Gast',
+        doublesSolo: 0,
+        doubles1vs1: 0,
+        totalDoubles: 0,
+        pdcSolo: 0,
+        pdc1vs1: 0,
+        totalPdc: 0,
+        fussballSolo: 0,
+        fussball1vs1: 0,
+        totalFussball: 0,
+        stellenCheckenSolo: 0,
+        stellenChecken1vs1: 0,
+        totalStellenChecken: 0,
+        scoringLeiterSolo: 0,
+        scoringLeiter1vs1: 0,
+        totalScoringLeiter: 0,
+        totalCompletedGames: 0,
+        isQualified: false,
+        isBlockedByPastWin: blockedPlayers.has(name),
+        isMonthWinner: winnerName === name,
+        gamesList: [],
+      };
+      statsMap.set(name, stat);
+    }
+
+    const isSolo = s.game_mode === 'solo';
+    if (isSolo) {
+      stat.scoringLeiterSolo += 1;
+    } else {
+      stat.scoringLeiter1vs1 += 1;
+    }
+    stat.totalScoringLeiter += 1;
+    stat.totalCompletedGames += 1;
+
+    const lvlText =
+      Number(s.levels_cleared_count || 0) >= 7
+        ? '140 Cleared'
+        : Number(s.highest_cleared_level || 0) > 0
+        ? `bis Stufe ${s.highest_cleared_level}`
+        : `Aus bei ${s.reached_level || 41}`;
+    stat.gamesList.push({
+      id: Number(s.id),
+      gameType: 'scoring_leiter',
+      gameMode: s.game_mode || 'solo',
+      opponentName: s.opponent_name || null,
+      date: s.training_date || s.created_at,
+      summary: `Scoring-Leiter (${lvlText}): ${s.total_score || 0} Pkt • ${s.total_hits || 0}/${s.total_visits || 0} Hits`,
       isWinner: Number(s.is_winner ?? 0),
     });
   }

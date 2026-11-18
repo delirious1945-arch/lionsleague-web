@@ -48,6 +48,7 @@ export default function TrainingSelectionClient({
       localStorage.setItem('lions_active_board_pdc', b);
       localStorage.setItem('lions_active_board_fussball', b);
       localStorage.setItem('lions_active_board_stellen_checken', b);
+      localStorage.setItem('lions_active_board_scoring_leiter', b);
       window.history.replaceState(null, '', `/training?board=${b}`);
     }
   };
@@ -412,6 +413,47 @@ export default function TrainingSelectionClient({
               <Link
                 href={`/training/stellen-checken?board=${activeBoard}`}
                 data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.START_BTN"
+                className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <span>Spiel starten</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* SPIEL 5: Scoring-Leiter (41–140) */}
+          <div
+            data-ui-id="TRAINING.GAME_SCORING_LEITER.CARD"
+            className="group relative rounded-3xl p-6 bg-white/[0.03] hover:bg-white/[0.05] backdrop-blur-2xl border border-white/[0.09] hover:border-emerald-400/40 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] transition-all duration-300 flex flex-col justify-between md:col-span-2"
+          >
+            <div className="space-y-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                  🪜 Scoring-Leiter (41–140)
+                </h2>
+                <span className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-400/[0.08] border border-amber-400/30 text-amber-200 font-mono font-bold text-[11px]">
+                  7 Stufen · Solo & 1vs1
+                </span>
+              </div>
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Klettere über die 7 Scoring-Hürden: 41, 60, 65, 80, 100, 120 und 140. Du hast pro Stufe 10 Aufnahmen Zeit, um den Zielwert zweimal mit 3 Darts zu erreichen oder zu übertreffen. Schaffst du es nicht mehr, ist das Spiel vorbei!
+              </p>
+
+              <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-slate-200 font-mono font-semibold">
+                  41 · 60 · 65 · 80 · 100 · 120 · 140
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-slate-200 font-semibold">
+                  2 Treffer in 10 Aufnahmen • Rechnerisches Aus
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
+              <Link
+                href={`/training/scoring-leiter?board=${activeBoard}`}
+                data-ui-id="TRAINING.GAME_SCORING_LEITER.START_BTN"
                 className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Spiel starten</span>

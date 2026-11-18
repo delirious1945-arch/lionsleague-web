@@ -94,7 +94,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-300">
-                Zentrale Erfassung aller Vereins-Trainingsmodule (Checkout Battle, PDC Challenge, Fußball Darts & Stellen & Checken). Jedes absolvierte Match zählt +1. Ab {targetGames} Spielen im Monat qualifiziert sich ein Spieler für die Monatsverlosung (5 Freigetränke, 4 Monate Sperrfrist nach Gewinn). Klicke auf einen Spieler, um alle Partien aufzuklappen.
+                Zentrale Erfassung aller Vereins-Trainingsmodule (Checkout Battle, PDC Challenge, Fußball Darts, Stellen & Checken & Scoring-Leiter). Jedes absolvierte Match zählt +1. Ab {targetGames} Spielen im Monat qualifiziert sich ein Spieler für die Monatsverlosung (5 Freigetränke, 4 Monate Sperrfrist nach Gewinn). Klicke auf einen Spieler, um alle Partien aufzuklappen.
               </p>
             </div>
           </div>
@@ -237,6 +237,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
               <th className="py-3 px-2 text-center">PDC Challenge (Solo / 1vs1)</th>
               <th className="py-3 px-2 text-center">Fußball (Bot / 1vs1)</th>
               <th className="py-3 px-2 text-center">Stellen & Checken (Solo / 1vs1)</th>
+              <th className="py-3 px-2 text-center">Scoring-Leiter (Solo / 1vs1)</th>
               <th className="py-3 px-3 text-center">Gesamt</th>
               <th className="py-3 px-3">Fortschritt (Ziel: {targetGames})</th>
               <th className="py-3 px-3 text-right">Lostopf-Status</th>
@@ -245,7 +246,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
           <tbody className="divide-y divide-white/5">
             {filteredPlayers.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-slate-500">
+                <td colSpan={10} className="py-8 text-center text-slate-500">
                   Keine Spieler für die ausgewählten Filterkriterien gefunden.
                 </td>
               </tr>
@@ -330,6 +331,16 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                         </span>
                       </td>
 
+                      {/* Scoring-Leiter */}
+                      <td className="py-3.5 px-2 text-center">
+                        <span className="font-mono font-semibold">
+                          <strong className="text-white">{p.totalScoringLeiter || 0}</strong>{' '}
+                          <span className="text-[11px] text-slate-400">
+                            ({p.scoringLeiterSolo || 0}s / {p.scoringLeiter1vs1 || 0}d)
+                          </span>
+                        </span>
+                      </td>
+
                       {/* Gesamtspiele */}
                       <td className="py-3.5 px-3 text-center">
                         <span className="text-base sm:text-lg font-black font-mono text-amber-400">
@@ -403,7 +414,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                     {/* Aufklappbare Einzelspiele des Spielers */}
                     {isExpanded && p.gamesList.length > 0 && (
                       <tr className="bg-slate-900/90 border-t border-b border-emerald-500/30 animate-fadeIn">
-                        <td colSpan={9} className="p-4">
+                        <td colSpan={10} className="p-4">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                               <span>
@@ -440,6 +451,8 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                                             : g.gameType === 'stellen_checken'
                                             ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                            : g.gameType === 'scoring_leiter'
+                                            ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                                             : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                         }`}>
                                           {g.gameType === 'doubles'
@@ -448,6 +461,8 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                                             ? 'PDC'
                                             : g.gameType === 'stellen_checken'
                                             ? '🎯 Stellen & Checken'
+                                            : g.gameType === 'scoring_leiter'
+                                            ? '🪜 Scoring-Leiter'
                                             : '⚽ Fußball'}
                                         </span>
                                         <span className="font-bold text-white">
