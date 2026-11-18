@@ -816,7 +816,7 @@ export default function ScoringLeiterClient({
               </h1>
             </div>
             <p className="text-xs text-slate-400">
-              7 Stufen • 10 Aufnahmen pro Stufe • 2 Treffer zum Aufstieg • Rechnerisches Aus
+              8 Stufen • 10 Aufnahmen pro Stufe • 2 Treffer zum Aufstieg • Rechnerisches Aus
             </p>
           </div>
         </div>
@@ -849,8 +849,8 @@ export default function ScoringLeiterClient({
           </div>
           <ul className="space-y-1.5 list-disc list-inside text-slate-300">
             <li>
-              <strong>Die 7 Stufen:</strong>{' '}
-              <span className="font-mono font-bold text-white">41 → 60 → 65 → 80 → 100 → 120 → 140</span>
+              <strong>Die 8 Stufen:</strong>{' '}
+              <span className="font-mono font-bold text-white">41 → 60 → 65 → 80 → 95 → 100 → 120 → 140</span>
             </li>
             <li>
               <strong>Aufnahme (3 Darts):</strong> Es zählen nur volle 3-Dart-Aufnahmen auf beliebige Segmente. Erreichst oder übertriffst du die Zielzahl (≥ Ziel), ist das ein Treffer.
@@ -909,7 +909,7 @@ export default function ScoringLeiterClient({
             )}
 
             {/* Stufen-Übersicht */}
-            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 sm:gap-2">
               {SCORING_LEITER_LEVELS.map((val, idx) => (
                 <div
                   key={val}
@@ -1093,7 +1093,7 @@ export default function ScoringLeiterClient({
           <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3">
             <div className="flex items-center gap-2.5">
               <span className="px-3 py-1 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono font-black text-xs sm:text-sm">
-                Stufe {curState.levelIdx + 1} / 7
+                Stufe {curState.levelIdx + 1} / {SCORING_LEITER_LEVELS.length}
               </span>
               <span className="px-3 py-1 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-black text-xs sm:text-sm">
                 Aufnahme {currentVisitNum} / 10
@@ -1129,9 +1129,9 @@ export default function ScoringLeiterClient({
             </div>
           </div>
 
-          {/* 7er Stufen-Stepper */}
+          {/* 8er Stufen-Stepper */}
           <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3">
-            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 sm:gap-2">
               {SCORING_LEITER_LEVELS.map((val, idx) => {
                 const detail = curState.levelDetails.find((d) => d.levelIndex === idx);
                 const isCurrent = idx === curState.levelIdx && !curState.clearedAll && !curState.eliminated;
@@ -1235,7 +1235,7 @@ export default function ScoringLeiterClient({
           <div className="rounded-3xl bg-gradient-to-b from-cyan-500/20 via-slate-900 to-slate-950 border-2 border-cyan-500/40 p-6 sm:p-10 text-center space-y-6 shadow-2xl">
             <div className="flex flex-col items-center gap-2">
               <span className="px-4 py-1 rounded-full text-xs sm:text-sm font-black uppercase tracking-wider border bg-cyan-500/20 text-cyan-300 border-cyan-500/50">
-                Stufe {curState.levelIdx + 1} von 7 • 2 Treffer zum Aufstieg
+                Stufe {curState.levelIdx + 1} von {SCORING_LEITER_LEVELS.length} • 2 Treffer zum Aufstieg
               </span>
 
               {gameMode === '1vs1' && (
@@ -1330,7 +1330,7 @@ export default function ScoringLeiterClient({
             <h2 className="text-2xl sm:text-4xl font-black text-white">
               {gameMode === 'solo' ? (
                 p1State.clearedAll ? (
-                  <>🏆 {p1Name} hat alle 7 Stufen (bis 140) bezwungen!</>
+                  <>🏆 {p1Name} hat alle {SCORING_LEITER_LEVELS.length} Stufen (bis 140) bezwungen!</>
                 ) : (
                   <>
                     {p1Name}: {p1Summary.levelsClearedCount > 0 ? `Stufe ${p1Summary.highestClearedLevel} gemeistert!` : 'An Stufe 41 gescheitert'}
@@ -1367,7 +1367,7 @@ export default function ScoringLeiterClient({
                     <div className="text-lg font-black text-white">{pl.name}</div>
                     <div className="text-xs text-slate-400">
                       {pl.st.clearedAll
-                        ? 'Alle 7 Stufen geschafft (140 Cleared)'
+                        ? `Alle ${SCORING_LEITER_LEVELS.length} Stufen geschafft (140 Cleared)`
                         : `Ausgeschieden bei Stufe ${pl.sum.reachedLevel}`}
                     </div>
                   </div>
@@ -1381,7 +1381,7 @@ export default function ScoringLeiterClient({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
                   {SCORING_LEITER_LEVELS.map((val, lIdx) => {
                     const d = pl.st.levelDetails.find((x) => x.levelIndex === lIdx);
                     return (

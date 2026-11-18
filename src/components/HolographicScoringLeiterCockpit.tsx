@@ -281,7 +281,7 @@ export default function HolographicScoringLeiterCockpit({
               ? '140 BEZWUNGEN'
               : eliminated
               ? `AUS BEI ${currentNumber}`
-              : `STUFE ${currentLevelIndex + 1}/7`}
+              : `STUFE ${currentLevelIndex + 1}/${SCORING_LEITER_LEVELS.length}`}
           </span>
         </div>
 
@@ -358,8 +358,8 @@ export default function HolographicScoringLeiterCockpit({
                 <div className="absolute left-1/2 -translate-x-1/2 top-2 bottom-2 w-[2px] bg-gradient-to-b from-cyan-400/50 via-white/25 to-cyan-400/50 z-0 pointer-events-none" />
               )}
 
-              {/* 7 Horizontale Sprossen von 140 (oben) bis 41 (unten) */}
-              <div className="relative z-10 flex flex-col gap-2.5 sm:gap-3 py-1">
+              {/* 8 Horizontale Sprossen von 140 (oben) bis 41 (unten) */}
+              <div className="relative z-10 flex flex-col gap-2 sm:gap-2.5 py-1">
                 {rungsTopToBottom.map(({ val, idx }) => {
                   if (is1vs1) {
                     const p1Done = p1ClearedAll || idx < p1LevelIndex;
@@ -377,8 +377,8 @@ export default function HolographicScoringLeiterCockpit({
                         key={val}
                         className={`relative grid grid-cols-[1fr_auto_1fr] items-center rounded-2xl border-2 overflow-hidden transition-all duration-500 ${
                           eitherCurr
-                            ? 'h-14 sm:h-16 bg-slate-950/95 border-cyan-300 shadow-[0_0_30px_rgba(0,229,255,0.45)] scale-[1.04] z-20'
-                            : 'h-11 sm:h-12 bg-slate-950/85 border-cyan-500/25'
+                            ? 'h-12 sm:h-14 bg-slate-950/95 border-cyan-300 shadow-[0_0_30px_rgba(0,229,255,0.45)] scale-[1.04] z-20'
+                            : 'h-9 sm:h-10 bg-slate-950/85 border-cyan-500/25'
                         }`}
                       >
                         {/* Linke Hälfte: Spieler 1 */}
@@ -461,12 +461,12 @@ export default function HolographicScoringLeiterCockpit({
                       key={val}
                       className={`relative flex items-center justify-between px-5 sm:px-7 rounded-2xl border-2 transition-all duration-500 ${
                         isCurr
-                          ? 'h-16 sm:h-20 bg-gradient-to-r from-slate-950 via-cyan-950/90 to-slate-950 border-cyan-300 shadow-[0_0_40px_rgba(0,229,255,0.65),inset_0_0_20px_rgba(0,229,255,0.25)] scale-[1.06] z-20'
+                          ? 'h-14 sm:h-16 bg-gradient-to-r from-slate-950 via-cyan-950/90 to-slate-950 border-cyan-300 shadow-[0_0_40px_rgba(0,229,255,0.65),inset_0_0_20px_rgba(0,229,255,0.25)] scale-[1.06] z-20'
                           : isElim
-                          ? 'h-14 sm:h-16 bg-red-950/80 border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.5)] scale-[1.03] z-20'
+                          ? 'h-12 sm:h-14 bg-red-950/80 border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.5)] scale-[1.03] z-20'
                           : isDone
-                          ? 'h-11 sm:h-12 bg-emerald-950/85 border-[#00ff88]/80 shadow-[0_0_20px_rgba(0,255,136,0.35)]'
-                          : 'h-11 sm:h-12 bg-slate-950/85 border-cyan-500/25 opacity-75'
+                          ? 'h-9 sm:h-11 bg-emerald-950/85 border-[#00ff88]/80 shadow-[0_0_20px_rgba(0,255,136,0.35)]'
+                          : 'h-9 sm:h-11 bg-slate-950/85 border-cyan-500/25 opacity-75'
                       }`}
                     >
                       <span

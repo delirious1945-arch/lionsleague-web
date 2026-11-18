@@ -962,7 +962,7 @@ export default function VerwaltungClient({
                           {isScoringLeiter && (
                             <div className="text-right">
                               <span className="text-teal-300 font-black text-sm font-mono">
-                                {s.levels_cleared_count >= 7 ? '140 Cleared 🏆' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : `Aus bei ${s.reached_level || 41}`}
+                                {s.levels_cleared_count >= 8 ? '140 Cleared 🏆' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : `Aus bei ${s.reached_level || 41}`}
                               </span>
                               <div className="text-[10px] text-slate-400">
                                 {s.total_score} Pkt. · {s.total_hits}/{s.total_visits} Hits
@@ -1122,7 +1122,7 @@ export default function VerwaltungClient({
                                 <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
                                   <div className="text-[10px] text-slate-400">Höchste geschaffte Stufe</div>
                                   <div className="text-sm font-black text-teal-400">
-                                    {s.levels_cleared_count >= 7 ? '140 (Alle 7!)' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : 'Keine'}
+                                    {s.levels_cleared_count >= 8 ? '140 (Alle 8!)' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : 'Keine'}
                                   </div>
                                 </div>
                                 <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
@@ -1139,7 +1139,7 @@ export default function VerwaltungClient({
                                 </div>
                               </div>
                               {Array.isArray(s.level_details) && s.level_details.length > 0 && (
-                                <div className="grid grid-cols-7 gap-1 text-center">
+                                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1 text-center">
                                   {s.level_details.map((d: any, dIdx: number) => (
                                     <div
                                       key={dIdx}
@@ -1353,7 +1353,7 @@ export default function VerwaltungClient({
                                 <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
                                   <div className="text-[10px] text-slate-400">Höchste geschaffte Stufe</div>
                                   <div className="text-sm font-black text-teal-400">
-                                    {s.levels_cleared_count >= 7 ? '140 (Alle 7!)' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : 'Keine'}
+                                    {s.levels_cleared_count >= 8 ? '140 (Alle 8!)' : s.highest_cleared_level > 0 ? `Stufe ${s.highest_cleared_level}` : 'Keine'}
                                   </div>
                                 </div>
                                 <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
@@ -1370,7 +1370,7 @@ export default function VerwaltungClient({
                                 </div>
                               </div>
                               {Array.isArray(s.level_details) && s.level_details.length > 0 && (
-                                <div className="grid grid-cols-7 gap-1 text-center">
+                                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1 text-center">
                                   {s.level_details.map((d: any, dIdx: number) => (
                                     <div
                                       key={dIdx}

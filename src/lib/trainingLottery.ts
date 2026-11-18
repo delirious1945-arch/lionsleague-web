@@ -996,7 +996,7 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     stat.totalCompletedGames += 1;
 
     const lvlText =
-      Number(s.levels_cleared_count || 0) >= 7
+      Number(s.levels_cleared_count || 0) >= 8
         ? '140 Cleared'
         : Number(s.highest_cleared_level || 0) > 0
         ? `bis Stufe ${s.highest_cleared_level}`

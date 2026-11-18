@@ -327,7 +327,8 @@ export default function UnifiedTvBoardClient({
     initialData.todayDoppelLeaderboard.length +
     initialData.todayPdcLeaderboard.length +
     (initialData.todayFussballMatches?.length || 0) +
-    (initialData.todayStellenCheckenLeaderboard?.length || 0)
+    (initialData.todayStellenCheckenLeaderboard?.length || 0) +
+    (initialData.todayScoringLeiterLeaderboard?.length || 0)
   );
 
   // Digital-Uhr
@@ -384,7 +385,8 @@ export default function UnifiedTvBoardClient({
         result.todayDoppelLeaderboard.length +
         result.todayPdcLeaderboard.length +
         (result.todayFussballMatches?.length || 0) +
-        (result.todayStellenCheckenLeaderboard?.length || 0);
+        (result.todayStellenCheckenLeaderboard?.length || 0) +
+        (result.todayScoringLeiterLeaderboard?.length || 0);
       if (currentTotal > prevSessionTotalRef.current) {
         playLivePing();
       }
@@ -554,7 +556,7 @@ export default function UnifiedTvBoardClient({
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Gesamtübersicht (4 Spiele)</span>
+              <span>Gesamtübersicht (5 Spiele)</span>
             </button>
 
             <button
@@ -615,6 +617,21 @@ export default function UnifiedTvBoardClient({
               }`}
             >
               <span>Stellen & Checken</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setViewMode('scoring_leiter');
+                if (timeframe === 'archive') setTimeframe('today');
+              }}
+              data-ui-id="TV_BOARD.NAV.TAB_SCORING_LEITER"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                viewMode === 'scoring_leiter' && timeframe !== 'archive'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
+              }`}
+            >
+              <span>Scoring-Leiter</span>
             </button>
 
             <button
@@ -946,7 +963,7 @@ export default function UnifiedTvBoardClient({
             <span className="font-bold text-slate-400">Aktiver Modus:</span>
             <span className="px-2.5 py-0.5 rounded-lg bg-amber-400/[0.08] text-amber-200 border border-amber-400/30 font-bold">
               {viewMode === 'both'
-                ? 'Gesamtübersicht (Alle 4 Trainingsspiele)'
+                ? 'Gesamtübersicht (Alle 5 Trainingsspiele)'
                 : viewMode === 'doppelquote'
                 ? 'Checkout Battle (Doppelquote)'
                 : viewMode === 'pdc'
@@ -955,6 +972,8 @@ export default function UnifiedTvBoardClient({
                 ? 'Fußball (Matchboard & Duelle)'
                 : viewMode === 'stellen_checken'
                 ? 'Stellen & Checken (3–101)'
+                : viewMode === 'scoring_leiter'
+                ? 'Scoring-Leiter (41–140)'
                 : 'Archiv & Kalender'}
             </span>
 
@@ -1013,6 +1032,10 @@ export default function UnifiedTvBoardClient({
             <span>•</span>
             <span>
               <strong className="text-white font-mono">{data.todayStellenCheckenLeaderboard?.length || 0}</strong> Stellen & Checken
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="text-white font-mono">{data.todayScoringLeiterLeaderboard?.length || 0}</strong> Scoring-Leiter
             </span>
             <span>•</span>
             <span>Stand: {data.lastUpdate || 'soeben'}</span>
@@ -1615,6 +1638,143 @@ export default function UnifiedTvBoardClient({
                   </div>
                 )}
               </div>
+
+              {/* TABELLE 5: SCORING-LEITER (41–140) */}
+              <div data-ui-id="TV_BOARD.QUADRANT.SCORING_LEITER_CARD" className="xl:col-span-2 bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+                {/* Header Spiel 5 */}
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
+                      🪜
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                        <span>Scoring-Leiter</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
+                          41–140
+                        </span>
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        7 Stufen (41 → 60 → 65 → 80 → 100 → 120 → 140) • 2 aus 10 Aufnahmen für Aufstieg • Ranking nach Punkten
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setViewMode('scoring_leiter')}
+                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-amber-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    title="Zur detaillierten Scoring-Leiter Übersicht"
+                  >
+                    <span>Details</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Tabelle Scoring-Leiter */}
+                {(!data.todayScoringLeiterLeaderboard || data.todayScoringLeiterLeaderboard.length === 0) ? (
+                  <div className="flex-1 min-h-[180px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
+                    <div className="text-4xl mb-2">🪜</div>
+                    <h3 className="text-base font-bold text-slate-200">
+                      Noch keine Scoring-Leiter Spiele heute
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-md mt-1">
+                      Sobald ein Spieler die 7-Stufen Scoring-Leiter (41–140) beendet, erscheint die Wertung hier sofort live auf dem TV-Board!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
+                          <th className="py-2.5 px-2 text-center w-12">Platz</th>
+                          <th className="py-2.5 px-3">Spieler</th>
+                          <th className="py-2.5 px-2 text-center">Höchststufe</th>
+                          <th className="py-2.5 px-2 text-center hidden sm:table-cell">Stufen</th>
+                          <th className="py-2.5 px-3 text-right">Punkte</th>
+                          <th className="py-2.5 px-3 text-right hidden sm:table-cell">Treffer / Aufn.</th>
+                          <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.05] font-medium">
+                        {data.todayScoringLeiterLeaderboard.map((row, idx) => {
+                          const photo = getPlayerPhotoUrl(row.player_name);
+                          const initials = getPlayerInitials(row.player_name);
+                          return (
+                            <tr
+                              key={row.session_id + '_sl_' + idx}
+                              className={`transition-colors hover:bg-white/[0.04] ${
+                                row.rank === 1
+                                  ? 'bg-amber-400/[0.08]'
+                                  : row.rank === 2
+                                  ? 'bg-white/[0.03]'
+                                  : row.rank === 3
+                                  ? 'bg-amber-900/[0.12]'
+                                  : ''
+                              }`}
+                            >
+                              <td className="py-3 px-2 text-center">
+                                {renderRankBadge(row.rank, row.isShared)}
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
+                                    {photo ? (
+                                      <Image src={photo} alt={row.player_name} width={32} height={32} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{initials}</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="font-black text-white text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
+                                      <span>{row.player_name}</span>
+                                      {row.attempt_nr > 1 && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/[0.06] text-amber-300 border border-white/[0.1]">
+                                          #{row.attempt_nr}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {row.opponent_name && (
+                                      <div className="text-[10px] text-slate-400">
+                                        vs. {row.opponent_name}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono">
+                                <span className={`px-2 py-0.5 rounded-lg border text-[11px] font-black ${
+                                  row.highest_cleared_level >= 140
+                                    ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300'
+                                    : row.highest_cleared_level > 0
+                                    ? 'bg-amber-400/10 border-amber-400/30 text-amber-200'
+                                    : 'bg-white/[0.04] border-white/[0.09] text-slate-400'
+                                }`}>
+                                  {row.highest_cleared_level > 0 ? `${row.highest_cleared_level}${row.highest_cleared_level >= 140 ? ' 🏆' : ''}` : 'Start (41)'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center hidden sm:table-cell font-mono text-slate-300">
+                                {row.levels_cleared_count} / 7
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <span className="font-mono font-black text-sm sm:text-base text-amber-300">
+                                  {row.total_score}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono ml-1">Pkt</span>
+                              </td>
+                              <td className="py-3 px-3 text-right hidden sm:table-cell font-mono text-slate-300">
+                                {row.total_hits}/{row.total_visits} ({row.hit_quote_percent.toFixed(0)}%)
+                              </td>
+                              <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
+                                {row.time_label || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1832,6 +1992,143 @@ export default function UnifiedTvBoardClient({
                     })}
                   </tbody>
                 </table>
+              </div>
+
+              {/* TABELLE 5: SCORING-LEITER (41–140) */}
+              <div data-ui-id="TV_BOARD.QUADRANT.SCORING_LEITER_CARD" className="xl:col-span-2 bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+                {/* Header Spiel 5 */}
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
+                      🪜
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                        <span>Scoring-Leiter</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
+                          41–140
+                        </span>
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        7 Stufen (41 → 60 → 65 → 80 → 100 → 120 → 140) • 2 aus 10 Aufnahmen für Aufstieg • Ranking nach Punkten
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setViewMode('scoring_leiter')}
+                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-amber-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    title="Zur detaillierten Scoring-Leiter Übersicht"
+                  >
+                    <span>Details</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Tabelle Scoring-Leiter */}
+                {(!data.todayScoringLeiterLeaderboard || data.todayScoringLeiterLeaderboard.length === 0) ? (
+                  <div className="flex-1 min-h-[180px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
+                    <div className="text-4xl mb-2">🪜</div>
+                    <h3 className="text-base font-bold text-slate-200">
+                      Noch keine Scoring-Leiter Spiele heute
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-md mt-1">
+                      Sobald ein Spieler die 7-Stufen Scoring-Leiter (41–140) beendet, erscheint die Wertung hier sofort live auf dem TV-Board!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
+                          <th className="py-2.5 px-2 text-center w-12">Platz</th>
+                          <th className="py-2.5 px-3">Spieler</th>
+                          <th className="py-2.5 px-2 text-center">Höchststufe</th>
+                          <th className="py-2.5 px-2 text-center hidden sm:table-cell">Stufen</th>
+                          <th className="py-2.5 px-3 text-right">Punkte</th>
+                          <th className="py-2.5 px-3 text-right hidden sm:table-cell">Treffer / Aufn.</th>
+                          <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.05] font-medium">
+                        {data.todayScoringLeiterLeaderboard.map((row, idx) => {
+                          const photo = getPlayerPhotoUrl(row.player_name);
+                          const initials = getPlayerInitials(row.player_name);
+                          return (
+                            <tr
+                              key={row.session_id + '_sl_' + idx}
+                              className={`transition-colors hover:bg-white/[0.04] ${
+                                row.rank === 1
+                                  ? 'bg-amber-400/[0.08]'
+                                  : row.rank === 2
+                                  ? 'bg-white/[0.03]'
+                                  : row.rank === 3
+                                  ? 'bg-amber-900/[0.12]'
+                                  : ''
+                              }`}
+                            >
+                              <td className="py-3 px-2 text-center">
+                                {renderRankBadge(row.rank, row.isShared)}
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
+                                    {photo ? (
+                                      <Image src={photo} alt={row.player_name} width={32} height={32} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{initials}</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="font-black text-white text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
+                                      <span>{row.player_name}</span>
+                                      {row.attempt_nr > 1 && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/[0.06] text-amber-300 border border-white/[0.1]">
+                                          #{row.attempt_nr}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {row.opponent_name && (
+                                      <div className="text-[10px] text-slate-400">
+                                        vs. {row.opponent_name}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono">
+                                <span className={`px-2 py-0.5 rounded-lg border text-[11px] font-black ${
+                                  row.highest_cleared_level >= 140
+                                    ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300'
+                                    : row.highest_cleared_level > 0
+                                    ? 'bg-amber-400/10 border-amber-400/30 text-amber-200'
+                                    : 'bg-white/[0.04] border-white/[0.09] text-slate-400'
+                                }`}>
+                                  {row.highest_cleared_level > 0 ? `${row.highest_cleared_level}${row.highest_cleared_level >= 140 ? ' 🏆' : ''}` : 'Start (41)'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center hidden sm:table-cell font-mono text-slate-300">
+                                {row.levels_cleared_count} / 7
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <span className="font-mono font-black text-sm sm:text-base text-amber-300">
+                                  {row.total_score}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono ml-1">Pkt</span>
+                              </td>
+                              <td className="py-3 px-3 text-right hidden sm:table-cell font-mono text-slate-300">
+                                {row.total_hits}/{row.total_visits} ({row.hit_quote_percent.toFixed(0)}%)
+                              </td>
+                              <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
+                                {row.time_label || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>

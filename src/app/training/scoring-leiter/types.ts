@@ -1,4 +1,4 @@
-export const SCORING_LEITER_LEVELS = [41, 60, 65, 80, 100, 120, 140] as const;
+export const SCORING_LEITER_LEVELS = [41, 60, 65, 80, 95, 100, 120, 140] as const;
 export const MAX_VISITS_PER_LEVEL = 10;
 export const REQUIRED_HITS_PER_LEVEL = 2;
 
@@ -7,6 +7,7 @@ export const LEVEL_BASE_POINTS: Record<number, number> = {
   60: 15,
   65: 20,
   80: 25,
+  95: 30,
   100: 35,
   120: 45,
   140: 60,

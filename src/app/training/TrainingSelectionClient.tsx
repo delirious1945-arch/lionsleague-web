@@ -432,17 +432,17 @@ export default function TrainingSelectionClient({
                   🪜 Scoring-Leiter (41–140)
                 </h2>
                 <span className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-400/[0.08] border border-amber-400/30 text-amber-200 font-mono font-bold text-[11px]">
-                  7 Stufen · Solo & 1vs1
+                  8 Stufen · Solo & 1vs1
                 </span>
               </div>
 
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Klettere über die 7 Scoring-Hürden: 41, 60, 65, 80, 100, 120 und 140. Du hast pro Stufe 10 Aufnahmen Zeit, um den Zielwert zweimal mit 3 Darts zu erreichen oder zu übertreffen. Schaffst du es nicht mehr, ist das Spiel vorbei!
+                Klettere über die 8 Scoring-Hürden: 41, 60, 65, 80, 95, 100, 120 und 140. Du hast pro Stufe 10 Aufnahmen Zeit, um den Zielwert zweimal mit 3 Darts zu erreichen oder zu übertreffen. Schaffst du es nicht mehr, ist das Spiel vorbei!
               </p>
 
               <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
                 <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-slate-200 font-mono font-semibold">
-                  41 · 60 · 65 · 80 · 100 · 120 · 140
+                  41 · 60 · 65 · 80 · 95 · 100 · 120 · 140
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-slate-200 font-semibold">
                   2 Treffer in 10 Aufnahmen • Rechnerisches Aus
