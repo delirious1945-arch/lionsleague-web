@@ -125,7 +125,7 @@ export default function TrainingSelectionClient({
             )}
 
             <Link
-              href={`/board/${activeBoard}`}
+              href="/training/live"
               data-ui-id="TRAINING.HEADER.TV_BOARD_BTN"
               className="px-4 py-2 rounded-xl bg-amber-400/[0.08] hover:bg-amber-400/[0.16] text-amber-200 border border-amber-400/40 font-bold text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md shadow-[inset_0_1px_0_0_rgba(251,191,36,0.2)] transition-all cursor-pointer"
             >
