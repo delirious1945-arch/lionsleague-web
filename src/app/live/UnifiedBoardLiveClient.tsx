@@ -457,6 +457,8 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     return (
       <HolographicScoringLeiterCockpit
         boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name}
         activeName={activeName}
         is1vs1={is1vs1}
         activePlayer={activePlayer}
@@ -467,6 +469,16 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         currentVisit={liveState.currentVisit ?? 1}
         eliminated={Boolean(liveState.eliminated)}
         clearedAll={Boolean(liveState.clearedAll)}
+        p1LevelIndex={liveState.p1LevelIndex ?? liveState.currentLevelIndex ?? 0}
+        p1HitsInLevel={liveState.p1HitsInLevel ?? 0}
+        p1LevelVisits={Array.isArray(liveState.p1LevelVisits) ? liveState.p1LevelVisits : []}
+        p1Eliminated={Boolean(liveState.p1Eliminated)}
+        p1ClearedAll={Boolean(liveState.p1ClearedAll)}
+        p2LevelIndex={liveState.p2LevelIndex ?? 0}
+        p2HitsInLevel={liveState.p2HitsInLevel ?? 0}
+        p2LevelVisits={Array.isArray(liveState.p2LevelVisits) ? liveState.p2LevelVisits : []}
+        p2Eliminated={Boolean(liveState.p2Eliminated)}
+        p2ClearedAll={Boolean(liveState.p2ClearedAll)}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
       />

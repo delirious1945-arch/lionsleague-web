@@ -251,38 +251,65 @@ export default function ScoringLeiterClient({
     };
   }, [sendStandbySignal]);
 
+  const buildLivePayload = useCallback(
+    (
+      finished: boolean,
+      p1S: PlayerProgressState,
+      p2S: PlayerProgressState,
+      actPlayer: 1 | 2,
+      overrideSessionId?: string
+    ) => {
+      const activeState = actPlayer === 1 ? p1S : p2S;
+      const targetVal = SCORING_LEITER_LEVELS[activeState.levelIdx] ?? 140;
+
+      return {
+        boardId: activeBoard,
+        sessionId: overrideSessionId || gameSessionId,
+        status: finished ? 'completed' : 'playing',
+        gameType: 'scoring_leiter' as const,
+        gameMode,
+        p1Name,
+        p2Name,
+        activePlayer: actPlayer,
+        currentNumber: targetVal,
+        currentLevelIndex: activeState.levelIdx,
+        hitsInLevel: activeState.hitsInLevel,
+        levelVisits: activeState.visitsInLevel,
+        currentVisit: Math.min(MAX_VISITS_PER_LEVEL, activeState.visitsInLevel.length + 1),
+        totalVisits: MAX_VISITS_PER_LEVEL,
+        p1Level: SCORING_LEITER_LEVELS[p1S.levelIdx] ?? 140,
+        p1LevelIndex: p1S.levelIdx,
+        p1HitsInLevel: p1S.hitsInLevel,
+        p1LevelVisits: p1S.visitsInLevel,
+        p1Eliminated: p1S.eliminated,
+        p1ClearedAll: p1S.clearedAll,
+        p2Level: SCORING_LEITER_LEVELS[p2S.levelIdx] ?? 140,
+        p2LevelIndex: p2S.levelIdx,
+        p2HitsInLevel: p2S.hitsInLevel,
+        p2LevelVisits: p2S.visitsInLevel,
+        p2Eliminated: p2S.eliminated,
+        p2ClearedAll: p2S.clearedAll,
+        eliminated: activeState.eliminated,
+        clearedAll: activeState.clearedAll,
+        updatedAt: Date.now(),
+      };
+    },
+    [activeBoard, gameSessionId, gameMode, p1Name, p2Name]
+  );
+
   // 4s Heartbeat während aktiven Spiels (sendet vollständigen Snapshot, damit Namen & Stand nie überschrieben werden!)
   useEffect(() => {
     if (!isGameStarted || isGameFinished) return;
     const interval = setInterval(() => {
-      const activeState = activePlayer === 1 ? p1State : p2State;
-      const targetVal = SCORING_LEITER_LEVELS[activeState.levelIdx] ?? 140;
+      const payload = buildLivePayload(false, p1State, p2State, activePlayer);
       fetch('/api/live/board', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boardId: activeBoard,
-          sessionId: gameSessionId,
-          status: 'playing',
-          gameType: 'scoring_leiter',
-          gameMode,
-          p1Name,
-          p2Name,
-          activePlayer,
-          currentNumber: targetVal,
-          currentLevelIndex: activeState.levelIdx,
-          hitsInLevel: activeState.hitsInLevel,
-          levelVisits: activeState.visitsInLevel,
-          currentVisit: Math.min(MAX_VISITS_PER_LEVEL, activeState.visitsInLevel.length + 1),
-          totalVisits: MAX_VISITS_PER_LEVEL,
-          eliminated: activeState.eliminated,
-          clearedAll: activeState.clearedAll,
-          updatedAt: Date.now(),
-        }),
+        body: JSON.stringify(payload),
       }).catch(() => {});
     }, 4000);
     return () => clearInterval(interval);
-  }, [isGameStarted, isGameFinished, activeBoard, gameSessionId, gameMode, p1Name, p2Name, activePlayer, p1State, p2State]);
+  }, [isGameStarted, isGameFinished, buildLivePayload, p1State, p2State, activePlayer]);
 
   const broadcastLiveState = (
     started: boolean,
@@ -293,32 +320,7 @@ export default function ScoringLeiterClient({
     overrideSessionId?: string
   ) => {
     if (!started && !finished) return;
-    const activeState = actPlayer === 1 ? p1S : p2S;
-    const targetVal = SCORING_LEITER_LEVELS[activeState.levelIdx] ?? 140;
-
-    const payload = {
-      boardId: activeBoard,
-      sessionId: overrideSessionId || gameSessionId,
-      status: finished ? 'completed' : 'playing',
-      gameType: 'scoring_leiter' as const,
-      gameMode,
-      p1Name,
-      p2Name,
-      activePlayer: actPlayer,
-      currentNumber: targetVal,
-      currentLevelIndex: activeState.levelIdx,
-      hitsInLevel: activeState.hitsInLevel,
-      levelVisits: activeState.visitsInLevel,
-      currentVisit: Math.min(MAX_VISITS_PER_LEVEL, activeState.visitsInLevel.length + 1),
-      totalVisits: MAX_VISITS_PER_LEVEL,
-      p1Level: SCORING_LEITER_LEVELS[p1S.levelIdx] ?? 140,
-      p1HitsInLevel: p1S.hitsInLevel,
-      p2Level: SCORING_LEITER_LEVELS[p2S.levelIdx] ?? 140,
-      p2HitsInLevel: p2S.hitsInLevel,
-      eliminated: activeState.eliminated,
-      clearedAll: activeState.clearedAll,
-      updatedAt: Date.now(),
-    };
+    const payload = buildLivePayload(finished, p1S, p2S, actPlayer, overrideSessionId);
 
     try {
       liveBroadcastRef.current?.postMessage(payload);

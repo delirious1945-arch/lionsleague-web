@@ -1,4 +1,4 @@
-export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'archive';
+export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'archive';
 
 export type UnifiedTvTimeframe = 'today' | 'month' | 'all' | 'archive';
 
@@ -93,12 +93,31 @@ export interface TvStellenCheckenRow {
   isShared: boolean;
 }
 
+export interface TvScoringLeiterRow {
+  session_id: string;
+  player_name: string;
+  opponent_name?: string | null;
+  game_mode: 'solo' | '1vs1';
+  attempt_nr: number;
+  attempt_label: string;
+  time_label: string;
+  highest_cleared_level: number;
+  reached_level: number;
+  levels_cleared_count: number;
+  total_score: number;
+  total_hits: number;
+  total_visits: number;
+  hit_quote_percent: number;
+  rank: number;
+  isShared: boolean;
+}
+
 export interface ArchiveTrainingDaySummary {
   dateStr: string; // YYYY-MM-DD
   dayLabel: string; // e.g. "Donnerstag, 22. Okt."
   totalSessions: number;
   uniquePlayersCount: number;
-  gamesList: ('doppelquote' | 'pdc' | 'fussball' | 'stellen_checken')[];
+  gamesList: ('doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter')[];
 }
 
 export interface ArchiveDayDetail {
@@ -150,6 +169,20 @@ export interface ArchiveDayDetail {
     quotePercent: number;
     time: string;
   }[];
+  scoringLeiterGames: {
+    id: string;
+    playerName: string;
+    opponentName?: string | null;
+    gameMode: string;
+    highestClearedLevel: number;
+    reachedLevel: number;
+    levelsClearedCount: number;
+    totalScore: number;
+    totalHits: number;
+    totalVisits: number;
+    hitQuotePercent: number;
+    time: string;
+  }[];
 }
 
 export interface UnifiedTvBoardData {
@@ -161,6 +194,7 @@ export interface UnifiedTvBoardData {
   todayFussballLeaderboard: TvFussballRow[];
   todayFussballMatches: TvFussballMatch[];
   todayStellenCheckenLeaderboard: TvStellenCheckenRow[];
+  todayScoringLeiterLeaderboard: TvScoringLeiterRow[];
   hasTodayData: boolean;
   hasMonthData: boolean;
   availableArchiveDays: ArchiveTrainingDaySummary[];

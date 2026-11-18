@@ -46,6 +46,16 @@ export interface UnifiedLiveState {
   levelVisits?: boolean[];
   eliminated?: boolean;
   clearedAll?: boolean;
+  p1LevelIndex?: number;
+  p1HitsInLevel?: number;
+  p1LevelVisits?: boolean[];
+  p1Eliminated?: boolean;
+  p1ClearedAll?: boolean;
+  p2LevelIndex?: number;
+  p2HitsInLevel?: number;
+  p2LevelVisits?: boolean[];
+  p2Eliminated?: boolean;
+  p2ClearedAll?: boolean;
   scoresP1?: any;
   scoresP2?: any;
   winner?: string;

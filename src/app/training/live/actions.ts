@@ -9,6 +9,7 @@ import {
   TvFussballRow,
   TvFussballMatch,
   TvStellenCheckenRow,
+  TvScoringLeiterRow,
   ArchiveTrainingDaySummary,
   ArchiveDayDetail,
 } from './types';
