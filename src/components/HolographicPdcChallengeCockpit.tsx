@@ -34,9 +34,10 @@ export default function HolographicPdcChallengeCockpit({
   onToggleFullscreen,
 }: HolographicPdcChallengeProps) {
   const visitPct = Math.min(100, Math.round((currentVisit / Math.max(1, totalVisits)) * 100));
+  const badgeLabel = currentPart === 2 ? 'DOPPEL' : currentPart === 3 ? 'SHANGHAI' : 'ZIEL';
 
   return (
-    <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-8 overflow-hidden select-none font-sans">
+    <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-8 overflow-hidden select-none font-sans">
       {/* Hintergrund-Atmosphäre exakt wie Checkout Battle */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-32 left-[18%] w-[26vw] h-[130vh] bg-gradient-to-b from-cyan-400/25 via-cyan-500/05 to-transparent rotate-[18deg] blur-2xl opacity-60" />
@@ -112,7 +113,7 @@ export default function HolographicPdcChallengeCockpit({
           {/* Zentrum: Identische Turnier-Dartscheibe wie Checkout Battle */}
           <HolographicDartboard
             target={currentTarget}
-            badgeLabel="ZIELFELD"
+            badgeLabel={badgeLabel}
             className="relative z-20 w-[320px] h-[320px] sm:w-[400px] sm:h-[400px] md:w-[450px] md:h-[450px] shrink-0"
           />
 

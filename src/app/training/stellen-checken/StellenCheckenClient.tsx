@@ -107,10 +107,20 @@ export default function StellenCheckenClient({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [history, setHistory] = useState<StellenCheckenHistoryItem[]>(initialHistory);
 
-  // Realtime Live-Synchronisation für den externen TV-Monitor (/training/stellen-checken/live)
+  // Realtime Live-Synchronisation für den externen TV-Monitor (/board/[id])
   const [activeBoard, setActiveBoard] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lions_active_board_stellen_checken') || localStorage.getItem('lions_active_board') || '1';
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlBoard = urlParams.get('board');
+      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+        return urlBoard;
+      }
+      return (
+        localStorage.getItem('lions_tablet_board') ||
+        localStorage.getItem('lions_active_board_stellen_checken') ||
+        localStorage.getItem('lions_active_board') ||
+        '1'
+      );
     }
     return '1';
   });
@@ -121,8 +131,12 @@ export default function StellenCheckenClient({
   const handleSelectBoard = (b: string) => {
     setActiveBoard(b);
     try {
-      localStorage.setItem('lions_active_board_stellen_checken', b);
+      localStorage.setItem('lions_tablet_board', b);
       localStorage.setItem('lions_active_board', b);
+      localStorage.setItem('lions_active_board_pdc', b);
+      localStorage.setItem('lions_active_board_fussball', b);
+      localStorage.setItem('lions_active_board_stellen_checken', b);
+      window.history.replaceState(null, '', `/training/stellen-checken?board=${b}`);
     } catch (e) {}
   };
 
@@ -1083,7 +1097,7 @@ export default function StellenCheckenClient({
                   </span>
                 </label>
                 <Link
-                  href={`/training/stellen-checken/live?board=${activeBoard}`}
+                  href={`/board/${activeBoard}`}
                   target="_blank"
                   className="text-xs text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 underline underline-offset-2"
                 >

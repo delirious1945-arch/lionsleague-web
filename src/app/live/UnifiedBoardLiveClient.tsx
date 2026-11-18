@@ -41,7 +41,15 @@ function mergeIncomingLiveState(prev: UnifiedLiveState, incoming: UnifiedLiveSta
 }
 
 export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: UnifiedBoardLiveProps) {
-  const [boardId, setBoardId] = useState<string>(initialBoardId);
+  const [boardId, setBoardId] = useState<string>(() => {
+    if (typeof window !== 'undefined' && initialBoardId === '1') {
+      const saved = localStorage.getItem('lions_monitor_board');
+      if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
+        return saved;
+      }
+    }
+    return initialBoardId;
+  });
   const [liveState, setLiveState] = useState<UnifiedLiveState>({
     boardId: initialBoardId,
     status: 'idle',
@@ -50,6 +58,15 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
   });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<string>('');
+
+  // Synchronisiere boardId mit URL / localStorage
+  const handleSelectBoard = (b: string) => {
+    setBoardId(b);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lions_monitor_board', b);
+      window.history.replaceState(null, '', `/board/${b}`);
+    }
+  };
 
   // Digital-Uhr
   useEffect(() => {
@@ -157,7 +174,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
   // =========================================================================
   if (liveState.status === 'idle' || liveState.gameType === 'idle') {
     return (
-      <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between p-6 sm:p-12 overflow-hidden select-none font-sans">
+      <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-6 sm:p-12 overflow-hidden select-none font-sans">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute top-[-20%] left-[20%] w-[55vw] h-[55vw] bg-cyan-600/10 rounded-full blur-[140px]" />
           <div className="absolute bottom-[-15%] right-[15%] w-[45vw] h-[45vw] bg-emerald-600/10 rounded-full blur-[140px]" />
@@ -191,7 +208,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
             {['1', '2', '3', '4', '5'].map((b) => (
               <button
                 key={b}
-                onClick={() => setBoardId(b)}
+                onClick={() => handleSelectBoard(b)}
                 className={`w-10 h-10 rounded-xl font-mono text-sm font-black transition-all cursor-pointer ${
                   boardId === b
                     ? 'bg-cyan-500 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.6)] scale-110'
@@ -223,7 +240,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     const curQuote = is1vs1 ? (activePlayer === 1 ? p1Quote : p2Quote) : p1Quote;
 
     return (
-      <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-8 overflow-hidden select-none font-sans">
+      <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-8 overflow-hidden select-none font-sans">
         {/* God Rays */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -top-32 left-[18%] w-[26vw] h-[130vh] bg-gradient-to-b from-cyan-400/25 via-cyan-500/05 to-transparent rotate-[18deg] blur-2xl opacity-60" />

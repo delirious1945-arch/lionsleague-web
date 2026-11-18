@@ -63,7 +63,7 @@ export default function HolographicFussballCockpit({
   const isP2Possession = ballPossession === 2;
 
   return (
-    <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between py-4 sm:py-6 lg:py-8 px-0 overflow-hidden select-none font-sans">
+    <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between py-4 sm:py-6 lg:py-8 px-0 overflow-hidden select-none font-sans">
       {/* =================================================================== */}
       {/* 1. PHOTOREALISTISCHE 3D-BÜHNE (100% CLEAN STAGE)                    */}
       {/* =================================================================== */}

@@ -170,7 +170,7 @@ export default function HolographicStellenCheckenCockpit({
   };
 
   return (
-    <div className="relative w-screen h-screen bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 overflow-hidden select-none font-sans">
+    <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 overflow-hidden select-none font-sans">
       {/* =================================================================== */}
       {/* 1. VOLUMETRISCHE GOD RAYS & CYBER-ATMOSPHÄRE (EXAKT WIE IM SOLL) */}
       {/* =================================================================== */}

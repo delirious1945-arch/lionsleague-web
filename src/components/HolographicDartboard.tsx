@@ -389,6 +389,7 @@ export default function HolographicDartboard({
 
           return (
             <g
+              transform={`rotate(${activeAngle} ${cx} ${cy})`}
               style={{
                 transformOrigin: `${cx}px ${cy}px`,
                 transform: `rotate(${activeAngle}deg)`,

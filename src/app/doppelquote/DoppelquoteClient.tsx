@@ -252,7 +252,15 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
 
   useEffect(() => {
     try {
-      const savedBoard = localStorage.getItem('lions_active_board');
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlBoard = urlParams.get('board');
+      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+        setActiveBoard(urlBoard);
+        localStorage.setItem('lions_tablet_board', urlBoard);
+        localStorage.setItem('lions_active_board', urlBoard);
+        return;
+      }
+      const savedBoard = localStorage.getItem('lions_tablet_board') || localStorage.getItem('lions_active_board');
       if (savedBoard && ['1', '2', '3', '4', '5'].includes(savedBoard)) {
         setActiveBoard(savedBoard);
       }
@@ -262,7 +270,12 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   const handleSelectBoard = (b: string) => {
     setActiveBoard(b);
     try {
+      localStorage.setItem('lions_tablet_board', b);
       localStorage.setItem('lions_active_board', b);
+      localStorage.setItem('lions_active_board_pdc', b);
+      localStorage.setItem('lions_active_board_fussball', b);
+      localStorage.setItem('lions_active_board_stellen_checken', b);
+      window.history.replaceState(null, '', `/doppelquote?board=${b}`);
     } catch (e) {}
     // Sofortigen Standby-Sync für das neu gewählte Board senden, falls Spiel noch nicht gestartet
     if (!isPlaying && !isCompleted) {
@@ -1489,9 +1502,19 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
                   <span>📺</span>
                   <span>Externer TV-Monitor / Oche-Scheibe:</span>
                 </label>
-                <span className="text-[11px] font-mono text-zinc-400">
-                  Dieses Tablet steuert <strong className="text-cyan-300 font-bold">TV-Board {activeBoard}</strong>
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-zinc-400">
+                    Dieses Tablet steuert <strong className="text-cyan-300 font-bold">TV-Board {activeBoard}</strong>
+                  </span>
+                  <a
+                    href={`/board/${activeBoard}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-mono font-bold text-cyan-400 hover:text-cyan-300 underline"
+                  >
+                    Monitor öffnen ↗
+                  </a>
+                </div>
               </div>
               <div className="grid grid-cols-5 gap-2 pt-1">
                 {['1', '2', '3', '4', '5'].map((b) => (

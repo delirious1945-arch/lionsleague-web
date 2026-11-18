@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { UserSession } from '@/app/actions';
 import {
@@ -15,14 +15,43 @@ import { PlayerMonthProgress, LotteryWinner } from '@/lib/trainingLottery';
 
 interface TrainingSelectionClientProps {
   user: UserSession;
+  initialBoard?: string | null;
   monthProgress?: PlayerMonthProgress | null;
   bannerWinner?: LotteryWinner | null;
 }
 
 export default function TrainingSelectionClient({
   user,
+  initialBoard,
   monthProgress,
 }: TrainingSelectionClientProps) {
+  const [activeBoard, setActiveBoard] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlBoard = urlParams.get('board');
+      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+        return urlBoard;
+      }
+      const saved = localStorage.getItem('lions_tablet_board') || localStorage.getItem('lions_active_board');
+      if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
+        return saved;
+      }
+    }
+    return initialBoard || '1';
+  });
+
+  const handleSelectBoard = (b: string) => {
+    setActiveBoard(b);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lions_tablet_board', b);
+      localStorage.setItem('lions_active_board', b);
+      localStorage.setItem('lions_active_board_pdc', b);
+      localStorage.setItem('lions_active_board_fussball', b);
+      localStorage.setItem('lions_active_board_stellen_checken', b);
+      window.history.replaceState(null, '', `/training?board=${b}`);
+    }
+  };
+
   const completed = monthProgress?.completedGames ?? 0;
   const target = monthProgress?.targetGames ?? 20;
   const pct = Math.min(100, Math.round((completed / target) * 100));
@@ -71,12 +100,63 @@ export default function TrainingSelectionClient({
             )}
 
             <Link
-              href="/training/live"
+              href={`/board/${activeBoard}`}
               data-ui-id="TRAINING.HEADER.TV_BOARD_BTN"
               className="px-4 py-2 rounded-xl bg-amber-400/[0.08] hover:bg-amber-400/[0.16] text-amber-200 border border-amber-400/40 font-bold text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md shadow-[inset_0_1px_0_0_rgba(251,191,36,0.2)] transition-all cursor-pointer"
             >
               <Tv className="w-4 h-4 text-amber-300" />
               <span>Vereinsheim TV-Board</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* 1.5 Tablet-Arretierung & Feste Board-Zuweisung */}
+        <div
+          data-ui-id="TRAINING.TABLET_LOCK.BAR"
+          className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-900/70 border border-cyan-500/30 backdrop-blur-xl shadow-[0_4px_25px_rgba(6,182,212,0.15)]"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 font-mono font-bold text-lg shadow-[0_0_15px_rgba(6,182,212,0.3)] shrink-0">
+              🎯
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-300">
+                  Geräte-Zuweisung (Tablet Lock)
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-[10px] font-mono text-emerald-300 font-bold">
+                  AKTIV
+                </span>
+              </div>
+              <p className="text-sm font-bold text-white">
+                Dieses Tablet steuert: <span className="text-cyan-400 font-mono text-base font-black">BOARD {activeBoard}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span className="text-xs font-mono text-slate-400 mr-1 hidden sm:inline">Board wechseln:</span>
+            {['1', '2', '3', '4', '5'].map((b) => (
+              <button
+                key={b}
+                onClick={() => handleSelectBoard(b)}
+                className={`px-3 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  activeBoard === b
+                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.6)] scale-105'
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-white/10'
+                }`}
+              >
+                Board {b}
+              </button>
+            ))}
+            <Link
+              href={`/board/${activeBoard}`}
+              target="_blank"
+              className="ml-1 sm:ml-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-500/30 text-cyan-300 hover:text-white font-mono text-xs font-bold flex items-center gap-1.5 transition-all"
+              title={`TV-Monitor für Board ${activeBoard} öffnen`}
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Monitor {activeBoard}</span>
             </Link>
           </div>
         </div>
@@ -186,7 +266,7 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
-                href="/doppelquote"
+                href={`/doppelquote?board=${activeBoard}`}
                 data-ui-id="TRAINING.GAME_CHECKOUT.START_BTN"
                 className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
@@ -228,7 +308,7 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
-                href="/training/pdc-challenge"
+                href={`/training/pdc-challenge?board=${activeBoard}`}
                 data-ui-id="TRAINING.GAME_PDC.START_BTN"
                 className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
@@ -267,7 +347,7 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
-                href="/training/fussball"
+                href={`/training/fussball?board=${activeBoard}`}
                 data-ui-id="TRAINING.GAME_FUSSBALL.START_BTN"
                 className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
@@ -306,7 +386,7 @@ export default function TrainingSelectionClient({
             <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center">
 
               <Link
-                href="/training/stellen-checken"
+                href={`/training/stellen-checken?board=${activeBoard}`}
                 data-ui-id="TRAINING.GAME_STELLEN_CHECKEN.START_BTN"
                 className="w-full min-h-[56px] py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >

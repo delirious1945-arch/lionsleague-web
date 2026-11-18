@@ -274,10 +274,20 @@ export default function PdcChallengeClient({
   const isPlaying = isMatchStarted && !isCompleted;
   const isGameActive = isMatchStarted && hasStarted && !isCompleted;
 
-  // Realtime Live-Synchronisation für den externen TV-Monitor (/training/pdc-challenge/live)
+  // Realtime Live-Synchronisation für den externen TV-Monitor (/board/[id])
   const [activeBoard, setActiveBoard] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lions_active_board_pdc') || localStorage.getItem('lions_active_board') || '1';
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlBoard = urlParams.get('board');
+      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+        return urlBoard;
+      }
+      return (
+        localStorage.getItem('lions_tablet_board') ||
+        localStorage.getItem('lions_active_board_pdc') ||
+        localStorage.getItem('lions_active_board') ||
+        '1'
+      );
     }
     return '1';
   });
@@ -287,8 +297,12 @@ export default function PdcChallengeClient({
   const handleSelectBoard = (b: string) => {
     setActiveBoard(b);
     try {
-      localStorage.setItem('lions_active_board_pdc', b);
+      localStorage.setItem('lions_tablet_board', b);
       localStorage.setItem('lions_active_board', b);
+      localStorage.setItem('lions_active_board_pdc', b);
+      localStorage.setItem('lions_active_board_fussball', b);
+      localStorage.setItem('lions_active_board_stellen_checken', b);
+      window.history.replaceState(null, '', `/training/pdc-challenge?board=${b}`);
     } catch (e) {}
   };
 
@@ -1380,7 +1394,7 @@ export default function PdcChallengeClient({
                   </span>
                 </label>
                 <Link
-                  href={`/training/pdc-challenge/live?board=${activeBoard}`}
+                  href={`/board/${activeBoard}`}
                   target="_blank"
                   className="text-xs text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 underline underline-offset-2"
                 >
@@ -2167,7 +2181,7 @@ export default function PdcChallengeClient({
               </h3>
             </div>
             <Link
-              href={`/training/pdc-challenge/live?board=${activeBoard}`}
+              href={`/board/${activeBoard}`}
               target="_blank"
               className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
             >
