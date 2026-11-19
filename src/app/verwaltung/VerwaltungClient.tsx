@@ -75,6 +75,7 @@ export default function VerwaltungClient({
   trainingFussball = [],
   trainingStellenChecken = [],
   trainingScoringLeiter = [],
+  trainingDarts99 = [],
   trainingBiomechanics = [],
   adminTrainingOverview,
 }: {
@@ -85,6 +86,7 @@ export default function VerwaltungClient({
   trainingFussball?: any[];
   trainingStellenChecken?: any[];
   trainingScoringLeiter?: any[];
+  trainingDarts99?: any[];
   trainingBiomechanics?: any[];
   adminTrainingOverview?: AdminTrainingOverviewData;
 }) {
@@ -98,7 +100,7 @@ export default function VerwaltungClient({
 
   const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'training'>(defaultTab);
   const [trainingGameType, setTrainingGameType] = useState<
-    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'biomechanics'
+    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'biomechanics'
   >('all');
   const [trainingPlayerFilter, setTrainingPlayerFilter] = useState<string>('all');
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
@@ -354,7 +356,7 @@ export default function VerwaltungClient({
               : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-transparent'
           }`}
         >
-          <span>📈</span> Trainingsleistungen ({trainingDoubles.length + trainingPdc.length + trainingFussball.length + trainingStellenChecken.length + trainingScoringLeiter.length + trainingBiomechanics.length})
+          <span>📈</span> Trainingsleistungen ({trainingDoubles.length + trainingPdc.length + trainingFussball.length + trainingStellenChecken.length + trainingScoringLeiter.length + trainingDarts99.length + trainingBiomechanics.length})
         </button>
       </div>
 
@@ -547,6 +549,7 @@ export default function VerwaltungClient({
             ...trainingFussball.map((f: any) => f.player_name),
             ...trainingStellenChecken.map((s: any) => s.player_name),
             ...trainingScoringLeiter.map((s: any) => s.player_name),
+            ...trainingDarts99.map((d: any) => d.player_name),
             ...trainingBiomechanics.map((b: any) => b.playerName),
           ].filter(Boolean))
         ).sort();
@@ -557,6 +560,7 @@ export default function VerwaltungClient({
           ...trainingFussball.map((f: any) => ({ ...f, gameType: 'fussball' })),
           ...trainingStellenChecken.map((s: any) => ({ ...s, gameType: 'stellen_checken' })),
           ...trainingScoringLeiter.map((s: any) => ({ ...s, gameType: 'scoring_leiter' })),
+          ...trainingDarts99.map((d: any) => ({ ...d, gameType: 'darts_99' })),
           ...trainingBiomechanics.map((b: any) => ({
             ...b,
             gameType: 'biomechanics',
@@ -599,7 +603,7 @@ export default function VerwaltungClient({
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Hier hast du als Admin vollständige Einsicht in alle absolvierten Vereins-Trainings (Checkout Battle, PDC Challenge, Fußball Darts & Stellen & Checken).
+                  Hier hast du als Admin vollständige Einsicht in alle absolvierten Vereins-Trainings (Checkout Battle, PDC Challenge, Fußball Darts, Stellen &amp; Checken, Scoring-Leiter &amp; 99 Darts).
                 </p>
               </div>
 
@@ -648,6 +652,14 @@ export default function VerwaltungClient({
                   <ExternalLink size={12} />
                 </Link>
                 <Link
+                  href="/training/99-darts"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_99_DARTS"
+                  className="px-3 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <span>🎯 99 Darts</span>
+                  <ExternalLink size={12} />
+                </Link>
+                <Link
                   href="/video"
                   data-ui-id="VERWALTUNG.TRAINING.LINK_VIDEO"
                   className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
@@ -681,7 +693,7 @@ export default function VerwaltungClient({
                   {combinedSessions.length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5">
-                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&C · {trainingScoringLeiter.length} SL · {trainingBiomechanics.length} Video
+                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&amp;C · {trainingScoringLeiter.length} SL · {trainingDarts99.length} 99D · {trainingBiomechanics.length} Video
                 </div>
               </div>
 
@@ -781,6 +793,17 @@ export default function VerwaltungClient({
                   Scoring-Leiter ({trainingScoringLeiter.length})
                 </button>
                 <button
+                  onClick={() => setTrainingGameType('darts_99')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_99_DARTS_BTN"
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    trainingGameType === 'darts_99'
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  99 Darts ({trainingDarts99.length})
+                </button>
+                <button
                   onClick={() => setTrainingGameType('biomechanics')}
                   data-ui-id="VERWALTUNG.TRAINING.FILTER_BIOMECHANICS_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
@@ -832,6 +855,7 @@ export default function VerwaltungClient({
                   const isFussball = s.gameType === 'fussball';
                   const isStellenChecken = s.gameType === 'stellen_checken';
                   const isScoringLeiter = s.gameType === 'scoring_leiter';
+                  const isDarts99 = s.gameType === 'darts_99';
                   const isBiomechanics = s.gameType === 'biomechanics';
                   const isAborted = Boolean(s.is_aborted);
                   const sessionKey = s.session_id ? `${s.session_id}_${s.player_name}_${idx}` : `s_${idx}`;
@@ -876,6 +900,8 @@ export default function VerwaltungClient({
                                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                                 : isScoringLeiter
                                 ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                                : isDarts99
+                                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                                 : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                             }`}
                           >
@@ -889,6 +915,8 @@ export default function VerwaltungClient({
                               ? '🎯 Stellen & Checken'
                               : isScoringLeiter
                               ? '🪜 Scoring-Leiter'
+                              : isDarts99
+                              ? '🎯 99 Darts'
                               : '🎥 KI-Wurfanalyse'}
                           </span>
                           <span className="font-bold text-white text-sm">{s.player_name}</span>
@@ -966,6 +994,17 @@ export default function VerwaltungClient({
                               </span>
                               <div className="text-[10px] text-slate-400">
                                 {s.total_score} Pkt. · {s.total_hits}/{s.total_visits} Hits
+                              </div>
+                            </div>
+                          )}
+
+                          {isDarts99 && (
+                            <div className="text-right">
+                              <span className="text-sky-300 font-black text-sm font-mono">
+                                {s.total_points} / 297 Pkt.
+                              </span>
+                              <div className="text-[10px] text-slate-400">
+                                Ziel {s.target_number || 20} · {s.triples_count || 0}T/{s.doubles_count || 0}D/{s.singles_count || 0}S
                               </div>
                             </div>
                           )}
@@ -1382,6 +1421,50 @@ export default function VerwaltungClient({
                                     >
                                       <div className="text-white text-xs">{d.target}</div>
                                       <div>{d.cleared ? `${d.hits}/${d.visits?.length || 0}` : '✕'}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {isDarts99 && (
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Zielzahl &amp; Punkte</div>
+                                  <div className="text-sm font-black text-sky-400">
+                                    Ziel {s.target_number || 20} · {s.total_points} / 297 Pkt.
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Trefferquote &amp; Pkt/Dart</div>
+                                  <div className="text-sm font-black text-emerald-400">
+                                    {s.total_hits || 0}/{s.total_darts || 99} ({((s.hit_quote ?? 0) * 100).toFixed(1)}%) · {Number(s.points_per_dart || 0).toFixed(2)} P/D
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">T / D / S / Miss Verteilung</div>
+                                  <div className="text-sm font-black text-amber-400">
+                                    {s.triples_count || 0}T · {s.doubles_count || 0}D · {s.singles_count || 0}S · {s.misses_count || 0}M
+                                  </div>
+                                </div>
+                              </div>
+                              {Array.isArray(s.round_details) && s.round_details.length > 0 && (
+                                <div className="grid grid-cols-11 gap-1 text-center">
+                                  {s.round_details.map((r: any, rIdx: number) => (
+                                    <div
+                                      key={rIdx}
+                                      className={`py-1 px-0.5 rounded border text-[10px] font-mono font-bold ${
+                                        Number(r.points || 0) >= 5
+                                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                                          : Number(r.points || 0) > 0
+                                          ? 'bg-cyan-500/15 border-cyan-400/50 text-cyan-200'
+                                          : 'bg-red-500/15 border-red-500/40 text-red-300'
+                                      }`}
+                                    >
+                                      <div className="text-[8px] opacity-75">#{r.round || rIdx + 1}</div>
+                                      <div className="text-white text-xs">{r.points ?? 0}</div>
                                     </div>
                                   ))}
                                 </div>

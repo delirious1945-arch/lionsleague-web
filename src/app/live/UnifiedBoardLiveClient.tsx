@@ -9,6 +9,7 @@ import HolographicFussballCockpit from '@/components/HolographicFussballCockpit'
 import HolographicDartboard from '@/components/HolographicDartboard';
 import HolographicPdcChallengeCockpit from '@/components/HolographicPdcChallengeCockpit';
 import HolographicScoringLeiterCockpit from '@/components/HolographicScoringLeiterCockpit';
+import HolographicDarts99Cockpit from '@/components/HolographicDarts99Cockpit';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -258,7 +259,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
 
         <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 font-mono border-t border-white/10 pt-4">
           <span>AUTO-SWITCHING LIVE BOARD</span>
-          <span>CHECKOUT BATTLE · PDC CHALLENGE · FUßBALL · STELLEN & CHECKEN · SCORING-LEITER</span>
+          <span>CHECKOUT BATTLE · PDC CHALLENGE · FUßBALL · STELLEN &amp; CHECKEN · SCORING-LEITER · 99 DARTS</span>
         </div>
       </div>
     );
@@ -479,6 +480,42 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         p2LevelVisits={Array.isArray(liveState.p2LevelVisits) ? liveState.p2LevelVisits : []}
         p2Eliminated={Boolean(liveState.p2Eliminated)}
         p2ClearedAll={Boolean(liveState.p2ClearedAll)}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 7. SPIEL: 99 DARTS CHALLENGE (20 / 19 / 18)
+  // =========================================================================
+  if (liveState.gameType === 'darts_99') {
+    const d99 = liveState.darts99Data || {};
+    const defaultStats = {
+      totalPoints: 0,
+      dartsThrown: 0,
+      currentRound: 1,
+      currentTurnDarts: [],
+      singles: 0,
+      doubles: 0,
+      triples: 0,
+      misses: 0,
+      hitQuote: 0,
+      pointsPerDart: 0,
+      finished: false,
+    };
+
+    return (
+      <HolographicDarts99Cockpit
+        boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name}
+        activeName={activeName}
+        is1vs1={is1vs1}
+        activePlayer={activePlayer}
+        targetNumber={Number(d99.targetNumber || liveState.currentNumber || 20)}
+        p1Stats={d99.p1 || defaultStats}
+        p2Stats={d99.p2 || defaultStats}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
       />

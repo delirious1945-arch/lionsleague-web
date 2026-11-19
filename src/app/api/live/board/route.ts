@@ -3,7 +3,7 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter';
+export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99';
 
 export interface UnifiedLiveState {
   boardId: string;
@@ -21,6 +21,7 @@ export interface UnifiedLiveState {
   fussballData?: any;
   fussballStats?: any;
   stellenCheckenData?: any;
+  darts99Data?: any;
   // Direct access fields for UI components
   currentTarget?: string;
   currentTargetIndex?: number;

@@ -7,6 +7,7 @@ import { getPdcChallengeHistoryAction } from '@/app/training/pdc-challenge/actio
 import { getFussballHistoryAction } from '@/app/training/fussball/actions';
 import { getStellenCheckenHistoryAction } from '@/app/training/stellen-checken/actions';
 import { getScoringLeiterHistoryAction } from '@/app/training/scoring-leiter/actions';
+import { getDarts99HistoryAction } from '@/app/training/99-darts/actions';
 import { getBiomechanicsHistoryAction } from '@/app/video/actions';
 import { getAdminTrainingOverviewData } from '@/lib/trainingLottery';
 import { redirect } from 'next/navigation';
@@ -30,6 +31,7 @@ export default async function VerwaltungPage() {
     trainingFussball,
     trainingStellenChecken,
     trainingScoringLeiter,
+    trainingDarts99,
     trainingBiomechanics,
     adminTrainingOverview,
   ] = await Promise.all([
@@ -40,6 +42,7 @@ export default async function VerwaltungPage() {
     getFussballHistoryAction(100),
     getStellenCheckenHistoryAction(100),
     getScoringLeiterHistoryAction(100),
+    getDarts99HistoryAction(100),
     getBiomechanicsHistoryAction(100),
     getAdminTrainingOverviewData(),
   ]);
@@ -54,6 +57,7 @@ export default async function VerwaltungPage() {
         trainingFussball={trainingFussball}
         trainingStellenChecken={trainingStellenChecken}
         trainingScoringLeiter={trainingScoringLeiter}
+        trainingDarts99={trainingDarts99}
         trainingBiomechanics={trainingBiomechanics}
         adminTrainingOverview={adminTrainingOverview}
       />

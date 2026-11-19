@@ -10,6 +10,7 @@ import {
   TvFussballMatch,
   TvStellenCheckenRow,
   TvScoringLeiterRow,
+  TvDarts99Row,
   ArchiveTrainingDaySummary,
   ArchiveDayDetail,
 } from './types';
@@ -103,7 +104,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
 
   try {
     // 1. Fetch raw data in parallel
-    const [rawDoubles, rawPdc, rawFussball, rawStellenChecken, rawScoringLeiter] = await Promise.all([
+    const [rawDoubles, rawPdc, rawFussball, rawStellenChecken, rawScoringLeiter, rawDarts99] = await Promise.all([
       sql`SELECT * FROM training_doubles ORDER BY created_at ASC`,
       sql`SELECT * FROM training_pdc_challenge ORDER BY created_at ASC`,
       sql`SELECT * FROM training_fussball ORDER BY created_at ASC`,
@@ -121,6 +122,13 @@ export async function getUnifiedTvBoardDataAction(options?: {
           return [];
         }
       })(),
+      (async () => {
+        try {
+          return await sql`SELECT * FROM training_99_darts ORDER BY created_at ASC`;
+        } catch {
+          return [];
+        }
+      })(),
     ]);
 
     // Streng reguläre Spiele filtern (Abgebrochene Spiele rausnehmen)
@@ -129,15 +137,16 @@ export async function getUnifiedTvBoardDataAction(options?: {
     const fussballRows = rawFussball.filter((r: any) => Number(r.is_aborted || 0) === 0);
     const stellenCheckenRows = rawStellenChecken.filter((r: any) => Number(r.is_aborted || 0) === 0);
     const scoringLeiterRows = rawScoringLeiter.filter((r: any) => Number(r.is_aborted || 0) === 0);
+    const darts99Rows = rawDarts99.filter((r: any) => Number(r.is_aborted || 0) === 0);
 
-    // 2. Identify available archive days across all 5 game types
+    // 2. Identify available archive days across all 6 game types
     const dayMap = new Map<string, {
       sessionsCount: number;
       players: Set<string>;
-      games: Set<'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter'>;
+      games: Set<'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99'>;
     }>();
 
-    const registerDay = (row: any, game: 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter') => {
+    const registerDay = (row: any, game: 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99') => {
       const d = extractRowDate(row);
       if (!d || d.length !== 10) return;
       if (!dayMap.has(d)) {
@@ -157,6 +166,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
     fussballRows.forEach((r: any) => registerDay(r, 'fussball'));
     stellenCheckenRows.forEach((r: any) => registerDay(r, 'stellen_checken'));
     scoringLeiterRows.forEach((r: any) => registerDay(r, 'scoring_leiter'));
+    darts99Rows.forEach((r: any) => registerDay(r, 'darts_99'));
 
     const availableArchiveDays: ArchiveTrainingDaySummary[] = Array.from(dayMap.entries())
       .map(([dStr, meta]) => ({
@@ -173,14 +183,16 @@ export async function getUnifiedTvBoardDataAction(options?: {
       pdcRows.some((r: any) => extractRowDate(r) === deTodayDateStr) ||
       fussballRows.some((r: any) => isRegularFussball(r) && extractRowDate(r) === deTodayDateStr) ||
       stellenCheckenRows.some((r: any) => extractRowDate(r) === deTodayDateStr) ||
-      scoringLeiterRows.some((r: any) => extractRowDate(r) === deTodayDateStr);
+      scoringLeiterRows.some((r: any) => extractRowDate(r) === deTodayDateStr) ||
+      darts99Rows.some((r: any) => extractRowDate(r) === deTodayDateStr);
 
     const hasMonthData =
       doublesRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
       pdcRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
       fussballRows.some((r: any) => isRegularFussball(r) && extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
       stellenCheckenRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
-      scoringLeiterRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
+      scoringLeiterRows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr) ||
+      darts99Rows.some((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
 
     // 3. Filter rows based on active timeframe
     let activeDoubles: any[] = [];
@@ -188,6 +200,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
     let activeFussball: any[] = [];
     let activeStellenChecken: any[] = [];
     let activeScoringLeiter: any[] = [];
+    let activeDarts99: any[] = [];
     const regularFussball = fussballRows.filter(isRegularFussball);
 
     if (timeframe === 'today') {
@@ -196,24 +209,28 @@ export async function getUnifiedTvBoardDataAction(options?: {
       activeFussball = regularFussball.filter((r: any) => extractRowDate(r) === deTodayDateStr);
       activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
       activeScoringLeiter = scoringLeiterRows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
+      activeDarts99 = darts99Rows.filter((r: any) => extractRowDate(r) === deTodayDateStr);
     } else if (timeframe === 'month') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activeFussball = regularFussball.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
       activeScoringLeiter = scoringLeiterRows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
+      activeDarts99 = darts99Rows.filter((r: any) => extractRowDate(r).slice(0, 7) === deCurrentMonthStr);
     } else if (timeframe === 'all') {
       activeDoubles = doublesRows;
       activePdc = pdcRows;
       activeFussball = regularFussball;
       activeStellenChecken = stellenCheckenRows;
       activeScoringLeiter = scoringLeiterRows;
+      activeDarts99 = darts99Rows;
     } else if (timeframe === 'archive') {
       activeDoubles = doublesRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activePdc = pdcRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activeFussball = regularFussball.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activeStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
       activeScoringLeiter = scoringLeiterRows.filter((r: any) => extractRowDate(r) === selectedDateStr);
+      activeDarts99 = darts99Rows.filter((r: any) => extractRowDate(r) === selectedDateStr);
     }
 
     // 4. Build Doppelquote Leaderboard with Single-Session or Aggregated
@@ -994,6 +1011,189 @@ export async function getUnifiedTvBoardDataAction(options?: {
       todayScoringLeiterLeaderboard[i].isShared = prevMatch || nextMatch;
     }
 
+    // 8d. Build 99 Darts Challenge Leaderboard
+    const todayDarts99Leaderboard: TvDarts99Row[] = [];
+
+    if (timeframe === 'today' || timeframe === 'archive') {
+      const playerAttemptCounter = new Map<string, number>();
+
+      for (const r of activeDarts99) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+
+        const attemptNr = (playerAttemptCounter.get(pName) || 0) + 1;
+        playerAttemptCounter.set(pName, attemptNr);
+
+        const hits = Number(r.total_hits || 0);
+        const darts = Number(r.total_darts || 99);
+        const rawQuote = Number(r.hit_quote || 0);
+        const hitQuotePercent =
+          darts > 0
+            ? Number((rawQuote <= 1 ? (hits / darts) * 100 : rawQuote).toFixed(1))
+            : 0;
+
+        todayDarts99Leaderboard.push({
+          session_id: String(r.session_id || r.id || ''),
+          player_name: pName,
+          opponent_name: r.opponent_name ? String(r.opponent_name) : null,
+          game_mode: r.game_mode === '1vs1' ? '1vs1' : 'solo',
+          target_number: Number(r.target_number || 20),
+          attempt_nr: attemptNr,
+          attempt_label: `Durchgang #${attemptNr}`,
+          time_label: formatTime(r.created_at),
+          total_points: Number(r.total_points || 0),
+          max_points: 297,
+          total_darts: darts,
+          total_hits: hits,
+          triples_count: Number(r.triples_count || 0),
+          doubles_count: Number(r.doubles_count || 0),
+          singles_count: Number(r.singles_count || 0),
+          misses_count: Number(r.misses_count || 0),
+          hit_quote_percent: hitQuotePercent,
+          points_per_dart: Number(r.points_per_dart || (darts > 0 ? Number(r.total_points || 0) / darts : 0)),
+          rank: 0,
+          isShared: false,
+        });
+      }
+    } else {
+      // MONAT / GESAMT: Bestes Spiel pro Spieler + Anzahl Durchgänge
+      const d99Map = new Map<
+        string,
+        {
+          player_name: string;
+          sessions_count: number;
+          target_number: number;
+          best_points: number;
+          total_darts: number;
+          total_hits: number;
+          triples_count: number;
+          doubles_count: number;
+          singles_count: number;
+          misses_count: number;
+          hit_quote_percent: number;
+          points_per_dart: number;
+          last_time: any;
+        }
+      >();
+
+      for (const r of activeDarts99) {
+        const pName = String(r.player_name || '').trim();
+        if (!pName) continue;
+
+        const pts = Number(r.total_points || 0);
+        const triples = Number(r.triples_count || 0);
+        const doubles = Number(r.doubles_count || 0);
+        const singles = Number(r.singles_count || 0);
+        const misses = Number(r.misses_count || 0);
+        const hits = Number(r.total_hits || 0);
+        const darts = Number(r.total_darts || 99);
+        const rawQuote = Number(r.hit_quote || 0);
+        const quotePct =
+          darts > 0
+            ? Number((rawQuote <= 1 ? (hits / darts) * 100 : rawQuote).toFixed(1))
+            : 0;
+        const ppd = Number(r.points_per_dart || (darts > 0 ? pts / darts : 0));
+
+        if (!d99Map.has(pName)) {
+          d99Map.set(pName, {
+            player_name: pName,
+            sessions_count: 1,
+            target_number: Number(r.target_number || 20),
+            best_points: pts,
+            total_darts: darts,
+            total_hits: hits,
+            triples_count: triples,
+            doubles_count: doubles,
+            singles_count: singles,
+            misses_count: misses,
+            hit_quote_percent: quotePct,
+            points_per_dart: ppd,
+            last_time: r.created_at,
+          });
+        } else {
+          const entry = d99Map.get(pName)!;
+          entry.sessions_count += 1;
+          if (
+            pts > entry.best_points ||
+            (pts === entry.best_points && triples > entry.triples_count) ||
+            (pts === entry.best_points && triples === entry.triples_count && hits > entry.total_hits)
+          ) {
+            entry.target_number = Number(r.target_number || 20);
+            entry.best_points = pts;
+            entry.total_darts = darts;
+            entry.total_hits = hits;
+            entry.triples_count = triples;
+            entry.doubles_count = doubles;
+            entry.singles_count = singles;
+            entry.misses_count = misses;
+            entry.hit_quote_percent = quotePct;
+            entry.points_per_dart = ppd;
+          }
+          entry.last_time = r.created_at;
+        }
+      }
+
+      for (const p of d99Map.values()) {
+        todayDarts99Leaderboard.push({
+          session_id: `agg_d99_${p.player_name}`,
+          player_name: p.player_name,
+          opponent_name: null,
+          game_mode: 'solo',
+          target_number: p.target_number,
+          attempt_nr: p.sessions_count,
+          attempt_label: `${p.sessions_count} ${p.sessions_count === 1 ? 'Spiel' : 'Spiele'} (Bestwert)`,
+          time_label: formatTime(p.last_time),
+          total_points: p.best_points,
+          max_points: 297,
+          total_darts: p.total_darts,
+          total_hits: p.total_hits,
+          triples_count: p.triples_count,
+          doubles_count: p.doubles_count,
+          singles_count: p.singles_count,
+          misses_count: p.misses_count,
+          hit_quote_percent: p.hit_quote_percent,
+          points_per_dart: p.points_per_dart,
+          rank: 0,
+          isShared: false,
+        });
+      }
+    }
+
+    // Sortierung 99 Darts: Punkte absteigend, dann Triples absteigend, dann Treffer absteigend
+    todayDarts99Leaderboard.sort((a, b) => {
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      if (b.triples_count !== a.triples_count) return b.triples_count - a.triples_count;
+      if (b.total_hits !== a.total_hits) return b.total_hits - a.total_hits;
+      return b.hit_quote_percent - a.hit_quote_percent;
+    });
+
+    // Geteilte Ränge zuweisen
+    let currentD99Rank = 1;
+    for (let i = 0; i < todayDarts99Leaderboard.length; i++) {
+      if (i > 0) {
+        const prev = todayDarts99Leaderboard[i - 1];
+        const curr = todayDarts99Leaderboard[i];
+        const isTie =
+          curr.total_points === prev.total_points &&
+          curr.triples_count === prev.triples_count;
+        if (!isTie) {
+          currentD99Rank = i + 1;
+        }
+      }
+      todayDarts99Leaderboard[i].rank = currentD99Rank;
+    }
+    for (let i = 0; i < todayDarts99Leaderboard.length; i++) {
+      const prevMatch =
+        i > 0 &&
+        todayDarts99Leaderboard[i].total_points === todayDarts99Leaderboard[i - 1].total_points &&
+        todayDarts99Leaderboard[i].triples_count === todayDarts99Leaderboard[i - 1].triples_count;
+      const nextMatch =
+        i < todayDarts99Leaderboard.length - 1 &&
+        todayDarts99Leaderboard[i].total_points === todayDarts99Leaderboard[i + 1].total_points &&
+        todayDarts99Leaderboard[i].triples_count === todayDarts99Leaderboard[i + 1].triples_count;
+      todayDarts99Leaderboard[i].isShared = prevMatch || nextMatch;
+    }
+
     // 9. Build detailed archive summary for the selected date if timeframe is archive or on demand
     let currentArchiveDayDetail: ArchiveDayDetail | null = null;
     const targetDayForDetail = timeframe === 'archive' ? selectedDateStr : (availableArchiveDays[0]?.dateStr || deTodayDateStr);
@@ -1004,6 +1204,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       const dayFussball = fussballRows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
       const dayStellenChecken = stellenCheckenRows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
       const dayScoringLeiter = scoringLeiterRows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
+      const dayDarts99 = darts99Rows.filter((r: any) => extractRowDate(r) === targetDayForDetail);
 
       const activePlayersSet = new Set<string>();
       dayDoubles.forEach((r: any) => {
@@ -1032,11 +1233,15 @@ export async function getUnifiedTvBoardDataAction(options?: {
         if (r.player_name) activePlayersSet.add(String(r.player_name).trim());
         if (r.opponent_name) activePlayersSet.add(String(r.opponent_name).trim());
       });
+      dayDarts99.forEach((r: any) => {
+        if (r.player_name) activePlayersSet.add(String(r.player_name).trim());
+        if (r.opponent_name) activePlayersSet.add(String(r.opponent_name).trim());
+      });
 
       currentArchiveDayDetail = {
         dateStr: targetDayForDetail,
         fullDateLabel: formatGermanDateLabel(targetDayForDetail),
-        totalSessions: dayDoubles.length + dayPdc.length + dayFussball.length + dayStellenChecken.length + dayScoringLeiter.length,
+        totalSessions: dayDoubles.length + dayPdc.length + dayFussball.length + dayStellenChecken.length + dayScoringLeiter.length + dayDarts99.length,
         activePlayers: Array.from(activePlayersSet),
         doppelGames: dayDoubles.map((r: any) => {
           const d = Number(r.total_darts || 0);
@@ -1115,6 +1320,31 @@ export async function getUnifiedTvBoardDataAction(options?: {
             time: formatTime(r.created_at),
           };
         }),
+        darts99Games: dayDarts99.map((r: any) => {
+          const hits = Number(r.total_hits || 0);
+          const darts = Number(r.total_darts || 99);
+          const rawQuote = Number(r.hit_quote || 0);
+          const hitQuotePercent =
+            darts > 0
+              ? Number((rawQuote <= 1 ? (hits / darts) * 100 : rawQuote).toFixed(1))
+              : 0;
+          return {
+            id: String(r.id || r.session_id),
+            playerName: String(r.player_name || ''),
+            opponentName: r.opponent_name ? String(r.opponent_name) : null,
+            gameMode: String(r.game_mode || 'solo'),
+            targetNumber: Number(r.target_number || 20),
+            totalPoints: Number(r.total_points || 0),
+            totalHits: hits,
+            totalDarts: darts,
+            triplesCount: Number(r.triples_count || 0),
+            doublesCount: Number(r.doubles_count || 0),
+            singlesCount: Number(r.singles_count || 0),
+            hitQuotePercent,
+            pointsPerDart: Number(r.points_per_dart || (darts > 0 ? Number(r.total_points || 0) / darts : 0)),
+            time: formatTime(r.created_at),
+          };
+        }),
       };
     }
 
@@ -1128,6 +1358,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       todayFussballMatches,
       todayStellenCheckenLeaderboard,
       todayScoringLeiterLeaderboard,
+      todayDarts99Leaderboard,
       hasTodayData,
       hasMonthData,
       availableArchiveDays,
@@ -1151,6 +1382,7 @@ export async function getUnifiedTvBoardDataAction(options?: {
       todayFussballMatches: [],
       todayStellenCheckenLeaderboard: [],
       todayScoringLeiterLeaderboard: [],
+      todayDarts99Leaderboard: [],
       hasTodayData: false,
       hasMonthData: false,
       availableArchiveDays: [],

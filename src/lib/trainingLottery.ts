@@ -212,6 +212,27 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
     // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
   }
 
+  // 6. 99 Darts Challenge (20 / 19 / 18)
+  try {
+    const d99Rows = await sql`
+      SELECT player_name, player_id, count(*)::int as cnt
+      FROM training_99_darts
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
+      GROUP BY player_name, player_id
+    `;
+
+    for (const r of d99Rows) {
+      const name = String(r.player_name).trim();
+      const current = playerStats.get(name) || { playerId: r.player_id ?? null, count: 0 };
+      current.count += Number(r.cnt);
+      if (r.player_id && !current.playerId) current.playerId = r.player_id;
+      playerStats.set(name, current);
+    }
+  } catch {
+    // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
+  }
+
   return playerStats;
 }
 
@@ -527,13 +548,16 @@ export interface PlayerMonthlyTrainingStat {
   scoringLeiterSolo: number;
   scoringLeiter1vs1: number;
   totalScoringLeiter: number;
+  darts99Solo: number;
+  darts991vs1: number;
+  totalDarts99: number;
   totalCompletedGames: number;
   isQualified: boolean;
   isBlockedByPastWin: boolean;
   isMonthWinner: boolean;
   gamesList: {
     id: number;
-    gameType: 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter';
+    gameType: 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99';
     gameMode: string;
     opponentName: string | null;
     date: string;
@@ -596,6 +620,18 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       WHERE is_aborted IS NULL OR is_aborted = 0;
     `;
     for (const r of slMonthRows) {
+      if (r.m && typeof r.m === 'string' && r.m.length === 7) {
+        monthSet.add(r.m);
+      }
+    }
+  } catch {}
+  try {
+    const d99MonthRows = await sql`
+      SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
+      FROM training_99_darts
+      WHERE is_aborted IS NULL OR is_aborted = 0;
+    `;
+    for (const r of d99MonthRows) {
       if (r.m && typeof r.m === 'string' && r.m.length === 7) {
         monthSet.add(r.m);
       }
@@ -693,6 +729,23 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     scoringLeiterSessions = [];
   }
 
+  let darts99Sessions: any[] = [];
+  try {
+    darts99Sessions = await sql`
+      SELECT 
+        id, session_id, player_name, opponent_name, game_mode,
+        target_number, total_points, total_darts, total_hits,
+        singles_count, doubles_count, triples_count, misses_count,
+        hit_quote, points_per_dart, training_date, created_at, is_winner
+      FROM training_99_darts
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+      ORDER BY COALESCE(training_date, created_at::text) DESC;
+    `;
+  } catch {
+    darts99Sessions = [];
+  }
+
   // 4. Sperrfrist & Gewinner des Monats ermitteln
   const blockedPlayers = await getBlockedPlayersForMonth(selectedMonthKey);
   const winnerRows = await sql`
@@ -728,6 +781,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       scoringLeiterSolo: 0,
       scoringLeiter1vs1: 0,
       totalScoringLeiter: 0,
+      darts99Solo: 0,
+      darts991vs1: 0,
+      totalDarts99: 0,
       totalCompletedGames: 0,
       isQualified: false,
       isBlockedByPastWin: blockedPlayers.has(name),
@@ -760,6 +816,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         scoringLeiterSolo: 0,
         scoringLeiter1vs1: 0,
         totalScoringLeiter: 0,
+        darts99Solo: 0,
+        darts991vs1: 0,
+        totalDarts99: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -814,6 +873,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         scoringLeiterSolo: 0,
         scoringLeiter1vs1: 0,
         totalScoringLeiter: 0,
+        darts99Solo: 0,
+        darts991vs1: 0,
+        totalDarts99: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -868,6 +930,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         scoringLeiterSolo: 0,
         scoringLeiter1vs1: 0,
         totalScoringLeiter: 0,
+        darts99Solo: 0,
+        darts991vs1: 0,
+        totalDarts99: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -923,6 +988,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         scoringLeiterSolo: 0,
         scoringLeiter1vs1: 0,
         totalScoringLeiter: 0,
+        darts99Solo: 0,
+        darts991vs1: 0,
+        totalDarts99: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -977,6 +1045,9 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
         scoringLeiterSolo: 0,
         scoringLeiter1vs1: 0,
         totalScoringLeiter: 0,
+        darts99Solo: 0,
+        darts991vs1: 0,
+        totalDarts99: 0,
         totalCompletedGames: 0,
         isQualified: false,
         isBlockedByPastWin: blockedPlayers.has(name),
@@ -1008,6 +1079,62 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       opponentName: s.opponent_name || null,
       date: s.training_date || s.created_at,
       summary: `Scoring-Leiter (${lvlText}): ${s.total_score || 0} Pkt • ${s.total_hits || 0}/${s.total_visits || 0} Hits`,
+      isWinner: Number(s.is_winner ?? 0),
+    });
+  }
+
+  // 99 Darts Challenge zuweisen
+  for (const s of darts99Sessions) {
+    const name = String(s.player_name).trim();
+    let stat = statsMap.get(name);
+    if (!stat) {
+      stat = {
+        playerName: name,
+        playerId: null,
+        team: 'Gast',
+        doublesSolo: 0,
+        doubles1vs1: 0,
+        totalDoubles: 0,
+        pdcSolo: 0,
+        pdc1vs1: 0,
+        totalPdc: 0,
+        fussballSolo: 0,
+        fussball1vs1: 0,
+        totalFussball: 0,
+        stellenCheckenSolo: 0,
+        stellenChecken1vs1: 0,
+        totalStellenChecken: 0,
+        scoringLeiterSolo: 0,
+        scoringLeiter1vs1: 0,
+        totalScoringLeiter: 0,
+        darts99Solo: 0,
+        darts991vs1: 0,
+        totalDarts99: 0,
+        totalCompletedGames: 0,
+        isQualified: false,
+        isBlockedByPastWin: blockedPlayers.has(name),
+        isMonthWinner: winnerName === name,
+        gamesList: [],
+      };
+      statsMap.set(name, stat);
+    }
+
+    const isSolo = s.game_mode === 'solo';
+    if (isSolo) {
+      stat.darts99Solo += 1;
+    } else {
+      stat.darts991vs1 += 1;
+    }
+    stat.totalDarts99 += 1;
+    stat.totalCompletedGames += 1;
+
+    stat.gamesList.push({
+      id: Number(s.id),
+      gameType: 'darts_99',
+      gameMode: s.game_mode || 'solo',
+      opponentName: s.opponent_name || null,
+      date: s.training_date || s.created_at,
+      summary: `99 Darts (Ziel ${s.target_number || 20}): ${s.total_points || 0}/297 Pkt • ${s.triples_count || 0}T/${s.doubles_count || 0}D/${s.singles_count || 0}S`,
       isWinner: Number(s.is_winner ?? 0),
     });
   }

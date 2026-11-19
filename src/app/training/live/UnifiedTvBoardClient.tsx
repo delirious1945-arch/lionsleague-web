@@ -328,7 +328,8 @@ export default function UnifiedTvBoardClient({
     initialData.todayPdcLeaderboard.length +
     (initialData.todayFussballMatches?.length || 0) +
     (initialData.todayStellenCheckenLeaderboard?.length || 0) +
-    (initialData.todayScoringLeiterLeaderboard?.length || 0)
+    (initialData.todayScoringLeiterLeaderboard?.length || 0) +
+    (initialData.todayDarts99Leaderboard?.length || 0)
   );
 
   // Digital-Uhr
@@ -386,7 +387,8 @@ export default function UnifiedTvBoardClient({
         result.todayPdcLeaderboard.length +
         (result.todayFussballMatches?.length || 0) +
         (result.todayStellenCheckenLeaderboard?.length || 0) +
-        (result.todayScoringLeiterLeaderboard?.length || 0);
+        (result.todayScoringLeiterLeaderboard?.length || 0) +
+        (result.todayDarts99Leaderboard?.length || 0);
       if (currentTotal > prevSessionTotalRef.current) {
         playLivePing();
       }
@@ -556,7 +558,7 @@ export default function UnifiedTvBoardClient({
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Gesamtübersicht (5 Spiele)</span>
+              <span>Gesamtübersicht (6 Spiele)</span>
             </button>
 
             <button
@@ -632,6 +634,21 @@ export default function UnifiedTvBoardClient({
               }`}
             >
               <span>Scoring-Leiter</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setViewMode('darts_99');
+                if (timeframe === 'archive') setTimeframe('today');
+              }}
+              data-ui-id="TV_BOARD.NAV.TAB_99_DARTS"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                viewMode === 'darts_99' && timeframe !== 'archive'
+                  ? 'bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(245,158,11,0.25)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
+              }`}
+            >
+              <span>99 Darts</span>
             </button>
 
             <button
@@ -1640,7 +1657,7 @@ export default function UnifiedTvBoardClient({
               </div>
 
               {/* TABELLE 5: SCORING-LEITER (41–140) */}
-              <div data-ui-id="TV_BOARD.QUADRANT.SCORING_LEITER_CARD" className="xl:col-span-2 bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+              <div data-ui-id="TV_BOARD.QUADRANT.SCORING_LEITER_CARD" className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
                 {/* Header Spiel 5 */}
                 <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
                   <div className="flex items-center gap-3">
@@ -1763,6 +1780,137 @@ export default function UnifiedTvBoardClient({
                               </td>
                               <td className="py-3 px-3 text-right hidden sm:table-cell font-mono text-slate-300">
                                 {row.total_hits}/{row.total_visits} ({row.hit_quote_percent.toFixed(0)}%)
+                              </td>
+                              <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
+                                {row.time_label || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* TABELLE 6: 99 DARTS CHALLENGE (20 · 19 · 18) */}
+              <div data-ui-id="TV_BOARD.QUADRANT.99_DARTS_CARD" className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col">
+                {/* Header Spiel 6 */}
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
+                      🎯
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                        <span>99 Darts Challenge</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 font-bold border border-amber-400/20">
+                          20 · 19 · 18
+                        </span>
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        33 Aufnahmen à 3 Darts • Single +1 · Double +2 · Triple +3 • Max. 297 Punkte
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setViewMode('darts_99')}
+                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-amber-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    title="Zur detaillierten 99 Darts Übersicht"
+                  >
+                    <span>Details</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Tabelle 99 Darts */}
+                {(!data.todayDarts99Leaderboard || data.todayDarts99Leaderboard.length === 0) ? (
+                  <div className="flex-1 min-h-[180px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
+                    <div className="text-4xl mb-2">🎯</div>
+                    <h3 className="text-base font-bold text-slate-200">
+                      Noch keine 99-Darts Spiele heute
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-md mt-1">
+                      Sobald ein Spieler 99 Darts auf 20, 19 oder 18 abschließt, erscheint die Wertung hier sofort live auf dem TV-Board!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
+                          <th className="py-2.5 px-2 text-center w-12">Platz</th>
+                          <th className="py-2.5 px-3">Spieler</th>
+                          <th className="py-2.5 px-2 text-center">Ziel</th>
+                          <th className="py-2.5 px-3 text-right">Punkte</th>
+                          <th className="py-2.5 px-2 text-center hidden sm:table-cell">T / D / S</th>
+                          <th className="py-2.5 px-2 text-right hidden sm:table-cell">Quote</th>
+                          <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.05] font-medium">
+                        {data.todayDarts99Leaderboard.map((row, idx) => {
+                          const photo = getPlayerPhotoUrl(row.player_name);
+                          const initials = getPlayerInitials(row.player_name);
+                          return (
+                            <tr
+                              key={row.session_id + '_d99_' + idx}
+                              className={`transition-colors hover:bg-white/[0.04] ${
+                                row.rank === 1
+                                  ? 'bg-amber-400/[0.08]'
+                                  : row.rank === 2
+                                  ? 'bg-white/[0.03]'
+                                  : row.rank === 3
+                                  ? 'bg-amber-900/[0.12]'
+                                  : ''
+                              }`}
+                            >
+                              <td className="py-3 px-2 text-center">
+                                {renderRankBadge(row.rank, row.isShared)}
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-amber-300">
+                                    {photo ? (
+                                      <Image src={photo} alt={row.player_name} width={32} height={32} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{initials}</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="font-black text-white text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
+                                      <span>{row.player_name}</span>
+                                      {row.attempt_nr > 1 && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/[0.06] text-amber-300 border border-white/[0.1]">
+                                          #{row.attempt_nr}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {row.opponent_name && (
+                                      <div className="text-[10px] text-slate-400">
+                                        vs. {row.opponent_name}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono">
+                                <span className="px-2 py-0.5 rounded-lg border bg-cyan-500/15 border-cyan-400/40 text-cyan-300 text-xs font-black">
+                                  {row.target_number}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <span className="font-mono font-black text-sm sm:text-base text-amber-300">
+                                  {row.total_points}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono ml-1">/ 297</span>
+                              </td>
+                              <td className="py-3 px-2 text-center hidden sm:table-cell font-mono text-slate-300 text-xs">
+                                {row.triples_count}/{row.doubles_count}/{row.singles_count}
+                              </td>
+                              <td className="py-3 px-2 text-right hidden sm:table-cell font-mono text-emerald-300 font-bold">
+                                {row.hit_quote_percent.toFixed(1)}%
                               </td>
                               <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
                                 {row.time_label || '-'}
@@ -2605,6 +2753,184 @@ export default function UnifiedTvBoardClient({
         )}
 
         {/* ========================================================
+            VIEW 4C: 99 DARTS CHALLENGE (20 · 19 · 18) DETAILANSICHT
+            ======================================================== */}
+        {viewMode === 'darts_99' && (
+          <div className="space-y-6">
+            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-5 sm:p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-5 border-b border-white/[0.07]">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400/[0.08] border border-amber-400/25 flex items-center justify-center text-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
+                    🎯
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-xl sm:text-2xl font-black text-white">
+                        99 Darts Challenge (20 · 19 · 18) • Live-Board
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400/[0.08] text-amber-300/90 border border-amber-400/20 text-xs font-black">
+                        33 Aufnahmen à 3 Darts · Max. 297 Punkte
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+                      Wertung: Single = <strong>+1 Pkt</strong> • Double = <strong>+2 Pkt</strong> • Triple = <strong>+3 Pkt</strong> • Gleichstand teilt den Platz (🤝)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/training/99-darts"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(245,158,11,0.2)] transition-all"
+                  >
+                    Spiel starten
+                  </Link>
+                  <button
+                    onClick={() => setViewMode('both')}
+                    className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] text-xs font-bold transition-all cursor-pointer"
+                  >
+                    ← Zurück
+                  </button>
+                </div>
+              </div>
+
+              {(!data.todayDarts99Leaderboard || data.todayDarts99Leaderboard.length === 0) ? (
+                <div className="py-16 text-center space-y-3 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
+                  <div className="text-4xl">🎯</div>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    Noch keine 99 Darts Challenge Spiele für diesen Zeitraum erfasst
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+                    Starte am Board eine 99-Darts-Runde auf 20, 19 oder 18 – das Ergebnis erscheint sofort hier auf dem TV-Board!
+                  </p>
+                  <div className="pt-2">
+                    <Link
+                      href="/training/99-darts"
+                      className="inline-block px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 hover:from-amber-200 hover:via-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(245,158,11,0.25)] transition-all"
+                    >
+                      Spiel starten
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/[0.07] text-[10px] uppercase tracking-wider text-slate-400 font-black">
+                        <th className="py-3 px-3">Platz</th>
+                        <th className="py-3 px-3">Spieler</th>
+                        <th className="py-3 px-3 text-center">Zielzahl</th>
+                        <th className="py-3 px-3 text-center">Modus / Durchgang</th>
+                        <th className="py-3 px-3 text-right">Punkte</th>
+                        <th className="py-3 px-3 text-center">T / D / S</th>
+                        <th className="py-3 px-3 text-right">Trefferquote</th>
+                        <th className="py-3 px-3 text-right">Pkt / Dart</th>
+                        <th className="py-3 px-3 text-right">Zeit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.05] text-xs sm:text-sm">
+                      {data.todayDarts99Leaderboard.map((row, idx) => {
+                        const photoUrl = getPlayerPhotoUrl(row.player_name);
+                        return (
+                          <tr
+                            key={row.session_id + '_d99_detail_' + idx}
+                            className={`transition-colors ${
+                              row.rank === 1
+                                ? 'bg-amber-400/[0.08] hover:bg-amber-400/[0.12]'
+                                : 'hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <td className="py-3.5 px-3 whitespace-nowrap">
+                              {renderRankBadge(row.rank, row.isShared)}
+                            </td>
+
+                            <td className="py-3.5 px-3">
+                              <div className="flex items-center gap-3">
+                                <div className="relative w-9 h-9 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center">
+                                  {photoUrl ? (
+                                    <Image
+                                      src={photoUrl}
+                                      alt={row.player_name}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-xs font-black text-amber-300">
+                                      {getPlayerInitials(row.player_name)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-black text-white text-sm sm:text-base">
+                                    {row.player_name}
+                                  </div>
+                                  {row.opponent_name && (
+                                    <div className="text-[11px] text-amber-300/90 font-semibold">
+                                      ⚔️ 1vs1 Duell vs. {row.opponent_name}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-center">
+                              <span className="px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-mono font-black text-xs">
+                                Ziel {row.target_number}
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-center">
+                              <span className="text-xs text-slate-300 font-semibold">
+                                {row.attempt_label}
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right">
+                              <span className="text-lg sm:text-xl font-black font-mono text-amber-300">
+                                {row.total_points}
+                              </span>
+                              <span className="text-xs text-slate-400 font-mono ml-1">/ 297 Pkt</span>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-200">
+                              <span className="text-amber-300">{row.triples_count}T</span> ·{' '}
+                              <span className="text-cyan-300">{row.doubles_count}D</span> ·{' '}
+                              <span className="text-emerald-300">{row.singles_count}S</span>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right min-w-[130px]">
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="font-mono font-black text-emerald-300 text-sm">
+                                  {row.hit_quote_percent.toFixed(1)}%
+                                </span>
+                                <div className="w-24 h-1.5 bg-white/[0.06] rounded-full overflow-hidden border border-white/10">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-full"
+                                    style={{ width: `${Math.min(100, row.hit_quote_percent)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right font-mono font-bold text-cyan-300">
+                              {row.points_per_dart.toFixed(2)}
+                            </td>
+
+                            <td className="py-3.5 px-3 text-right font-mono text-xs text-slate-400">
+                              {row.time_label}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
             VIEW 5: ARCHIV & KALENDER (DATUMSAUSWAHL & PROTOKOLL)
             ======================================================== */}
         {viewMode === 'archive' && (
@@ -2713,7 +3039,7 @@ export default function UnifiedTvBoardClient({
                 </div>
 
                 {/* Spiele-Listen des Tages */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   {/* Doppelquote Spiele */}
                   <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 shadow-xl flex flex-col">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.07]">
@@ -2963,6 +3289,54 @@ export default function UnifiedTvBoardClient({
                       </div>
                     )}
                   </div>
+
+                  {/* 99 Darts Challenge Spiele */}
+                  <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 shadow-xl flex flex-col">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.07]">
+                      <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5">
+                        <span>🎯 99 Darts</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          ({data.currentArchiveDayDetail.darts99Games?.length || 0})
+                        </span>
+                      </h4>
+                    </div>
+
+                    {!data.currentArchiveDayDetail.darts99Games ||
+                    data.currentArchiveDayDetail.darts99Games.length === 0 ? (
+                      <div className="text-xs text-slate-500 py-6 text-center">
+                        Keine 99-Darts Spiele an diesem Tag
+                      </div>
+                    ) : (
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[400px] pr-1">
+                        {data.currentArchiveDayDetail.darts99Games.map((g, idx) => (
+                          <div
+                            key={g.id + '_d99_' + idx}
+                            className="bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.07] flex items-center justify-between text-xs"
+                          >
+                            <div>
+                              <div className="font-bold text-white flex items-center gap-1.5">
+                                <span>{g.playerName}</span>
+                                <span className="text-[10px] font-mono px-1.5 rounded bg-cyan-500/15 text-cyan-300 font-bold border border-cyan-400/30">
+                                  Ziel {g.targetNumber}
+                                </span>
+                              </div>
+                              {g.opponentName && (
+                                <div className="text-[10px] text-slate-400">vs. {g.opponentName}</div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="font-mono font-black text-amber-300 text-sm">
+                                {g.totalPoints} / 297 Pkt
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-mono">
+                                {g.triplesCount}T/{g.doublesCount}D/{g.singlesCount}S • {g.time}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -3003,6 +3377,10 @@ export default function UnifiedTvBoardClient({
           <span>•</span>
           <Link href="/training/scoring-leiter" className="hover:text-amber-300 transition-colors">
             🪜 Scoring-Leiter
+          </Link>
+          <span>•</span>
+          <Link href="/training/99-darts" className="hover:text-amber-300 transition-colors">
+            🎯 99 Darts
           </Link>
         </div>
       </footer>

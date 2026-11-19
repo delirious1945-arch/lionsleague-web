@@ -1,4 +1,4 @@
-export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'archive';
+export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'archive';
 
 export type UnifiedTvTimeframe = 'today' | 'month' | 'all' | 'archive';
 
@@ -112,12 +112,35 @@ export interface TvScoringLeiterRow {
   isShared: boolean;
 }
 
+export interface TvDarts99Row {
+  session_id: string;
+  player_name: string;
+  opponent_name?: string | null;
+  game_mode: 'solo' | '1vs1';
+  target_number: number;
+  attempt_nr: number;
+  attempt_label: string;
+  time_label: string;
+  total_points: number;
+  max_points: number;
+  total_darts: number;
+  total_hits: number;
+  triples_count: number;
+  doubles_count: number;
+  singles_count: number;
+  misses_count: number;
+  hit_quote_percent: number;
+  points_per_dart: number;
+  rank: number;
+  isShared: boolean;
+}
+
 export interface ArchiveTrainingDaySummary {
   dateStr: string; // YYYY-MM-DD
   dayLabel: string; // e.g. "Donnerstag, 22. Okt."
   totalSessions: number;
   uniquePlayersCount: number;
-  gamesList: ('doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter')[];
+  gamesList: ('doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99')[];
 }
 
 export interface ArchiveDayDetail {
@@ -183,6 +206,22 @@ export interface ArchiveDayDetail {
     hitQuotePercent: number;
     time: string;
   }[];
+  darts99Games: {
+    id: string;
+    playerName: string;
+    opponentName?: string | null;
+    gameMode: string;
+    targetNumber: number;
+    totalPoints: number;
+    totalHits: number;
+    totalDarts: number;
+    triplesCount: number;
+    doublesCount: number;
+    singlesCount: number;
+    hitQuotePercent: number;
+    pointsPerDart: number;
+    time: string;
+  }[];
 }
 
 export interface UnifiedTvBoardData {
@@ -195,6 +234,7 @@ export interface UnifiedTvBoardData {
   todayFussballMatches: TvFussballMatch[];
   todayStellenCheckenLeaderboard: TvStellenCheckenRow[];
   todayScoringLeiterLeaderboard: TvScoringLeiterRow[];
+  todayDarts99Leaderboard: TvDarts99Row[];
   hasTodayData: boolean;
   hasMonthData: boolean;
   availableArchiveDays: ArchiveTrainingDaySummary[];
