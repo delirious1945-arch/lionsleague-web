@@ -1067,8 +1067,8 @@ export default function TannenbaumClient({
             {/* Spieler 1 */}
             <div className="space-y-2 p-4 rounded-2xl bg-slate-950/60 border border-white/10">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-mono font-black uppercase tracking-wider text-emerald-300">
-                  {gameMode === '1vs1' ? 'Spieler 1 · ◀ Links (Smaragd)' : 'Spieler 1'}
+                <label className="text-xs font-mono font-black uppercase tracking-wider text-red-300">
+                  {gameMode === '1vs1' ? 'Spieler 1 · ◀ Links (Rot)' : 'Spieler 1'}
                 </label>
                 {!soloLocked && (
                   <button
@@ -1299,7 +1299,7 @@ export default function TannenbaumClient({
         <div className="rounded-2xl p-4 bg-slate-900/95 border border-amber-400/40 text-xs sm:text-sm text-slate-200 space-y-1.5">
           <div className="font-black text-amber-300">🎄 Spielregeln: Lions Tannenbaum</div>
           <p>
-            1. Duell an einem gemeinsamen Tannenbaum (Links = Spieler 1 Smaragd, Rechts = Spieler 2 Gold). Alle 9
+            1. Duell an einem gemeinsamen Tannenbaum (Links = Spieler 1 Rot, Rechts = Spieler 2 Gold). Alle 9
             Christbaumkugeln (12 bis 20) und der Baumstamm (beliebiges Doppel) müssen leuchten.
           </p>
           <p>
@@ -1334,7 +1334,7 @@ export default function TannenbaumClient({
                   ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]'
                   : isAct
                   ? isP1
-                    ? 'bg-emerald-950/45 border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.25)]'
+                    ? 'bg-red-950/45 border-red-400 shadow-[0_0_25px_rgba(239,68,68,0.28)]'
                     : 'bg-amber-950/45 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
                   : 'bg-slate-900/60 border-white/10 opacity-80'
               }`}
@@ -1344,10 +1344,10 @@ export default function TannenbaumClient({
                   {gameMode === '1vs1' && (
                     <span
                       className={`text-[10px] font-mono font-black uppercase tracking-wider block ${
-                        isP1 ? 'text-emerald-300' : 'text-amber-300'
+                        isP1 ? 'text-red-300' : 'text-amber-300'
                       }`}
                     >
-                      {isP1 ? '◀ Links (Smaragd)' : 'Rechts (Gold) ▶'}
+                      {isP1 ? '◀ Links (Rot)' : 'Rechts (Gold) ▶'}
                     </span>
                   )}
                   <div className="text-sm sm:text-lg font-black text-white truncate">{name}</div>
@@ -1355,14 +1355,14 @@ export default function TannenbaumClient({
                     {isWin ? (
                       <span className="text-amber-300 font-black">🏆 SIEGER!</span>
                     ) : isAct ? (
-                      <span className={`${isP1 ? 'text-emerald-300' : 'text-amber-300'} font-black`}>
+                      <span className={`${isP1 ? 'text-red-300' : 'text-amber-300'} font-black`}>
                         🎯 AM WURF
                       </span>
                     ) : (
                       <span className="text-slate-400">Wartet</span>
                     )}
                     {showTripleButtons && st.extinguishedCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-200 font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-200 font-bold">
                         💨 {st.extinguishedCount}
                       </span>
                     )}
@@ -1372,7 +1372,7 @@ export default function TannenbaumClient({
                 <div className="text-right shrink-0">
                   <span
                     className={`text-2xl sm:text-3xl font-black font-mono ${
-                      isP1 ? 'text-emerald-300' : 'text-amber-300'
+                      isP1 ? 'text-red-300' : 'text-amber-300'
                     }`}
                   >
                     {lit}
@@ -1385,7 +1385,7 @@ export default function TannenbaumClient({
                 <div
                   className={`h-full transition-all duration-300 ${
                     isP1
-                      ? 'bg-gradient-to-r from-emerald-500 to-cyan-400'
+                      ? 'bg-gradient-to-r from-red-500 to-rose-400'
                       : 'bg-gradient-to-r from-amber-500 to-yellow-300'
                   }`}
                   style={{ width: `${pct}%` }}
@@ -1554,7 +1554,7 @@ export default function TannenbaumClient({
 
                     const tileBorderCls = isOwnLit
                       ? activePlayer === 1
-                        ? 'border-emerald-400 bg-emerald-950/35 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
+                        ? 'border-red-400 bg-red-950/35 shadow-[0_0_16px_rgba(239,68,68,0.28)]'
                         : 'border-amber-400 bg-amber-950/35 shadow-[0_0_16px_rgba(251,191,36,0.25)]'
                       : 'border-white/20 bg-slate-900/85';
 
@@ -1580,7 +1580,7 @@ export default function TannenbaumClient({
                               <span
                                 className={`px-1.5 py-0.5 rounded-md border ${
                                   isP1Lit
-                                    ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                                    ? 'bg-red-500/25 border-red-400 text-red-200'
                                     : 'bg-slate-950/70 border-white/10 text-slate-400'
                                 }`}
                               >
@@ -1599,7 +1599,7 @@ export default function TannenbaumClient({
                           ) : (
                             <span
                               className={`text-[10px] font-bold mt-1 ${
-                                isOwnLit ? 'text-emerald-300' : 'text-slate-400'
+                                isOwnLit ? 'text-red-300' : 'text-slate-400'
                               }`}
                             >
                               {isOwnLit ? '✓ AN' : '○ AUS'}
@@ -1619,7 +1619,7 @@ export default function TannenbaumClient({
                             }
                             className={`min-h-[52px] w-full px-2 py-1.5 font-mono text-xs font-black flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] transition-all ${
                               isOppLit
-                                ? 'bg-red-600/85 hover:bg-red-500 text-white border-t border-red-400/70'
+                                ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white border-t border-orange-300/80'
                                 : 'bg-slate-950/85 hover:bg-slate-800 text-slate-300 border-t border-white/10'
                             }`}
                           >
@@ -1645,7 +1645,7 @@ export default function TannenbaumClient({
                 className={`min-h-[60px] w-full max-w-md px-5 py-2 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center cursor-pointer active:scale-95 ${
                   ownState.tree.trunk
                     ? activePlayer === 1
-                      ? 'bg-emerald-500/25 border-emerald-400 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                      ? 'bg-red-500/25 border-red-400 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.3)]'
                       : 'bg-amber-500/25 border-amber-400 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                     : 'bg-amber-950/45 hover:bg-amber-900/50 border-amber-600/50 text-amber-100'
                 }`}
@@ -1655,7 +1655,7 @@ export default function TannenbaumClient({
                 </span>
                 {gameMode === '1vs1' ? (
                   <div className="flex items-center justify-center gap-4 mt-1 font-mono text-[11px] font-black">
-                    <span className={p1State.tree.trunk ? 'text-emerald-300' : 'text-slate-400'}>
+                    <span className={p1State.tree.trunk ? 'text-red-300' : 'text-slate-400'}>
                       P1: {p1State.tree.trunk ? '✓ AN' : '○ AUS'}
                     </span>
                     <span className="text-slate-600">|</span>

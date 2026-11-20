@@ -227,8 +227,10 @@ export default function SpecialHubClient({
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                  Duell an einem <strong className="text-emerald-300">gemeinsamen Tannenbaum</strong> (Links Smaragd vs.
-                  Rechts Gold): Bringe alle <strong className="text-emerald-300">9 Kugeln (12–20)</strong> sowie den{' '}
+                  Duell an einem <strong className="text-emerald-300">gemeinsamen Tannenbaum</strong> (Links{' '}
+                  <strong className="text-red-300">Rot</strong> vs. Rechts{' '}
+                  <strong className="text-amber-300">Gold</strong>): Bringe alle{' '}
+                  <strong className="text-emerald-300">9 Kugeln (12–20)</strong> sowie den{' '}
                   <strong className="text-amber-300">Baumstamm (beliebiges Doppel)</strong> zum Leuchten! Sobald alle
                   10 Lichter brennen, setzt du mit <strong className="text-amber-300">Bull oder D20</strong> den Stern
                   auf die Spitze.

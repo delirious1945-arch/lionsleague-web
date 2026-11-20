@@ -125,16 +125,16 @@ function formatDartSlot(ev: TannenbaumDartEvent) {
 function CurrentTurnRow({
   darts,
   isActive,
-  accentColor = 'emerald',
+  accentColor = 'red',
 }: {
   darts: TannenbaumDartEvent[];
   isActive: boolean;
-  accentColor?: 'emerald' | 'amber';
+  accentColor?: 'red' | 'amber';
 }) {
   const pulseBorder =
     accentColor === 'amber'
       ? 'bg-amber-500/10 border-amber-400/75 text-amber-300 animate-pulse'
-      : 'bg-emerald-500/10 border-emerald-400/75 text-emerald-300 animate-pulse';
+      : 'bg-red-500/10 border-red-400/75 text-red-300 animate-pulse';
 
   return (
     <div className="grid grid-cols-3 gap-2 w-full">
@@ -211,10 +211,10 @@ function FestiveSvgTree({
   if (!anyStarWon) {
     if (is1vs1 && p1StarReady && p2StarReady) {
       starBadgeText = 'SUDDEN DEATH!';
-      starRingStroke = '#f87171';
+      starRingStroke = '#facc15';
     } else if (p1StarReady) {
       starBadgeText = is1vs1 ? `${p1First.toUpperCase()} FINALE!` : 'FINALE!';
-      starRingStroke = '#34d399';
+      starRingStroke = '#f87171';
     } else if (p2StarReady) {
       starBadgeText = `${p2First.toUpperCase()} FINALE!`;
       starRingStroke = '#fbbf24';
@@ -237,12 +237,12 @@ function FestiveSvgTree({
           <stop offset="100%" stopColor="#022c22" />
         </linearGradient>
 
-        {/* P1 Smaragd-Gradient */}
+        {/* P1 Festliches Rot-Gradient */}
         <radialGradient id={`${treeIdPrefix}-ball-p1`} cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stopColor="#a7f3d0" />
-          <stop offset="40%" stopColor="#34d399" />
-          <stop offset="85%" stopColor="#059669" />
-          <stop offset="100%" stopColor="#064e3b" />
+          <stop offset="0%" stopColor="#fecaca" />
+          <stop offset="40%" stopColor="#f87171" />
+          <stop offset="85%" stopColor="#dc2626" />
+          <stop offset="100%" stopColor="#7f1d1d" />
         </radialGradient>
 
         {/* P2 Gold/Amber-Gradient */}
@@ -260,16 +260,16 @@ function FestiveSvgTree({
           <stop offset="100%" stopColor="#020617" />
         </radialGradient>
 
-        {/* Geklaut / Rot */}
+        {/* Geklaut / Ausgepustet (Eis-Cyan zur klaren Unterscheidung von P1-Rot) */}
         <radialGradient id={`${treeIdPrefix}-ball-ext`} cx="45%" cy="35%" r="75%">
-          <stop offset="0%" stopColor="#fca5a5" />
-          <stop offset="55%" stopColor="#ef4444" />
-          <stop offset="100%" stopColor="#7f1d1d" />
+          <stop offset="0%" stopColor="#e0f2fe" />
+          <stop offset="55%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#0369a1" />
         </radialGradient>
 
         <linearGradient id={`${treeIdPrefix}-trunk-p1`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#34d399" />
-          <stop offset="100%" stopColor="#047857" />
+          <stop offset="0%" stopColor="#f87171" />
+          <stop offset="100%" stopColor="#b91c1c" />
         </linearGradient>
 
         <linearGradient id={`${treeIdPrefix}-trunk-p2`} x1="0" y1="0" x2="1" y2="1">
@@ -328,7 +328,7 @@ function FestiveSvgTree({
       {/* Subtile Seiten-Akzente & vertikale Mittellinie im 1vs1 */}
       {is1vs1 && (
         <g>
-          <polygon points="210,86 24,386 210,386" fill="#10b981" fillOpacity="0.06" />
+          <polygon points="210,86 24,386 210,386" fill="#ef4444" fillOpacity="0.07" />
           <polygon points="210,86 210,386 396,386" fill="#fbbf24" fillOpacity="0.06" />
           <line
             x1="210"
@@ -365,7 +365,7 @@ function FestiveSvgTree({
               height="66"
               rx="14"
               fill="none"
-              stroke={p1Tree.trunk && safeP2Tree.trunk ? '#fef08a' : p1Tree.trunk ? '#34d399' : '#fbbf24'}
+              stroke={p1Tree.trunk && safeP2Tree.trunk ? '#fef08a' : p1Tree.trunk ? '#f87171' : '#fbbf24'}
               strokeWidth="2.5"
               opacity="0.7"
               filter={`url(#${treeIdPrefix}-glow)`}
@@ -418,7 +418,7 @@ function FestiveSvgTree({
             paintOrder="stroke"
             stroke="#020617"
             strokeWidth="3"
-            fill={p1Tree.trunk ? '#a7f3d0' : '#94a3b8'}
+            fill={p1Tree.trunk ? '#fecaca' : '#94a3b8'}
             fontSize="13"
             fontWeight="900"
             fontFamily="monospace"
@@ -450,7 +450,7 @@ function FestiveSvgTree({
               height="66"
               rx="14"
               fill="none"
-              stroke="#34d399"
+              stroke="#f87171"
               strokeWidth="3"
               opacity="0.7"
               filter={`url(#${treeIdPrefix}-glow)`}
@@ -463,14 +463,14 @@ function FestiveSvgTree({
             height="56"
             rx="12"
             fill={p1Tree.trunk ? `url(#${treeIdPrefix}-trunk-p1)` : `url(#${treeIdPrefix}-trunk-off)`}
-            stroke={p1Tree.trunk ? '#34d399' : '#92400e'}
+            stroke={p1Tree.trunk ? '#f87171' : '#92400e'}
             strokeWidth={p1Tree.trunk ? 2.5 : 2}
           />
           <text
             x="210"
             y="416"
             textAnchor="middle"
-            fill={p1Tree.trunk ? '#022c22' : '#fed7aa'}
+            fill={p1Tree.trunk ? '#ffffff' : '#fed7aa'}
             fontSize="12"
             fontWeight="900"
             fontFamily="monospace"
@@ -482,7 +482,7 @@ function FestiveSvgTree({
             x="210"
             y="438"
             textAnchor="middle"
-            fill={p1Tree.trunk ? '#022c22' : '#ffffff'}
+            fill="#ffffff"
             fontSize="15"
             fontWeight="900"
             fontFamily="monospace"
@@ -503,17 +503,17 @@ function FestiveSvgTree({
 
         const outerStroke =
           p1Ext || p2Ext
-            ? '#ff3366'
+            ? '#38bdf8'
             : is1vs1
             ? p1Lit && p2Lit
               ? '#fef08a'
               : p1Lit
-              ? '#34d399'
+              ? '#f87171'
               : p2Lit
               ? '#fbbf24'
               : '#475569'
             : p1Lit
-            ? '#34d399'
+            ? '#f87171'
             : '#475569';
 
         const anyLit = p1Lit || p2Lit;
@@ -539,13 +539,13 @@ function FestiveSvgTree({
                 fill="none"
                 stroke={
                   p1Fresh
-                    ? '#34d399'
+                    ? '#f87171'
                     : p2Fresh
                     ? '#fde047'
                     : p1Lit && p2Lit
                     ? '#fde047'
                     : p1Lit
-                    ? '#34d399'
+                    ? '#f87171'
                     : '#fbbf24'
                 }
                 strokeWidth={p1Fresh || p2Fresh ? '3.5' : '2'}
@@ -554,12 +554,12 @@ function FestiveSvgTree({
               />
             )}
 
-            {/* Pulsierender roter Bogen bei geklauter Hälfte (oder ganzem Kreis im Solo) */}
+            {/* Pulsierender eisblauer Bogen bei geklauter Hälfte (oder ganzem Kreis im Solo) */}
             {p1Ext && (
               <path
                 d={`M ${cx} ${cy - (r + 6)} A ${r + 6} ${r + 6} 0 0 0 ${cx} ${cy + (r + 6)}`}
                 fill="none"
-                stroke="#ff3366"
+                stroke="#38bdf8"
                 strokeWidth="4"
                 strokeLinecap="round"
                 className="animate-pulse"
@@ -570,7 +570,7 @@ function FestiveSvgTree({
               <path
                 d={`M ${cx} ${cy - (r + 6)} A ${r + 6} ${r + 6} 0 0 1 ${cx} ${cy + (r + 6)}`}
                 fill="none"
-                stroke="#ff3366"
+                stroke="#38bdf8"
                 strokeWidth="4"
                 strokeLinecap="round"
                 className="animate-pulse"
@@ -864,7 +864,7 @@ export default function HolographicTannenbaumCockpit({
             ? 'bg-slate-900/85 border-amber-400 shadow-[0_0_55px_rgba(251,191,36,0.5)]'
             : isAct
             ? isP1
-              ? 'bg-slate-900/80 border-emerald-400/90 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_45px_rgba(16,185,129,0.38)]'
+              ? 'bg-slate-900/80 border-red-400/90 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_45px_rgba(239,68,68,0.4)]'
               : 'bg-slate-900/80 border-amber-400/90 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_45px_rgba(251,191,36,0.38)]'
             : 'bg-slate-900/45 border-white/15 opacity-80 shadow-[0_20px_50px_rgba(0,0,0,0.7)]'
         }`}
@@ -872,7 +872,7 @@ export default function HolographicTannenbaumCockpit({
         {/* Farb-Leiste oben */}
         <div
           className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${
-            isP1 ? 'from-emerald-400 to-cyan-400' : 'from-amber-400 to-yellow-300'
+            isP1 ? 'from-red-500 to-rose-400' : 'from-amber-400 to-yellow-300'
           }`}
         />
 
@@ -882,11 +882,11 @@ export default function HolographicTannenbaumCockpit({
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-[11px] font-black tracking-wider border ${
                 isP1
-                  ? 'bg-emerald-500/15 border-emerald-400/50 text-emerald-300'
+                  ? 'bg-red-500/15 border-red-400/50 text-red-300'
                   : 'bg-amber-500/15 border-amber-400/50 text-amber-300'
               }`}
             >
-              {isP1 ? '◀ LINKE HÄLFTE · SMARAGD' : 'GOLD · RECHTE HÄLFTE ▶'}
+              {isP1 ? '◀ LINKE HÄLFTE · ROT' : 'GOLD · RECHTE HÄLFTE ▶'}
             </span>
           </div>
 
@@ -910,13 +910,13 @@ export default function HolographicTannenbaumCockpit({
               <span
                 className={`inline-flex items-center gap-2 px-3.5 py-1 rounded-full border-2 font-mono text-xs font-black ${
                   isP1
-                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+                    ? 'bg-red-500/20 border-red-400 text-red-200'
                     : 'bg-amber-500/20 border-amber-400 text-amber-200'
                 }`}
               >
                 <span
                   className={`w-2 h-2 rounded-full animate-ping ${
-                    isP1 ? 'bg-emerald-400' : 'bg-amber-400'
+                    isP1 ? 'bg-red-400' : 'bg-amber-400'
                   }`}
                 />
                 <span>🎯 AM WURF</span>
@@ -939,7 +939,7 @@ export default function HolographicTannenbaumCockpit({
               <span
                 className={`text-5xl sm:text-6xl font-black font-mono leading-none ${
                   isP1
-                    ? 'text-[#00ff88] drop-shadow-[0_0_25px_rgba(0,255,136,0.75)]'
+                    ? 'text-[#ff4d6d] drop-shadow-[0_0_25px_rgba(239,68,68,0.8)]'
                     : 'text-[#fbbf24] drop-shadow-[0_0_25px_rgba(251,191,36,0.75)]'
                 }`}
               >
@@ -953,7 +953,7 @@ export default function HolographicTannenbaumCockpit({
             <div
               className={`h-full transition-all duration-500 ${
                 isP1
-                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-400'
+                  ? 'bg-gradient-to-r from-red-600 to-rose-400'
                   : 'bg-gradient-to-r from-amber-500 to-yellow-300'
               }`}
               style={{ width: `${pct}%` }}
@@ -966,9 +966,9 @@ export default function HolographicTannenbaumCockpit({
               <div className="text-lg font-black text-cyan-300">{state.dartsThrown}</div>
             </div>
             {tripleExtinguishEnabled ? (
-              <div className="p-2.5 rounded-xl bg-red-950/40 border border-red-400/35 text-center">
-                <div className="text-[10px] text-red-300 uppercase">💨 Geklaut</div>
-                <div className="text-lg font-black text-red-200">{state.extinguishedCount}</div>
+              <div className="p-2.5 rounded-xl bg-sky-950/45 border border-sky-400/40 text-center">
+                <div className="text-[10px] text-sky-300 uppercase">💨 Geklaut</div>
+                <div className="text-lg font-black text-sky-200">{state.extinguishedCount}</div>
               </div>
             ) : (
               <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/10 text-center">
@@ -987,7 +987,7 @@ export default function HolographicTannenbaumCockpit({
           <CurrentTurnRow
             darts={state.currentTurnDarts || []}
             isActive={isAct}
-            accentColor={isP1 ? 'emerald' : 'amber'}
+            accentColor={isP1 ? 'red' : 'amber'}
           />
         </div>
       </div>
@@ -998,7 +998,7 @@ export default function HolographicTannenbaumCockpit({
     <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-hidden select-none font-sans">
       {/* Festliche God Rays & subtiler Schneefall */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 left-[14%] w-[28vw] h-[130vh] bg-gradient-to-b from-emerald-500/20 via-emerald-600/05 to-transparent rotate-[18deg] blur-2xl opacity-70" />
+        <div className="absolute -top-32 left-[14%] w-[28vw] h-[130vh] bg-gradient-to-b from-red-500/20 via-rose-600/05 to-transparent rotate-[18deg] blur-2xl opacity-70" />
         <div className="absolute -top-32 right-[14%] w-[28vw] h-[130vh] bg-gradient-to-b from-amber-400/20 via-amber-500/05 to-transparent -rotate-[18deg] blur-2xl opacity-70" />
         <div className="absolute top-[42%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] bg-emerald-600/12 rounded-full blur-[150px]" />
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:48px_48px] opacity-30" />
@@ -1072,8 +1072,8 @@ export default function HolographicTannenbaumCockpit({
             <div className="flex flex-col items-center justify-between h-full max-h-[82vh] py-1 gap-2">
               {/* Kompakte Farb-Legende über dem Baum */}
               <div className="flex items-center justify-center gap-4 px-4 py-1.5 rounded-full bg-slate-900/75 border border-white/15 font-mono text-xs font-black backdrop-blur-xl">
-                <span className="flex items-center gap-1.5 text-emerald-300">
-                  <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                <span className="flex items-center gap-1.5 text-red-300">
+                  <span className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
                   <span>{p1First}</span>
                 </span>
                 <span className="text-slate-500">VS</span>
@@ -1129,9 +1129,9 @@ export default function HolographicTannenbaumCockpit({
           /* Solo-Modus */
           <div className="grid grid-cols-12 gap-6 items-center w-full max-w-6xl h-full">
             {/* Linker Flügel */}
-            <div className="col-span-4 rounded-[2rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-emerald-400/50 p-6 flex flex-col justify-between h-[360px] shadow-[0_25px_60px_rgba(0,0,0,0.8)]">
+            <div className="col-span-4 rounded-[2rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-red-400/50 p-6 flex flex-col justify-between h-[360px] shadow-[0_25px_60px_rgba(0,0,0,0.8)]">
               <div>
-                <span className="text-xs font-mono font-black uppercase tracking-widest text-emerald-400">
+                <span className="text-xs font-mono font-black uppercase tracking-widest text-red-400">
                   🎄 SOLO-MODUS · AM OCHE
                 </span>
                 <h2 className="text-3xl sm:text-4xl font-black text-white mt-2 leading-tight">
@@ -1144,7 +1144,7 @@ export default function HolographicTannenbaumCockpit({
                   <span className="text-[11px] font-mono uppercase text-slate-400 block">
                     Lichterstand
                   </span>
-                  <div className="text-4xl font-black font-mono text-[#00ff88]">
+                  <div className="text-4xl font-black font-mono text-[#ff4d6d]">
                     {p1Lit}
                     <span className="text-base text-slate-400">/11</span>
                   </div>
@@ -1185,7 +1185,7 @@ export default function HolographicTannenbaumCockpit({
                 <span className="text-xs font-mono font-black uppercase tracking-widest text-amber-300 block">
                   Aktuelle Aufnahme
                 </span>
-                <CurrentTurnRow darts={p1.currentTurnDarts || []} isActive={!winnerName} />
+                <CurrentTurnRow darts={p1.currentTurnDarts || []} isActive={!winnerName} accentColor="red" />
               </div>
 
               <ActionBannerBox lastAction={lastAction} />
@@ -1200,7 +1200,7 @@ export default function HolographicTannenbaumCockpit({
                       key={num}
                       className={`px-2 py-0.5 rounded-md font-mono text-xs font-black border ${
                         p1.tree.balls[num]
-                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                          ? 'bg-red-500/25 border-red-400 text-red-200'
                           : 'bg-slate-950/70 border-white/15 text-slate-400'
                       }`}
                     >
