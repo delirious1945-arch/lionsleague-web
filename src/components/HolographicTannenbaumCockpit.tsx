@@ -562,7 +562,8 @@ function FestiveSvgTree({
                 stroke="#ff3366"
                 strokeWidth="4"
                 strokeLinecap="round"
-                className="animate-ping"
+                className="animate-pulse"
+                filter={`url(#${treeIdPrefix}-glow)`}
               />
             )}
             {p2Ext && (
@@ -572,7 +573,8 @@ function FestiveSvgTree({
                 stroke="#ff3366"
                 strokeWidth="4"
                 strokeLinecap="round"
-                className="animate-ping"
+                className="animate-pulse"
+                filter={`url(#${treeIdPrefix}-glow)`}
               />
             )}
 
@@ -1060,7 +1062,7 @@ export default function HolographicTannenbaumCockpit({
       {/* Haupt-Arena */}
       <div className="relative z-10 flex-1 flex items-center justify-center min-h-0 py-2">
         {is1vs1 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(250px,1fr)_minmax(360px,1.3fr)_minmax(250px,1fr)] gap-4 lg:gap-6 items-center w-full max-w-[1520px] h-full">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_minmax(340px,1.45fr)_minmax(220px,1fr)] gap-4 lg:gap-6 items-center w-full max-w-[1520px] h-full">
             {/* Linker Flügel: Spieler 1 */}
             <div className="h-full flex flex-col justify-center">
               {renderPlayerWing(1, p1Name, p1, p1Lit)}
@@ -1095,7 +1097,7 @@ export default function HolographicTannenbaumCockpit({
                   p2RecentlyExtinguished={p2RecentlyExtinguished}
                   p1RecentlyLit={p1RecentlyLit}
                   p2RecentlyLit={p2RecentlyLit}
-                  className="max-h-[58vh] w-auto max-w-full"
+                  className="max-h-[62vh] w-auto max-w-full"
                 />
               </div>
 

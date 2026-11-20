@@ -3,6 +3,9 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+const BOARD_UI_VERSION =
+  process.env.VERCEL_GIT_COMMIT_SHA || '2026-11-20-tannenbaum-split-v2';
+
 export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'tannenbaum';
 
 export interface UnifiedLiveState {
@@ -61,6 +64,7 @@ export interface UnifiedLiveState {
   scoresP1?: any;
   scoresP2?: any;
   winner?: string;
+  uiVersion?: string;
   updatedAt: number;
 }
 
@@ -104,11 +108,14 @@ export async function GET(req: Request) {
 
         // Auto-Standby: Wenn älter als 25 Sekunden ohne Aktivität oder status === 'idle' -> sauberes Standby
         if (ageMs > 25 * 1000 || row.status === 'idle') {
-          return NextResponse.json(defaultState(boardId, row.session_id), {
-            headers: {
-              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-            },
-          });
+          return NextResponse.json(
+            { ...defaultState(boardId, row.session_id), uiVersion: BOARD_UI_VERSION },
+            {
+              headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              },
+            }
+          );
         }
 
         const payload =
@@ -116,11 +123,14 @@ export async function GET(req: Request) {
             ? row.payload
             : JSON.parse(row.payload);
 
-        return NextResponse.json(payload, {
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          },
-        });
+        return NextResponse.json(
+          { ...payload, uiVersion: BOARD_UI_VERSION },
+          {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            },
+          }
+        );
       }
     } catch (dbErr) {
       console.error('Database read error in /api/live/board, using fallback:', dbErr);
@@ -129,19 +139,28 @@ export async function GET(req: Request) {
     const fallback = inMemoryFallback[boardId] || defaultState(boardId);
     if (fallback.status !== 'idle' && Date.now() - fallback.updatedAt > 25 * 1000) {
       inMemoryFallback[boardId] = defaultState(boardId);
-      return NextResponse.json(inMemoryFallback[boardId], {
+      return NextResponse.json(
+        { ...inMemoryFallback[boardId], uiVersion: BOARD_UI_VERSION },
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+        }
+      );
+    }
+    return NextResponse.json(
+      { ...fallback, uiVersion: BOARD_UI_VERSION },
+      {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         },
-      });
-    }
-    return NextResponse.json(fallback, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-      },
-    });
+      }
+    );
   } catch (err: any) {
-    return NextResponse.json(defaultState('1'), { status: 200 });
+    return NextResponse.json(
+      { ...defaultState('1'), uiVersion: BOARD_UI_VERSION },
+      { status: 200 }
+    );
   }
 }
 

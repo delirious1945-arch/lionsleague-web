@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { UnifiedLiveState } from '@/app/api/live/board/route';
@@ -70,6 +70,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
   });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<string>('');
+  const loadedUiVersionRef = useRef<string | null>(null);
 
   // Synchronisiere boardId mit URL / localStorage
   const handleSelectBoard = (b: string) => {
@@ -164,6 +165,15 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         if (res.ok) {
           const data = await res.json();
           if (data) {
+            if (data.uiVersion) {
+              const incomingVersion = String(data.uiVersion);
+              if (loadedUiVersionRef.current === null) {
+                loadedUiVersionRef.current = incomingVersion;
+              } else if (loadedUiVersionRef.current !== incomingVersion) {
+                window.location.reload();
+                return;
+              }
+            }
             setLiveState((prev) => mergeIncomingLiveState(prev, data));
           }
         }
