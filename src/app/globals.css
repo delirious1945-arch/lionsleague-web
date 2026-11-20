@@ -249,3 +249,35 @@ html.show-ui-labels [data-ui-id]::after {
   line-height: 1.2;
 }
 
+/* =========================================================
+   WINTER- & SCHNEEFALL-ANIMATION (EVENT-MODUS)
+   ========================================================= */
+@keyframes lionsSnowfall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate3d(18px, 48vh, 0) rotate(180deg);
+    opacity: 0.65;
+  }
+  88% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate3d(-12px, 108vh, 0) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-lions-snow {
+  animation-name: lionsSnowfall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+

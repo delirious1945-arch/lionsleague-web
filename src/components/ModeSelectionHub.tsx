@@ -50,10 +50,10 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
         currentUser={user.name}
       />
 
-      {/* Haupt-Bereich: Ranking, Training & Video-Wurfstilanalyse nebeneinander auf voller Bildschirmbreite */}
+      {/* Haupt-Bereich: Auswahl-Kacheln nebeneinander auf voller Bildschirmbreite */}
       <div
         data-ui-id="HOME.TILES.GRID"
-        className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-5 flex-1 min-h-[380px] sm:min-h-[460px] lg:min-h-[500px]"
+        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5 flex-1 min-h-[380px] sm:min-h-[460px] lg:min-h-[500px]"
       >
         {/* Kachel 1: Ranking-System */}
         <Link
@@ -186,6 +186,76 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
           <div className="relative z-10 p-4 sm:p-7 flex items-center justify-between opacity-35" aria-hidden="true">
             <div>
               <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-emerald-400 block mb-0.5 blur-[5px] select-none">
+                ••••••••••••••••••
+              </span>
+              <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide drop-shadow-md blur-[7px] select-none">
+                ••••••••••••••
+              </h2>
+            </div>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 rounded-2xl bg-slate-800/80 text-slate-400 border border-slate-700 flex items-center justify-center font-black text-lg sm:text-xl shrink-0 ml-2">
+              <Lock className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Kachel 4: Geheimes Feature II (Coming Soon / Komplett unkenntlich, nur für Admins anwählbar) */}
+        <div
+          onClick={() => {
+            if (user.role === 'admin') {
+              router.push('/special');
+            }
+          }}
+          data-ui-id="HOME.TILES.SPECIAL_CARD"
+          className={`group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 shadow-2xl select-none transition-all duration-300 ${
+            user.role === 'admin'
+              ? 'border-amber-500/40 hover:border-amber-400 cursor-pointer hover:scale-[1.01] active:scale-[0.99]'
+              : 'border-slate-700/60 cursor-not-allowed pointer-events-none'
+          }`}
+        >
+          {/* Hintergrundbild extrem stark weichgezeichnet & unkenntlich gemacht */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#1f120b] to-slate-950" />
+          <Image
+            src="/training-banner.jpg"
+            alt="Coming Soon"
+            fill
+            className="object-cover object-center blur-3xl scale-150 opacity-20 grayscale brightness-50"
+          />
+
+          {/* Milchglas- und Abdunklungs-Overlay */}
+          <div className="absolute inset-0 backdrop-blur-2xl bg-slate-950/75" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/50" />
+
+          {/* Zentrale COMING SOON Einblendung */}
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 text-center">
+            <div className="px-5 py-2.5 sm:px-6 sm:py-3 rounded-2xl bg-slate-900/90 border-2 border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.25)] backdrop-blur-md flex flex-col items-center gap-1">
+              <div className="flex items-center gap-2 text-amber-400">
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-base sm:text-xl xl:text-2xl font-black uppercase tracking-[0.2em] text-white drop-shadow">
+                  Coming Soon
+                </span>
+              </div>
+              <span className="text-[10px] sm:text-xs font-bold text-amber-400/90 uppercase tracking-widest">
+                {user.role === 'admin' ? 'Geheimprojekt II • Admin-Zugang aktiv' : 'Geheimes Feature'}
+              </span>
+            </div>
+          </div>
+
+          {/* Badges oben links (komplett unkenntlich / geschwärzt) */}
+          <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-10 flex flex-col gap-1.5 opacity-40" aria-hidden="true">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/25 text-[10px] font-black uppercase tracking-wider backdrop-blur-md">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span className="blur-[5px] select-none">••••••••••••••</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/80 text-slate-400 border border-slate-700/60 text-[9px] font-bold backdrop-blur-md">
+              <ShieldCheck className="w-3 h-3 text-amber-400" />
+              <span className="blur-[5px] select-none">••••••••••••••</span>
+            </span>
+          </div>
+
+          {/* Titel unten (komplett unkenntlich / verschwommen) */}
+          <div className="relative z-10 p-4 sm:p-7 flex items-center justify-between opacity-35" aria-hidden="true">
+            <div>
+              <span className="text-[10px] sm:text-xs uppercase font-black tracking-widest text-amber-400 block mb-0.5 blur-[5px] select-none">
                 ••••••••••••••••••
               </span>
               <h2 className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-wide drop-shadow-md blur-[7px] select-none">

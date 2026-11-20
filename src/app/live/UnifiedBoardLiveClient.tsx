@@ -10,6 +10,8 @@ import HolographicDartboard from '@/components/HolographicDartboard';
 import HolographicPdcChallengeCockpit from '@/components/HolographicPdcChallengeCockpit';
 import HolographicScoringLeiterCockpit from '@/components/HolographicScoringLeiterCockpit';
 import HolographicDarts99Cockpit from '@/components/HolographicDarts99Cockpit';
+import HolographicTannenbaumCockpit from '@/components/HolographicTannenbaumCockpit';
+import { createInitialPlayerState } from '@/app/special/tannenbaum/types';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -516,6 +518,36 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         targetNumber={Number(d99.targetNumber || liveState.currentNumber || 20)}
         p1Stats={d99.p1 || defaultStats}
         p2Stats={d99.p2 || defaultStats}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 8. SPIEL: LIONS TANNENBAUM
+  // =========================================================================
+  if (liveState.gameType === 'tannenbaum') {
+    const tb = liveState.tannenbaumData || {};
+    const fallbackPlayer = createInitialPlayerState();
+
+    return (
+      <HolographicTannenbaumCockpit
+        boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name}
+        activeName={activeName}
+        is1vs1={is1vs1}
+        activePlayer={activePlayer}
+        roundNumber={Number(tb.roundNumber || liveState.currentRound || 1)}
+        tripleExtinguishEnabled={tb.tripleExtinguishEnabled ?? true}
+        starTarget={tb.starTarget === 'D20' ? 'D20' : 'BULL'}
+        p1={tb.p1 || fallbackPlayer}
+        p2={tb.p2 || fallbackPlayer}
+        lastAction={tb.lastAction ?? null}
+        winnerPlayer={tb.winnerPlayer ?? null}
+        winnerName={tb.winnerName ?? null}
+        currentTime={currentTime}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
       />
