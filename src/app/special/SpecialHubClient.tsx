@@ -227,7 +227,8 @@ export default function SpecialHubClient({
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                  Bringe alle <strong className="text-emerald-300">9 Christbaumkugeln (12–20)</strong> sowie den{' '}
+                  Duell an einem <strong className="text-emerald-300">gemeinsamen Tannenbaum</strong> (Links Smaragd vs.
+                  Rechts Gold): Bringe alle <strong className="text-emerald-300">9 Kugeln (12–20)</strong> sowie den{' '}
                   <strong className="text-amber-300">Baumstamm (beliebiges Doppel)</strong> zum Leuchten! Sobald alle
                   10 Lichter brennen, setzt du mit <strong className="text-amber-300">Bull oder D20</strong> den Stern
                   auf die Spitze.
@@ -236,8 +237,8 @@ export default function SpecialHubClient({
                 <div className="rounded-2xl bg-slate-950/60 border border-amber-400/25 px-3.5 py-2.5 text-xs text-amber-200/95 flex items-center gap-2">
                   <span>🔥</span>
                   <span>
-                    <strong>Party-Clou:</strong> Triffst du ein <strong>Triple</strong> einer Zahl, die beim Gegner
-                    schon leuchtet, pustest du seine Kugel wieder aus!
+                    <strong>Party-Clou (1-Tap):</strong> Ein direktes <strong>Triple</strong> auf eine gegnerische
+                    Kugelhälfte klaut dem Kontrahenten sofort wieder das Licht!
                   </span>
                 </div>
               </div>

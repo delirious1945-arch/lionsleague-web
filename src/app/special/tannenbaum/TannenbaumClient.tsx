@@ -49,7 +49,6 @@ interface TurnSnapshot {
   lastAction: TannenbaumLastActionBanner | null;
   winnerPlayer: 1 | 2 | null;
   isGameFinished: boolean;
-  isTripleMode: boolean;
 }
 
 type SoundKind = 'lit' | 'trunk' | 'extinguish' | 'star_unlocked' | 'win' | 'miss';
@@ -154,7 +153,6 @@ export default function TannenbaumClient({
   const [roundNumber, setRoundNumber] = useState<number>(1);
   const [p1State, setP1State] = useState<TannenbaumPlayerState>(createInitialPlayerState);
   const [p2State, setP2State] = useState<TannenbaumPlayerState>(createInitialPlayerState);
-  const [isTripleMode, setIsTripleMode] = useState<boolean>(false);
   const [lastAction, setLastAction] = useState<TannenbaumLastActionBanner | null>(null);
   const [winnerPlayer, setWinnerPlayer] = useState<1 | 2 | null>(null);
   const [undoStack, setUndoStack] = useState<TurnSnapshot[]>([]);
@@ -519,7 +517,6 @@ export default function TannenbaumClient({
     setP2State(initP2);
     setActivePlayer(1);
     setRoundNumber(1);
-    setIsTripleMode(false);
     setWinnerPlayer(null);
     setUndoStack([]);
     setLastAction(startBanner);
@@ -574,7 +571,6 @@ export default function TannenbaumClient({
     setIsGameFinished(false);
     setWinnerPlayer(null);
     setUndoStack([]);
-    setIsTripleMode(false);
     sendStandbySignal();
   };
 
@@ -591,7 +587,6 @@ export default function TannenbaumClient({
     setWinnerPlayer(prev.winnerPlayer);
     setIsGameFinished(prev.isGameFinished);
     setIsGameStarted(true);
-    setIsTripleMode(prev.isTripleMode);
   };
 
   // Hilfsfunktion: Snapshot pushen & Zugabschluss ausführen
@@ -635,7 +630,6 @@ export default function TannenbaumClient({
     setLastAction(banner);
     setWinnerPlayer(winPlayer);
     setIsGameFinished(isWin);
-    setIsTripleMode(false);
   };
 
   const pushSnapshot = () => {
@@ -647,13 +641,12 @@ export default function TannenbaumClient({
       lastAction,
       winnerPlayer,
       isGameFinished,
-      isTripleMode,
     };
     setUndoStack((prev) => [...prev.slice(-49), snap]);
   };
 
-  // A) Kugel 12–20 getroffen
-  const handleBallHit = (num: TannenbaumBallNumber) => {
+  // A) Kugel 12–20 getroffen (Single/Double oder direkter Triple-Angriff)
+  const handleBallHit = (num: TannenbaumBallNumber, isTriple: boolean) => {
     if (isGameFinished) return;
     pushSnapshot();
 
@@ -675,7 +668,7 @@ export default function TannenbaumClient({
     }
 
     let extinguishedOpp = false;
-    if (isTripleMode && tripleExtinguishEnabled && gameMode === '1vs1' && opp.tree.balls[num]) {
+    if (isTriple && tripleExtinguishEnabled && gameMode === '1vs1' && opp.tree.balls[num]) {
       opp.tree.balls[num] = false;
       opp.timesExtinguished += 1;
       own.extinguishedCount += 1;
@@ -698,15 +691,15 @@ export default function TannenbaumClient({
       : newlyLitBall
       ? {
           kind: 'ball_lit',
-          label: `${isTripleMode ? 'T' : ''}${num}`,
+          label: `${isTriple ? 'T' : ''}${num}`,
           target: nodeId,
-          isTriple: isTripleMode,
+          isTriple,
         }
       : {
           kind: 'ball_already_lit',
-          label: `${isTripleMode ? 'T' : ''}${num}`,
+          label: `${isTriple ? 'T' : ''}${num}`,
           target: nodeId,
-          isTriple: isTripleMode,
+          isTriple,
         };
 
     own.currentTurnDarts.push(ev);
@@ -717,10 +710,10 @@ export default function TannenbaumClient({
       banner = {
         id: Date.now(),
         type: 'extinguish',
-        headline: '💨 AUSGEPUSTET!',
+        headline: '💨 LICHT GEKLAUT!',
         subline: unlockedStarThisDart
-          ? `${activeName} löscht ${oppName}s Kugel ${num} — UND schaltet den Stern frei!`
-          : `${activeName} löscht ${oppName}s Kugel ${num}!`,
+          ? `${activeName} klaut ${oppName}s Kugel ${num} — UND schaltet den Stern frei!`
+          : `${activeName} klaut ${oppName}s Kugel ${num}!`,
         actorPlayer: activePlayer,
         affectedNode: nodeId,
       };
@@ -751,7 +744,7 @@ export default function TannenbaumClient({
         type: 'info',
         headline: `KUGEL ${num} BEREITS AN`,
         subline:
-          isTripleMode && tripleExtinguishEnabled && gameMode === '1vs1'
+          isTriple && tripleExtinguishEnabled && gameMode === '1vs1'
             ? `Bei ${oppName} leuchtet die ${num} noch nicht.`
             : `${activeName} trifft erneut die ${num}.`,
         actorPlayer: activePlayer,
@@ -1011,7 +1004,7 @@ export default function TannenbaumClient({
                   🎄 Lions Tannenbaum
                 </h1>
                 <p className="text-xs sm:text-sm text-amber-300 font-semibold">
-                  Weihnachts-Partyspiel · 9 Kugeln (12–20) + Stamm (Doppel) + Stern ({starTarget})
+                  Duell an einem gemeinsamen Tannenbaum · 9 Kugeln (12–20) + Stamm (Doppel) + Stern ({starTarget})
                 </p>
               </div>
             </div>
@@ -1075,7 +1068,7 @@ export default function TannenbaumClient({
             <div className="space-y-2 p-4 rounded-2xl bg-slate-950/60 border border-white/10">
               <div className="flex items-center justify-between gap-2">
                 <label className="text-xs font-mono font-black uppercase tracking-wider text-emerald-300">
-                  Spieler 1
+                  {gameMode === '1vs1' ? 'Spieler 1 · ◀ Links (Smaragd)' : 'Spieler 1'}
                 </label>
                 {!soloLocked && (
                   <button
@@ -1123,7 +1116,7 @@ export default function TannenbaumClient({
               <div className="space-y-2 p-4 rounded-2xl bg-slate-950/60 border border-white/10">
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-xs font-mono font-black uppercase tracking-wider text-amber-300">
-                    Spieler 2
+                    Spieler 2 · Rechts (Gold) ▶
                   </label>
                   <button
                     type="button"
@@ -1177,10 +1170,10 @@ export default function TannenbaumClient({
               <div>
                 <div className="text-sm font-black flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-red-400" />
-                  <span>Triple pustet Gegner-Kugel aus</span>
+                  <span>Triple klaut Gegner-Licht</span>
                 </div>
                 <div className="text-[11px] text-slate-300 mt-0.5">
-                  Im 1 vs. 1 löscht ein Triple eine brennende Gegner-Kugel!
+                  Ein direktes Triple klaut die brennende Kugelhälfte des Gegners!
                 </div>
               </div>
               <span
@@ -1249,8 +1242,9 @@ export default function TannenbaumClient({
   const oppName = activePlayer === 1 ? p2Name : p1Name;
   const ownLit = countTotalLit(ownState.tree);
   const starReady = isStarUnlocked(ownState.tree);
+  const oppStarReady = gameMode === '1vs1' && isStarUnlocked(oppState.tree);
   const remainingBaseLights = Math.max(0, 10 - countLitBaseElements(ownState.tree));
-  const showTripleToggle = gameMode === '1vs1' && tripleExtinguishEnabled;
+  const showTripleButtons = gameMode === '1vs1' && tripleExtinguishEnabled;
 
   return (
     <div className="max-w-5xl mx-auto px-2.5 sm:px-5 space-y-3.5 animate-fadeIn">
@@ -1304,11 +1298,18 @@ export default function TannenbaumClient({
       {showHelp && (
         <div className="rounded-2xl p-4 bg-slate-900/95 border border-amber-400/40 text-xs sm:text-sm text-slate-200 space-y-1.5">
           <div className="font-black text-amber-300">🎄 Spielregeln: Lions Tannenbaum</div>
-          <p>1. Alle 9 Christbaumkugeln (12 bis 20) und den Baumstamm (beliebiges Doppel) durch Treffer zum Leuchten bringen.</p>
-          <p>2. Brennen alle 10 Lichter (9 Kugeln + Stamm), wird der Spitzen-Stern ({starTarget}) freigeschaltet. Ein Treffer darauf gewinnt sofort!</p>
-          {showTripleToggle && (
+          <p>
+            1. Duell an einem gemeinsamen Tannenbaum (Links = Spieler 1 Smaragd, Rechts = Spieler 2 Gold). Alle 9
+            Christbaumkugeln (12 bis 20) und der Baumstamm (beliebiges Doppel) müssen leuchten.
+          </p>
+          <p>
+            2. Brennen alle 10 eigenen Lichter (9 Kugeln + Stamm), wird der Spitzen-Stern ({starTarget}) freigeschaltet.
+            Ein Treffer darauf gewinnt sofort!
+          </p>
+          {showTripleButtons && (
             <p className="text-red-300 font-semibold">
-              3. Party-Clou: Aktiviere vor dem Tippen „🔥 TRIPLE“, wenn ein Triple fällt – brennt diese Zahl schon beim Gegner, pustest du seine Kugel wieder aus!
+              3. Direkt-Klau ohne Umschalten: Tippe auf die Zahl für Single/Double oder direkt darunter auf 🔥 T-Zahl,
+              um dem Gegner das Licht zu klauen!
             </p>
           )}
         </div>
@@ -1332,22 +1333,35 @@ export default function TannenbaumClient({
                 isWin
                   ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]'
                   : isAct
-                  ? 'bg-emerald-950/45 border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.25)]'
+                  ? isP1
+                    ? 'bg-emerald-950/45 border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.25)]'
+                    : 'bg-amber-950/45 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
                   : 'bg-slate-900/60 border-white/10 opacity-80'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
+                  {gameMode === '1vs1' && (
+                    <span
+                      className={`text-[10px] font-mono font-black uppercase tracking-wider block ${
+                        isP1 ? 'text-emerald-300' : 'text-amber-300'
+                      }`}
+                    >
+                      {isP1 ? '◀ Links (Smaragd)' : 'Rechts (Gold) ▶'}
+                    </span>
+                  )}
                   <div className="text-sm sm:text-lg font-black text-white truncate">{name}</div>
-                  <div className="text-[11px] font-mono text-slate-300 flex items-center gap-2 mt-0.5">
+                  <div className="text-[11px] font-mono text-slate-300 flex items-center gap-2 mt-0.5 flex-wrap">
                     {isWin ? (
                       <span className="text-amber-300 font-black">🏆 SIEGER!</span>
                     ) : isAct ? (
-                      <span className="text-emerald-300 font-black">🎯 AM WURF</span>
+                      <span className={`${isP1 ? 'text-emerald-300' : 'text-amber-300'} font-black`}>
+                        🎯 AM WURF
+                      </span>
                     ) : (
                       <span className="text-slate-400">Wartet</span>
                     )}
-                    {showTripleToggle && st.extinguishedCount > 0 && (
+                    {showTripleButtons && st.extinguishedCount > 0 && (
                       <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-200 font-bold">
                         💨 {st.extinguishedCount}
                       </span>
@@ -1356,7 +1370,11 @@ export default function TannenbaumClient({
                 </div>
 
                 <div className="text-right shrink-0">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-300">
+                  <span
+                    className={`text-2xl sm:text-3xl font-black font-mono ${
+                      isP1 ? 'text-emerald-300' : 'text-amber-300'
+                    }`}
+                  >
                     {lit}
                     <span className="text-xs text-slate-400">/11</span>
                   </span>
@@ -1365,7 +1383,11 @@ export default function TannenbaumClient({
 
               <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden mt-2.5 border border-white/10">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-amber-400 transition-all duration-300"
+                  className={`h-full transition-all duration-300 ${
+                    isP1
+                      ? 'bg-gradient-to-r from-emerald-500 to-cyan-400'
+                      : 'bg-gradient-to-r from-amber-500 to-yellow-300'
+                  }`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -1479,39 +1501,10 @@ export default function TannenbaumClient({
             </button>
           </div>
 
-          {/* Multiplikator Toggle im 1vs1 */}
-          {showTripleToggle && (
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => setIsTripleMode(false)}
-                className={`min-h-[54px] px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  !isTripleMode
-                    ? 'bg-emerald-500/25 border-emerald-400 text-emerald-100 shadow-lg'
-                    : 'bg-slate-950/70 border-white/10 text-slate-400'
-                }`}
-              >
-                <span>✓ NORMAL (Single / Double)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsTripleMode((v) => !v)}
-                className={`min-h-[54px] px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  isTripleMode
-                    ? 'bg-red-600/35 border-red-400 text-red-100 shadow-[0_0_25px_rgba(239,68,68,0.45)] animate-pulse'
-                    : 'bg-slate-950/70 border-red-500/30 text-red-300 hover:bg-red-950/40'
-                }`}
-              >
-                <Flame className="w-4 h-4 text-red-400" />
-                <span>🔥 TRIPLE · Gegner-Kugel auspusten!</span>
-              </button>
-            </div>
-          )}
-
-          {/* Interaktive Tannenbaum-Pyramide */}
-          <div className="rounded-3xl p-4 sm:p-6 bg-gradient-to-b from-[#061812]/90 via-[#04120d]/95 to-slate-950 border-2 border-emerald-500/30 space-y-3 shadow-2xl">
+          {/* Interaktive Tannenbaum-Pyramide (1-Blick, ohne Umschalter) */}
+          <div className="rounded-3xl p-4 sm:p-6 bg-gradient-to-b from-[#061812]/90 via-[#04120d]/95 to-slate-950 border-2 border-emerald-500/30 space-y-3.5 shadow-2xl">
             <div className="text-center text-xs font-mono uppercase tracking-widest text-emerald-300 font-bold">
-              🎯 {ownName} wirft ({ownLit}/11 Lichter) — Tipp auf getroffenes Feld:
+              🎯 {ownName} wirft ({ownLit}/11 Lichter) — Tipp direkt aufs getroffene Feld:
             </div>
 
             {/* Reihe 0: Spitzen-Stern */}
@@ -1520,10 +1513,10 @@ export default function TannenbaumClient({
                 type="button"
                 onClick={handleStarHit}
                 disabled={!starReady}
-                className={`min-h-[64px] w-full max-w-xs px-5 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center ${
+                className={`min-h-[60px] w-full max-w-sm px-5 py-2 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center ${
                   starReady
                     ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 border-yellow-200 shadow-[0_0_30px_rgba(251,191,36,0.65)] animate-pulse cursor-pointer hover:scale-[1.02]'
-                    : 'bg-slate-900/75 border-white/10 text-slate-400 cursor-not-allowed opacity-75'
+                    : 'bg-slate-900/75 border-white/10 text-slate-400 cursor-not-allowed opacity-80'
                 }`}
               >
                 <span className="text-base sm:text-lg flex items-center gap-1.5">
@@ -1534,66 +1527,147 @@ export default function TannenbaumClient({
                     ? 'FINALE FREI! JETZT TREFFEN ZUM SIEG!'
                     : `Noch ${remainingBaseLights} Lichter bis zum Stern`}
                 </span>
+                {oppStarReady && (
+                  <span className="text-[10px] font-mono font-black text-red-400 mt-0.5">
+                    🔥 {oppName} steht ebenfalls am Stern!
+                  </span>
+                )}
               </button>
             </div>
 
-            {/* Reihen 1–3: Christbaumkugeln */}
-            {TANNENBAUM_ROWS.map((row, rIdx) => (
-              <div key={rIdx} className="flex flex-wrap justify-center gap-2.5 sm:gap-3">
-                {row.map((num) => {
-                  const isOwnLit = ownState.tree.balls[num];
-                  const isOppLit = gameMode === '1vs1' && oppState.tree.balls[num];
-                  const canExtinguish = isTripleMode && showTripleToggle && isOppLit;
+            {/* Reihen 1–3: Christbaumkugeln als Kombi-Kacheln */}
+            {TANNENBAUM_ROWS.map((row, rIdx) => {
+              const rowGridCls =
+                rIdx === 0
+                  ? 'grid grid-cols-2 gap-2.5 sm:gap-3 max-w-md mx-auto w-full'
+                  : rIdx === 1
+                  ? 'grid grid-cols-3 gap-2 sm:gap-3 max-w-2xl mx-auto w-full'
+                  : 'grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 max-w-4xl mx-auto w-full';
 
-                  return (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => handleBallHit(num)}
-                      className={`min-h-[64px] min-w-[74px] sm:min-w-[96px] flex-1 max-w-[140px] px-2.5 py-2 rounded-2xl border-2 font-mono transition-all flex flex-col items-center justify-center cursor-pointer active:scale-95 ${
-                        canExtinguish
-                          ? 'bg-red-600/35 border-red-400 text-white shadow-[0_0_24px_rgba(239,68,68,0.5)]'
-                          : isOwnLit
-                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.3)]'
-                          : 'bg-slate-900/85 hover:bg-slate-800 border-white/20 text-white'
-                      }`}
-                    >
-                      <span className="text-xl sm:text-2xl font-black leading-none">{num}</span>
-                      <span className="text-[10px] font-bold mt-1 flex items-center gap-1">
-                        {isOwnLit ? (
-                          <span className="text-emerald-300">✓ AN</span>
-                        ) : (
-                          <span className="text-slate-400">○ AUS</span>
-                        )}
-                        {isOppLit && (
-                          <span className="text-amber-300" title={`Leuchtet bei ${oppName}`}>
-                            · 🔥
+              return (
+                <div key={rIdx} className={rowGridCls}>
+                  {row.map((num) => {
+                    const isP1Lit = p1State.tree.balls[num];
+                    const isP2Lit = p2State.tree.balls[num];
+                    const isOwnLit = ownState.tree.balls[num];
+                    const isOppLit = gameMode === '1vs1' && oppState.tree.balls[num];
+
+                    const tileBorderCls = isOwnLit
+                      ? activePlayer === 1
+                        ? 'border-emerald-400 bg-emerald-950/35 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
+                        : 'border-amber-400 bg-amber-950/35 shadow-[0_0_16px_rgba(251,191,36,0.25)]'
+                      : 'border-white/20 bg-slate-900/85';
+
+                    return (
+                      <div
+                        key={num}
+                        className={`rounded-2xl overflow-hidden border-2 flex flex-col transition-all ${tileBorderCls}`}
+                      >
+                        {/* Oberer Haupt-Button: Single / Double */}
+                        <button
+                          type="button"
+                          onClick={() => handleBallHit(num, false)}
+                          className={`${
+                            showTripleButtons ? 'min-h-[58px]' : 'min-h-[64px]'
+                          } w-full px-2.5 py-2 flex flex-col items-center justify-center cursor-pointer hover:bg-white/[0.06] active:scale-[0.98] transition-all font-mono`}
+                        >
+                          <span className="text-xl sm:text-2xl font-black text-white leading-none">
+                            {num}
                           </span>
+
+                          {gameMode === '1vs1' ? (
+                            <div className="flex items-center justify-between gap-1.5 w-full mt-1.5 text-[10px] font-black">
+                              <span
+                                className={`px-1.5 py-0.5 rounded-md border ${
+                                  isP1Lit
+                                    ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                                    : 'bg-slate-950/70 border-white/10 text-slate-400'
+                                }`}
+                              >
+                                {isP1Lit ? '✓ P1' : '○ P1'}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded-md border ${
+                                  isP2Lit
+                                    ? 'bg-amber-500/25 border-amber-400 text-amber-200'
+                                    : 'bg-slate-950/70 border-white/10 text-slate-400'
+                                }`}
+                              >
+                                {isP2Lit ? 'P2 ✓' : 'P2 ○'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span
+                              className={`text-[10px] font-bold mt-1 ${
+                                isOwnLit ? 'text-emerald-300' : 'text-slate-400'
+                              }`}
+                            >
+                              {isOwnLit ? '✓ AN' : '○ AUS'}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Unterer Direkt-Triple-Button (ohne Umschalten!) */}
+                        {showTripleButtons && (
+                          <button
+                            type="button"
+                            onClick={() => handleBallHit(num, true)}
+                            title={
+                              isOppLit
+                                ? `Triple ${num} — klaut ${oppName} das Licht!`
+                                : `Triple ${num} buchen`
+                            }
+                            className={`min-h-[52px] w-full px-2 py-1.5 font-mono text-xs font-black flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] transition-all ${
+                              isOppLit
+                                ? 'bg-red-600/85 hover:bg-red-500 text-white border-t border-red-400/70'
+                                : 'bg-slate-950/85 hover:bg-slate-800 text-slate-300 border-t border-white/10'
+                            }`}
+                          >
+                            {isOppLit ? (
+                              <span>🔥 T{num} · KLAUEN</span>
+                            ) : (
+                              <span>T{num}</span>
+                            )}
+                          </button>
                         )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
 
             {/* Basis: Baumstamm */}
             <div className="flex justify-center pt-1">
               <button
                 type="button"
                 onClick={handleTrunkHit}
-                className={`min-h-[60px] w-full max-w-sm px-5 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center cursor-pointer active:scale-95 ${
+                className={`min-h-[60px] w-full max-w-md px-5 py-2 rounded-2xl border-2 font-black transition-all flex flex-col items-center justify-center cursor-pointer active:scale-95 ${
                   ownState.tree.trunk
-                    ? 'bg-emerald-500/25 border-amber-400 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
+                    ? activePlayer === 1
+                      ? 'bg-emerald-500/25 border-emerald-400 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                      : 'bg-amber-500/25 border-amber-400 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                     : 'bg-amber-950/45 hover:bg-amber-900/50 border-amber-600/50 text-amber-100'
                 }`}
               >
                 <span className="text-sm sm:text-base">
                   🪵 BAUMSTAMM (Beliebiges Doppel)
                 </span>
-                <span className="text-[11px] font-mono">
-                  {ownState.tree.trunk ? '✓ STAMM ERLEUCHTET' : '○ NOCH DUNKEL · Doppel treffen'}
-                </span>
+                {gameMode === '1vs1' ? (
+                  <div className="flex items-center justify-center gap-4 mt-1 font-mono text-[11px] font-black">
+                    <span className={p1State.tree.trunk ? 'text-emerald-300' : 'text-slate-400'}>
+                      P1: {p1State.tree.trunk ? '✓ AN' : '○ AUS'}
+                    </span>
+                    <span className="text-slate-600">|</span>
+                    <span className={p2State.tree.trunk ? 'text-amber-300' : 'text-slate-400'}>
+                      P2: {p2State.tree.trunk ? '✓ AN' : '○ AUS'}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[11px] font-mono">
+                    {ownState.tree.trunk ? '✓ STAMM ERLEUCHTET' : '○ NOCH DUNKEL · Doppel treffen'}
+                  </span>
+                )}
               </button>
             </div>
           </div>

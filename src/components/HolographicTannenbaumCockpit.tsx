@@ -56,19 +56,20 @@ const SNOWFLAKES = [
   { left: '74%', size: 14, duration: '16.5s', delay: '-13s', opacity: 0.28 },
 ];
 
+// Positionen passend zu viewBox="0 0 420 500"
 const BALL_POSITIONS: { num: TannenbaumBallNumber; cx: number; cy: number; r: number }[] = [
   // Reihe 1 (oben)
-  { num: 20, cx: 145, cy: 142, r: 24 },
-  { num: 19, cx: 215, cy: 142, r: 24 },
+  { num: 20, cx: 168, cy: 158, r: 28 },
+  { num: 19, cx: 252, cy: 158, r: 28 },
   // Reihe 2 (Mitte)
-  { num: 18, cx: 112, cy: 214, r: 24 },
-  { num: 17, cx: 180, cy: 214, r: 24 },
-  { num: 16, cx: 248, cy: 214, r: 24 },
+  { num: 18, cx: 130, cy: 242, r: 28 },
+  { num: 17, cx: 210, cy: 242, r: 28 },
+  { num: 16, cx: 290, cy: 242, r: 28 },
   // Reihe 3 (unten)
-  { num: 15, cx: 84, cy: 290, r: 24 },
-  { num: 14, cx: 148, cy: 290, r: 24 },
-  { num: 13, cx: 212, cy: 290, r: 24 },
-  { num: 12, cx: 276, cy: 290, r: 24 },
+  { num: 15, cx: 96, cy: 330, r: 28 },
+  { num: 14, cx: 172, cy: 330, r: 28 },
+  { num: 13, cx: 248, cy: 330, r: 28 },
+  { num: 12, cx: 324, cy: 330, r: 28 },
 ];
 
 function getNameSizing(name: string) {
@@ -89,7 +90,7 @@ function formatDartSlot(ev: TannenbaumDartEvent) {
   if (ev.kind === 'triple_extinguish') {
     return {
       title: ev.label,
-      sub: '💨 AUS!',
+      sub: '💨 GEKLAUT!',
       cls: 'bg-red-500/25 border-red-400 text-red-100 shadow-[0_0_16px_rgba(239,68,68,0.45)]',
     };
   }
@@ -124,10 +125,17 @@ function formatDartSlot(ev: TannenbaumDartEvent) {
 function CurrentTurnRow({
   darts,
   isActive,
+  accentColor = 'emerald',
 }: {
   darts: TannenbaumDartEvent[];
   isActive: boolean;
+  accentColor?: 'emerald' | 'amber';
 }) {
+  const pulseBorder =
+    accentColor === 'amber'
+      ? 'bg-amber-500/10 border-amber-400/75 text-amber-300 animate-pulse'
+      : 'bg-emerald-500/10 border-emerald-400/75 text-emerald-300 animate-pulse';
+
   return (
     <div className="grid grid-cols-3 gap-2 w-full">
       {[0, 1, 2].map((idx) => {
@@ -137,7 +145,7 @@ function CurrentTurnRow({
           return (
             <div
               key={idx}
-              className={`py-1.5 px-2 rounded-xl border-2 text-center font-mono transition-all ${chip.cls}`}
+              className={`py-2 px-1.5 rounded-xl border-2 text-center font-mono transition-all ${chip.cls}`}
             >
               <div className="text-xs sm:text-sm font-black leading-tight truncate">{chip.title}</div>
               <div className="text-[10px] font-bold opacity-90">{chip.sub}</div>
@@ -147,9 +155,9 @@ function CurrentTurnRow({
         return (
           <div
             key={idx}
-            className={`py-1.5 px-2 rounded-xl border border-dashed text-center font-mono flex flex-col items-center justify-center ${
+            className={`py-2 px-1.5 rounded-xl border border-dashed text-center font-mono flex flex-col items-center justify-center ${
               isActive && idx === darts.length
-                ? 'bg-emerald-500/10 border-emerald-400/70 text-emerald-300 animate-pulse'
+                ? pulseBorder
                 : 'bg-slate-950/60 border-white/15 text-slate-500'
             }`}
           >
@@ -164,26 +172,61 @@ function CurrentTurnRow({
 
 function FestiveSvgTree({
   treeIdPrefix,
-  tree,
+  is1vs1,
+  p1Tree,
+  p2Tree,
+  p1Name,
+  p2Name = 'Spieler 2',
   starTarget,
-  recentlyExtinguishedNode,
-  recentlyLitNode,
+  p1RecentlyExtinguished,
+  p2RecentlyExtinguished,
+  p1RecentlyLit,
+  p2RecentlyLit,
   className = '',
 }: {
   treeIdPrefix: string;
-  tree: TannenbaumTreeState;
+  is1vs1: boolean;
+  p1Tree: TannenbaumTreeState;
+  p2Tree?: TannenbaumTreeState;
+  p1Name: string;
+  p2Name?: string;
   starTarget: TannenbaumStarTarget;
-  recentlyExtinguishedNode?: TannenbaumNodeId;
-  recentlyLitNode?: TannenbaumNodeId;
+  p1RecentlyExtinguished?: TannenbaumNodeId;
+  p2RecentlyExtinguished?: TannenbaumNodeId;
+  p1RecentlyLit?: TannenbaumNodeId;
+  p2RecentlyLit?: TannenbaumNodeId;
   className?: string;
 }) {
-  const starReady = isStarUnlocked(tree);
-  const starLit = tree.star;
+  const safeP2Tree = p2Tree || p1Tree;
+  const p1StarReady = isStarUnlocked(p1Tree);
+  const p2StarReady = is1vs1 && isStarUnlocked(safeP2Tree);
+  const anyStarWon = p1Tree.star || (is1vs1 && safeP2Tree.star);
+
+  const p1First = p1Name.trim().split(' ')[0] || 'P1';
+  const p2First = p2Name.trim().split(' ')[0] || 'P2';
+
+  // Stern-Status-Text & Farbe
+  let starBadgeText: string | null = null;
+  let starRingStroke = '#facc15';
+  if (!anyStarWon) {
+    if (is1vs1 && p1StarReady && p2StarReady) {
+      starBadgeText = 'SUDDEN DEATH!';
+      starRingStroke = '#f87171';
+    } else if (p1StarReady) {
+      starBadgeText = is1vs1 ? `${p1First.toUpperCase()} FINALE!` : 'FINALE!';
+      starRingStroke = '#34d399';
+    } else if (p2StarReady) {
+      starBadgeText = `${p2First.toUpperCase()} FINALE!`;
+      starRingStroke = '#fbbf24';
+    }
+  }
+
+  const starAnyReady = p1StarReady || p2StarReady;
 
   return (
     <svg
-      viewBox="0 0 360 440"
-      className={`w-full h-auto drop-shadow-[0_12px_30px_rgba(0,0,0,0.75)] ${className}`}
+      viewBox="0 0 420 500"
+      className={`w-full h-auto drop-shadow-[0_14px_34px_rgba(0,0,0,0.85)] ${className}`}
       role="img"
       aria-label="Lions Tannenbaum"
     >
@@ -194,29 +237,44 @@ function FestiveSvgTree({
           <stop offset="100%" stopColor="#022c22" />
         </linearGradient>
 
-        <radialGradient id={`${treeIdPrefix}-ball-lit`} cx="35%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#fef08a" />
-          <stop offset="38%" stopColor="#34d399" />
+        {/* P1 Smaragd-Gradient */}
+        <radialGradient id={`${treeIdPrefix}-ball-p1`} cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#a7f3d0" />
+          <stop offset="40%" stopColor="#34d399" />
           <stop offset="85%" stopColor="#059669" />
-          <stop offset="100%" stopColor="#065f46" />
+          <stop offset="100%" stopColor="#064e3b" />
         </radialGradient>
 
-        <radialGradient id={`${treeIdPrefix}-ball-off`} cx="35%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#334155" />
+        {/* P2 Gold/Amber-Gradient */}
+        <radialGradient id={`${treeIdPrefix}-ball-p2`} cx="65%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#fef08a" />
+          <stop offset="40%" stopColor="#fbbf24" />
+          <stop offset="85%" stopColor="#d97706" />
+          <stop offset="100%" stopColor="#78350f" />
+        </radialGradient>
+
+        {/* Aus / Dunkel */}
+        <radialGradient id={`${treeIdPrefix}-ball-off`} cx="45%" cy="35%" r="75%">
+          <stop offset="0%" stopColor="#1e293b" />
           <stop offset="70%" stopColor="#0f172a" />
           <stop offset="100%" stopColor="#020617" />
         </radialGradient>
 
-        <radialGradient id={`${treeIdPrefix}-ball-ext`} cx="35%" cy="30%" r="75%">
+        {/* Geklaut / Rot */}
+        <radialGradient id={`${treeIdPrefix}-ball-ext`} cx="45%" cy="35%" r="75%">
           <stop offset="0%" stopColor="#fca5a5" />
           <stop offset="55%" stopColor="#ef4444" />
           <stop offset="100%" stopColor="#7f1d1d" />
         </radialGradient>
 
-        <linearGradient id={`${treeIdPrefix}-trunk-lit`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fbbf24" />
-          <stop offset="50%" stopColor="#10b981" />
+        <linearGradient id={`${treeIdPrefix}-trunk-p1`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#34d399" />
           <stop offset="100%" stopColor="#047857" />
+        </linearGradient>
+
+        <linearGradient id={`${treeIdPrefix}-trunk-p2`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fde047" />
+          <stop offset="100%" stopColor="#b45309" />
         </linearGradient>
 
         <linearGradient id={`${treeIdPrefix}-trunk-off`} x1="0" y1="0" x2="0" y2="1">
@@ -239,29 +297,26 @@ function FestiveSvgTree({
         </filter>
       </defs>
 
-      {/* Hintergrund-Tannenbaum-Silhouette (3 übereinander liegende Stufen) */}
+      {/* Hintergrund-Tannenbaum-Silhouette (3 Stufen, zentriert bei x=210) */}
       <g>
-        {/* Untere Stufe */}
         <polygon
-          points="180,175 26,342 334,342"
+          points="210,202 22,388 398,388"
           fill={`url(#${treeIdPrefix}-foliage)`}
           stroke="#10b981"
           strokeOpacity="0.45"
           strokeWidth="2.5"
           strokeLinejoin="round"
         />
-        {/* Mittlere Stufe */}
         <polygon
-          points="180,118 52,258 308,258"
+          points="210,136 58,296 362,296"
           fill={`url(#${treeIdPrefix}-foliage)`}
           stroke="#10b981"
-          strokeOpacity="0.5"
+          strokeOpacity="0.52"
           strokeWidth="2.5"
           strokeLinejoin="round"
         />
-        {/* Obere Stufe */}
         <polygon
-          points="180,74 88,176 272,176"
+          points="210,82 100,200 320,200"
           fill={`url(#${treeIdPrefix}-foliage)`}
           stroke="#34d399"
           strokeOpacity="0.6"
@@ -270,145 +325,340 @@ function FestiveSvgTree({
         />
       </g>
 
+      {/* Subtile Seiten-Akzente & vertikale Mittellinie im 1vs1 */}
+      {is1vs1 && (
+        <g>
+          <polygon points="210,86 24,386 210,386" fill="#10b981" fillOpacity="0.06" />
+          <polygon points="210,86 210,386 396,386" fill="#fbbf24" fillOpacity="0.06" />
+          <line
+            x1="210"
+            y1="88"
+            x2="210"
+            y2="388"
+            stroke="#ffffff"
+            strokeOpacity="0.18"
+            strokeWidth="1.5"
+            strokeDasharray="6 6"
+          />
+        </g>
+      )}
+
       {/* Dekorative Lichterketten zwischen den Kugeln */}
       <path
-        d="M 145 142 Q 180 158 215 142 M 112 214 Q 146 232 180 214 Q 214 232 248 214 M 84 290 Q 116 310 148 290 Q 180 310 212 290 Q 244 310 276 290"
+        d="M 168 158 Q 210 176 252 158 M 130 242 Q 170 262 210 242 Q 250 262 290 242 M 96 330 Q 134 352 172 330 Q 210 352 248 330 Q 286 352 324 330"
         fill="none"
         stroke="#fbbf24"
-        strokeOpacity="0.35"
+        strokeOpacity="0.32"
         strokeWidth="2"
-        strokeDasharray="4 5"
+        strokeDasharray="5 5"
       />
 
-      {/* Baumstamm (TRUNK = Beliebiges Doppel) */}
-      <g>
-        {tree.trunk && (
-          <rect
-            x="110"
-            y="347"
-            width="140"
-            height="58"
-            rx="14"
-            fill="none"
-            stroke="#fbbf24"
-            strokeWidth="3"
-            opacity="0.7"
-            filter={`url(#${treeIdPrefix}-glow)`}
+      {/* Baumstamm (TRUNK = Beliebiges Doppel, x=130..290, y=396..452) */}
+      {is1vs1 ? (
+        <g>
+          {/* Glow falls mind. ein Spieler Stamm an hat */}
+          {(p1Tree.trunk || safeP2Tree.trunk) && (
+            <rect
+              x="124"
+              y="391"
+              width="172"
+              height="66"
+              rx="14"
+              fill="none"
+              stroke={p1Tree.trunk && safeP2Tree.trunk ? '#fef08a' : p1Tree.trunk ? '#34d399' : '#fbbf24'}
+              strokeWidth="2.5"
+              opacity="0.7"
+              filter={`url(#${treeIdPrefix}-glow)`}
+            />
+          )}
+
+          {/* Linke Hälfte (Spieler 1: x=130..210) */}
+          <path
+            d="M 142 396 L 210 396 L 210 452 L 142 452 A 12 12 0 0 1 130 440 L 130 408 A 12 12 0 0 1 142 396 Z"
+            fill={p1Tree.trunk ? `url(#${treeIdPrefix}-trunk-p1)` : `url(#${treeIdPrefix}-trunk-off)`}
           />
-        )}
-        <rect
-          x="116"
-          y="352"
-          width="128"
-          height="48"
-          rx="11"
-          fill={tree.trunk ? `url(#${treeIdPrefix}-trunk-lit)` : `url(#${treeIdPrefix}-trunk-off)`}
-          stroke={tree.trunk ? '#fde047' : '#92400e'}
-          strokeWidth={tree.trunk ? 2.5 : 2}
-        />
-        <text
-          x="180"
-          y="372"
-          textAnchor="middle"
-          fill={tree.trunk ? '#022c22' : '#fed7aa'}
-          fontSize="11"
-          fontWeight="900"
-          fontFamily="monospace"
-          letterSpacing="1.2"
-        >
-          STAMM
-        </text>
-        <text
-          x="180"
-          y="390"
-          textAnchor="middle"
-          fill={tree.trunk ? '#022c22' : '#ffffff'}
-          fontSize="15"
-          fontWeight="900"
-          fontFamily="monospace"
-        >
-          {tree.trunk ? '✓ DOPPEL AN' : 'DOPPEL'}
-        </text>
-      </g>
+          {/* Rechte Hälfte (Spieler 2: x=210..290) */}
+          <path
+            d="M 210 396 L 278 396 A 12 12 0 0 1 290 408 L 290 440 A 12 12 0 0 1 278 452 L 210 452 Z"
+            fill={safeP2Tree.trunk ? `url(#${treeIdPrefix}-trunk-p2)` : `url(#${treeIdPrefix}-trunk-off)`}
+          />
+          {/* Äußerer Stamm-Rahmen & Mittelnaht */}
+          <rect
+            x="130"
+            y="396"
+            width="160"
+            height="56"
+            rx="12"
+            fill="none"
+            stroke={p1Tree.trunk || safeP2Tree.trunk ? '#fde047' : '#92400e'}
+            strokeWidth="2.2"
+          />
+          <line x1="210" y1="396" x2="210" y2="452" stroke="#020617" strokeOpacity="0.7" strokeWidth="2" />
+
+          {/* Stamm-Beschriftung */}
+          <text
+            x="210"
+            y="416"
+            textAnchor="middle"
+            paintOrder="stroke"
+            stroke="#020617"
+            strokeWidth="3.5"
+            fill="#ffffff"
+            fontSize="12"
+            fontWeight="900"
+            fontFamily="monospace"
+            letterSpacing="1.2"
+          >
+            STAMM · DOPPEL
+          </text>
+          <text
+            x="170"
+            y="439"
+            textAnchor="middle"
+            paintOrder="stroke"
+            stroke="#020617"
+            strokeWidth="3"
+            fill={p1Tree.trunk ? '#a7f3d0' : '#94a3b8'}
+            fontSize="13"
+            fontWeight="900"
+            fontFamily="monospace"
+          >
+            {p1Tree.trunk ? '✓ AN' : '○ AUS'}
+          </text>
+          <text
+            x="250"
+            y="439"
+            textAnchor="middle"
+            paintOrder="stroke"
+            stroke="#020617"
+            strokeWidth="3"
+            fill={safeP2Tree.trunk ? '#fef08a' : '#94a3b8'}
+            fontSize="13"
+            fontWeight="900"
+            fontFamily="monospace"
+          >
+            {safeP2Tree.trunk ? '✓ AN' : '○ AUS'}
+          </text>
+        </g>
+      ) : (
+        <g>
+          {p1Tree.trunk && (
+            <rect
+              x="124"
+              y="391"
+              width="172"
+              height="66"
+              rx="14"
+              fill="none"
+              stroke="#34d399"
+              strokeWidth="3"
+              opacity="0.7"
+              filter={`url(#${treeIdPrefix}-glow)`}
+            />
+          )}
+          <rect
+            x="130"
+            y="396"
+            width="160"
+            height="56"
+            rx="12"
+            fill={p1Tree.trunk ? `url(#${treeIdPrefix}-trunk-p1)` : `url(#${treeIdPrefix}-trunk-off)`}
+            stroke={p1Tree.trunk ? '#34d399' : '#92400e'}
+            strokeWidth={p1Tree.trunk ? 2.5 : 2}
+          />
+          <text
+            x="210"
+            y="416"
+            textAnchor="middle"
+            fill={p1Tree.trunk ? '#022c22' : '#fed7aa'}
+            fontSize="12"
+            fontWeight="900"
+            fontFamily="monospace"
+            letterSpacing="1.2"
+          >
+            STAMM
+          </text>
+          <text
+            x="210"
+            y="438"
+            textAnchor="middle"
+            fill={p1Tree.trunk ? '#022c22' : '#ffffff'}
+            fontSize="15"
+            fontWeight="900"
+            fontFamily="monospace"
+          >
+            {p1Tree.trunk ? '✓ DOPPEL AN' : 'DOPPEL'}
+          </text>
+        </g>
+      )}
 
       {/* 9 Christbaumkugeln (20 bis 12) */}
       {BALL_POSITIONS.map(({ num, cx, cy, r }) => {
-        const isLit = tree.balls[num];
-        const isExtinguished = recentlyExtinguishedNode === String(num);
-        const isFreshLit = recentlyLitNode === String(num);
+        const p1Lit = p1Tree.balls[num];
+        const p2Lit = is1vs1 && safeP2Tree.balls[num];
+        const p1Ext = p1RecentlyExtinguished === String(num);
+        const p2Ext = is1vs1 && p2RecentlyExtinguished === String(num);
+        const p1Fresh = p1RecentlyLit === String(num);
+        const p2Fresh = is1vs1 && p2RecentlyLit === String(num);
+
+        const outerStroke =
+          p1Ext || p2Ext
+            ? '#ff3366'
+            : is1vs1
+            ? p1Lit && p2Lit
+              ? '#fef08a'
+              : p1Lit
+              ? '#34d399'
+              : p2Lit
+              ? '#fbbf24'
+              : '#475569'
+            : p1Lit
+            ? '#34d399'
+            : '#475569';
+
+        const anyLit = p1Lit || p2Lit;
 
         return (
           <g key={num}>
             {/* Kleiner goldener Kugel-Aufhänger oben */}
             <rect
-              x={cx - 5}
-              y={cy - r - 6}
-              width={10}
-              height={7}
+              x={cx - 6}
+              y={cy - r - 7}
+              width={12}
+              height={8}
               rx={2}
-              fill={isLit ? '#fbbf24' : '#64748b'}
+              fill={anyLit ? '#fbbf24' : '#64748b'}
             />
 
-            {/* Äußerer Glow oder Warn-Halo */}
-            {isExtinguished && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={r + 8}
-                fill="none"
-                stroke="#ff3366"
-                strokeWidth="3.5"
-                className="animate-ping"
-              />
-            )}
-            {(isLit || isFreshLit) && !isExtinguished && (
+            {/* Äußerer Glow bei Licht an */}
+            {(anyLit || p1Fresh || p2Fresh) && !p1Ext && !p2Ext && (
               <circle
                 cx={cx}
                 cy={cy}
                 r={r + 5}
                 fill="none"
-                stroke={isFreshLit ? '#fde047' : '#34d399'}
-                strokeWidth={isFreshLit ? '3.5' : '2'}
+                stroke={
+                  p1Fresh
+                    ? '#34d399'
+                    : p2Fresh
+                    ? '#fde047'
+                    : p1Lit && p2Lit
+                    ? '#fde047'
+                    : p1Lit
+                    ? '#34d399'
+                    : '#fbbf24'
+                }
+                strokeWidth={p1Fresh || p2Fresh ? '3.5' : '2'}
                 opacity="0.75"
                 filter={`url(#${treeIdPrefix}-glow)`}
               />
             )}
 
-            {/* Kugel */}
-            <circle
-              cx={cx}
-              cy={cy}
-              r={r}
-              fill={
-                isExtinguished
-                  ? `url(#${treeIdPrefix}-ball-ext)`
-                  : isLit
-                  ? `url(#${treeIdPrefix}-ball-lit)`
-                  : `url(#${treeIdPrefix}-ball-off)`
-              }
-              stroke={
-                isExtinguished ? '#ff3366' : isLit ? '#fde047' : '#475569'
-              }
-              strokeWidth={isLit || isExtinguished ? 2.8 : 1.8}
-            />
+            {/* Pulsierender roter Bogen bei geklauter Hälfte (oder ganzem Kreis im Solo) */}
+            {p1Ext && (
+              <path
+                d={`M ${cx} ${cy - (r + 6)} A ${r + 6} ${r + 6} 0 0 0 ${cx} ${cy + (r + 6)}`}
+                fill="none"
+                stroke="#ff3366"
+                strokeWidth="4"
+                strokeLinecap="round"
+                className="animate-ping"
+              />
+            )}
+            {p2Ext && (
+              <path
+                d={`M ${cx} ${cy - (r + 6)} A ${r + 6} ${r + 6} 0 0 1 ${cx} ${cy + (r + 6)}`}
+                fill="none"
+                stroke="#ff3366"
+                strokeWidth="4"
+                strokeLinecap="round"
+                className="animate-ping"
+              />
+            )}
 
-            {/* Lichtreflex oben links auf der Kugel */}
+            {is1vs1 ? (
+              <>
+                {/* Linke Halbkugel (Spieler 1 - Smaragd) */}
+                <path
+                  d={`M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r} Z`}
+                  fill={
+                    p1Ext
+                      ? `url(#${treeIdPrefix}-ball-ext)`
+                      : p1Lit
+                      ? `url(#${treeIdPrefix}-ball-p1)`
+                      : `url(#${treeIdPrefix}-ball-off)`
+                  }
+                />
+                {/* Rechte Halbkugel (Spieler 2 - Gold/Amber) */}
+                <path
+                  d={`M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r} Z`}
+                  fill={
+                    p2Ext
+                      ? `url(#${treeIdPrefix}-ball-ext)`
+                      : p2Lit
+                      ? `url(#${treeIdPrefix}-ball-p2)`
+                      : `url(#${treeIdPrefix}-ball-off)`
+                  }
+                />
+                {/* Vertikale Mittelnaht */}
+                <line
+                  x1={cx}
+                  y1={cy - r}
+                  x2={cx}
+                  y2={cy + r}
+                  stroke="#020617"
+                  strokeOpacity="0.65"
+                  strokeWidth="2"
+                />
+                {/* Äußerer Kreis-Rand */}
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="none"
+                  stroke={outerStroke}
+                  strokeWidth={anyLit || p1Ext || p2Ext ? 2.8 : 1.8}
+                />
+              </>
+            ) : (
+              /* Solo-Modus: Vollflächige Kugel */
+              <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill={
+                  p1Ext
+                    ? `url(#${treeIdPrefix}-ball-ext)`
+                    : p1Lit
+                    ? `url(#${treeIdPrefix}-ball-p1)`
+                    : `url(#${treeIdPrefix}-ball-off)`
+                }
+                stroke={outerStroke}
+                strokeWidth={p1Lit || p1Ext ? 2.8 : 1.8}
+              />
+            )}
+
+            {/* Subtiler Glanzpunkt */}
             <ellipse
-              cx={cx - 7}
-              cy={cy - 9}
-              rx={5}
-              ry={3}
+              cx={cx - 8}
+              cy={cy - 11}
+              rx={6}
+              ry={3.2}
               fill="#ffffff"
-              opacity={isLit ? 0.55 : 0.16}
+              opacity={anyLit ? 0.45 : 0.14}
             />
 
-            {/* Kugel-Zahl */}
+            {/* Zahl mit starkem Kontrast-Rand für gestochen scharfe Lesbarkeit */}
             <text
               x={cx}
-              y={cy + 6}
+              y={cy + 8}
               textAnchor="middle"
-              fill={isLit && !isExtinguished ? '#022c22' : '#f8fafc'}
-              fontSize="19"
+              paintOrder="stroke"
+              stroke="#020617"
+              strokeWidth="4.5"
+              strokeLinejoin="round"
+              fill="#ffffff"
+              fontSize="22"
               fontWeight="900"
               fontFamily="monospace"
             >
@@ -418,62 +668,67 @@ function FestiveSvgTree({
         );
       })}
 
-      {/* Spitzen-Stern (STAR = BULL oder D20) */}
-      <g transform="translate(180, 46)">
-        {(starReady || starLit) && (
+      {/* Spitzen-Stern (STAR = BULL oder D20, zentriert bei 210, 54) */}
+      <g transform="translate(210, 54)">
+        {(starAnyReady || anyStarWon) && (
           <circle
             cx="0"
             cy="0"
-            r={starLit ? 44 : 38}
+            r={anyStarWon ? 48 : 42}
             fill="none"
-            stroke="#facc15"
-            strokeWidth={starLit ? '3.5' : '2.5'}
-            strokeDasharray={starLit ? undefined : '6 4'}
-            opacity={starLit ? 0.9 : 0.8}
-            className={!starLit ? 'animate-pulse' : undefined}
+            stroke={anyStarWon ? '#facc15' : starRingStroke}
+            strokeWidth={anyStarWon ? '3.5' : '2.8'}
+            strokeDasharray={anyStarWon ? undefined : '7 4'}
+            opacity="0.88"
+            className={!anyStarWon ? 'animate-pulse' : undefined}
             filter={`url(#${treeIdPrefix}-glow)`}
           />
         )}
 
-        {/* 5-zackiger Stern */}
         <polygon
-          points="0,-32 9,-10 32,-10 14,5 20,28 0,14 -20,28 -14,5 -32,-10 -9,-10"
+          points="0,-35 10,-11 35,-11 15,6 22,30 0,15 -22,30 -15,6 -35,-11 -10,-11"
           fill={
-            starLit || starReady
+            anyStarWon || starAnyReady
               ? `url(#${treeIdPrefix}-star-gold)`
               : '#1e293b'
           }
-          stroke={starLit ? '#fef08a' : starReady ? '#fde047' : '#64748b'}
-          strokeWidth={starLit || starReady ? 2.5 : 1.8}
+          stroke={
+            anyStarWon
+              ? '#fef08a'
+              : starAnyReady
+              ? starRingStroke
+              : '#64748b'
+          }
+          strokeWidth={anyStarWon || starAnyReady ? 2.6 : 1.8}
           strokeLinejoin="round"
-          filter={starLit || starReady ? `url(#${treeIdPrefix}-glow)` : undefined}
+          filter={anyStarWon || starAnyReady ? `url(#${treeIdPrefix}-glow)` : undefined}
         />
 
         <text
           x="0"
-          y="4"
+          y="5"
           textAnchor="middle"
-          fill={starLit || starReady ? '#451a03' : '#cbd5e1'}
-          fontSize="11"
+          fill={anyStarWon || starAnyReady ? '#451a03' : '#cbd5e1'}
+          fontSize="12"
           fontWeight="900"
           fontFamily="monospace"
         >
           {starTarget}
         </text>
 
-        {starReady && !starLit && (
-          <g transform="translate(0, -40)">
-            <rect x="-34" y="-11" width="68" height="17" rx="8" fill="#fbbf24" />
+        {starBadgeText && (
+          <g transform="translate(0, -42)">
+            <rect x="-56" y="-12" width="112" height="19" rx="9" fill={starRingStroke} />
             <text
               x="0"
               y="1"
               textAnchor="middle"
               fill="#020617"
-              fontSize="10"
+              fontSize="10.5"
               fontWeight="900"
               fontFamily="monospace"
             >
-              FINALE!
+              {starBadgeText}
             </text>
           </g>
         )}
@@ -485,11 +740,11 @@ function FestiveSvgTree({
 function ActionBannerBox({ lastAction }: { lastAction?: TannenbaumLastActionBanner | null }) {
   if (!lastAction) {
     return (
-      <div className="rounded-2xl bg-slate-900/60 border border-white/10 px-4 py-3 text-center backdrop-blur-xl">
+      <div className="rounded-2xl bg-slate-900/65 border border-white/10 px-4 py-2.5 text-center backdrop-blur-xl">
         <div className="text-xs font-mono uppercase tracking-widest text-emerald-300 font-black">
           🎄 Spiel läuft
         </div>
-        <div className="text-xs text-slate-300 mt-1">
+        <div className="text-xs text-slate-300 mt-0.5">
           Alle 9 Kugeln + Stamm aufleuchten lassen, dann Stern treffen!
         </div>
       </div>
@@ -511,11 +766,11 @@ function ActionBannerBox({ lastAction }: { lastAction?: TannenbaumLastActionBann
   }
 
   return (
-    <div className={`rounded-2xl border-2 px-4 py-3 text-center backdrop-blur-2xl transition-all ${boxCls}`}>
+    <div className={`rounded-2xl border-2 px-4 py-2.5 text-center backdrop-blur-2xl transition-all ${boxCls}`}>
       <div className="text-sm sm:text-base font-black tracking-wide uppercase leading-tight">
         {lastAction.headline}
       </div>
-      <div className="text-xs sm:text-sm font-semibold opacity-95 mt-1 leading-snug">
+      <div className="text-xs sm:text-sm font-semibold opacity-95 mt-0.5 leading-snug">
         {lastAction.subline}
       </div>
     </div>
@@ -585,93 +840,153 @@ export default function HolographicTannenbaumCockpit({
       ? lastAction.affectedNode
       : undefined;
 
-  const renderPlayerColumn = (
+  const p1First = p1Name.trim().split(' ')[0] || 'Spieler 1';
+  const p2First = p2Name.trim().split(' ')[0] || 'Spieler 2';
+
+  const renderPlayerWing = (
     playerNum: 1 | 2,
     name: string,
     state: TannenbaumPlayerState,
-    litCount: number,
-    recExtinguished?: TannenbaumNodeId,
-    recLit?: TannenbaumNodeId
+    litCount: number
   ) => {
+    const isP1 = playerNum === 1;
     const isAct = !winnerName && activePlayer === playerNum;
     const isWinner = winnerPlayer === playerNum;
     const { firstName, lastName, sizeClass } = getNameSizing(name);
+    const pct = Math.round((litCount / 11) * 100);
 
     return (
       <div
-        className={`relative flex flex-col justify-between rounded-[2rem] backdrop-blur-3xl border-2 p-4 sm:p-5 transition-all duration-500 h-full max-h-[82vh] ${
+        className={`relative flex flex-col justify-between rounded-[2rem] backdrop-blur-3xl border-2 p-5 sm:p-6 transition-all duration-500 overflow-hidden h-full max-h-[78vh] ${
           isWinner
-            ? 'bg-slate-900/80 border-amber-400 shadow-[0_0_55px_rgba(251,191,36,0.45)]'
+            ? 'bg-slate-900/85 border-amber-400 shadow-[0_0_55px_rgba(251,191,36,0.5)]'
             : isAct
-            ? 'bg-slate-900/75 border-emerald-400/85 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_40px_rgba(16,185,129,0.35)]'
-            : 'bg-slate-900/45 border-white/15 opacity-85 shadow-[0_20px_50px_rgba(0,0,0,0.7)]'
+            ? isP1
+              ? 'bg-slate-900/80 border-emerald-400/90 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_45px_rgba(16,185,129,0.38)]'
+              : 'bg-slate-900/80 border-amber-400/90 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_45px_rgba(251,191,36,0.38)]'
+            : 'bg-slate-900/45 border-white/15 opacity-80 shadow-[0_20px_50px_rgba(0,0,0,0.7)]'
         }`}
       >
-        {/* Spieler-Kopfzeile */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className={`${sizeClass} font-black text-white tracking-tight leading-none truncate`}>
-                {firstName}
-              </span>
-              {lastName && (
-                <span className="text-lg sm:text-xl font-extrabold text-slate-300 leading-none truncate">
-                  {lastName}
-                </span>
-              )}
-            </div>
-            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-              {isWinner ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/25 border border-amber-400 text-amber-200 font-mono text-[11px] font-black">
-                  🏆 WEIHNACHTSSIEGER
-                </span>
-              ) : isAct ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-200 font-mono text-[11px] font-black">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span>🎯 AM WURF</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-3 py-0.5 rounded-full bg-slate-950/60 border border-white/15 text-slate-400 font-mono text-[11px] font-bold">
-                  SPIELER {playerNum} · WARTET
-                </span>
-              )}
+        {/* Farb-Leiste oben */}
+        <div
+          className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${
+            isP1 ? 'from-emerald-400 to-cyan-400' : 'from-amber-400 to-yellow-300'
+          }`}
+        />
 
-              {tripleExtinguishEnabled && state.extinguishedCount > 0 && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-500/20 border border-red-400/50 text-red-200 font-mono text-[11px] font-black">
-                  💨 {state.extinguishedCount}
-                </span>
-              )}
-            </div>
+        {/* Seiten-Indikator + Name */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-[11px] font-black tracking-wider border ${
+                isP1
+                  ? 'bg-emerald-500/15 border-emerald-400/50 text-emerald-300'
+                  : 'bg-amber-500/15 border-amber-400/50 text-amber-300'
+              }`}
+            >
+              {isP1 ? '◀ LINKE HÄLFTE · SMARAGD' : 'GOLD · RECHTE HÄLFTE ▶'}
+            </span>
           </div>
 
-          <div className="text-right shrink-0">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
-              Lichter
+          <div className="flex flex-col">
+            <span className={`${sizeClass} font-black text-white tracking-tight leading-none truncate`}>
+              {firstName}
             </span>
-            <div className="flex items-baseline justify-end gap-0.5">
-              <span className="text-3xl sm:text-4xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_20px_rgba(0,255,136,0.7)]">
+            {lastName && (
+              <span className="text-xl sm:text-2xl font-extrabold text-slate-300 leading-none mt-1 truncate">
+                {lastName}
+              </span>
+            )}
+          </div>
+
+          <div>
+            {isWinner ? (
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/25 border-2 border-amber-400 text-amber-200 font-mono text-xs font-black">
+                🏆 WEIHNACHTSSIEGER
+              </span>
+            ) : isAct ? (
+              <span
+                className={`inline-flex items-center gap-2 px-3.5 py-1 rounded-full border-2 font-mono text-xs font-black ${
+                  isP1
+                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+                    : 'bg-amber-500/20 border-amber-400 text-amber-200'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full animate-ping ${
+                    isP1 ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`}
+                />
+                <span>🎯 AM WURF</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-3.5 py-1 rounded-full bg-slate-950/60 border border-white/15 text-slate-400 font-mono text-xs font-bold">
+                SPIELER {playerNum} · WARTET
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Großer Lichterstand */}
+        <div className="my-auto py-4 border-y border-white/10 space-y-3">
+          <div className="flex items-end justify-between">
+            <span className="text-xs font-mono uppercase tracking-widest text-slate-400">
+              Lichterstand
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span
+                className={`text-5xl sm:text-6xl font-black font-mono leading-none ${
+                  isP1
+                    ? 'text-[#00ff88] drop-shadow-[0_0_25px_rgba(0,255,136,0.75)]'
+                    : 'text-[#fbbf24] drop-shadow-[0_0_25px_rgba(251,191,36,0.75)]'
+                }`}
+              >
                 {litCount}
               </span>
-              <span className="text-sm font-mono font-bold text-slate-400">/11</span>
+              <span className="text-lg font-mono font-bold text-slate-400">/11</span>
             </div>
+          </div>
+
+          <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-white/10">
+            <div
+              className={`h-full transition-all duration-500 ${
+                isP1
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-400'
+                  : 'bg-gradient-to-r from-amber-500 to-yellow-300'
+              }`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-xs">
+            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/10 text-center">
+              <div className="text-[10px] text-slate-400 uppercase">Darts</div>
+              <div className="text-lg font-black text-cyan-300">{state.dartsThrown}</div>
+            </div>
+            {tripleExtinguishEnabled ? (
+              <div className="p-2.5 rounded-xl bg-red-950/40 border border-red-400/35 text-center">
+                <div className="text-[10px] text-red-300 uppercase">💨 Geklaut</div>
+                <div className="text-lg font-black text-red-200">{state.extinguishedCount}</div>
+              </div>
+            ) : (
+              <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/10 text-center">
+                <div className="text-[10px] text-slate-400 uppercase">Runden</div>
+                <div className="text-lg font-black text-white">{state.roundsPlayed}</div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* SVG-Tannenbaum */}
-        <div className="flex-1 flex items-center justify-center min-h-0 py-1">
-          <FestiveSvgTree
-            treeIdPrefix={`p${playerNum}`}
-            tree={state.tree}
-            starTarget={starTarget}
-            recentlyExtinguishedNode={recExtinguished}
-            recentlyLitNode={recLit}
-            className="max-h-[46vh] w-auto max-w-full"
+        {/* Aktuelle 3-Dart-Aufnahme */}
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
+            Aufnahme
+          </span>
+          <CurrentTurnRow
+            darts={state.currentTurnDarts || []}
+            isActive={isAct}
+            accentColor={isP1 ? 'emerald' : 'amber'}
           />
-        </div>
-
-        {/* Aktuelle 3-Dart-Slots */}
-        <div className="pt-2 border-t border-white/10">
-          <CurrentTurnRow darts={state.currentTurnDarts || []} isActive={isAct} />
         </div>
       </div>
     );
@@ -683,10 +998,9 @@ export default function HolographicTannenbaumCockpit({
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-32 left-[14%] w-[28vw] h-[130vh] bg-gradient-to-b from-emerald-500/20 via-emerald-600/05 to-transparent rotate-[18deg] blur-2xl opacity-70" />
         <div className="absolute -top-32 right-[14%] w-[28vw] h-[130vh] bg-gradient-to-b from-amber-400/20 via-amber-500/05 to-transparent -rotate-[18deg] blur-2xl opacity-70" />
-        <div className="absolute top-[40%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-emerald-600/12 rounded-full blur-[150px]" />
+        <div className="absolute top-[42%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] bg-emerald-600/12 rounded-full blur-[150px]" />
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:48px_48px] opacity-30" />
 
-        {/* 18 leichte Schneeflocken */}
         {SNOWFLAKES.map((flake, i) => (
           <span
             key={i}
@@ -746,40 +1060,67 @@ export default function HolographicTannenbaumCockpit({
       {/* Haupt-Arena */}
       <div className="relative z-10 flex-1 flex items-center justify-center min-h-0 py-2">
         {is1vs1 ? (
-          <div className="grid grid-cols-12 gap-4 lg:gap-6 items-center w-full max-w-[1520px] h-full">
-            {/* Links: Spieler 1 */}
-            <div className="col-span-5 h-full flex flex-col justify-center">
-              {renderPlayerColumn(1, p1Name, p1, p1Lit, p1RecentlyExtinguished, p1RecentlyLit)}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(250px,1fr)_minmax(360px,1.3fr)_minmax(250px,1fr)] gap-4 lg:gap-6 items-center w-full max-w-[1520px] h-full">
+            {/* Linker Flügel: Spieler 1 */}
+            <div className="h-full flex flex-col justify-center">
+              {renderPlayerWing(1, p1Name, p1, p1Lit)}
             </div>
 
-            {/* Mitte: VS, Live-Event & Regeln */}
-            <div className="col-span-2 flex flex-col items-center justify-center gap-4 px-1">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/25 to-amber-500/25 border-2 border-amber-400/50 flex items-center justify-center shadow-[0_0_30px_rgba(251,191,36,0.3)]">
-                <span className="text-2xl font-black font-mono text-amber-300">VS</span>
+            {/* Mittlere Spalte: Der EINE gemeinsame Split-Tannenbaum */}
+            <div className="flex flex-col items-center justify-between h-full max-h-[82vh] py-1 gap-2">
+              {/* Kompakte Farb-Legende über dem Baum */}
+              <div className="flex items-center justify-center gap-4 px-4 py-1.5 rounded-full bg-slate-900/75 border border-white/15 font-mono text-xs font-black backdrop-blur-xl">
+                <span className="flex items-center gap-1.5 text-emerald-300">
+                  <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                  <span>{p1First}</span>
+                </span>
+                <span className="text-slate-500">VS</span>
+                <span className="flex items-center gap-1.5 text-amber-300">
+                  <span>{p2First}</span>
+                  <span className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]" />
+                </span>
               </div>
 
-              <div className="w-full">
+              {/* Zentraler riesiger SVG-Tannenbaum */}
+              <div className="flex-1 flex items-center justify-center min-h-0 w-full">
+                <FestiveSvgTree
+                  treeIdPrefix="duel"
+                  is1vs1={true}
+                  p1Tree={p1.tree}
+                  p2Tree={safeP2.tree}
+                  p1Name={p1Name}
+                  p2Name={p2Name}
+                  starTarget={starTarget}
+                  p1RecentlyExtinguished={p1RecentlyExtinguished}
+                  p2RecentlyExtinguished={p2RecentlyExtinguished}
+                  p1RecentlyLit={p1RecentlyLit}
+                  p2RecentlyLit={p2RecentlyLit}
+                  className="max-h-[58vh] w-auto max-w-full"
+                />
+              </div>
+
+              {/* Action Banner & kompakte Regel-Pills unter dem Baum */}
+              <div className="w-full space-y-2 shrink-0">
                 <ActionBannerBox lastAction={lastAction} />
-              </div>
-
-              <div className="w-full space-y-2 text-center font-mono text-[11px]">
-                {tripleExtinguishEnabled && (
-                  <div className="px-3 py-2 rounded-xl bg-red-950/60 border border-red-400/40 text-red-200 font-bold">
-                    🔥 Triple löscht Gegner-Kugel
-                  </div>
-                )}
-                <div className="px-3 py-2 rounded-xl bg-amber-950/60 border border-amber-400/40 text-amber-200 font-bold">
-                  ⭐ Spitze: {starTarget}
-                </div>
-                <div className="px-3 py-2 rounded-xl bg-emerald-950/60 border border-emerald-400/40 text-emerald-200 font-bold">
-                  🪵 Stamm: Beliebiges Doppel
+                <div className="flex flex-wrap items-center justify-center gap-2 font-mono text-[11px]">
+                  {tripleExtinguishEnabled && (
+                    <span className="px-2.5 py-1 rounded-lg bg-red-950/65 border border-red-400/40 text-red-200 font-bold">
+                      🔥 Triple klaut Licht
+                    </span>
+                  )}
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-950/65 border border-emerald-400/40 text-emerald-200 font-bold">
+                    🪵 Stamm: Doppel
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-950/65 border border-amber-400/40 text-amber-200 font-bold">
+                    ⭐ Spitze: {starTarget}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Rechts: Spieler 2 */}
-            <div className="col-span-5 h-full flex flex-col justify-center">
-              {renderPlayerColumn(2, p2Name, safeP2, p2Lit, p2RecentlyExtinguished, p2RecentlyLit)}
+            {/* Rechter Flügel: Spieler 2 */}
+            <div className="h-full flex flex-col justify-center">
+              {renderPlayerWing(2, p2Name, safeP2, p2Lit)}
             </div>
           </div>
         ) : (
@@ -827,9 +1168,11 @@ export default function HolographicTannenbaumCockpit({
             <div className="col-span-4 flex items-center justify-center">
               <FestiveSvgTree
                 treeIdPrefix="solo"
-                tree={p1.tree}
+                is1vs1={false}
+                p1Tree={p1.tree}
+                p1Name={p1Name}
                 starTarget={starTarget}
-                recentlyLitNode={p1RecentlyLit}
+                p1RecentlyLit={p1RecentlyLit}
                 className="max-h-[68vh] w-auto max-w-full"
               />
             </div>
@@ -898,7 +1241,7 @@ export default function HolographicTannenbaumCockpit({
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-                <div className="text-[10px] text-slate-400 uppercase">Ausgepustet</div>
+                <div className="text-[10px] text-slate-400 uppercase">Geklaut</div>
                 <div className="text-xl font-black text-red-300">
                   {winnerPlayer === 2 ? safeP2.extinguishedCount : p1.extinguishedCount}
                 </div>
@@ -908,7 +1251,6 @@ export default function HolographicTannenbaumCockpit({
         </div>
       )}
 
-      {/* Dezenter Abstand unten */}
       <div className="relative z-20 h-2 shrink-0" />
     </div>
   );
