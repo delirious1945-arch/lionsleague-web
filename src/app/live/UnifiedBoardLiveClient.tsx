@@ -17,6 +17,13 @@ import {
   createInitialAdventsPlayerState,
   createShuffledDoors,
 } from '@/app/special/adventskalender/types';
+import HolographicRudolphCockpit from '@/components/HolographicRudolphCockpit';
+import { createInitialRudolphPlayerState } from '@/app/special/rudolph/types';
+import HolographicBingoCockpit from '@/components/HolographicBingoCockpit';
+import {
+  createBingoCard,
+  createInitialBingoPlayerState,
+} from '@/app/special/bingo/types';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -596,6 +603,64 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         lastAction={ak.lastAction ?? null}
         winnerPlayer={ak.winnerPlayer ?? null}
         winnerName={ak.winnerName ?? null}
+        currentTime={currentTime}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 10. SPIEL: RUDOLPHS FLUG NACH WEYHAUSEN
+  // =========================================================================
+  if (liveState.gameType === 'rudolph') {
+    const rd = liveState.rudolphData || {};
+    const fallbackPlayer = createInitialRudolphPlayerState();
+
+    return (
+      <HolographicRudolphCockpit
+        boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name}
+        activeName={activeName}
+        is1vs1={is1vs1}
+        activePlayer={activePlayer}
+        roundNumber={Number(rd.roundNumber || liveState.currentRound || 1)}
+        finalTarget={rd.finalTarget === 'D20' ? 'D20' : 'BULL'}
+        p1={rd.p1 || fallbackPlayer}
+        p2={rd.p2 || fallbackPlayer}
+        lastAction={rd.lastAction ?? null}
+        winnerPlayer={rd.winnerPlayer ?? null}
+        winnerName={rd.winnerName ?? null}
+        currentTime={currentTime}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 11. SPIEL: WEIHNACHTS-BINGO
+  // =========================================================================
+  if (liveState.gameType === 'bingo') {
+    const bg = liveState.bingoData || {};
+    const fallbackCells = createBingoCard();
+    const fallbackPlayer = createInitialBingoPlayerState(fallbackCells);
+
+    return (
+      <HolographicBingoCockpit
+        boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name}
+        activeName={activeName}
+        is1vs1={is1vs1}
+        activePlayer={activePlayer}
+        roundNumber={Number(bg.roundNumber || liveState.currentRound || 1)}
+        p1={bg.p1 || fallbackPlayer}
+        p2={bg.p2 || fallbackPlayer}
+        lastAction={bg.lastAction ?? null}
+        winnerPlayer={bg.winnerPlayer ?? null}
+        winnerName={bg.winnerName ?? null}
         currentTime={currentTime}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}

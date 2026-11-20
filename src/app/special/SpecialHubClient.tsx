@@ -39,11 +39,6 @@ const UPCOMING_SPECIALS = [
     title: 'Lions-Schneeballschlacht',
     subtitle: 'Schneebälle formen, Festung reparieren & mit dem Bullseye Mauern sprengen',
   },
-  {
-    icon: '🦌',
-    title: 'Rudolphs Flug nach Weyhausen',
-    subtitle: '5 Checkpoints vom Nordpol bis ins Vereinsheim Weyhausen im Sprint-Rennen',
-  },
 ] as const;
 
 export default function SpecialHubClient({
@@ -61,7 +56,9 @@ export default function SpecialHubClient({
         localStorage.getItem('lions_tablet_board') ||
         localStorage.getItem('lions_active_board') ||
         localStorage.getItem('lions_active_board_tannenbaum') ||
-        localStorage.getItem('lions_active_board_adventskalender');
+        localStorage.getItem('lions_active_board_adventskalender') ||
+        localStorage.getItem('lions_active_board_rudolph') ||
+        localStorage.getItem('lions_active_board_bingo');
       if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
         return saved;
       }
@@ -77,6 +74,8 @@ export default function SpecialHubClient({
         localStorage.setItem('lions_active_board', b);
         localStorage.setItem('lions_active_board_tannenbaum', b);
         localStorage.setItem('lions_active_board_adventskalender', b);
+        localStorage.setItem('lions_active_board_rudolph', b);
+        localStorage.setItem('lions_active_board_bingo', b);
         window.history.replaceState(null, '', `/special?board=${b}`);
       } catch {}
     }
@@ -298,6 +297,122 @@ export default function SpecialHubClient({
                 href={`/special/adventskalender?board=${activeBoard}`}
                 data-ui-id="SPECIAL.GAME_ADVENTSKALENDER.START_BTN"
                 className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <span>Spiel starten</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+
+          <div
+            data-ui-id="SPECIAL.GAME_RUDOLPH.CARD"
+            className="group relative overflow-hidden rounded-3xl border border-rose-500/30 bg-gradient-to-br from-slate-900/95 via-rose-950/25 to-slate-900/95 p-6 sm:p-7 flex flex-col justify-between gap-6 shadow-2xl shadow-rose-950/30 hover:border-rose-400/50 transition-all"
+          >
+            <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-400/30 flex items-center justify-center text-3xl shadow-inner shrink-0">
+                    🦌
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        Live-Rennen
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-800/80 text-slate-300 border border-slate-700">
+                        Solo &amp; 1 vs. 1
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                      Rudolphs Flug nach Weyhausen
+                    </h3>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Fliege über 5 Checkpoints vom Nordpol (20) über Hamburg (Grün), Hannover (19·17·15) und
+                Wolfsburg (Doppel) bis zur Landung in Weyhausen (Bull oder D20). Mit 3 Treffern in
+                einer Aufnahme zündest du den Rudolph-Turbo!
+              </p>
+
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  🛫 5 Checkpoints
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  ⚡ 3-in-a-Turn Turbo
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  📺 Flug-Radar auf TV
+                </span>
+              </div>
+            </div>
+
+            <div className="relative z-10">
+              <Link
+                href={`/special/rudolph?board=${activeBoard}`}
+                data-ui-id="SPECIAL.GAME_RUDOLPH.START_BTN"
+                className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-500 via-red-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-rose-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <span>Spiel starten</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+
+          <div
+            data-ui-id="SPECIAL.GAME_BINGO.CARD"
+            className="group relative overflow-hidden rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-slate-900/95 via-emerald-950/25 to-slate-900/95 p-6 sm:p-7 flex flex-col justify-between gap-6 shadow-2xl shadow-emerald-950/30 hover:border-emerald-400/50 transition-all"
+          >
+            <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-3xl shadow-inner shrink-0">
+                    🎱
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Party-Bingo
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-800/80 text-slate-300 border border-slate-700">
+                        Solo &amp; 1 vs. 1
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                      Weihnachts-Bingo
+                    </h3>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Stemple deine 3×3 Weihnachts-Bingo-Karte per 1-Tap am Tablet ab – wahlweise im Duell auf
+                identischen oder individuellen Karten. Wer zuerst eine 3er-Reihe (waagerecht, senkrecht
+                oder diagonal) füllt, gewinnt!
+              </p>
+
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  🎄 3×3 Missionskarte
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  🔥 Fehlt-1-Alarm
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  🎉 Live-BINGO-Buzzer
+                </span>
+              </div>
+            </div>
+
+            <div className="relative z-10">
+              <Link
+                href={`/special/bingo?board=${activeBoard}`}
+                data-ui-id="SPECIAL.GAME_BINGO.START_BTN"
+                className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Spiel starten</span>
                 <ArrowRight className="w-5 h-5" />
