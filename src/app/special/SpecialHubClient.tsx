@@ -332,20 +332,20 @@ export default function SpecialHubClient({
               </div>
 
               <p className="text-sm text-slate-300 leading-relaxed">
-                Fliege über 12 Weihnachts-Stationen vom Nordpol (20) über Wichtel-Werkstatt,
-                Glühwein-Tanke und Grinch-Hinterhalt bis nach Weyhausen (Bull/D20) – mit
-                Schneeball-Sabotage, Schlitten-Crash, Triple-Turbo und Wichtel-Schild!
+                10 zufällig geloste Weihnachts-Routen über 12 Stationen (Nordpol bis Weyhausen) mit
+                strengen Segment-Zielen (Großes/Kleines Single, Doppel, Triple, Bull) sowie
+                Schneeball-Sabotage, Schlitten-Crash und Wichtel-Schild!
               </p>
 
               <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
-                  🛫 12 Stationen
+                  🎲 10 Zufalls-Routen
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  🎯 Strikte Zonen
                 </span>
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
                   ❄️ Sabotage &amp; Crash
-                </span>
-                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
-                  🔥 Triple-Turbo (+2)
                 </span>
               </div>
             </div>

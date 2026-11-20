@@ -8,7 +8,9 @@ import {
   RudolphFinalTarget,
   RudolphLastActionBanner,
   RudolphPlayerState,
+  RudolphZoneType,
   getRudolphCheckpoints,
+  getRudolphRouteById,
 } from '@/app/special/rudolph/types';
 
 export interface HolographicRudolphProps {
@@ -21,6 +23,9 @@ export interface HolographicRudolphProps {
   roundNumber: number;
   finalTarget: RudolphFinalTarget;
   chaosEnabled?: boolean;
+  routeId?: string;
+  routeName?: string;
+  routeDifficulty?: string;
   p1: RudolphPlayerState;
   p2?: RudolphPlayerState;
   lastAction?: RudolphLastActionBanner | null;
@@ -64,6 +69,21 @@ function getNameSizing(name: string) {
       ? 'text-xl sm:text-2xl lg:text-3xl'
       : 'text-2xl sm:text-3xl';
   return { firstName, lastName, sizeClass };
+}
+
+function getZonePillClasses(zoneType: RudolphZoneType): string {
+  switch (zoneType) {
+    case 'inner_single':
+      return 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200';
+    case 'outer_single':
+      return 'bg-slate-200/15 border-slate-300/50 text-white';
+    case 'double':
+      return 'bg-rose-500/20 border-rose-400/60 text-rose-200';
+    case 'triple':
+      return 'bg-amber-500/20 border-amber-400/60 text-amber-200';
+    case 'bull':
+      return 'bg-emerald-500/20 border-emerald-400/60 text-emerald-200';
+  }
 }
 
 function CurrentTurnRow({
@@ -154,7 +174,7 @@ function ActionBannerBox({ lastAction }: { lastAction?: RudolphLastActionBanner 
           🦌 Bereit zum Abflug
         </div>
         <div className="text-xs sm:text-sm text-slate-200 mt-0.5">
-          12 Weihnachts-Stationen · Nordpol bis Weyhausen!
+          12 Weihnachts-Stationen · Nur exakter Ring zählt!
         </div>
       </div>
     );
@@ -206,6 +226,9 @@ export default function HolographicRudolphCockpit({
   roundNumber,
   finalTarget,
   chaosEnabled = true,
+  routeId,
+  routeName,
+  routeDifficulty,
   p1,
   p2,
   lastAction,
@@ -235,7 +258,10 @@ export default function HolographicRudolphCockpit({
 
   const displayTime = currentTime || fallbackTime;
   const safeP2 = p2 || p1;
-  const checkpoints = getRudolphCheckpoints(finalTarget);
+  const route = getRudolphRouteById(routeId);
+  const checkpoints = getRudolphCheckpoints(finalTarget, route.id);
+  const displayRouteName = routeName || route.name;
+  const displayRouteDiff = routeDifficulty || route.difficulty;
 
   const p1Pct = Math.min(
     96,
@@ -315,7 +341,7 @@ export default function HolographicRudolphCockpit({
 
         {/* Aktuelles Ziel-Feld */}
         <div className="my-2 p-3 rounded-2xl bg-slate-950/75 border border-white/15 flex items-center justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400">
                 {state.completedSteps >= RUDOLPH_TOTAL_STEPS
@@ -328,11 +354,22 @@ export default function HolographicRudolphCockpit({
                 </span>
               )}
             </div>
-            <span className="text-lg sm:text-2xl font-black text-white flex items-center gap-2 mt-0.5">
+
+            <div>
+              <span
+                className={`inline-block text-[10px] font-mono font-black px-2 py-0.5 rounded-md border ${getZonePillClasses(
+                  nextCp.zoneType
+                )}`}
+              >
+                {nextCp.zoneBadge}
+              </span>
+            </div>
+
+            <div className="text-lg sm:text-2xl font-black text-white flex items-center gap-2 leading-tight">
               <span>{nextCp.icon}</span>
               <span className="text-emerald-300 font-mono">{nextCp.targetLabel}</span>
-            </span>
-            <span className="text-[11px] text-slate-300 block truncate">{nextCp.ruleHint}</span>
+            </div>
+            <span className="text-[11px] text-slate-300 block leading-snug">{nextCp.ruleHint}</span>
           </div>
 
           <div className="text-right font-mono shrink-0 space-y-1">
@@ -424,10 +461,14 @@ export default function HolographicRudolphCockpit({
           </span>
           <span className="text-slate-500">•</span>
           <span className="text-xs sm:text-sm font-black tracking-wider text-amber-300 uppercase">
-            🦌 RUDOLPHS FLUG NACH WEYHAUSEN
+            🦌 RUDOLPHS FLUG
           </span>
           <span className="text-slate-500">•</span>
           <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-emerald-300">
+            🗺️ {route.icon} {displayRouteName} ({displayRouteDiff})
+          </span>
+          <span className="text-slate-500">•</span>
+          <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-white">
             RUNDE {roundNumber}
           </span>
         </div>
@@ -452,7 +493,7 @@ export default function HolographicRudolphCockpit({
       {/* Haupt-Cockpit */}
       <div className="relative z-10 flex-1 flex flex-col justify-between gap-3.5 min-h-0 py-2.5 max-w-[1580px] w-full mx-auto">
         {/* Obere Zone: 12-Stationen-Weihnachtsflugkarte + Schlitten-Spuren */}
-        <div className="rounded-[2rem] bg-slate-900/65 backdrop-blur-3xl border border-white/15 p-3.5 sm:p-4 shadow-2xl space-y-3.5">
+        <div className="rounded-[2rem] bg-slate-900/65 backdrop-blur-3xl border border-white/15 p-3.5 sm:p-4 shadow-2xl space-y-3">
           {/* 12 Stationen in 2 Reihen à 6 */}
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {checkpoints.map((cp) => {
@@ -474,7 +515,7 @@ export default function HolographicRudolphCockpit({
               return (
                 <div
                   key={cp.step}
-                  className={`relative rounded-xl px-2.5 py-2 border-2 flex flex-col justify-between transition-all ${
+                  className={`relative rounded-xl px-2.5 py-1.5 border-2 flex flex-col justify-between transition-all ${
                     p1AtThis && p2AtThis
                       ? 'bg-slate-950/95 border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.4)]'
                       : p1AtThis || p2AtThis
@@ -492,12 +533,12 @@ export default function HolographicRudolphCockpit({
 
                     <div className="flex items-center gap-1">
                       {p1AtThis && (
-                        <span className="px-1 py-0.2 rounded bg-red-500 text-white text-[9px] leading-tight">
+                        <span className="px-1 rounded bg-red-500 text-white text-[9px] leading-tight">
                           P1🛷
                         </span>
                       )}
                       {p2AtThis && (
-                        <span className="px-1 py-0.2 rounded bg-amber-400 text-slate-950 text-[9px] leading-tight">
+                        <span className="px-1 rounded bg-amber-400 text-slate-950 text-[9px] leading-tight">
                           P2🛷
                         </span>
                       )}
@@ -520,16 +561,19 @@ export default function HolographicRudolphCockpit({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-1.5 my-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-lg sm:text-xl shrink-0">{cp.icon}</span>
-                      <span className="text-[11px] sm:text-xs font-bold text-slate-200 truncate">
-                        {cp.location}
-                      </span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/15 font-mono text-[11px] font-black text-emerald-300 shrink-0">
-                      {cp.targetLabel}
+                  <div className="flex items-center gap-1.5 my-0.5 min-w-0">
+                    <span className="text-base sm:text-lg shrink-0">{cp.icon}</span>
+                    <span className="text-[11px] font-bold text-slate-200 truncate">
+                      {cp.location}
                     </span>
+                  </div>
+
+                  <div
+                    className={`px-1.5 py-0.5 rounded-md border font-mono text-[10px] sm:text-[11px] font-black text-center truncate ${getZonePillClasses(
+                      cp.zoneType
+                    )}`}
+                  >
+                    {cp.targetLabel}
                   </div>
                 </div>
               );
@@ -606,8 +650,8 @@ export default function HolographicRudolphCockpit({
               </div>
               <div className="px-3.5 py-2 rounded-xl bg-slate-900/75 border border-white/10 text-center font-mono text-[11px] text-cyan-200 font-bold">
                 {chaosEnabled
-                  ? '🔥 Triple = +2 · ❄️ Sabotage = -1 & Eis · 💥 Gleiche Etappe = Crash'
-                  : '🔥 Triple = +2 · 🚀 Treffer = Sofort zur nächsten Station!'}
+                  ? '🎯 Nur exakte Zone zählt · 🚀 3/3 = +1 Bonus & 🛡️ · ❄️ Sabotage & 💥 Crash'
+                  : '🎯 Nur exakte Zone zählt · 🚀 3/3 = +1 Bonus & 🛡️'}
               </div>
             </div>
 
@@ -618,10 +662,15 @@ export default function HolographicRudolphCockpit({
             <div className="col-span-6">{renderPlayerCard(1, p1Name, p1)}</div>
             <div className="col-span-6 flex flex-col justify-center gap-4">
               <ActionBannerBox lastAction={lastAction} />
-              <div className="rounded-2xl bg-slate-900/65 border border-white/10 p-4 text-center font-mono text-xs text-slate-300">
-                🔥 <strong>Triple-Turbo:</strong> Triff das Ziel-Triple für <strong>+2 Stationen</strong>!
-                3 Treffer in einer Aufnahme sichern ein <strong>🛡️ Wichtel-Schild</strong>. Beste Aufnahme:{' '}
-                <strong className="text-amber-300">{p1.bestTurnSteps} Etappen</strong>.
+              <div className="rounded-2xl bg-slate-900/65 border border-white/10 p-4 text-center font-mono text-xs text-slate-300 space-y-1">
+                <div>
+                  🎯 <strong>Nur die exakte Ring-Zone zählt!</strong> ({route.icon} {displayRouteName} ·{' '}
+                  {displayRouteDiff})
+                </div>
+                <div>
+                  🚀 3 exakte Treffer in einer Aufnahme = <strong>+1 Bonus-Etappe &amp; 🛡️ Schild</strong> · Beste
+                  Aufnahme: <strong className="text-amber-300">{p1.bestTurnSteps} Etappen</strong>.
+                </div>
               </div>
             </div>
           </div>
@@ -641,7 +690,8 @@ export default function HolographicRudolphCockpit({
                 SIEG FÜR {winnerName.toUpperCase()}!
               </h2>
               <p className="text-sm sm:text-base text-emerald-300 font-semibold">
-                🏟️ Alle {RUDOLPH_TOTAL_STEPS} Weihnachts-Stationen vom Nordpol nach Weyhausen bezwungen!
+                🗺️ Route {route.icon} {displayRouteName} ({displayRouteDiff}) über alle{' '}
+                {RUDOLPH_TOTAL_STEPS} Stationen bezwungen!
               </p>
             </div>
 
@@ -667,9 +717,9 @@ export default function HolographicRudolphCockpit({
                 </div>
               ) : (
                 <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-                  <div className="text-[10px] text-slate-400 uppercase">Turbo (Max)</div>
+                  <div className="text-[10px] text-slate-400 uppercase">Max / Aufn.</div>
                   <div className="text-xl font-black text-amber-300">
-                    {winnerPlayer === 2 ? safeP2.bestTurnSteps : p1.bestTurnSteps} / Aufn.
+                    {winnerPlayer === 2 ? safeP2.bestTurnSteps : p1.bestTurnSteps} Etp.
                   </div>
                 </div>
               )}
