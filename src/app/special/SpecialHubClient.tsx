@@ -40,11 +40,6 @@ const UPCOMING_SPECIALS = [
     subtitle: 'Schneebälle formen, Festung reparieren & mit dem Bullseye Mauern sprengen',
   },
   {
-    icon: '🚪',
-    title: 'Verhexter Adventskalender',
-    subtitle: '12 Kalendertürchen mit Schoko-Punkten, Grinch-Tausch & Knecht Ruprecht',
-  },
-  {
     icon: '🦌',
     title: 'Rudolphs Flug nach Weyhausen',
     subtitle: '5 Checkpoints vom Nordpol bis ins Vereinsheim Weyhausen im Sprint-Rennen',
@@ -65,7 +60,8 @@ export default function SpecialHubClient({
       const saved =
         localStorage.getItem('lions_tablet_board') ||
         localStorage.getItem('lions_active_board') ||
-        localStorage.getItem('lions_active_board_tannenbaum');
+        localStorage.getItem('lions_active_board_tannenbaum') ||
+        localStorage.getItem('lions_active_board_adventskalender');
       if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
         return saved;
       }
@@ -80,6 +76,7 @@ export default function SpecialHubClient({
         localStorage.setItem('lions_tablet_board', b);
         localStorage.setItem('lions_active_board', b);
         localStorage.setItem('lions_active_board_tannenbaum', b);
+        localStorage.setItem('lions_active_board_adventskalender', b);
         window.history.replaceState(null, '', `/special?board=${b}`);
       } catch {}
     }
@@ -249,6 +246,58 @@ export default function SpecialHubClient({
                 href={`/special/tannenbaum?board=${activeBoard}`}
                 data-ui-id="SPECIAL.GAME_TANNENBAUM.START_BTN"
                 className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <span>Spiel starten</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+
+            {/* Karte 2: Der verhexte Adventskalender */}
+            <div
+              data-ui-id="SPECIAL.GAME_ADVENTSKALENDER.CARD"
+              className="group relative rounded-3xl p-6 bg-gradient-to-br from-[#230910]/90 via-slate-900/90 to-[#161006]/90 hover:from-[#2f0c15]/95 hover:to-[#1f1608]/95 backdrop-blur-2xl border-2 border-amber-500/40 hover:border-amber-400/75 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.6)] transition-all duration-300 flex flex-col justify-between gap-5"
+            >
+              <div className="space-y-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-2xl shadow-lg">
+                      🚪
+                    </div>
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                        Der verhexte Adventskalender
+                      </h3>
+                      <span className="text-xs font-semibold text-amber-300">
+                        12 Mystery-Türchen (Zahlen 1–12)
+                      </span>
+                    </div>
+                  </div>
+                  <span className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-400/[0.12] border border-amber-400/35 text-amber-200 font-mono font-bold text-[11px]">
+                    1 vs. 1 &amp; Solo · Live TV
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                  Öffne mit Treffern auf <strong className="text-amber-300">1 bis 12</strong> die 12
+                  Kalendertürchen! Dahinter stecken{' '}
+                  <strong className="text-emerald-300">Schoko-Punkte (+30 bis +60)</strong>, der{' '}
+                  <strong className="text-amber-300">Weihnachtsstern (×2)</strong> und der{' '}
+                  <strong className="text-red-300">Wichtel-Dieb (-25/+25)</strong>.
+                </p>
+
+                <div className="rounded-2xl bg-slate-950/60 border border-purple-400/30 px-3.5 py-2.5 text-xs text-purple-200/95 flex items-center gap-2">
+                  <span>👹</span>
+                  <span>
+                    <strong>Party-Chaos:</strong> Der <strong>Grinch</strong> tauscht eiskalt die Punktestände und{' '}
+                    <strong>Knecht Ruprecht</strong> erzwingt die falsche Hand!
+                  </span>
+                </div>
+              </div>
+
+              <Link
+                href={`/special/adventskalender?board=${activeBoard}`}
+                data-ui-id="SPECIAL.GAME_ADVENTSKALENDER.START_BTN"
+                className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Spiel starten</span>
                 <ArrowRight className="w-5 h-5" />

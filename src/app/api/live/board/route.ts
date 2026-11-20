@@ -4,9 +4,9 @@ import { sql } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 const BOARD_UI_VERSION =
-  process.env.VERCEL_GIT_COMMIT_SHA || '2026-11-20-tannenbaum-split-v2';
+  process.env.VERCEL_GIT_COMMIT_SHA || '2026-11-20-adventskalender-v1';
 
-export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'tannenbaum';
+export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'tannenbaum' | 'adventskalender';
 
 export interface UnifiedLiveState {
   boardId: string;
@@ -26,6 +26,7 @@ export interface UnifiedLiveState {
   stellenCheckenData?: any;
   darts99Data?: any;
   tannenbaumData?: any;
+  adventskalenderData?: any;
   // Direct access fields for UI components
   currentTarget?: string;
   currentTargetIndex?: number;

@@ -12,6 +12,11 @@ import HolographicScoringLeiterCockpit from '@/components/HolographicScoringLeit
 import HolographicDarts99Cockpit from '@/components/HolographicDarts99Cockpit';
 import HolographicTannenbaumCockpit from '@/components/HolographicTannenbaumCockpit';
 import { createInitialPlayerState } from '@/app/special/tannenbaum/types';
+import HolographicAdventskalenderCockpit from '@/components/HolographicAdventskalenderCockpit';
+import {
+  createInitialAdventsPlayerState,
+  createShuffledDoors,
+} from '@/app/special/adventskalender/types';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -557,6 +562,40 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         lastAction={tb.lastAction ?? null}
         winnerPlayer={tb.winnerPlayer ?? null}
         winnerName={tb.winnerName ?? null}
+        currentTime={currentTime}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 9. SPIEL: DER VERHEXTE ADVENTSKALENDER
+  // =========================================================================
+  if (liveState.gameType === 'adventskalender') {
+    const ak = liveState.adventskalenderData || {};
+    const fallbackPlayer = createInitialAdventsPlayerState();
+    const fallbackDoors = Array.isArray(ak.doors) && ak.doors.length === 12
+      ? ak.doors
+      : createShuffledDoors(is1vs1 ? '1vs1' : 'solo');
+
+    return (
+      <HolographicAdventskalenderCockpit
+        boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name}
+        activeName={activeName}
+        is1vs1={is1vs1}
+        activePlayer={activePlayer}
+        roundNumber={Number(ak.roundNumber || liveState.currentRound || 1)}
+        maxRounds={ak.maxRounds ?? null}
+        isSuddenDeath={Boolean(ak.isSuddenDeath)}
+        doors={fallbackDoors}
+        p1={ak.p1 || fallbackPlayer}
+        p2={ak.p2 || fallbackPlayer}
+        lastAction={ak.lastAction ?? null}
+        winnerPlayer={ak.winnerPlayer ?? null}
+        winnerName={ak.winnerName ?? null}
         currentTime={currentTime}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
