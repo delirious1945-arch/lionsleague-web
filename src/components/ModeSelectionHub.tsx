@@ -164,9 +164,6 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
                   Coming Soon
                 </span>
               </div>
-              <span className="text-[10px] sm:text-xs font-bold text-emerald-400/90 uppercase tracking-widest">
-                {user.role === 'admin' ? 'Geheimprojekt • Admin-Zugang aktiv' : 'Geheimes Feature'}
-              </span>
             </div>
           </div>
 
@@ -234,9 +231,6 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
                   Coming Soon
                 </span>
               </div>
-              <span className="text-[10px] sm:text-xs font-bold text-amber-400/90 uppercase tracking-widest">
-                {user.role === 'admin' ? 'Geheimprojekt II • Admin-Zugang aktiv' : 'Geheimes Feature'}
-              </span>
             </div>
           </div>
 
