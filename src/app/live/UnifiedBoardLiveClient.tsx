@@ -627,6 +627,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         activePlayer={activePlayer}
         roundNumber={Number(rd.roundNumber || liveState.currentRound || 1)}
         finalTarget={rd.finalTarget === 'D20' ? 'D20' : 'BULL'}
+        chaosEnabled={rd.chaosEnabled ?? true}
         p1={rd.p1 || fallbackPlayer}
         p2={rd.p2 || fallbackPlayer}
         lastAction={rd.lastAction ?? null}

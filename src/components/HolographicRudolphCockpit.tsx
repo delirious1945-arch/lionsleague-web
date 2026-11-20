@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import {
+  RUDOLPH_TOTAL_STEPS,
   RudolphDartEvent,
   RudolphFinalTarget,
   RudolphLastActionBanner,
@@ -19,6 +20,7 @@ export interface HolographicRudolphProps {
   activePlayer: 1 | 2;
   roundNumber: number;
   finalTarget: RudolphFinalTarget;
+  chaosEnabled?: boolean;
   p1: RudolphPlayerState;
   p2?: RudolphPlayerState;
   lastAction?: RudolphLastActionBanner | null;
@@ -57,20 +59,22 @@ function getNameSizing(name: string) {
   const maxNameLen = Math.max(firstName.length, lastName.length);
   const sizeClass =
     maxNameLen > 14
-      ? 'text-xl sm:text-2xl lg:text-3xl'
+      ? 'text-lg sm:text-2xl'
       : maxNameLen > 10
-      ? 'text-2xl sm:text-3xl'
-      : 'text-2xl sm:text-3xl lg:text-4xl';
+      ? 'text-xl sm:text-2xl lg:text-3xl'
+      : 'text-2xl sm:text-3xl';
   return { firstName, lastName, sizeClass };
 }
 
 function CurrentTurnRow({
   darts,
   isActive,
+  isFrozen = false,
   accentColor = 'red',
 }: {
   darts: RudolphDartEvent[];
   isActive: boolean;
+  isFrozen?: boolean;
   accentColor?: 'red' | 'amber';
 }) {
   const pulseBorder =
@@ -81,14 +85,41 @@ function CurrentTurnRow({
   return (
     <div className="grid grid-cols-3 gap-2 w-full">
       {[0, 1, 2].map((idx) => {
+        if (isFrozen && idx === 2) {
+          return (
+            <div
+              key={idx}
+              className="py-2 px-1.5 rounded-xl border-2 border-cyan-400/80 bg-cyan-950/80 text-cyan-200 text-center font-mono shadow-[0_0_12px_rgba(6,182,212,0.3)]"
+            >
+              <div className="text-[11px] font-black leading-tight truncate">❄️ EIS</div>
+              <div className="text-[9px] font-bold opacity-90 truncate">EINGEFROREN</div>
+            </div>
+          );
+        }
+
         const ev = darts[idx];
         if (ev) {
-          const cls =
-            ev.kind === 'win'
-              ? 'bg-amber-500/30 border-amber-300 text-amber-100 shadow-[0_0_16px_rgba(251,191,36,0.45)]'
-              : ev.kind === 'hit'
-              ? 'bg-emerald-500/25 border-emerald-400 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.35)]'
-              : 'bg-red-950/75 border-red-500/65 text-red-200';
+          let cls = 'bg-red-950/75 border-red-500/65 text-red-200';
+          if (ev.kind === 'win') {
+            cls =
+              'bg-amber-500/30 border-amber-300 text-amber-100 shadow-[0_0_16px_rgba(251,191,36,0.45)]';
+          } else if (ev.kind === 'turbo') {
+            cls =
+              'bg-amber-500/25 border-orange-400 text-amber-100 shadow-[0_0_16px_rgba(249,115,22,0.4)]';
+          } else if (ev.kind === 'sabotage') {
+            cls =
+              'bg-cyan-500/25 border-cyan-400 text-cyan-100 shadow-[0_0_14px_rgba(6,182,212,0.4)]';
+          } else if (ev.kind === 'crash') {
+            cls =
+              'bg-orange-500/25 border-orange-400 text-orange-100 shadow-[0_0_14px_rgba(249,115,22,0.4)]';
+          } else if (ev.kind === 'shield') {
+            cls =
+              'bg-emerald-500/25 border-cyan-300 text-emerald-100 shadow-[0_0_14px_rgba(6,182,212,0.35)]';
+          } else if (ev.kind === 'hit') {
+            cls =
+              'bg-emerald-500/25 border-emerald-400 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.35)]';
+          }
+
           return (
             <div key={idx} className={`py-2 px-1.5 rounded-xl border-2 text-center font-mono transition-all ${cls}`}>
               <div className="text-xs sm:text-sm font-black leading-tight truncate">{ev.label}</div>
@@ -96,6 +127,7 @@ function CurrentTurnRow({
             </div>
           );
         }
+
         return (
           <div
             key={idx}
@@ -122,7 +154,7 @@ function ActionBannerBox({ lastAction }: { lastAction?: RudolphLastActionBanner 
           🦌 Bereit zum Abflug
         </div>
         <div className="text-xs sm:text-sm text-slate-200 mt-0.5">
-          Treffer = Sofort weiter zur nächsten Etappe!
+          12 Weihnachts-Stationen · Nordpol bis Weyhausen!
         </div>
       </div>
     );
@@ -132,6 +164,18 @@ function ActionBannerBox({ lastAction }: { lastAction?: RudolphLastActionBanner 
   if (lastAction.tone === 'turbo' || lastAction.tone === 'win') {
     boxCls =
       'bg-amber-950/85 border-amber-400 text-amber-100 shadow-[0_0_35px_rgba(251,191,36,0.45)] animate-pulse';
+  } else if (lastAction.tone === 'sabotage') {
+    boxCls =
+      'bg-cyan-950/85 border-cyan-400 text-cyan-100 shadow-[0_0_32px_rgba(6,182,212,0.45)]';
+  } else if (lastAction.tone === 'crash') {
+    boxCls =
+      'bg-orange-950/85 border-orange-400 text-orange-100 shadow-[0_0_34px_rgba(249,115,22,0.45)]';
+  } else if (lastAction.tone === 'trap') {
+    boxCls =
+      'bg-rose-950/90 border-fuchsia-400/80 text-rose-100 shadow-[0_0_32px_rgba(244,63,94,0.45)]';
+  } else if (lastAction.tone === 'shield') {
+    boxCls =
+      'bg-emerald-950/85 border-cyan-400 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.4)]';
   } else if (lastAction.tone === 'hit') {
     boxCls =
       'bg-emerald-950/80 border-emerald-400 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.38)]';
@@ -141,7 +185,7 @@ function ActionBannerBox({ lastAction }: { lastAction?: RudolphLastActionBanner 
 
   return (
     <div className={`rounded-2xl border-2 px-4 py-3 text-center backdrop-blur-2xl transition-all ${boxCls}`}>
-      <div className="text-sm sm:text-lg font-black tracking-wide uppercase leading-tight flex items-center justify-center gap-2">
+      <div className="text-sm sm:text-base lg:text-lg font-black tracking-wide uppercase leading-tight flex items-center justify-center gap-2">
         <span>{lastAction.icon}</span>
         <span>{lastAction.headline}</span>
       </div>
@@ -161,6 +205,7 @@ export default function HolographicRudolphCockpit({
   activePlayer,
   roundNumber,
   finalTarget,
+  chaosEnabled = true,
   p1,
   p2,
   lastAction,
@@ -192,8 +237,14 @@ export default function HolographicRudolphCockpit({
   const safeP2 = p2 || p1;
   const checkpoints = getRudolphCheckpoints(finalTarget);
 
-  const p1Pct = Math.min(96, Math.max(4, Math.round((p1.completedSteps / 5) * 92 + 4)));
-  const p2Pct = Math.min(96, Math.max(4, Math.round((safeP2.completedSteps / 5) * 92 + 4)));
+  const p1Pct = Math.min(
+    96,
+    Math.max(4, Math.round((p1.completedSteps / RUDOLPH_TOTAL_STEPS) * 92 + 4))
+  );
+  const p2Pct = Math.min(
+    96,
+    Math.max(4, Math.round((safeP2.completedSteps / RUDOLPH_TOTAL_STEPS) * 92 + 4))
+  );
 
   const renderPlayerCard = (playerNum: 1 | 2, name: string, state: RudolphPlayerState) => {
     const isP1 = playerNum === 1;
@@ -201,9 +252,9 @@ export default function HolographicRudolphCockpit({
     const isWin = winnerPlayer === playerNum;
     const { firstName, lastName, sizeClass } = getNameSizing(name);
     const nextCp =
-      state.completedSteps >= 5
-        ? checkpoints[4]
-        : checkpoints[Math.min(4, state.completedSteps)];
+      state.completedSteps >= RUDOLPH_TOTAL_STEPS
+        ? checkpoints[RUDOLPH_TOTAL_STEPS - 1]
+        : checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, state.completedSteps)];
 
     return (
       <div
@@ -225,46 +276,75 @@ export default function HolographicRudolphCockpit({
 
         <div className="flex items-start justify-between gap-2 pt-1">
           <div className="min-w-0">
-            <span
-              className={`inline-block text-[10px] font-mono font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border mb-1.5 ${
-                isP1
-                  ? 'bg-red-500/15 border-red-400/50 text-red-300'
-                  : 'bg-amber-500/15 border-amber-400/50 text-amber-300'
-              }`}
-            >
-              {is1vs1 ? (isP1 ? 'SCHLITTEN 1 · ROT' : 'SCHLITTEN 2 · GOLD') : 'SOLO-FLUG'}
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+              <span
+                className={`inline-block text-[10px] font-mono font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  isP1
+                    ? 'bg-red-500/15 border-red-400/50 text-red-300'
+                    : 'bg-amber-500/15 border-amber-400/50 text-amber-300'
+                }`}
+              >
+                {is1vs1 ? (isP1 ? 'SCHLITTEN 1 · ROT' : 'SCHLITTEN 2 · GOLD') : 'SOLO-FLUG'}
+              </span>
+              {state.isFrozen && (
+                <span className="inline-block text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-full bg-cyan-500/25 border border-cyan-400 text-cyan-200 animate-pulse">
+                  ❄️ KUFEN VEREIST · 2 DARTS
+                </span>
+              )}
+              {state.hasShield && (
+                <span className="inline-block text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400 text-emerald-200">
+                  🛡️ WICHTEL-SCHILD
+                </span>
+              )}
+            </div>
+
             <div className={`${sizeClass} font-black text-white leading-none truncate`}>
               {firstName}{' '}
-              {lastName && <span className="text-lg sm:text-xl font-bold text-slate-300">{lastName}</span>}
+              {lastName && <span className="text-base sm:text-lg font-bold text-slate-300">{lastName}</span>}
             </div>
           </div>
 
           <div className="text-right shrink-0 font-mono">
-            <span className="text-[10px] text-slate-400 uppercase block">Etappe</span>
-            <span className={`text-3xl sm:text-4xl font-black ${isP1 ? 'text-[#ff4d6d]' : 'text-[#fbbf24]'}`}>
+            <span className="text-[10px] text-slate-400 uppercase block">Station</span>
+            <span className={`text-2xl sm:text-3xl font-black ${isP1 ? 'text-[#ff4d6d]' : 'text-[#fbbf24]'}`}>
               {state.completedSteps}
-              <span className="text-sm text-slate-400">/5</span>
+              <span className="text-sm text-slate-400">/{RUDOLPH_TOTAL_STEPS}</span>
             </span>
           </div>
         </div>
 
         {/* Aktuelles Ziel-Feld */}
-        <div className="my-2 p-3.5 rounded-2xl bg-slate-950/75 border border-white/15 flex items-center justify-between gap-3">
-          <div>
-            <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400 block">
-              {state.completedSteps >= 5 ? 'ZIEL ERREICHT' : `NÄCHSTES ZIEL (${nextCp.location})`}
-            </span>
+        <div className="my-2 p-3 rounded-2xl bg-slate-950/75 border border-white/15 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400">
+                {state.completedSteps >= RUDOLPH_TOTAL_STEPS
+                  ? 'ZIEL ERREICHT'
+                  : `#${nextCp.step} ${nextCp.location}`}
+              </span>
+              {nextCp.specialBadge && (
+                <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-white/10 text-amber-200">
+                  {nextCp.specialBadge}
+                </span>
+              )}
+            </div>
             <span className="text-lg sm:text-2xl font-black text-white flex items-center gap-2 mt-0.5">
               <span>{nextCp.icon}</span>
               <span className="text-emerald-300 font-mono">{nextCp.targetLabel}</span>
             </span>
-            <span className="text-[11px] text-slate-300 block">{nextCp.ruleHint}</span>
+            <span className="text-[11px] text-slate-300 block truncate">{nextCp.ruleHint}</span>
           </div>
 
-          <div className="text-right font-mono shrink-0">
-            <span className="text-[10px] text-slate-400 block uppercase">Darts</span>
-            <span className="text-2xl font-black text-cyan-300">{state.dartsThrown}</span>
+          <div className="text-right font-mono shrink-0 space-y-1">
+            <div>
+              <span className="text-[10px] text-slate-400 block uppercase">Darts</span>
+              <span className="text-xl sm:text-2xl font-black text-cyan-300">{state.dartsThrown}</span>
+            </div>
+            {is1vs1 && chaosEnabled && (
+              <div className="text-[10px] text-slate-300 font-bold whitespace-nowrap">
+                ❄️ {state.sabotagesLanded ?? 0} · 💥 {state.crashesCaused ?? 0}
+              </div>
+            )}
           </div>
         </div>
 
@@ -272,10 +352,20 @@ export default function HolographicRudolphCockpit({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             {isWin ? (
-              <span className="text-xs font-mono font-black text-amber-300">🏆 IN WEYHAUSEN GELANDET!</span>
+              <span className="text-xs font-mono font-black text-amber-300">
+                🏆 IN WEYHAUSEN GELANDET!
+              </span>
             ) : isAct ? (
-              <span className={`text-xs font-mono font-black flex items-center gap-1.5 ${isP1 ? 'text-red-300' : 'text-amber-300'}`}>
-                <span className={`w-2 h-2 rounded-full animate-ping ${isP1 ? 'bg-red-400' : 'bg-amber-400'}`} />
+              <span
+                className={`text-xs font-mono font-black flex items-center gap-1.5 ${
+                  isP1 ? 'text-red-300' : 'text-amber-300'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full animate-ping ${
+                    isP1 ? 'bg-red-400' : 'bg-amber-400'
+                  }`}
+                />
                 <span>🎯 AM WURF</span>
               </span>
             ) : (
@@ -286,6 +376,7 @@ export default function HolographicRudolphCockpit({
           <CurrentTurnRow
             darts={state.currentTurnDarts || []}
             isActive={isAct}
+            isFrozen={Boolean(state.isFrozen)}
             accentColor={isP1 ? 'red' : 'amber'}
           />
         </div>
@@ -294,7 +385,7 @@ export default function HolographicRudolphCockpit({
   };
 
   return (
-    <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-hidden select-none font-sans">
+    <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 lg:p-7 overflow-hidden select-none font-sans">
       {/* God Rays & Schneefall */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-32 left-[14%] w-[28vw] h-[130vh] bg-gradient-to-b from-red-500/20 via-rose-600/05 to-transparent rotate-[18deg] blur-2xl opacity-70" />
@@ -327,7 +418,7 @@ export default function HolographicRudolphCockpit({
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-5 py-2 rounded-full bg-slate-900/75 backdrop-blur-2xl border border-amber-400/40 shadow-[0_0_25px_rgba(251,191,36,0.28)]">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-5 py-1.5 rounded-full bg-slate-900/75 backdrop-blur-2xl border border-amber-400/40 shadow-[0_0_25px_rgba(251,191,36,0.28)]">
           <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-cyan-300">
             BOARD {boardId}
           </span>
@@ -359,46 +450,69 @@ export default function HolographicRudolphCockpit({
       </div>
 
       {/* Haupt-Cockpit */}
-      <div className="relative z-10 flex-1 flex flex-col justify-between gap-4 min-h-0 py-3 max-w-[1540px] w-full mx-auto">
-        {/* Obere Zone: Horizontales 5-Etappen-Flug-Radar & Schlitten-Spuren */}
-        <div className="rounded-[2rem] bg-slate-900/65 backdrop-blur-3xl border border-white/15 p-4 sm:p-6 shadow-2xl space-y-5">
-          {/* 5 Checkpoints */}
-          <div className="relative grid grid-cols-5 gap-2 sm:gap-4 items-stretch">
-            {/* Verbindungslinie im Hintergrund */}
-            <div className="pointer-events-none hidden sm:block absolute top-1/2 left-[10%] right-[10%] h-1 -translate-y-1/2 bg-gradient-to-r from-cyan-500/30 via-emerald-400/40 to-amber-400/50 rounded-full" />
-
+      <div className="relative z-10 flex-1 flex flex-col justify-between gap-3.5 min-h-0 py-2.5 max-w-[1580px] w-full mx-auto">
+        {/* Obere Zone: 12-Stationen-Weihnachtsflugkarte + Schlitten-Spuren */}
+        <div className="rounded-[2rem] bg-slate-900/65 backdrop-blur-3xl border border-white/15 p-3.5 sm:p-4 shadow-2xl space-y-3.5">
+          {/* 12 Stationen in 2 Reihen à 6 */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {checkpoints.map((cp) => {
               const p1Passed = p1.completedSteps >= cp.step;
               const p2Passed = is1vs1 && safeP2.completedSteps >= cp.step;
               const p1AtThis = !winnerPlayer && p1.completedSteps === cp.step - 1;
               const p2AtThis = is1vs1 && !winnerPlayer && safeP2.completedSteps === cp.step - 1;
+              const specialIcon =
+                cp.specialType === 'trap'
+                  ? '⚠️'
+                  : cp.specialType === 'shield'
+                  ? '🛡️'
+                  : cp.specialType === 'thaw'
+                  ? '🍷'
+                  : cp.specialType === 'finish'
+                  ? '🏆'
+                  : null;
 
               return (
                 <div
                   key={cp.step}
-                  className={`relative z-10 rounded-2xl p-2.5 sm:p-3.5 border-2 text-center flex flex-col items-center justify-between transition-all ${
-                    p1AtThis || p2AtThis
-                      ? 'bg-slate-950/90 border-cyan-400/70 shadow-[0_0_22px_rgba(6,182,212,0.28)]'
+                  className={`relative rounded-xl px-2.5 py-2 border-2 flex flex-col justify-between transition-all ${
+                    p1AtThis && p2AtThis
+                      ? 'bg-slate-950/95 border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.4)]'
+                      : p1AtThis || p2AtThis
+                      ? 'bg-slate-950/90 border-cyan-400/80 shadow-[0_0_16px_rgba(6,182,212,0.3)]'
                       : p1Passed || p2Passed
-                      ? 'bg-slate-950/85 border-emerald-400/50'
-                      : 'bg-slate-950/65 border-white/10'
+                      ? 'bg-slate-950/80 border-emerald-400/45'
+                      : 'bg-slate-950/60 border-white/10'
                   }`}
                 >
-                  <div className="flex items-center justify-between w-full text-[10px] font-mono font-black">
-                    <span className="text-slate-400">#{cp.step}</span>
+                  <div className="flex items-center justify-between gap-1 text-[10px] font-mono font-black">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <span>#{cp.step}</span>
+                      {specialIcon && <span>{specialIcon}</span>}
+                    </span>
+
                     <div className="flex items-center gap-1">
+                      {p1AtThis && (
+                        <span className="px-1 py-0.2 rounded bg-red-500 text-white text-[9px] leading-tight">
+                          P1🛷
+                        </span>
+                      )}
+                      {p2AtThis && (
+                        <span className="px-1 py-0.2 rounded bg-amber-400 text-slate-950 text-[9px] leading-tight">
+                          P2🛷
+                        </span>
+                      )}
                       <span
-                        className={`w-2.5 h-2.5 rounded-full border ${
+                        className={`w-2 h-2 rounded-full border ${
                           p1Passed
-                            ? 'bg-red-500 border-red-300 shadow-[0_0_8px_#ef4444]'
+                            ? 'bg-red-500 border-red-300 shadow-[0_0_6px_#ef4444]'
                             : 'bg-slate-800 border-white/20'
                         }`}
                       />
                       {is1vs1 && (
                         <span
-                          className={`w-2.5 h-2.5 rounded-full border ${
+                          className={`w-2 h-2 rounded-full border ${
                             p2Passed
-                              ? 'bg-amber-400 border-amber-200 shadow-[0_0_8px_#fbbf24]'
+                              ? 'bg-amber-400 border-amber-200 shadow-[0_0_6px_#fbbf24]'
                               : 'bg-slate-800 border-white/20'
                           }`}
                         />
@@ -406,12 +520,16 @@ export default function HolographicRudolphCockpit({
                     </div>
                   </div>
 
-                  <div className="text-2xl sm:text-3xl my-1">{cp.icon}</div>
-                  <div className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider leading-tight">
-                    {cp.location}
-                  </div>
-                  <div className="mt-1 px-2 py-0.5 rounded-lg bg-white/5 border border-white/15 font-mono text-xs sm:text-sm font-black text-emerald-300">
-                    {cp.targetLabel}
+                  <div className="flex items-center justify-between gap-1.5 my-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-lg sm:text-xl shrink-0">{cp.icon}</span>
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-200 truncate">
+                        {cp.location}
+                      </span>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/15 font-mono text-[11px] font-black text-emerald-300 shrink-0">
+                      {cp.targetLabel}
+                    </span>
                   </div>
                 </div>
               );
@@ -419,20 +537,25 @@ export default function HolographicRudolphCockpit({
           </div>
 
           {/* Parallele Schlitten-Flugspuren */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Spur Spieler 1 */}
             <div className="flex items-center gap-3">
-              <div className="w-32 sm:w-44 shrink-0 flex items-center justify-between text-xs font-mono font-black text-red-300 truncate">
-                <span className="truncate">{p1Name}</span>
-                <span>{p1.completedSteps}/5</span>
+              <div className="w-40 sm:w-52 shrink-0 flex items-center justify-between gap-1 text-xs font-mono font-black text-red-300">
+                <span className="truncate">
+                  {p1Name} {p1.isFrozen ? '❄️' : ''}
+                  {p1.hasShield ? '🛡️' : ''}
+                </span>
+                <span className="shrink-0">
+                  {p1.completedSteps}/{RUDOLPH_TOTAL_STEPS}
+                </span>
               </div>
-              <div className="relative flex-1 h-7 rounded-full bg-slate-950/90 border border-red-400/40 overflow-hidden">
+              <div className="relative flex-1 h-6 rounded-full bg-slate-950/90 border border-red-400/40 overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-red-600/80 via-rose-500/80 to-red-400 transition-all duration-700"
-                  style={{ width: `${(p1.completedSteps / 5) * 100}%` }}
+                  style={{ width: `${(p1.completedSteps / RUDOLPH_TOTAL_STEPS) * 100}%` }}
                 />
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-lg sm:text-xl transition-all duration-700 drop-shadow-[0_0_8px_rgba(239,68,68,0.9)]"
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-base sm:text-lg transition-all duration-700 drop-shadow-[0_0_8px_rgba(239,68,68,0.9)]"
                   style={{ left: `${p1Pct}%` }}
                 >
                   🦌🛷
@@ -443,17 +566,22 @@ export default function HolographicRudolphCockpit({
             {/* Spur Spieler 2 */}
             {is1vs1 && (
               <div className="flex items-center gap-3">
-                <div className="w-32 sm:w-44 shrink-0 flex items-center justify-between text-xs font-mono font-black text-amber-300 truncate">
-                  <span className="truncate">{p2Name}</span>
-                  <span>{safeP2.completedSteps}/5</span>
+                <div className="w-40 sm:w-52 shrink-0 flex items-center justify-between gap-1 text-xs font-mono font-black text-amber-300">
+                  <span className="truncate">
+                    {p2Name} {safeP2.isFrozen ? '❄️' : ''}
+                    {safeP2.hasShield ? '🛡️' : ''}
+                  </span>
+                  <span className="shrink-0">
+                    {safeP2.completedSteps}/{RUDOLPH_TOTAL_STEPS}
+                  </span>
                 </div>
-                <div className="relative flex-1 h-7 rounded-full bg-slate-950/90 border border-amber-400/40 overflow-hidden">
+                <div className="relative flex-1 h-6 rounded-full bg-slate-950/90 border border-amber-400/40 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-amber-600/80 via-amber-500/80 to-yellow-300 transition-all duration-700"
-                    style={{ width: `${(safeP2.completedSteps / 5) * 100}%` }}
+                    style={{ width: `${(safeP2.completedSteps / RUDOLPH_TOTAL_STEPS) * 100}%` }}
                   />
                   <div
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-lg sm:text-xl transition-all duration-700 drop-shadow-[0_0_8px_rgba(251,191,36,0.9)]"
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 text-base sm:text-lg transition-all duration-700 drop-shadow-[0_0_8px_rgba(251,191,36,0.9)]"
                     style={{ left: `${p2Pct}%` }}
                   >
                     🦌🛷
@@ -470,14 +598,16 @@ export default function HolographicRudolphCockpit({
             <div>{renderPlayerCard(1, p1Name, p1)}</div>
 
             <div className="flex flex-col items-center justify-center gap-3 px-2">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500/25 to-amber-500/25 border-2 border-amber-400/50 flex items-center justify-center shadow-lg">
-                <span className="text-xl font-black font-mono text-amber-300">VS</span>
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/25 to-amber-500/25 border-2 border-amber-400/50 flex items-center justify-center shadow-lg">
+                <span className="text-lg font-black font-mono text-amber-300">VS</span>
               </div>
               <div className="w-full">
                 <ActionBannerBox lastAction={lastAction} />
               </div>
-              <div className="px-3.5 py-2 rounded-xl bg-slate-900/70 border border-white/10 text-center font-mono text-[11px] text-cyan-200 font-bold">
-                🚀 Treffer = Sofort weiter zur nächsten Etappe!
+              <div className="px-3.5 py-2 rounded-xl bg-slate-900/75 border border-white/10 text-center font-mono text-[11px] text-cyan-200 font-bold">
+                {chaosEnabled
+                  ? '🔥 Triple = +2 · ❄️ Sabotage = -1 & Eis · 💥 Gleiche Etappe = Crash'
+                  : '🔥 Triple = +2 · 🚀 Treffer = Sofort zur nächsten Station!'}
               </div>
             </div>
 
@@ -489,8 +619,9 @@ export default function HolographicRudolphCockpit({
             <div className="col-span-6 flex flex-col justify-center gap-4">
               <ActionBannerBox lastAction={lastAction} />
               <div className="rounded-2xl bg-slate-900/65 border border-white/10 p-4 text-center font-mono text-xs text-slate-300">
-                🚀 <strong>Multi-Pass-Regel:</strong> Schaffst du eine Station mit Dart 1, fliegst du direkt
-                mit Dart 2 auf den nächsten Checkpoint! Beste Aufnahme: <strong className="text-amber-300">{p1.bestTurnSteps} Etappen</strong>.
+                🔥 <strong>Triple-Turbo:</strong> Triff das Ziel-Triple für <strong>+2 Stationen</strong>!
+                3 Treffer in einer Aufnahme sichern ein <strong>🛡️ Wichtel-Schild</strong>. Beste Aufnahme:{' '}
+                <strong className="text-amber-300">{p1.bestTurnSteps} Etappen</strong>.
               </div>
             </div>
           </div>
@@ -510,7 +641,7 @@ export default function HolographicRudolphCockpit({
                 SIEG FÜR {winnerName.toUpperCase()}!
               </h2>
               <p className="text-sm sm:text-base text-emerald-300 font-semibold">
-                🏟️ Rudolph ist sicher auf der Lions-Landebahn gelandet!
+                🏟️ Alle {RUDOLPH_TOTAL_STEPS} Weihnachts-Stationen vom Nordpol nach Weyhausen bezwungen!
               </p>
             </div>
 
@@ -525,12 +656,23 @@ export default function HolographicRudolphCockpit({
                   {winnerPlayer === 2 ? safeP2.dartsThrown : p1.dartsThrown}
                 </div>
               </div>
-              <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-                <div className="text-[10px] text-slate-400 uppercase">Turbo (Max)</div>
-                <div className="text-xl font-black text-amber-300">
-                  {winnerPlayer === 2 ? safeP2.bestTurnSteps : p1.bestTurnSteps} / Aufn.
+              {is1vs1 && chaosEnabled ? (
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="text-[10px] text-slate-400 uppercase">Sabotage / Crash</div>
+                  <div className="text-xl font-black text-cyan-300">
+                    ❄️{' '}
+                    {winnerPlayer === 2 ? safeP2.sabotagesLanded ?? 0 : p1.sabotagesLanded ?? 0} / 💥{' '}
+                    {winnerPlayer === 2 ? safeP2.crashesCaused ?? 0 : p1.crashesCaused ?? 0}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="text-[10px] text-slate-400 uppercase">Turbo (Max)</div>
+                  <div className="text-xl font-black text-amber-300">
+                    {winnerPlayer === 2 ? safeP2.bestTurnSteps : p1.bestTurnSteps} / Aufn.
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

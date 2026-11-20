@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Player } from '@/lib/data';
 import { generateSessionId } from '@/lib/liveSession';
 import {
+  RUDOLPH_TOTAL_STEPS,
+  RudolphDartEvent,
   RudolphFinalTarget,
   RudolphLastActionBanner,
   RudolphPlayerState,
@@ -15,8 +17,11 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  Flame,
   HelpCircle,
   RotateCcw,
+  Shield,
+  Snowflake,
   Sparkles,
   Target,
   Tv,
@@ -26,7 +31,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 
-const CACHE_KEY = 'lions_active_rudolph_session_v1';
+const CACHE_KEY = 'lions_active_rudolph_session_v2';
 
 interface RudolphClientProps {
   players: Player[];
@@ -43,7 +48,15 @@ interface TurnSnapshot {
   isGameFinished: boolean;
 }
 
-type SoundKind = 'hit' | 'turbo' | 'win' | 'miss';
+type SoundKind =
+  | 'hit'
+  | 'turbo'
+  | 'sabotage'
+  | 'crash'
+  | 'trap'
+  | 'shield'
+  | 'win'
+  | 'miss';
 
 function createRudolphSound(kind: SoundKind) {
   if (typeof window === 'undefined') return;
@@ -76,10 +89,25 @@ function createRudolphSound(kind: SoundKind) {
       playTone(587.33, 0, 0.12, 'triangle', 0.12);
       playTone(880, 0.08, 0.18, 'sine', 0.13);
     } else if (kind === 'turbo') {
-      playTone(523.25, 0, 0.11, 'triangle', 0.13);
-      playTone(659.25, 0.08, 0.11, 'triangle', 0.13);
-      playTone(783.99, 0.16, 0.14, 'triangle', 0.14);
-      playTone(1046.5, 0.25, 0.28, 'sine', 0.15);
+      playTone(523.25, 0, 0.1, 'triangle', 0.13);
+      playTone(659.25, 0.07, 0.1, 'triangle', 0.13);
+      playTone(783.99, 0.14, 0.12, 'triangle', 0.14);
+      playTone(1046.5, 0.22, 0.26, 'sine', 0.15);
+    } else if (kind === 'sabotage') {
+      playTone(1174.66, 0, 0.09, 'sine', 0.12);
+      playTone(932.33, 0.07, 0.11, 'sine', 0.12);
+      playTone(622.25, 0.16, 0.22, 'triangle', 0.13);
+    } else if (kind === 'crash') {
+      playTone(220, 0, 0.09, 'sawtooth', 0.12);
+      playTone(164.81, 0.07, 0.14, 'sawtooth', 0.13);
+      playTone(110, 0.16, 0.22, 'triangle', 0.13);
+    } else if (kind === 'trap') {
+      playTone(392, 0, 0.11, 'sawtooth', 0.1);
+      playTone(311.13, 0.1, 0.12, 'sawtooth', 0.11);
+      playTone(220, 0.2, 0.24, 'triangle', 0.12);
+    } else if (kind === 'shield') {
+      playTone(659.25, 0, 0.1, 'sine', 0.12);
+      playTone(987.77, 0.08, 0.18, 'triangle', 0.13);
     } else if (kind === 'win') {
       playTone(523.25, 0, 0.14, 'triangle', 0.14);
       playTone(659.25, 0.11, 0.14, 'triangle', 0.14);
@@ -92,8 +120,19 @@ function createRudolphSound(kind: SoundKind) {
 
     setTimeout(() => {
       ctx.close().catch(() => {});
-    }, 1500);
+    }, 1600);
   } catch {}
+}
+
+function getMaxDartsForTurn(st: RudolphPlayerState): number {
+  return st.isFrozen ? 2 : 3;
+}
+
+function getStepsCountForDart(d: RudolphDartEvent): number {
+  if (d.kind === 'turbo') return 2;
+  if (d.kind === 'hit' || d.kind === 'win') return 1;
+  if (d.kind === 'crash') return d.subLabel.includes('+2') ? 2 : 1;
+  return 0;
 }
 
 export default function RudolphClient({
@@ -117,6 +156,7 @@ export default function RudolphClient({
   const [isGameFinished, setIsGameFinished] = useState<boolean>(false);
   const [gameMode, setGameMode] = useState<'1vs1' | 'solo'>('1vs1');
   const [finalTarget, setFinalTarget] = useState<RudolphFinalTarget>('BULL');
+  const [chaosEnabled, setChaosEnabled] = useState<boolean>(true);
   const [p1Name, setP1Name] = useState<string>(defaultP1);
   const [p2Name, setP2Name] = useState<string>(validPlayers[1]?.name || 'Gastspieler');
   const [isGuestP1, setIsGuestP1] = useState<boolean>(false);
@@ -293,6 +333,7 @@ export default function RudolphClient({
         winner: winnerDisplayName || undefined,
         rudolphData: {
           finalTarget,
+          chaosEnabled,
           roundNumber: rNum,
           p1: p1S,
           p2: p2S,
@@ -303,7 +344,7 @@ export default function RudolphClient({
         updatedAt: Date.now(),
       };
     },
-    [activeBoard, finalTarget, gameMode, gameSessionId, p1Name, p2Name]
+    [activeBoard, chaosEnabled, finalTarget, gameMode, gameSessionId, p1Name, p2Name]
   );
 
   // 4s Heartbeat solange aktiv oder im Sieger-Screen
@@ -420,6 +461,7 @@ export default function RudolphClient({
             isGameFinished,
             gameMode,
             finalTarget,
+            chaosEnabled,
             p1Name,
             p2Name,
             isGuestP1,
@@ -443,6 +485,7 @@ export default function RudolphClient({
     isGameFinished,
     gameMode,
     finalTarget,
+    chaosEnabled,
     p1Name,
     p2Name,
     isGuestP1,
@@ -475,8 +518,8 @@ export default function RudolphClient({
       headline: 'FREIGABE ZUM ABFLUG!',
       subline:
         gameMode === '1vs1'
-          ? `${cleanP1} eröffnet das Rentier-Rennen gegen ${cleanP2}! Ziel 1: Nordpol (20)!`
-          : `${cleanP1} hebt vom Nordpol ab! Ziel 1: die 20!`,
+          ? `${cleanP1} eröffnet die 12-Stationen-Jagd gegen ${cleanP2}! Start: Nordpol (20)!`
+          : `${cleanP1} hebt vom Nordpol ab! 12 Weihnachts-Stationen bis Weyhausen — Ziel 1: die 20!`,
       actorPlayer: 1,
     };
 
@@ -508,14 +551,19 @@ export default function RudolphClient({
     }
     setGameMode(c.gameMode === 'solo' ? 'solo' : '1vs1');
     setFinalTarget(c.finalTarget === 'D20' ? 'D20' : 'BULL');
+    setChaosEnabled(c.chaosEnabled ?? true);
     setP1Name(c.p1Name || defaultP1);
     setP2Name(c.p2Name || 'Gastspieler');
     setIsGuestP1(Boolean(c.isGuestP1));
     setIsGuestP2(Boolean(c.isGuestP2));
     setActivePlayer(c.activePlayer === 2 ? 2 : 1);
     setRoundNumber(Number(c.roundNumber || 1));
-    setP1State(c.p1State || createInitialRudolphPlayerState());
-    setP2State(c.p2State || createInitialRudolphPlayerState());
+    setP1State(
+      c.p1State ? cloneRudolphPlayerState(c.p1State) : createInitialRudolphPlayerState()
+    );
+    setP2State(
+      c.p2State ? cloneRudolphPlayerState(c.p2State) : createInitialRudolphPlayerState()
+    );
     setLastAction(c.lastAction ?? null);
     setWinnerPlayer(c.winnerPlayer ?? null);
     setUndoStack(Array.isArray(c.undoStack) ? c.undoStack : []);
@@ -574,112 +622,317 @@ export default function RudolphClient({
     setUndoStack((prev) => [...prev.slice(-49), snap]);
   };
 
+  const checkpoints = getRudolphCheckpoints(finalTarget);
+
   const commitTurnStep = (
     nextP1: RudolphPlayerState,
     nextP2: RudolphPlayerState,
     banner: RudolphLastActionBanner,
-    winPlayer: 1 | 2 | null
+    winPlayer: 1 | 2 | null,
+    isMissSoundPending = false
   ) => {
     const ownAfter = activePlayer === 1 ? nextP1 : nextP2;
+    const activeName = activePlayer === 1 ? p1Name : p2Name;
     let nextActive: 1 | 2 = activePlayer;
     let nextRound = roundNumber;
+    let finalBanner = banner;
+    let playedSpecialTrapOrShield = false;
+
+    const maxDarts = getMaxDartsForTurn(ownAfter);
 
     if (winPlayer !== null) {
       ownAfter.roundsPlayed += 1;
       try {
         localStorage.removeItem(CACHE_KEY);
       } catch {}
-    } else if (ownAfter.currentTurnDarts.length >= 3) {
+    } else if (ownAfter.currentTurnDarts.length >= maxDarts) {
       ownAfter.roundsPlayed += 1;
+
+      const currentCp =
+        checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, ownAfter.completedSteps)];
+      if (
+        chaosEnabled &&
+        ownAfter.currentTurnDarts.length === 3 &&
+        ownAfter.currentTurnDarts.every((d) => d.kind === 'miss') &&
+        currentCp?.specialType === 'trap'
+      ) {
+        playedSpecialTrapOrShield = true;
+        if (ownAfter.hasShield) {
+          ownAfter.hasShield = false;
+          playSound('shield');
+          finalBanner = {
+            id: Date.now(),
+            tone: 'shield',
+            icon: '🛡️',
+            headline: 'WICHTEL-SCHILD RETTET!',
+            subline: `3× Miss an ${currentCp.location} — doch das Wichtel-Schild fängt den Schubs gegen ${activeName} ab!`,
+            actorPlayer: activePlayer,
+          };
+        } else {
+          ownAfter.completedSteps = Math.max(0, ownAfter.completedSteps - 1);
+          playSound('trap');
+          if (currentCp.step === 10) {
+            finalBanner = {
+              id: Date.now(),
+              tone: 'trap',
+              icon: '👹',
+              headline: 'GRINCH-FALLE! -1 ETAPPE!',
+              subline: `3× Miss im Grinch-Hinterhalt! Der Grinch schubst ${activeName} zurück auf Station ${ownAfter.completedSteps + 1}!`,
+              actorPlayer: activePlayer,
+            };
+          } else {
+            finalBanner = {
+              id: Date.now(),
+              tone: 'trap',
+              icon: '🧦',
+              headline: 'KNECHT RUPRECHTS RUTE!',
+              subline: `3× Miss bei Knecht Ruprecht! ${activeName} rutscht -1 Etappe zurück!`,
+              actorPlayer: activePlayer,
+            };
+          }
+        }
+      }
+
+      ownAfter.isFrozen = false;
+      ownAfter.sabotagedThisTurn = false;
+
       if (gameMode === '1vs1') {
         if (activePlayer === 1) {
           nextActive = 2;
           nextP2.currentTurnDarts = [];
+          nextP2.sabotagedThisTurn = false;
         } else {
           nextActive = 1;
           nextRound = roundNumber + 1;
           nextP1.currentTurnDarts = [];
+          nextP1.sabotagedThisTurn = false;
         }
       } else {
         nextRound = roundNumber + 1;
         nextP1.currentTurnDarts = [];
+        nextP1.sabotagedThisTurn = false;
       }
+    }
+
+    if (isMissSoundPending && !playedSpecialTrapOrShield) {
+      playSound('miss');
     }
 
     setP1State(nextP1);
     setP2State(nextP2);
     setActivePlayer(nextActive);
     setRoundNumber(nextRound);
-    setLastAction(banner);
+    setLastAction(finalBanner);
     setWinnerPlayer(winPlayer);
     setIsGameFinished(winPlayer !== null);
   };
 
-  const checkpoints = getRudolphCheckpoints(finalTarget);
-
-  // A) Checkpoint geschafft!
-  const handleCheckpointHit = () => {
+  // A) Normal-Treffer (+1) oder Triple-Turbo (+2)
+  const handleCheckpointAdvance = (advanceBy: 1 | 2) => {
     if (isGameFinished) return;
     pushSnapshot();
 
     const nextP1 = cloneRudolphPlayerState(p1State);
     const nextP2 = cloneRudolphPlayerState(p2State);
     const own = activePlayer === 1 ? nextP1 : nextP2;
+    const opp = activePlayer === 1 ? nextP2 : nextP1;
     const activeName = activePlayer === 1 ? p1Name : p2Name;
+    const oppName = activePlayer === 1 ? p2Name : p1Name;
 
-    if (own.currentTurnDarts.length >= 3) own.currentTurnDarts = [];
-
-    const clearedIndex = own.completedSteps; // 0..4
-    const cp = checkpoints[Math.min(4, clearedIndex)];
-    own.completedSteps = Math.min(5, own.completedSteps + 1);
-    own.dartsThrown += 1;
-
-    const isLandingWin = own.completedSteps >= 5;
-    own.currentTurnDarts.push({
-      kind: isLandingWin ? 'win' : 'hit',
-      checkpointStep: cp.step,
-      label: `${cp.icon} ${cp.targetLabel}`,
-      subLabel: isLandingWin ? '🏆 LANDUNG!' : `Etappe ${cp.step}/5`,
-    });
-
-    const hitsInTurn = own.currentTurnDarts.filter(
-      (d) => d.kind === 'hit' || d.kind === 'win'
-    ).length;
-    if (hitsInTurn > own.bestTurnSteps) {
-      own.bestTurnSteps = hitsInTurn;
+    if (own.currentTurnDarts.length >= getMaxDartsForTurn(own)) {
+      own.currentTurnDarts = [];
+      own.sabotagedThisTurn = false;
     }
 
-    const isTurboTurn = !isLandingWin && hitsInTurn === 3;
-    let banner: RudolphLastActionBanner;
+    const prevSteps = own.completedSteps;
+    const cp = checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, prevSteps)];
 
-    if (isLandingWin) {
+    // Landung in Weyhausen (Etappe 12)
+    if (prevSteps >= RUDOLPH_TOTAL_STEPS - 1) {
+      own.completedSteps = RUDOLPH_TOTAL_STEPS;
+      own.dartsThrown += 1;
+      own.currentTurnDarts.push({
+        kind: 'win',
+        checkpointStep: RUDOLPH_TOTAL_STEPS,
+        label: `${cp.icon} ${cp.targetLabel}`,
+        subLabel: '🏆 LANDUNG!',
+      });
+
+      const stepsThisTurn = own.currentTurnDarts.reduce(
+        (acc, d) => acc + getStepsCountForDart(d),
+        0
+      );
+      if (stepsThisTurn > own.bestTurnSteps) {
+        own.bestTurnSteps = stepsThisTurn;
+      }
+
       playSound('win');
-      banner = {
+      const winBanner: RudolphLastActionBanner = {
         id: Date.now(),
         tone: 'win',
         icon: '🏆',
         headline: 'LANDUNG IN WEYHAUSEN!',
-        subline: `${activeName} landet sicher auf der Lions-Landebahn (${cp.targetLabel}) und gewinnt!`,
+        subline: `${activeName} landet sicher auf der Lions-Landebahn (${cp.targetLabel}) und gewinnt das Weihnachtsrennen!`,
         actorPlayer: activePlayer,
       };
-      commitTurnStep(nextP1, nextP2, banner, activePlayer);
+      commitTurnStep(nextP1, nextP2, winBanner, activePlayer);
       return;
     }
 
-    if (isTurboTurn) {
+    // Etappen 1–11 (nie Etappe 12 überspringen)
+    const nextSteps =
+      advanceBy === 2
+        ? Math.min(RUDOLPH_TOTAL_STEPS - 1, prevSteps + 2)
+        : Math.min(RUDOLPH_TOTAL_STEPS - 1, prevSteps + 1);
+    const actualJump = nextSteps - prevSteps;
+    const gainedLucky13Shield = prevSteps === 10 && advanceBy === 2;
+
+    own.completedSteps = nextSteps;
+    own.dartsThrown += 1;
+
+    // Sonder-Stationen prüfen im Intervall (prevSteps, nextSteps]
+    let thawedNow = false;
+    let gainedStationShield = false;
+    if (prevSteps < 4 && nextSteps >= 4 && own.isFrozen) {
+      own.isFrozen = false;
+      thawedNow = true;
+    }
+    if (prevSteps < 9 && nextSteps >= 9) {
+      own.hasShield = true;
+      gainedStationShield = true;
+    }
+    if (gainedLucky13Shield) {
+      own.hasShield = true;
+    }
+
+    // Aktueller Treffer vorab zählen für 3-in-a-Turn Turbo & Crash
+    const provisionalKind: RudolphDartEvent['kind'] =
+      advanceBy === 2 ? 'turbo' : 'hit';
+    const nextCp = checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, nextSteps)];
+
+    // Crash-Prüfung auf gleicher Etappe (1..11)
+    const crashPossible =
+      gameMode === '1vs1' &&
+      chaosEnabled &&
+      nextSteps >= 1 &&
+      nextSteps <= RUDOLPH_TOTAL_STEPS - 1 &&
+      opp.completedSteps === nextSteps;
+
+    let dartKind: RudolphDartEvent['kind'] = provisionalKind;
+    let dartLabel = advanceBy === 2 ? `🔥 ${cp.icon} ${cp.targetLabel}` : `${cp.icon} ${cp.targetLabel}`;
+    let dartSubLabel =
+      actualJump === 2
+        ? `+2 (${nextSteps}/${RUDOLPH_TOTAL_STEPS})`
+        : `Etappe ${cp.step}/${RUDOLPH_TOTAL_STEPS}`;
+
+    if (crashPossible && !opp.hasShield) {
+      dartKind = 'crash';
+      dartLabel = `💥 ${cp.icon} ${cp.targetLabel}`;
+      dartSubLabel = actualJump === 2 ? '+2 & CRASH!' : 'CRASH!';
+    }
+
+    own.currentTurnDarts.push({
+      kind: dartKind,
+      checkpointStep: cp.step,
+      label: dartLabel,
+      subLabel: dartSubLabel,
+    });
+
+    const hitsInTurn = own.currentTurnDarts.filter(
+      (d) => d.kind === 'hit' || d.kind === 'turbo' || d.kind === 'crash' || d.kind === 'win'
+    ).length;
+    const stepsThisTurn = own.currentTurnDarts.reduce(
+      (acc, d) => acc + getStepsCountForDart(d),
+      0
+    );
+    if (stepsThisTurn > own.bestTurnSteps) {
+      own.bestTurnSteps = stepsThisTurn;
+    }
+
+    const isThreeInTurnTurbo = hitsInTurn === 3;
+    if (isThreeInTurnTurbo) {
+      own.hasShield = true;
+    }
+
+    let banner: RudolphLastActionBanner;
+
+    if (crashPossible) {
+      if (opp.hasShield) {
+        opp.hasShield = false;
+        playSound('shield');
+        banner = {
+          id: Date.now(),
+          tone: 'shield',
+          icon: '🛡️',
+          headline: 'CRASH ABGEBLOCKT!',
+          subline: `${activeName} zieht auf Flughöhe ${nextSteps}/${RUDOLPH_TOTAL_STEPS}, aber ${oppName}s Wichtel-Schild fängt die Ramme ab!`,
+          actorPlayer: activePlayer,
+        };
+      } else {
+        opp.completedSteps = Math.max(0, opp.completedSteps - 1);
+        own.crashesCaused += 1;
+        playSound('crash');
+        banner = {
+          id: Date.now(),
+          tone: 'crash',
+          icon: '💥',
+          headline: 'SCHLITTEN-CRASH!',
+          subline: `${activeName} landet exakt bei ${oppName} (${nextSteps}/${RUDOLPH_TOTAL_STEPS}) und rammt den Rivalen -1 Etappe nach unten!`,
+          actorPlayer: activePlayer,
+        };
+      }
+    } else if (gainedLucky13Shield) {
       playSound('turbo');
-      const nextCp = checkpoints[own.completedSteps];
+      banner = {
+        id: Date.now(),
+        tone: 'turbo',
+        icon: '⚡',
+        headline: 'T13 LANDEANFLUG + 🛡️ SCHILD!',
+        subline: `${activeName} knackt die Pechvogel-Wolke per Triple + 🛡️ Schild! Finale in Weyhausen (${nextCp.targetLabel})!`,
+        actorPlayer: activePlayer,
+      };
+    } else if (isThreeInTurnTurbo) {
+      playSound('turbo');
       banner = {
         id: Date.now(),
         tone: 'turbo',
         icon: '🚀',
-        headline: 'TURBO-FLUG! 3 ETAPPEN!',
-        subline: `${activeName} fliegt in einer Aufnahme durch 3 Checkpoints! Nächstes Ziel: ${nextCp.targetLabel}`,
+        headline: '3-IN-A-TURN TURBO + 🛡️!',
+        subline: `3 Treffer in einer Aufnahme! ${activeName} holt ein 🛡️ Wichtel-Schild — nächstes Ziel: ${nextCp.location} (${nextCp.targetLabel})!`,
+        actorPlayer: activePlayer,
+      };
+    } else if (thawedNow) {
+      playSound('hit');
+      banner = {
+        id: Date.now(),
+        tone: 'hit',
+        icon: '🍷',
+        headline: 'GLÜHWEIN TAUT KUFEN AUF!',
+        subline: `${activeName} heizt mit ${cp.targetLabel} durch! Dart 3 wieder frei — nächster Halt: ${nextCp.location} (${nextCp.targetLabel})!`,
+        actorPlayer: activePlayer,
+      };
+    } else if (gainedStationShield) {
+      playSound('shield');
+      banner = {
+        id: Date.now(),
+        tone: 'shield',
+        icon: '🎁',
+        headline: 'WICHTEL-SCHILD EINGESACKT!',
+        subline: `${activeName} holt 🛡️ Schildschutz bei ${cp.location}! Nächstes Ziel: ${nextCp.location} (${nextCp.targetLabel})!`,
+        actorPlayer: activePlayer,
+      };
+    } else if (advanceBy === 2) {
+      playSound('turbo');
+      banner = {
+        id: Date.now(),
+        tone: 'turbo',
+        icon: '🔥',
+        headline: 'TRIPLE-TURBO! +2 ETAPPEN!',
+        subline: `${activeName} zündet den Rentier-Nachbrenner über ${cp.location}! Nächstes Ziel: ${nextCp.location} (${nextCp.targetLabel})!`,
         actorPlayer: activePlayer,
       };
     } else {
       playSound('hit');
-      const nextCp = checkpoints[own.completedSteps];
       banner = {
         id: Date.now(),
         tone: 'hit',
@@ -693,7 +946,79 @@ export default function RudolphClient({
     commitTurnStep(nextP1, nextP2, banner, null);
   };
 
-  // B) Einzelner Dart Miss
+  // B) Schneeball-Sabotage (max 1× pro Aufnahme)
+  const handleSabotage = () => {
+    if (
+      isGameFinished ||
+      gameMode !== '1vs1' ||
+      !chaosEnabled ||
+      ownState.sabotagedThisTurn
+    ) {
+      return;
+    }
+    pushSnapshot();
+
+    const nextP1 = cloneRudolphPlayerState(p1State);
+    const nextP2 = cloneRudolphPlayerState(p2State);
+    const own = activePlayer === 1 ? nextP1 : nextP2;
+    const opp = activePlayer === 1 ? nextP2 : nextP1;
+    const activeName = activePlayer === 1 ? p1Name : p2Name;
+    const oppName = activePlayer === 1 ? p2Name : p1Name;
+
+    if (own.currentTurnDarts.length >= getMaxDartsForTurn(own)) {
+      own.currentTurnDarts = [];
+      own.sabotagedThisTurn = false;
+    }
+
+    const oppCp = checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, opp.completedSteps)];
+    const targetText = oppCp.targetLabel === 'BULL' ? 'BULL' : `${oppCp.targetLabel}/BULL`;
+
+    own.dartsThrown += 1;
+    own.sabotagedThisTurn = true;
+
+    let banner: RudolphLastActionBanner;
+
+    if (opp.hasShield) {
+      opp.hasShield = false;
+      own.currentTurnDarts.push({
+        kind: 'shield',
+        label: '🛡️ GEBLOCKT',
+        subLabel: `${oppName} hält stand`,
+      });
+      playSound('shield');
+      banner = {
+        id: Date.now(),
+        tone: 'shield',
+        icon: '🛡️',
+        headline: 'SCHNEEBALL ABGEPRALLT!',
+        subline: `${activeName} trifft ${targetText}, aber ${oppName}s Wichtel-Schild blockt die Sabotage komplett ab!`,
+        actorPlayer: activePlayer,
+      };
+    } else {
+      const pushBack = opp.isFrozen ? 2 : 1;
+      opp.completedSteps = Math.max(0, opp.completedSteps - pushBack);
+      opp.isFrozen = true;
+      own.sabotagesLanded += 1;
+      own.currentTurnDarts.push({
+        kind: 'sabotage',
+        label: '❄️ SABOTAGE',
+        subLabel: `-${pushBack} & Eis!`,
+      });
+      playSound('sabotage');
+      banner = {
+        id: Date.now(),
+        tone: 'sabotage',
+        icon: '❄️',
+        headline: 'SCHNEEBALL-VOLLETREFFER!',
+        subline: `${activeName} trifft ${targetText} — ${oppName} rutscht -${pushBack} zurück & Kufen vereist (nur 2 Darts)!`,
+        actorPlayer: activePlayer,
+      };
+    }
+
+    commitTurnStep(nextP1, nextP2, banner, null);
+  };
+
+  // C) Einzelner Dart Miss
   const handleMiss = () => {
     if (isGameFinished) return;
     pushSnapshot();
@@ -703,8 +1028,11 @@ export default function RudolphClient({
     const own = activePlayer === 1 ? nextP1 : nextP2;
     const activeName = activePlayer === 1 ? p1Name : p2Name;
 
-    if (own.currentTurnDarts.length >= 3) own.currentTurnDarts = [];
-    const curCp = checkpoints[Math.min(4, own.completedSteps)];
+    if (own.currentTurnDarts.length >= getMaxDartsForTurn(own)) {
+      own.currentTurnDarts = [];
+      own.sabotagedThisTurn = false;
+    }
+    const curCp = checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, own.completedSteps)];
 
     own.dartsThrown += 1;
     own.currentTurnDarts.push({
@@ -713,7 +1041,6 @@ export default function RudolphClient({
       subLabel: 'Kein Weiterflug',
     });
 
-    playSound('miss');
     const banner: RudolphLastActionBanner = {
       id: Date.now(),
       tone: 'miss',
@@ -723,10 +1050,10 @@ export default function RudolphClient({
       actorPlayer: activePlayer,
     };
 
-    commitTurnStep(nextP1, nextP2, banner, null);
+    commitTurnStep(nextP1, nextP2, banner, null, true);
   };
 
-  // C) Restliche Darts Miss
+  // D) Restliche Darts Miss
   const handleRestMiss = () => {
     if (isGameFinished) return;
     pushSnapshot();
@@ -736,10 +1063,14 @@ export default function RudolphClient({
     const own = activePlayer === 1 ? nextP1 : nextP2;
     const activeName = activePlayer === 1 ? p1Name : p2Name;
 
-    const existing = own.currentTurnDarts.length >= 3 ? 0 : own.currentTurnDarts.length;
-    if (existing === 0) own.currentTurnDarts = [];
-    const remaining = Math.max(1, 3 - existing);
-    const curCp = checkpoints[Math.min(4, own.completedSteps)];
+    const maxDarts = getMaxDartsForTurn(own);
+    const existing = own.currentTurnDarts.length >= maxDarts ? 0 : own.currentTurnDarts.length;
+    if (existing === 0) {
+      own.currentTurnDarts = [];
+      own.sabotagedThisTurn = false;
+    }
+    const remaining = Math.max(1, maxDarts - existing);
+    const curCp = checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, own.completedSteps)];
 
     own.dartsThrown += remaining;
     for (let i = 0; i < remaining; i += 1) {
@@ -750,7 +1081,6 @@ export default function RudolphClient({
       });
     }
 
-    playSound('miss');
     const banner: RudolphLastActionBanner = {
       id: Date.now(),
       tone: 'miss',
@@ -760,7 +1090,7 @@ export default function RudolphClient({
       actorPlayer: activePlayer,
     };
 
-    commitTurnStep(nextP1, nextP2, banner, null);
+    commitTurnStep(nextP1, nextP2, banner, null, true);
   };
 
   // =========================================================================
@@ -806,11 +1136,11 @@ export default function RudolphClient({
                 </h2>
                 <p className="text-xs sm:text-sm text-amber-100/90 mt-1">
                   <strong>{cachedSessionToResume.p1Name}</strong> (Etappe{' '}
-                  {cachedSessionToResume.p1State?.completedSteps ?? 0}/5)
+                  {cachedSessionToResume.p1State?.completedSteps ?? 0}/{RUDOLPH_TOTAL_STEPS})
                   {cachedSessionToResume.gameMode === '1vs1' && (
                     <>
                       {' '}vs. <strong>{cachedSessionToResume.p2Name}</strong> (Etappe{' '}
-                      {cachedSessionToResume.p2State?.completedSteps ?? 0}/5)
+                      {cachedSessionToResume.p2State?.completedSteps ?? 0}/{RUDOLPH_TOTAL_STEPS})
                     </>
                   )}{' '}
                   • Runde {cachedSessionToResume.roundNumber || 1}
@@ -849,7 +1179,7 @@ export default function RudolphClient({
                   Rudolphs Flug nach Weyhausen
                 </h1>
                 <p className="text-xs sm:text-sm text-cyan-300 font-semibold">
-                  5 Checkpoints vom Nordpol ins Vereinsheim · Treffer schaltet sofort weiter!
+                  12 Weihnachts-Stationen vom Nordpol ins Vereinsheim · Mit Sabotage, Turbo &amp; Crash!
                 </p>
               </div>
             </div>
@@ -994,12 +1324,44 @@ export default function RudolphClient({
             )}
           </div>
 
+          {/* Chaos- & Sabotage-Modus Toggle */}
+          <button
+            type="button"
+            onClick={() => setChaosEnabled((v) => !v)}
+            data-ui-id="RUDOLPH.SETUP.CHAOS_TOGGLE"
+            className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between gap-4 text-left transition-all cursor-pointer ${
+              chaosEnabled
+                ? 'bg-cyan-950/40 border-cyan-400/70 shadow-[0_0_24px_rgba(6,182,212,0.18)]'
+                : 'bg-slate-950/60 border-white/10'
+            }`}
+          >
+            <div className="space-y-0.5">
+              <div className="text-sm font-black text-cyan-200 flex items-center gap-2">
+                <Snowflake className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Chaos- &amp; Sabotage-Modus (Bein stellen!)</span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed">
+                Schneeball-Sabotage (Rivalen zurückwerfen &amp; Kufen vereisen), Schlitten-Crash bei
+                Überholmanöver sowie Knecht-Ruprecht- &amp; Grinch-Fallen (3× Miss = -1 Etappe)
+              </p>
+            </div>
+            <span
+              className={`shrink-0 px-3.5 py-2 rounded-xl font-mono text-xs font-black uppercase ${
+                chaosEnabled
+                  ? 'bg-emerald-500 text-slate-950 shadow-md'
+                  : 'bg-slate-800 text-slate-400 border border-white/10'
+              }`}
+            >
+              {chaosEnabled ? '✓ AN' : 'AUS'}
+            </span>
+          </button>
+
           {/* Finale Landeziel-Wahl */}
           <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="text-sm font-black text-amber-200 flex items-center gap-1.5">
                 <Target className="w-4 h-4 text-amber-400" />
-                <span>Landeziel in Weyhausen (Etappe 5)</span>
+                <span>Landeziel in Weyhausen (Station 12)</span>
               </div>
               <div className="text-[11px] text-slate-400 mt-0.5">
                 Der entscheidende Treffer zur Landung am Vereinsheim
@@ -1043,9 +1405,15 @@ export default function RudolphClient({
   // ANSICHT 2: AKTIVES SPIEL (TABLET-OBERFLÄCHE)
   // =========================================================================
   const ownState = activePlayer === 1 ? p1State : p2State;
+  const oppState = activePlayer === 1 ? p2State : p1State;
   const ownName = activePlayer === 1 ? p1Name : p2Name;
-  const activeCp = checkpoints[Math.min(4, ownState.completedSteps)];
-  const isFinalStep = ownState.completedSteps === 4;
+  const oppName = activePlayer === 1 ? p2Name : p1Name;
+  const activeCp = checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, ownState.completedSteps)];
+  const oppCp = checkpoints[Math.min(RUDOLPH_TOTAL_STEPS - 1, oppState.completedSteps)];
+  const isFinalStep = ownState.completedSteps >= RUDOLPH_TOTAL_STEPS - 1;
+  const maxDartsThisTurn = getMaxDartsForTurn(ownState);
+  const sabotageTargetLabel =
+    oppCp.targetLabel === 'BULL' ? 'BULL (25/50)' : `${oppCp.targetLabel} oder BULL`;
 
   return (
     <div className="max-w-4xl mx-auto px-2.5 sm:px-5 space-y-4 animate-fadeIn">
@@ -1067,6 +1435,11 @@ export default function RudolphClient({
           <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/35 text-amber-200 font-mono text-xs font-black">
             RUNDE {roundNumber}
           </span>
+          {chaosEnabled && (
+            <span className="hidden sm:inline px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-400/35 text-sky-200 font-mono text-[11px] font-black">
+              ❄️ CHAOS AN
+            </span>
+          )}
           {restoredFromCache && (
             <span className="hidden sm:inline px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 text-[10px] font-bold">
               ✓ Wiederhergestellt
@@ -1095,17 +1468,29 @@ export default function RudolphClient({
 
       {/* Hilfe-Box */}
       {showHelp && (
-        <div className="rounded-2xl p-4 bg-slate-900/95 border border-cyan-400/40 text-xs sm:text-sm text-slate-200 space-y-1.5">
-          <div className="font-black text-cyan-300">🦌 Spielregeln: Rudolphs Flug nach Weyhausen</div>
+        <div className="rounded-2xl p-4 bg-slate-900/95 border border-cyan-400/40 text-xs sm:text-sm text-slate-200 space-y-2">
+          <div className="font-black text-cyan-300">
+            🦌 Spielregeln: Rudolphs 12-Stationen-Weihnachtsrennen
+          </div>
           <p>
-            1. Fliege nacheinander durch alle 5 Checkpoints: <strong>1. 20</strong> (Nordpol) ➔{' '}
-            <strong>2. Grünes Feld</strong> (Hamburg) ➔ <strong>3. 19, 17 oder 15</strong> (Hannover) ➔{' '}
-            <strong>4. Beliebiges Doppel</strong> (Wolfsburg) ➔ <strong>5. {finalTarget}</strong> (Weyhausen).
+            <strong>1. Strecke (Nordpol → Weyhausen):</strong> 12 weihnachtliche Etappen (20 → 19 → 18 →
+            ROT → 17 → 16 → GRÜN → 15 → 14 → DOPPEL → 13 → {finalTarget}).
           </p>
           <p>
-            2. <strong>Multi-Pass:</strong> Triffst du mit Dart 1 das Ziel, darfst du mit Dart 2 sofort das nächste
-            Ziel anwerfen!
+            <strong>2. Triple-Turbo (+2):</strong> Triffst du das Ziel-Triple (bzw. Bullseye/D20 bei
+            Farbe/Doppel), fliegst du sofort <strong>2 Etappen</strong> vor! 3 Treffer in einer
+            Aufnahme schenken ein <strong>🛡️ Wichtel-Schild</strong>.
           </p>
+          {chaosEnabled && (
+            <p>
+              <strong>3. Bein stellen (Chaos-Modus):</strong>{' '}
+              <span className="text-cyan-300 font-bold">❄️ Schneeball-Sabotage</span> (1×/Aufnahme auf
+              Rivalenziel oder BULL) wirft den Gegner -1 zurück &amp; vereist Kufen (nur 2 Darts).{' '}
+              <span className="text-amber-300 font-bold">💥 Schlitten-Crash</span> bei Gleichstand rammt
+              ihn -1 zurück. <span className="text-rose-300 font-bold">⚠️ Fallen</span> (Station 6 &amp; 10):
+              3× Miss = -1 Etappe!
+            </p>
+          )}
         </div>
       )}
 
@@ -1128,13 +1513,13 @@ export default function RudolphClient({
                   ? isP1
                     ? 'bg-red-950/45 border-red-400 shadow-[0_0_25px_rgba(239,68,68,0.28)]'
                     : 'bg-amber-950/45 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
-                  : 'bg-slate-900/60 border-white/10 opacity-80'
+                  : 'bg-slate-900/60 border-white/10 opacity-85'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-sm sm:text-lg font-black text-white truncate">{name}</div>
-                  <div className="text-[11px] font-mono text-slate-300 mt-0.5">
+                  <div className="text-[11px] font-mono text-slate-300 mt-0.5 flex flex-wrap items-center gap-1.5">
                     {isWin ? (
                       <span className="text-amber-300 font-black">🏆 GELANDET!</span>
                     ) : isAct ? (
@@ -1144,32 +1529,43 @@ export default function RudolphClient({
                     ) : (
                       <span className="text-slate-400">Wartet</span>
                     )}
+                    {st.isFrozen && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-400/60 text-cyan-200 text-[10px] font-black">
+                        ❄️ VEREIST · 2 DARTS
+                      </span>
+                    )}
+                    {st.hasShield && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/60 text-emerald-200 text-[10px] font-black">
+                        🛡️ WICHTEL-SCHILD
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <div className="text-right font-mono shrink-0">
                   <span className={`text-2xl sm:text-3xl font-black ${isP1 ? 'text-red-300' : 'text-amber-300'}`}>
                     {st.completedSteps}
-                    <span className="text-xs text-slate-400">/5</span>
+                    <span className="text-xs text-slate-400">/{RUDOLPH_TOTAL_STEPS}</span>
                   </span>
                 </div>
               </div>
 
-              {/* Mini-5-Etappen-Leiste */}
-              <div className="grid grid-cols-5 gap-1.5 mt-2.5">
+              {/* Mini-12-Etappen-Leiste */}
+              <div className="grid grid-cols-12 gap-1 mt-2.5">
                 {checkpoints.map((cp) => {
                   const done = st.completedSteps >= cp.step;
                   const activeHere = !isWin && st.completedSteps === cp.step - 1;
                   return (
                     <div
                       key={cp.step}
-                      className={`py-1 rounded-lg border text-center text-xs font-mono font-bold ${
+                      title={`${cp.step}. ${cp.location} (${cp.targetLabel})`}
+                      className={`py-1 rounded-md border text-center text-[10px] sm:text-xs font-mono font-bold ${
                         done
                           ? isP1
-                            ? 'bg-red-500/30 border-red-400 text-white'
-                            : 'bg-amber-500/30 border-amber-400 text-white'
+                            ? 'bg-red-500/35 border-red-400 text-white'
+                            : 'bg-amber-500/35 border-amber-400 text-white'
                           : activeHere
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 animate-pulse'
+                          ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 animate-pulse'
                           : 'bg-slate-950/60 border-white/10 text-slate-500'
                       }`}
                     >
@@ -1189,6 +1585,14 @@ export default function RudolphClient({
           className={`rounded-2xl px-4 py-2.5 border text-center transition-all ${
             lastAction.tone === 'turbo' || lastAction.tone === 'win'
               ? 'bg-amber-950/80 border-amber-400 text-amber-100'
+              : lastAction.tone === 'sabotage'
+              ? 'bg-cyan-950/80 border-cyan-400 text-cyan-100'
+              : lastAction.tone === 'crash'
+              ? 'bg-orange-950/80 border-orange-400 text-orange-100'
+              : lastAction.tone === 'trap'
+              ? 'bg-rose-950/85 border-rose-400 text-rose-100'
+              : lastAction.tone === 'shield'
+              ? 'bg-emerald-950/80 border-cyan-400 text-emerald-100'
               : lastAction.tone === 'hit'
               ? 'bg-emerald-950/75 border-emerald-400 text-emerald-100'
               : lastAction.tone === 'miss'
@@ -1212,7 +1616,8 @@ export default function RudolphClient({
               {winnerPlayer === 1 ? p1Name : p2Name} landet sicher in Weyhausen!
             </h2>
             <p className="text-xs sm:text-sm text-amber-200 mt-1">
-              Alle 5 Checkpoints bezwungen in Runde {roundNumber} ({ownState.dartsThrown} Darts).
+              Alle {RUDOLPH_TOTAL_STEPS} Weihnachts-Stationen bezwungen in Runde {roundNumber} (
+              {(winnerPlayer === 1 ? p1State : p2State).dartsThrown} Darts).
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
@@ -1247,10 +1652,28 @@ export default function RudolphClient({
       {!isGameFinished && (
         <>
           {/* Riesige Ziel-Card */}
-          <div className="rounded-3xl p-5 sm:p-7 bg-gradient-to-br from-[#081b26] via-slate-950 to-[#1a1106] border-2 border-cyan-400/45 text-center space-y-2 shadow-2xl">
-            <span className="text-xs font-mono font-black uppercase tracking-widest text-cyan-300 block">
-              🎯 {ownName} fliegt Etappe {activeCp.step} / 5 · {activeCp.location}
-            </span>
+          <div className="rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-[#081b26] via-slate-950 to-[#1a1106] border-2 border-cyan-400/45 text-center space-y-2 shadow-2xl">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span className="text-xs font-mono font-black uppercase tracking-widest text-cyan-300">
+                🎯 {ownName} · Etappe {activeCp.step} / {RUDOLPH_TOTAL_STEPS} · {activeCp.location} ({activeCp.title})
+              </span>
+              {activeCp.specialBadge && (
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black border ${
+                    activeCp.specialType === 'trap'
+                      ? 'bg-rose-500/25 border-rose-400 text-rose-200'
+                      : activeCp.specialType === 'shield'
+                      ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                      : activeCp.specialType === 'thaw'
+                      ? 'bg-amber-500/25 border-amber-400 text-amber-200'
+                      : 'bg-yellow-500/25 border-yellow-300 text-yellow-200'
+                  }`}
+                >
+                  {activeCp.specialBadge}
+                </span>
+              )}
+            </div>
+
             <div className="text-4xl sm:text-6xl font-black font-mono text-white flex items-center justify-center gap-3 py-1">
               <span>{activeCp.icon}</span>
               <span className="text-emerald-300 drop-shadow-[0_0_20px_rgba(16,185,129,0.5)]">
@@ -1258,21 +1681,46 @@ export default function RudolphClient({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 font-semibold">{activeCp.ruleHint}</p>
+            {activeCp.turboHint && (
+              <p className="text-[11px] font-mono font-bold text-amber-300">
+                🔥 {activeCp.turboHint}
+              </p>
+            )}
           </div>
 
           {/* 3-Dart-Aufnahme + Undo */}
           <div className="grid grid-cols-12 gap-2 items-center">
             <div className="col-span-8 sm:col-span-9 grid grid-cols-3 gap-2">
               {[0, 1, 2].map((idx) => {
+                const isFrozenSlot = ownState.isFrozen && idx === 2;
                 const ev = ownState.currentTurnDarts[idx];
-                const isNext = idx === ownState.currentTurnDarts.length;
+                const isNext = !isFrozenSlot && idx === ownState.currentTurnDarts.length;
+
+                if (isFrozenSlot) {
+                  return (
+                    <div
+                      key={idx}
+                      className="min-h-[54px] px-2 py-1.5 rounded-xl border border-cyan-400/70 bg-cyan-950/75 text-cyan-200 flex flex-col items-center justify-center font-mono"
+                    >
+                      <span className="text-[10px] font-bold opacity-90">Dart 3</span>
+                      <span className="text-[11px] font-black truncate max-w-full">
+                        ❄️ EINGEFROREN
+                      </span>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={idx}
-                    className={`min-h-[52px] px-2 py-1.5 rounded-xl border flex flex-col items-center justify-center font-mono ${
+                    className={`min-h-[54px] px-2 py-1.5 rounded-xl border flex flex-col items-center justify-center font-mono ${
                       ev
-                        ? ev.kind === 'win'
+                        ? ev.kind === 'win' || ev.kind === 'turbo'
                           ? 'bg-amber-500/25 border-amber-300 text-amber-100'
+                          : ev.kind === 'sabotage' || ev.kind === 'shield'
+                          ? 'bg-cyan-500/25 border-cyan-400 text-cyan-100'
+                          : ev.kind === 'crash'
+                          ? 'bg-orange-500/25 border-orange-400 text-orange-100'
                           : ev.kind === 'hit'
                           ? 'bg-emerald-500/25 border-emerald-400 text-emerald-100'
                           : 'bg-red-950/70 border-red-500/60 text-red-200'
@@ -1294,18 +1742,18 @@ export default function RudolphClient({
               type="button"
               onClick={handleUndo}
               disabled={undoStack.length === 0}
-              className="col-span-4 sm:col-span-3 min-h-[52px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white border border-white/15 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              className="col-span-4 sm:col-span-3 min-h-[54px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white border border-white/15 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
               <RotateCcw className="w-4 h-4" />
               <span>Korrektur</span>
             </button>
           </div>
 
-          {/* 2 Riesige 1-Tap Touch-Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Reihe 1: Treffer (+1) & Triple-Turbo (+2) */}
+          <div className={`grid gap-3 ${!isFinalStep ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             <button
               type="button"
-              onClick={handleCheckpointHit}
+              onClick={() => handleCheckpointAdvance(1)}
               data-ui-id="RUDOLPH.PLAY.HIT_BTN"
               className={`min-h-[80px] px-5 py-4 rounded-2xl border-2 font-black text-base sm:text-lg flex flex-col items-center justify-center shadow-xl cursor-pointer active:scale-[0.98] transition-all ${
                 isFinalStep
@@ -1316,28 +1764,85 @@ export default function RudolphClient({
               {isFinalStep ? (
                 <span>🏆 LANDUNG IN WEYHAUSEN (SIEG!)</span>
               ) : (
-                <span>✓ CHECKPOINT GESCHAFFT! (WEITERFLIEGEN 🦌)</span>
+                <>
+                  <span>✓ TREFFER · +1 ETAPPE</span>
+                  <span className="text-[11px] font-mono opacity-80">
+                    Weiter zu Station {activeCp.step + 1}: {checkpoints[activeCp.step]?.location}
+                  </span>
+                </>
               )}
             </button>
 
+            {!isFinalStep && (
+              <button
+                type="button"
+                onClick={() => handleCheckpointAdvance(2)}
+                data-ui-id="RUDOLPH.PLAY.TURBO_BTN"
+                className="min-h-[80px] px-5 py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 hover:from-amber-300 hover:to-orange-300 text-slate-950 border-2 border-amber-100 font-black text-base sm:text-lg flex flex-col items-center justify-center shadow-xl shadow-amber-500/30 cursor-pointer active:scale-[0.98] transition-all"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Flame className="w-5 h-5" />
+                  <span>
+                    {ownState.completedSteps === 10
+                      ? '🔥 TRIPLE 13 · LANDEANFLUG + 🛡️'
+                      : '🔥 TRIPLE-TURBO · +2 ETAPPEN'}
+                  </span>
+                </span>
+                <span className="text-[11px] font-mono opacity-85">
+                  {activeCp.turboHint || 'Triple getroffen = 2 Stationen vor!'}
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* Reihe 2: Schneeball-Sabotage im 1 vs 1 Chaos-Modus */}
+          {gameMode === '1vs1' && chaosEnabled && (
+            <button
+              type="button"
+              onClick={handleSabotage}
+              disabled={ownState.sabotagedThisTurn}
+              data-ui-id="RUDOLPH.PLAY.SABOTAGE_BTN"
+              className="w-full min-h-[68px] px-5 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500/25 via-sky-500/30 to-cyan-500/25 hover:from-cyan-500/35 hover:to-sky-500/40 disabled:opacity-45 disabled:cursor-not-allowed text-cyan-100 border-2 border-cyan-400/80 font-black text-sm sm:text-base flex flex-col items-center justify-center shadow-lg shadow-cyan-500/15 cursor-pointer active:scale-[0.98] transition-all"
+            >
+              {ownState.sabotagedThisTurn ? (
+                <span className="flex items-center gap-2 text-cyan-200">
+                  <Shield className="w-4 h-4" />
+                  <span>✓ Sabotage in dieser Aufnahme bereits genutzt</span>
+                </span>
+              ) : (
+                <>
+                  <span className="flex items-center gap-2">
+                    <Snowflake className="w-5 h-5 text-cyan-300" />
+                    <span>❄️ SCHNEEBALL-SABOTAGE!</span>
+                  </span>
+                  <span className="text-[11px] sm:text-xs font-mono text-cyan-200 mt-0.5">
+                    Triff {sabotageTargetLabel} ➔ {oppName} -1 &amp; ❄️ Vereist (nur 2 Darts!)
+                  </span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Reihe 3: Miss & Restliche Darts Miss */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={handleMiss}
               data-ui-id="RUDOLPH.PLAY.MISS_BTN"
-              className="min-h-[80px] px-5 py-4 rounded-2xl bg-red-600/90 hover:bg-red-500 text-white border-2 border-red-400 font-black text-base sm:text-lg flex items-center justify-center shadow-xl cursor-pointer active:scale-[0.98] transition-all"
+              className="min-h-[68px] px-5 py-3.5 rounded-2xl bg-red-600/90 hover:bg-red-500 text-white border-2 border-red-400 font-black text-base flex items-center justify-center shadow-xl cursor-pointer active:scale-[0.98] transition-all"
             >
               <span>✕ DANEBEN (MISS)</span>
             </button>
-          </div>
 
-          <button
-            type="button"
-            onClick={handleRestMiss}
-            data-ui-id="RUDOLPH.PLAY.REST_MISS_BTN"
-            className="w-full min-h-[56px] px-5 py-3 rounded-2xl bg-rose-950/90 hover:bg-rose-900 text-rose-100 border-2 border-rose-500/70 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98]"
-          >
-            <span>✕✕✕ Restliche Darts Miss</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleRestMiss}
+              data-ui-id="RUDOLPH.PLAY.REST_MISS_BTN"
+              className="min-h-[68px] px-5 py-3.5 rounded-2xl bg-rose-950/90 hover:bg-rose-900 text-rose-100 border-2 border-rose-500/70 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98]"
+            >
+              <span>✕✕✕ Restliche Darts Miss</span>
+            </button>
+          </div>
         </>
       )}
     </div>

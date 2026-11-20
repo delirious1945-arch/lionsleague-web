@@ -332,20 +332,20 @@ export default function SpecialHubClient({
               </div>
 
               <p className="text-sm text-slate-300 leading-relaxed">
-                Fliege über 5 Checkpoints vom Nordpol (20) über Hamburg (Grün), Hannover (19·17·15) und
-                Wolfsburg (Doppel) bis zur Landung in Weyhausen (Bull oder D20). Mit 3 Treffern in
-                einer Aufnahme zündest du den Rudolph-Turbo!
+                Fliege über 12 Weihnachts-Stationen vom Nordpol (20) über Wichtel-Werkstatt,
+                Glühwein-Tanke und Grinch-Hinterhalt bis nach Weyhausen (Bull/D20) – mit
+                Schneeball-Sabotage, Schlitten-Crash, Triple-Turbo und Wichtel-Schild!
               </p>
 
               <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
-                  🛫 5 Checkpoints
+                  🛫 12 Stationen
                 </span>
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
-                  ⚡ 3-in-a-Turn Turbo
+                  ❄️ Sabotage &amp; Crash
                 </span>
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
-                  📺 Flug-Radar auf TV
+                  🔥 Triple-Turbo (+2)
                 </span>
               </div>
             </div>
