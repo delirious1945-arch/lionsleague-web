@@ -2,7 +2,20 @@ export type GolfGameMode = '1vsComputer' | '1vs1';
 export type GolfHolesCount = 18 | 9;
 export type GolfBotDifficulty = 'caddy' | 'clubmeister' | 'tourpro' | 'legend';
 
-export const MAX_STROKES_PER_HOLE = 9;
+export const MAX_STROKES_PER_HOLE = 8;
+
+export const IMPOSSIBLE_3DART_SCORES = new Set<number>([
+  163, 166, 169, 172, 173, 175, 176, 178, 179,
+]);
+
+export function isValidThreeDartScore(score: number): boolean {
+  return (
+    Number.isInteger(score) &&
+    score >= 0 &&
+    score <= 180 &&
+    !IMPOSSIBLE_3DART_SCORES.has(score)
+  );
+}
 
 export interface GolfBotConfig {
   id: GolfBotDifficulty;
@@ -10,9 +23,12 @@ export interface GolfBotConfig {
   handicapLabel: string;
   subtitle: string;
   badgeColor: string;
-  exactCheckoutChance: number;
-  goodDriveChance: number;
-  accidentalTripleChance: number;
+  avgMin: number;
+  avgMax: number;
+  checkoutChanceLow: number; // <= 60 m
+  checkoutChanceMid: number; // 61..120 m
+  checkoutChanceHigh: number; // 121..170 m
+  overshootChance: number;
   missChance: number;
 }
 
@@ -21,45 +37,57 @@ export const GOLF_BOT_CONFIGS: Record<GolfBotDifficulty, GolfBotConfig> = {
     id: 'caddy',
     name: 'Platz-Caddy',
     handicapLabel: 'HCP 36',
-    subtitle: 'Einsteiger · Streut öfter & fliegt gelegentlich übers Grün',
+    subtitle: 'Einsteiger (Ø 38–52 Pkt.) · Streut öfter & fliegt gelegentlich übers Grün',
     badgeColor: 'text-emerald-300 border-emerald-400/40 bg-emerald-500/15',
-    exactCheckoutChance: 0.28,
-    goodDriveChance: 0.48,
-    accidentalTripleChance: 0.16,
-    missChance: 0.22,
+    avgMin: 34,
+    avgMax: 56,
+    checkoutChanceLow: 0.32,
+    checkoutChanceMid: 0.08,
+    checkoutChanceHigh: 0.01,
+    overshootChance: 0.22,
+    missChance: 0.08,
   },
   clubmeister: {
     id: 'clubmeister',
     name: 'Club-Golfer',
     handicapLabel: 'HCP 18',
-    subtitle: 'Fortgeschritten · Solide Annäherung & sichere Single-Putts',
+    subtitle: 'Fortgeschritten (Ø 52–68 Pkt.) · Solide Annäherung & sichere Checkouts',
     badgeColor: 'text-cyan-300 border-cyan-400/40 bg-cyan-500/15',
-    exactCheckoutChance: 0.48,
-    goodDriveChance: 0.68,
-    accidentalTripleChance: 0.1,
-    missChance: 0.12,
+    avgMin: 48,
+    avgMax: 74,
+    checkoutChanceLow: 0.54,
+    checkoutChanceMid: 0.16,
+    checkoutChanceHigh: 0.03,
+    overshootChance: 0.14,
+    missChance: 0.04,
   },
   tourpro: {
     id: 'tourpro',
     name: 'PGA Tour-Pro',
     handicapLabel: 'HCP 0',
-    subtitle: 'Profi · Starke Triple-Drives & hohe Checkout-Quote',
+    subtitle: 'Profi (Ø 68–88 Pkt.) · Hohe Scores & starke Finishes bis 170 m',
     badgeColor: 'text-amber-300 border-amber-400/40 bg-amber-500/15',
-    exactCheckoutChance: 0.68,
-    goodDriveChance: 0.82,
-    accidentalTripleChance: 0.05,
-    missChance: 0.06,
+    avgMin: 64,
+    avgMax: 96,
+    checkoutChanceLow: 0.76,
+    checkoutChanceMid: 0.28,
+    checkoutChanceHigh: 0.08,
+    overshootChance: 0.07,
+    missChance: 0.01,
   },
   legend: {
     id: 'legend',
     name: 'Green-Jacket Legende',
     handicapLabel: 'Plus-HCP',
-    subtitle: 'Weltklasse · Laser-Drives & eiskalte Finishes aus bis zu 60 m',
+    subtitle: 'Weltklasse (Ø 85–112 Pkt.) · Konstante 100+ Aufnahmen & eiskalte Finishes',
     badgeColor: 'text-rose-300 border-rose-400/40 bg-rose-500/15',
-    exactCheckoutChance: 0.84,
-    goodDriveChance: 0.92,
-    accidentalTripleChance: 0.02,
-    missChance: 0.03,
+    avgMin: 82,
+    avgMax: 120,
+    checkoutChanceLow: 0.9,
+    checkoutChanceMid: 0.44,
+    checkoutChanceHigh: 0.15,
+    overshootChance: 0.03,
+    missChance: 0.0,
   },
 };
 
@@ -72,15 +100,15 @@ export interface GolfHoleDefinition {
 }
 
 export interface GolfDartShot {
-  strokeNumber: number; // 1..9 an diesem Loch
+  strokeNumber: number; // 1..8 an diesem Loch (1 Schlag = 1 Aufnahme)
   dartInTurn: 1 | 2 | 3;
-  label: string; // z. B. "T20", "S15", "D18", "BULL", "MISS"
-  value: number; // 0..60
+  label: string; // z. B. "100", "60", "41", "MISS"
+  value: number; // 0..180
   distanceBefore: number;
   distanceAfter: number;
   overshot: boolean; // true wenn value > distanceBefore
   holedOut: boolean; // true wenn distanceAfter === 0
-  pickedUp?: boolean; // true wenn Max-Schläge (9) erreicht ohne Einlochen
+  pickedUp?: boolean; // true wenn Max-Schläge (8) erreicht ohne Einlochen
 }
 
 export interface GolfHolePlayerResult {
@@ -173,7 +201,7 @@ const HOLE_NAMES_18: { name: string; hazardHint: string }[] = [
   { name: 'Kiefern-Schneise', hazardHint: 'Vorsicht vor dem Überflug ins Unterholz' },
   { name: 'Insel-Grün Weyhausen', hazardHint: 'Präzises kurzes Eisen gefragt' },
   { name: 'Sandbunker-Kurve', hazardHint: 'Dogleg links – guter Drive legt das Grün frei' },
-  { name: 'Lions-Allee', hazardHint: 'Langes Par 5 – hier zählt jeder Meter' },
+  { name: 'Lions-Allee', hazardHint: 'Langes Par 5 – hier zählt jede Aufnahme' },
   { name: 'Teich-Panorama', hazardHint: 'Kurz vor der Fahne lauert das Wasser' },
   { name: 'Windmühlen-Hügel', hazardHint: 'Gegenwind auf dem erhöhten Grün' },
   { name: 'Heide-Blick', hazardHint: 'Schnelles Grün – nicht überschießen!' },
@@ -209,7 +237,7 @@ function shufflePars(template: (3 | 4 | 5)[]): (3 | 4 | 5)[] {
 
 /**
  * Generiert einen kompletten 18-Loch (Par 72) oder 9-Loch (Par 36) Golfkurs
- * mit realistischen, zufälligen Loch-Distanzen in Metern.
+ * mit realistischen, zufälligen 3-Dart-Lochdistanzen (55 m bis 300 m).
  */
 export function generateGolfCourse(holesCount: GolfHolesCount = 18): GolfHoleDefinition[] {
   const frontNinePars = shufflePars(NINE_HOLE_PAR_TEMPLATE);
@@ -220,17 +248,14 @@ export function generateGolfCourse(holesCount: GolfHolesCount = 18): GolfHoleDef
   let prevDist = 0;
 
   return allPars.map((par, idx) => {
-    let dist = 80;
+    let dist = 140;
     for (let attempt = 0; attempt < 6; attempt += 1) {
       if (par === 3) {
-        // 40 bis 60 Meter (Checkbar mit 1 starken Dart oder 2 leichten Schlägen)
-        dist = randomInt(40, 60);
+        dist = randomInt(55, 120);
       } else if (par === 4) {
-        // 68 bis 116 Meter
-        dist = randomInt(68, 116);
+        dist = randomInt(125, 210);
       } else {
-        // Par 5: 122 bis 168 Meter
-        dist = randomInt(122, 168);
+        dist = randomInt(215, 300);
       }
       if (dist !== prevDist) break;
     }
@@ -249,92 +274,6 @@ export function generateGolfCourse(holesCount: GolfHolesCount = 18): GolfHoleDef
       hazardHint: meta.hazardHint,
     };
   });
-}
-
-/**
- * Prüft, ob eine Restdistanz mit exakt einem einzigen Dart (Single, Double, Triple, 25, 50)
- * auf 0 gecheckt (eingelocht) werden kann, und liefert alle möglichen Zielfelder.
- */
-export function getDirectCheckoutOptions(distance: number): {
-  canCheckoutInOne: boolean;
-  primaryLabel: string;
-  allOptionsText: string;
-  value: number;
-} {
-  if (distance <= 0 || distance > 60) {
-    return {
-      canCheckoutInOne: false,
-      primaryLabel: '',
-      allOptionsText: '',
-      value: distance,
-    };
-  }
-
-  const options: string[] = [];
-
-  if (distance === 50) {
-    options.push('BULLSEYE (50)');
-  }
-  if (distance === 25) {
-    options.push('SINGLE BULL (25)');
-  }
-  if (distance >= 1 && distance <= 20) {
-    options.push(`Single ${distance}`);
-  }
-  if (distance % 2 === 0 && distance / 2 >= 1 && distance / 2 <= 20) {
-    options.push(`D${distance / 2}`);
-  }
-  if (distance % 3 === 0 && distance / 3 >= 1 && distance / 3 <= 20) {
-    options.push(`T${distance / 3}`);
-  }
-
-  if (options.length === 0) {
-    return {
-      canCheckoutInOne: false,
-      primaryLabel: '',
-      allOptionsText: '',
-      value: distance,
-    };
-  }
-
-  return {
-    canCheckoutInOne: true,
-    primaryLabel: options[0],
-    allOptionsText: options.join(' · '),
-    value: distance,
-  };
-}
-
-/**
- * Gibt einen intelligenten Schläger-/Wurf-Tipp für die aktuelle Restdistanz zurück.
- */
-export function getCaddyAdvice(distance: number): string {
-  const chk = getDirectCheckoutOptions(distance);
-  if (chk.canCheckoutInOne) {
-    return `⛳ Putt zum Einlochen (${distance} m): ${chk.allOptionsText}!`;
-  }
-  if (distance > 60) {
-    const afterT20 = Math.abs(distance - 60);
-    const afterS20 = Math.abs(distance - 20);
-    if (distance >= 70) {
-      return `🏌️‍♂️ Driver: T20 (60 m) legt den Ball auf ${afterT20} m Rest (S20 → ${afterS20} m).`;
-    }
-    // 61..69m: T20 lässt 1..9m Putt übrig!
-    return `🏌️‍♂️ Fairway-Holz: T20 (60 m) lässt ${afterT20} m Putt · BULL (50 m) lässt ${distance - 50} m!`;
-  }
-  // distance < 60, aber nicht direkt in 1 Dart checkbar (z.B. 59, 58, 56, 55, 53, 52, 49, 47, 46, 44, 43, 41, 37, 35, 31, 29, 23)
-  if (distance > 40) {
-    const layup20 = distance - 20;
-    const layup25 = distance - 25;
-    return `🎯 Annäherung (Chip): Single 20 → ${layup20} m Rest oder Bull (25) → ${layup25} m Rest! Vorsicht vor Triple-Überflug!`;
-  }
-  // 23, 29, 31, 35, 37
-  const to16 = distance - 16;
-  const to20 = distance - 20;
-  if (to16 >= 1 && to16 <= 20) {
-    return `🎯 Chip aufs Grün: Single ${to16} legt auf 16 m (D8/S16) · Single 20 legt auf ${to20} m!`;
-  }
-  return `🎯 Annäherung: Single ${to20} legt den Ball auf 20 m Rest!`;
 }
 
 /**
@@ -472,101 +411,76 @@ export function cloneGolfPlayerState(s: GolfPlayerState): GolfPlayerState {
   };
 }
 
+function clampToValidThreeDartScore(rawScore: number): number {
+  let s = Math.max(0, Math.min(180, Math.round(rawScore)));
+  while (IMPOSSIBLE_3DART_SCORES.has(s) && s > 0) {
+    s -= 1;
+  }
+  return s;
+}
+
 /**
- * Simuliert einen einzelnen Dartwurf des Computer-Gegners anhand der Restdistanz
- * und des gewählten Bot-Handicaps (inkl. realistischer Annäherung, Putt & Überflug-Risiko).
+ * Simuliert eine komplette 3-Dart-Aufnahme (0–180) des Computer-Gegners
+ * passend zum Handicap-Level – inklusive realistischem Checkout und gelegentlichem Überflug.
  */
-export function simulateGolfBotDart(
+export function simulateGolfBotVisit(
   distance: number,
   difficulty: GolfBotDifficulty
 ): { label: string; value: number } {
   const cfg = GOLF_BOT_CONFIGS[difficulty] || GOLF_BOT_CONFIGS.clubmeister;
-  const roll = Math.random();
 
-  // 1. Falls direkt mit 1 Dart checkbar
-  const chk = getDirectCheckoutOptions(distance);
-  if (chk.canCheckoutInOne) {
-    // Leichter bei Single (1..20) als bei Triple/Bullseye
-    const isEasySingle = distance >= 1 && distance <= 20;
-    const hitProb = isEasySingle
-      ? Math.min(0.95, cfg.exactCheckoutChance + 0.22)
-      : cfg.exactCheckoutChance;
+  // 1. Checkout-Versuch wenn Restdistanz <= 170 und in einer Aufnahme erreichbar
+  if (distance > 0 && distance <= 170 && isValidThreeDartScore(distance)) {
+    const chkChance =
+      distance <= 60
+        ? cfg.checkoutChanceLow
+        : distance <= 120
+        ? cfg.checkoutChanceMid
+        : cfg.checkoutChanceHigh;
 
-    if (roll < hitProb) {
-      return { label: chk.primaryLabel.replace('Single ', 'S'), value: distance };
+    if (Math.random() < chkChance) {
+      return { label: String(distance), value: distance };
     }
-
-    // Verfehlt beim Putt:
-    // Chance auf versehentliches Doppel/Triple (Overshoot!)
-    if (isEasySingle && Math.random() < cfg.accidentalTripleChance) {
-      const mult = Math.random() < 0.55 ? 2 : 3;
-      const val = distance * mult;
-      return { label: `${mult === 2 ? 'D' : 'T'}${distance}`, value: val };
-    }
-
-    // Oder trifft Single statt Doppel/Triple (Annäherung ohne Überflug)
-    if (!isEasySingle && distance % 2 === 0 && distance / 2 <= 20 && Math.random() < 0.65) {
-      const half = distance / 2;
-      return { label: `S${half}`, value: half };
-    }
-    if (!isEasySingle && distance % 3 === 0 && distance / 3 <= 20 && Math.random() < 0.7) {
-      const third = distance / 3;
-      return { label: `S${third}`, value: third };
-    }
-    if (distance === 50 && Math.random() < 0.65) {
-      return { label: '25', value: 25 };
-    }
-
-    // Oder verfehlt am Draht vorbei (0m) oder kleines Nachbarfeld
-    if (Math.random() < 0.55) {
-      return { label: 'MISS', value: 0 };
-    }
-    const neighbor = Math.max(1, Math.min(20, distance <= 20 ? distance : 12));
-    return { label: `S${neighbor}`, value: neighbor };
   }
 
-  // 2. Langer Schlag (Distance > 60m)
-  if (distance > 60) {
-    if (Math.random() < cfg.missChance * 0.4) {
-      return { label: 'S5', value: 5 };
-    }
-    if (Math.random() < cfg.goodDriveChance) {
-      // Starker Drive: T20 (60), T19 (57), T18 (54) oder Bullseye (50)
-      const drives = [
-        { label: 'T20', value: 60 },
-        { label: 'T19', value: 57 },
-        { label: 'T18', value: 54 },
-        { label: 'BULL', value: 50 },
-      ];
-      // Wähle Drive, der möglichst gut auf <= 20m oder gerade Zahl stellt
-      const bestDrive =
-        drives.find((d) => distance - d.value >= 1 && distance - d.value <= 20) ||
-        drives[0];
-      return bestDrive;
-    }
-    // Normaler Single-Drive (S20 oder S19)
-    return Math.random() < 0.7
-      ? { label: 'S20', value: 20 }
-      : { label: 'S19', value: 19 };
-  }
-
-  // 3. Mittlere Annäherung (21..59m, nicht in 1 Dart checkbar)
-  // Ziel: Ein Single treffen, sodass 1..20m Rest bleibt!
-  const desiredLeave = distance > 36 ? 20 : 16;
-  const neededSingle = Math.max(1, Math.min(20, distance - desiredLeave));
-
+  // 2. Gelegentlicher Luftschlag / Nuller
   if (Math.random() < cfg.missChance) {
     return { label: 'MISS', value: 0 };
   }
 
-  // Versehentlicher Triple-Treffer beim Annähern -> Überflug!
-  if (Math.random() < cfg.accidentalTripleChance) {
-    return { label: `T${neededSingle}`, value: neededSingle * 3 };
+  // 3. Versehentlicher Überflug bei kurzer/mittlerer Distanz (z. B. Triple 20 statt Single 20)
+  if (distance <= 55 && Math.random() < cfg.overshootChance) {
+    const overChoices = [45, 55, 60, 66, 75, 80].filter((v) => v > distance);
+    const pickedOver =
+      overChoices[Math.floor(Math.random() * overChoices.length)] ??
+      clampToValidThreeDartScore(distance + randomInt(12, 35));
+    return { label: String(pickedOver), value: pickedOver };
   }
 
-  if (Math.random() < cfg.goodDriveChance) {
-    return { label: `S${neededSingle}`, value: neededSingle };
+  // 4. Lange Distanz (> 120 m): Power-Scoring anhand Handicap-Durchschnitt
+  let value: number;
+  if (distance > 120) {
+    const raw = randomInt(cfg.avgMin, cfg.avgMax) + randomInt(-10, 14);
+    value = clampToValidThreeDartScore(raw);
+    if (value > distance && Math.random() > cfg.overshootChance) {
+      value = clampToValidThreeDartScore(distance - randomInt(8, 32));
+    }
+  } else if (distance > 40) {
+    // 5. Mittlere Annäherung (41..120 m): Annähern auf machbaren Rest oder knapper Überflug
+    if (Math.random() < cfg.overshootChance * 0.8) {
+      value = clampToValidThreeDartScore(distance + randomInt(5, 28));
+    } else {
+      const leave = randomInt(4, Math.min(36, distance - 1));
+      value = clampToValidThreeDartScore(distance - leave);
+    }
+  } else {
+    // 6. Kurzer Putt (1..40 m) knapp vorbei ohne Überschießen
+    const leave = randomInt(1, Math.max(1, distance - 1));
+    value = clampToValidThreeDartScore(distance - leave);
   }
 
-  return { label: 'S20', value: 20 };
+  return {
+    label: value === 0 ? 'MISS' : String(value),
+    value,
+  };
 }

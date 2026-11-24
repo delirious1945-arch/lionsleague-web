@@ -521,12 +521,12 @@ export default function TrainingSelectionClient({
               </div>
 
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                18 Bahnen mit zufällig generierten Loch-Entfernungen (40–168 m). Checke die Distanz mit jedem beliebigen Feld (Single, Doppel, Triple oder Bull) exakt auf 0 Meter! Vorsicht vor dem Überflug: Wirfst du mehr Meter als Rest (z. B. 25 m Rest mit T20 = 60 m), schießt der Ball übers Grün hinaus und du stehst bei 35 m Rest!
+                18 Bahnen mit zufällig generierten Loch-Entfernungen (55–300 m). Gib die geworfene Gesamtpunktzahl (0–180) klassisch am Eingabepad ein – der Rest wird im Kopf ausgeworfen! Vorsicht vor dem Überflug: Wirfst du mehr Meter als Rest (z. B. 25 m Rest mit 60 m), fliegt der Ball übers Loch auf 35 m Rest!
               </p>
 
               <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
                 <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-slate-200 font-mono font-semibold">
-                  ⛳ Check: Single · Double · Triple · Bull
+                  ⌨️ Klassisches 0–180 Eingabepad
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-amber-200 font-mono font-semibold">
                   💨 Überflug = |Rest − Wurf|

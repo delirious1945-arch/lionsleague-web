@@ -448,17 +448,17 @@ export default function SpecialHubClient({
               </div>
 
               <p className="text-sm text-slate-300 leading-relaxed">
-                18 Bahnen mit zufällig generierten Loch-Entfernungen (40–168 m). Checke die Restdistanz
-                mit Single, Doppel, Triple oder Bull exakt auf 0 m! Wirfst du zu weit (z. B. 25 m Rest
-                und T20 = 60 m), fliegt der Ball übers Loch hinaus auf 35 m Rest!
+                18 Bahnen mit zufällig generierten Loch-Entfernungen (55–300 m). Gib die geworfene
+                Gesamtzahl (0–180) klassisch am 0–9 Eingabepad ein – der Rest erfolgt im Kopf! Wirfst
+                du zu weit (z. B. 25 m Rest und 60 m), fliegt der Ball übers Loch auf 35 m Rest!
               </p>
 
               <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
-                  ⛳ 18 Löcher Zufallsdistanz
+                  ⛳ 18 Löcher (55–300 m)
                 </span>
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
-                  💨 Overshoot = |Rest − Wurf|
+                  ⌨️ Klassisches 0–180 Numpad
                 </span>
                 <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
                   🤖 4 Golf-Bots &amp; 1vs1

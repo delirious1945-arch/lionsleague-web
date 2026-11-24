@@ -12,7 +12,6 @@ import {
   GolfPlayerState,
   MAX_STROKES_PER_HOLE,
   formatToPar,
-  getDirectCheckoutOptions,
   getGolfTermForScore,
 } from '@/app/training/dartsgolf/types';
 
@@ -88,15 +87,22 @@ function TurnShotSlots({
               key={idx}
               className={`py-1.5 px-1.5 rounded-xl border-2 text-center font-mono transition-all ${cls}`}
             >
+              <div className="text-[10px] font-bold opacity-80">
+                Schlag {sh.strokeNumber}
+              </div>
               <div className="text-xs sm:text-sm font-black leading-tight truncate">
-                {sh.holedOut ? `⛳ ${sh.label}` : sh.overshot ? `💨 ${sh.label}` : sh.label}
+                {sh.holedOut
+                  ? `⛳ ${sh.value} m`
+                  : sh.overshot
+                  ? `💨 ${sh.value} m`
+                  : `${sh.value} m`}
               </div>
               <div className="text-[10px] font-bold opacity-90 truncate">
                 {sh.holedOut
                   ? 'EINGELOCHT!'
                   : sh.overshot
                   ? `Überflug → ${sh.distanceAfter}m`
-                  : `→ ${sh.distanceAfter}m`}
+                  : `→ ${sh.distanceAfter} m`}
               </div>
             </div>
           );
@@ -105,7 +111,7 @@ function TurnShotSlots({
         return (
           <div
             key={idx}
-            className={`py-1.5 px-1.5 rounded-xl border border-dashed text-center font-mono flex flex-col items-center justify-center ${
+            className={`py-2 px-1.5 rounded-xl border border-dashed text-center font-mono flex flex-col items-center justify-center ${
               isHoledOut
                 ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-400/70'
                 : isActive && idx === shots.length
@@ -114,7 +120,7 @@ function TurnShotSlots({
             }`}
           >
             <div className="text-[11px] font-black">
-              {isHoledOut ? '⛳ Im Loch' : `Schlag ${idx + 1}`}
+              {isHoledOut ? '⛳ Im Loch' : `Aufn. ${idx + 1}`}
             </div>
             <div className="text-[10px]">•</div>
           </div>
@@ -210,7 +216,7 @@ export default function HolographicDartsGolfCockpit({
     holes[Math.min(holes.length - 1, Math.max(0, currentHoleIndex))] || {
       holeNumber: currentHoleIndex + 1,
       par: 4,
-      startDistance: 90,
+      startDistance: 150,
       name: 'Fairway Weyhausen',
       hazardHint: 'Spiele den Ball exakt auf 0 Meter',
     };
@@ -218,7 +224,7 @@ export default function HolographicDartsGolfCockpit({
   const botCfg = GOLF_BOT_CONFIGS[computerLevel] || GOLF_BOT_CONFIGS.clubmeister;
 
   // Berechne Ball-Positionen auf der Fairway-Grafik:
-  // Abschlag links = 6%, Fahne rechts = 80%, Hinterland (Überflug) = 82%..95%
+  // Abschlag links = 6%, Fahne rechts = 80%, Hinterland (Überflug) = 83%..95%
   const computeBallLeftPct = (st: GolfPlayerState) => {
     if (st.currentHoleHoledOut || st.currentDistance === 0) return 80;
     const lastShot =
@@ -226,7 +232,7 @@ export default function HolographicDartsGolfCockpit({
         ? st.currentHoleAllShots[st.currentHoleAllShots.length - 1]
         : null;
     if (lastShot?.overshot) {
-      const overshootRatio = Math.min(1, st.currentDistance / 45);
+      const overshootRatio = Math.min(1, st.currentDistance / 90);
       return Math.round(83 + overshootRatio * 12);
     }
     const maxDist = Math.max(currentHole.startDistance, st.currentDistance, 1);
@@ -242,7 +248,10 @@ export default function HolographicDartsGolfCockpit({
     const isAct = !winnerPlayer && activePlayer === playerNum;
     const isWin = winnerPlayer === playerNum;
     const { firstName, lastName, sizeClass } = getNameSizing(name);
-    const chk = getDirectCheckoutOptions(st.currentDistance);
+    const recentShots =
+      st.currentHoleAllShots && st.currentHoleAllShots.length > 0
+        ? st.currentHoleAllShots.slice(-3)
+        : st.currentTurnShots || [];
     const lastShot =
       st.currentHoleAllShots && st.currentHoleAllShots.length > 0
         ? st.currentHoleAllShots[st.currentHoleAllShots.length - 1]
@@ -322,7 +331,7 @@ export default function HolographicDartsGolfCockpit({
           </div>
         </div>
 
-        {/* Aktuelle Distanz zum Loch */}
+        {/* Aktuelle Distanz zum Loch (ohne Kopfrechen-Spoiler!) */}
         <div className="my-2 p-3 rounded-2xl bg-slate-950/80 border border-white/15 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400 block">
@@ -337,18 +346,13 @@ export default function HolographicDartsGolfCockpit({
                 className={`text-3xl sm:text-4xl font-black font-mono ${
                   st.currentHoleHoledOut
                     ? 'text-emerald-400'
-                    : chk.canCheckoutInOne
-                    ? 'text-emerald-300 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                    : st.currentDistance <= 170
+                    ? 'text-emerald-300 drop-shadow-[0_0_15px_rgba(16,185,129,0.45)]'
                     : 'text-white'
                 }`}
               >
                 {st.currentDistance} m
               </span>
-              {chk.canCheckoutInOne && !st.currentHoleHoledOut && (
-                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/60 text-emerald-200 font-mono text-[11px] font-black">
-                  ⛳ PUTT: {chk.allOptionsText}
-                </span>
-              )}
             </div>
           </div>
 
@@ -361,7 +365,7 @@ export default function HolographicDartsGolfCockpit({
           </div>
         </div>
 
-        {/* Mini-Golf-Bilanz + 3-Dart-Slots */}
+        {/* Mini-Golf-Bilanz + Letzte 3 Schläge */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[11px] font-mono">
             {isWin ? (
@@ -399,7 +403,7 @@ export default function HolographicDartsGolfCockpit({
           </div>
 
           <TurnShotSlots
-            shots={st.currentTurnShots || []}
+            shots={recentShots}
             isActive={isAct}
             isHoledOut={st.currentHoleHoledOut}
             accent={isP1 ? 'emerald' : 'amber'}
@@ -460,7 +464,7 @@ export default function HolographicDartsGolfCockpit({
 
       {/* Haupt-Cockpit */}
       <div className="relative z-10 flex-1 flex flex-col justify-between gap-3 min-h-0 py-2 max-w-[1600px] w-full mx-auto">
-        {/* 1. Obere Zone: Interaktives Fairway-Radar (Tee -> Grün/Fahne -> Überflug-Rough) */}
+        {/* 1. Obere Zone: Interaktives Fairway-Radar */}
         <div className="rounded-[1.75rem] bg-slate-900/70 backdrop-blur-3xl border border-emerald-400/25 p-3.5 sm:p-4 shadow-2xl space-y-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
@@ -490,18 +494,14 @@ export default function HolographicDartsGolfCockpit({
 
           {/* Fairway & Putting-Grün Grafik */}
           <div className="relative h-20 sm:h-24 w-full rounded-2xl bg-gradient-to-r from-emerald-950/95 via-emerald-900/75 to-amber-950/75 border border-emerald-400/35 overflow-hidden px-4">
-            {/* Fairway-Streifen & Distanz-Markierungen */}
             <div className="absolute inset-y-0 left-0 w-[80%] bg-gradient-to-r from-emerald-950/60 via-emerald-800/35 to-emerald-600/30" />
-            {/* Putting-Grün rund um die Fahne (68%..83%) */}
             <div className="absolute top-1/2 -translate-y-1/2 left-[70%] w-[14%] h-14 sm:h-16 rounded-full bg-emerald-400/25 border-2 border-emerald-300/60 shadow-[0_0_25px_rgba(16,185,129,0.4)]" />
-            {/* Überflug-Rough rechts hinter der Fahne (82%..100%) */}
-            <div className="absolute inset-y-0 left-[82%] right-0 bg-repeating-linear-gradient bg-amber-950/50 border-l-2 border-dashed border-amber-400/60 flex items-center justify-center">
-              <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-wider text-amber-300/80 rotate-0 px-1 text-center">
+            <div className="absolute inset-y-0 left-[82%] right-0 bg-amber-950/50 border-l-2 border-dashed border-amber-400/60 flex items-center justify-center">
+              <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-wider text-amber-300/80 px-1 text-center">
                 💨 Überflug-Rough
               </span>
             </div>
 
-            {/* Abschlag (Tee) bei 5% */}
             <div className="absolute left-[4%] top-1/2 -translate-y-1/2 flex flex-col items-center">
               <span className="text-xs font-mono font-black text-slate-300">TEE</span>
               <span className="text-[10px] font-mono text-slate-400">
@@ -509,7 +509,6 @@ export default function HolographicDartsGolfCockpit({
               </span>
             </div>
 
-            {/* Die Fahne (0 m) bei 80% */}
             <div className="absolute left-[80%] top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center z-10">
               <span className="text-xl sm:text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.9)]">
                 ⛳
@@ -519,7 +518,6 @@ export default function HolographicDartsGolfCockpit({
               </span>
             </div>
 
-            {/* Golfball Spieler 1 (Obere Spur) */}
             <div
               className="absolute top-[24%] -translate-y-1/2 -translate-x-1/2 transition-all duration-700 z-20 flex items-center gap-1"
               style={{ left: `${p1BallLeft}%` }}
@@ -529,7 +527,6 @@ export default function HolographicDartsGolfCockpit({
               </span>
             </div>
 
-            {/* Golfball Spieler 2 / Computer (Untere Spur) */}
             <div
               className="absolute top-[74%] -translate-y-1/2 -translate-x-1/2 transition-all duration-700 z-20 flex items-center gap-1"
               style={{ left: `${p2BallLeft}%` }}
@@ -577,7 +574,6 @@ export default function HolographicDartsGolfCockpit({
                   <td className="py-1 px-2">-</td>
                 </tr>
 
-                {/* Zeile Spieler 1 */}
                 <tr>
                   <td className="py-1 px-2 text-left font-black text-emerald-300 truncate max-w-[110px]">
                     {p1Name}
@@ -622,7 +618,6 @@ export default function HolographicDartsGolfCockpit({
                   </td>
                 </tr>
 
-                {/* Zeile Spieler 2 / Bot */}
                 <tr>
                   <td className="py-1 px-2 text-left font-black text-amber-300 truncate max-w-[110px]">
                     {p2Name}
@@ -683,7 +678,7 @@ export default function HolographicDartsGolfCockpit({
               <ActionBanner lastAction={lastAction} />
             </div>
             <div className="px-3.5 py-2 rounded-xl bg-slate-900/75 border border-white/10 text-center font-mono text-[11px] text-cyan-200 font-bold">
-              ⛳ Check über Single, Doppel, Triple &amp; Bull · 💨 Überwurf = |Rest − Wurf|
+              ⛳ 1 Aufnahme = 1 Schlag · 💨 Überwurf = |Rest − Wurf|
             </div>
           </div>
 

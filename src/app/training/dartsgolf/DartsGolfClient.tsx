@@ -21,17 +21,17 @@ import {
   createInitialGolfPlayerState,
   formatToPar,
   generateGolfCourse,
-  getCaddyAdvice,
-  getDirectCheckoutOptions,
   getGolfTermForScore,
-  simulateGolfBotDart,
+  isValidThreeDartScore,
+  simulateGolfBotVisit,
 } from './types';
 import { saveDartsGolfSessionAction } from './actions';
 import {
   ArrowLeft,
   ArrowRight,
   Bot,
-  CheckCircle2,
+  ClipboardList,
+  Delete,
   Flag,
   HelpCircle,
   RotateCcw,
@@ -43,7 +43,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 
-const CACHE_KEY = 'lions_active_dartsgolf_session_v1';
+const CACHE_KEY = 'lions_active_dartsgolf_session_v2';
 const OFFLINE_QUEUE_KEY = 'lions_dartsgolf_offline_queue_v1';
 
 interface DartsGolfClientProps {
@@ -154,7 +154,8 @@ export default function DartsGolfClient({
   const [isGuestP2, setIsGuestP2] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [showHelp, setShowHelp] = useState<boolean>(false);
-  const [selectedMultiplier, setSelectedMultiplier] = useState<1 | 2 | 3>(1);
+  const [showScorecard, setShowScorecard] = useState<boolean>(false);
+  const [scoreInput, setScoreInput] = useState<string>('');
   const [historyList, setHistoryList] = useState<GolfHistoryItem[]>(initialHistory || []);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -170,10 +171,10 @@ export default function DartsGolfClient({
   const [currentHoleIndex, setCurrentHoleIndex] = useState<number>(0);
   const [activePlayer, setActivePlayer] = useState<1 | 2>(1);
   const [p1State, setP1State] = useState<GolfPlayerState>(() =>
-    createInitialGolfPlayerState(90)
+    createInitialGolfPlayerState(140)
   );
   const [p2State, setP2State] = useState<GolfPlayerState>(() =>
-    createInitialGolfPlayerState(90)
+    createInitialGolfPlayerState(140)
   );
   const [lastAction, setLastAction] = useState<GolfLastActionBanner | null>(null);
   const [winnerPlayer, setWinnerPlayer] = useState<1 | 2 | 'draw' | null>(null);
@@ -363,7 +364,7 @@ export default function DartsGolfClient({
         status: finished ? ('completed' as const) : ('playing' as const),
         gameType: 'dartsgolf' as const,
         gameTitle: `Lions Darts-Golf (${courseHoles.length} Holes)`,
-        gameMode: gameMode === '1vsComputer' ? '1vs1' : '1vs1',
+        gameMode: '1vs1',
         p1Name: p1Name.trim() || 'Spieler 1',
         p2Name: effectiveP2Name,
         activePlayer: actPlayer,
@@ -677,7 +678,9 @@ export default function DartsGolfClient({
     setLastAction(startBanner);
     setWinnerPlayer(null);
     setUndoStack([]);
-    setSelectedMultiplier(1);
+    setScoreInput('');
+    setShowScorecard(false);
+    setShowHelp(false);
     setGameSessionId(freshId);
     setIsGameFinished(false);
     setIsGameStarted(true);
@@ -716,6 +719,8 @@ export default function DartsGolfClient({
     setLastAction(c.lastAction ?? null);
     setWinnerPlayer(c.winnerPlayer ?? null);
     setUndoStack(Array.isArray(c.undoStack) ? c.undoStack : []);
+    setScoreInput('');
+    setShowScorecard(false);
     setGameSessionId(c.gameSessionId || generateSessionId('dartsgolf', activeBoard));
     setIsGameFinished(false);
     setIsGameStarted(true);
@@ -740,10 +745,11 @@ export default function DartsGolfClient({
     setIsGameFinished(false);
     setWinnerPlayer(null);
     setUndoStack([]);
+    setScoreInput('');
     sendStandbySignal();
   };
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (undoStack.length === 0 || isBotThrowing) return;
     const prev = undoStack[undoStack.length - 1];
     setUndoStack((s) => s.slice(0, -1));
@@ -754,8 +760,9 @@ export default function DartsGolfClient({
     setLastAction(prev.lastAction);
     setWinnerPlayer(prev.winnerPlayer);
     setIsGameFinished(prev.isGameFinished);
+    setScoreInput('');
     setIsGameStarted(true);
-  };
+  }, [isBotThrowing, undoStack]);
 
   // Hilfsfunktion: Loch für einen Spieler abschließen
   const finalizeHoleForPlayer = (st: GolfPlayerState, hole: GolfHoleDefinition) => {
@@ -782,12 +789,12 @@ export default function DartsGolfClient({
     else st.doubleBogeysOrWorse += 1;
   };
 
-  // Kernfunktion: Einen einzelnen Dart (Schlag) verarbeiten
-  const executeDartShot = useCallback(
-    (label: string, value: number, isFromBot = false) => {
+  // Kernfunktion: Eine 3-Dart-Aufnahme (1 Aufnahme = 1 Schlag) verbuchen
+  const submitVisitScore = useCallback(
+    (score: number, isFromBot = false) => {
       if (isGameFinished) return;
+      if (!isValidThreeDartScore(score)) return;
 
-      // Undo-Snapshot nur bei menschlichen Würfen anlegen, damit "Korrektur" immer zum letzten eigenen Wurf zurückspringt
       if (!isFromBot) {
         const snap: GolfSnapshot = {
           activePlayer,
@@ -808,13 +815,9 @@ export default function DartsGolfClient({
       const actorName = activePlayer === 1 ? p1Name : effectiveP2Name;
       const currentHole = holes[currentHoleIndex];
 
-      if (own.currentTurnShots.length >= 3) {
-        own.currentTurnShots = [];
-      }
-
       const distBefore = own.currentDistance;
-      const distAfter = Math.abs(distBefore - value);
-      const overshot = value > distBefore;
+      const distAfter = Math.abs(distBefore - score);
+      const overshot = score > distBefore;
       const holedOut = distAfter === 0;
 
       own.currentHoleStrokes += 1;
@@ -837,9 +840,9 @@ export default function DartsGolfClient({
 
       const shot: GolfDartShot = {
         strokeNumber: own.currentHoleStrokes,
-        dartInTurn: (own.currentTurnShots.length + 1) as 1 | 2 | 3,
-        label,
-        value,
+        dartInTurn: (((own.currentHoleStrokes - 1) % 3) + 1) as 1 | 2 | 3,
+        label: score === 0 ? 'MISS' : String(score),
+        value: score,
         distanceBefore: distBefore,
         distanceAfter: own.currentDistance,
         overshot,
@@ -847,8 +850,8 @@ export default function DartsGolfClient({
         pickedUp: reachedMaxStrokes,
       };
 
-      own.currentTurnShots.push(shot);
       own.currentHoleAllShots.push(shot);
+      own.currentTurnShots = own.currentHoleAllShots.slice(-3);
 
       // Laufenden Score-To-Par aktualisieren
       const completedParOwn = own.completedHoles.reduce((a, h) => a + h.par, 0);
@@ -861,14 +864,15 @@ export default function DartsGolfClient({
 
       if (holedOut) {
         const term = getGolfTermForScore(own.currentHoleStrokes, currentHole.par);
-        const isEagleOrBetter = own.currentHoleStrokes - currentHole.par <= -2 || own.currentHoleStrokes === 1;
+        const isEagleOrBetter =
+          own.currentHoleStrokes - currentHole.par <= -2 || own.currentHoleStrokes === 1;
         triggerSound(isEagleOrBetter ? 'eagle' : 'hole_out');
         banner = {
           id: Date.now(),
           tone: isEagleOrBetter ? 'eagle' : 'hole_out',
           icon: isEagleOrBetter ? '🦅' : '⛳',
-          headline: `${term.term.toUpperCase()} AN LOCH ${currentHole.holeNumber}!`,
-          subline: `${actorName} checkt ${distBefore} m über ${label} im ${own.currentHoleStrokes}. Schlag (${term.toParLabel})!`,
+          headline: `${term.term.toUpperCase()}!`,
+          subline: `${actorName} checkt ${distBefore} m im ${own.currentHoleStrokes}. Schlag (${term.toParLabel})!`,
           actorPlayer: activePlayer,
         };
       } else if (reachedMaxStrokes) {
@@ -877,8 +881,8 @@ export default function DartsGolfClient({
           id: Date.now(),
           tone: 'miss',
           icon: '⚠️',
-          headline: `MAX-SCHLÄGE (${MAX_STROKES_PER_HOLE}) ERREICHT`,
-          subline: `${actorName} hebt den Ball an Loch ${currentHole.holeNumber} mit ${MAX_STROKES_PER_HOLE} Schlägen auf.`,
+          headline: `MAX-SCHLÄGE (${MAX_STROKES_PER_HOLE})`,
+          subline: `${actorName} beendet Loch ${currentHole.holeNumber} mit ${MAX_STROKES_PER_HOLE} Schlägen.`,
           actorPlayer: activePlayer,
         };
       } else if (overshot) {
@@ -887,17 +891,17 @@ export default function DartsGolfClient({
           id: Date.now(),
           tone: 'overshoot',
           icon: '💨',
-          headline: `ÜBERFLUG! +${distAfter} M HINTER DIE FAHNE!`,
-          subline: `${actorName} wirft ${label} (${value} m) bei ${distBefore} m Rest — neue Distanz: ${distAfter} m!`,
+          headline: `ÜBERFLUG! ${score} M BEI ${distBefore} M REST`,
+          subline: `${actorName} fliegt übers Loch ➔ ${distAfter} m Rest!`,
           actorPlayer: activePlayer,
         };
-      } else if (value === 0) {
+      } else if (score === 0) {
         triggerSound('miss');
         banner = {
           id: Date.now(),
           tone: 'miss',
           icon: '✕',
-          headline: 'LUFTSCHLAG (0 M)',
+          headline: '0 M (KEIN SCORE)',
           subline: `${actorName} bleibt bei ${distAfter} m vor der Fahne.`,
           actorPlayer: activePlayer,
         };
@@ -907,8 +911,8 @@ export default function DartsGolfClient({
           id: Date.now(),
           tone: 'drive',
           icon: '🏌️‍♂️',
-          headline: `${label} (${value} M) GESCHLAGEN`,
-          subline: `${actorName} verkürzt von ${distBefore} m auf ${distAfter} m Restdistanz!`,
+          headline: `${score} M GESCHLAGEN`,
+          subline: `${actorName}: ${distBefore} m ➔ ${distAfter} m Rest!`,
           actorPlayer: activePlayer,
         };
       }
@@ -942,11 +946,13 @@ export default function DartsGolfClient({
             icon: '🏆',
             headline:
               winP === 'draw'
-                ? `RUNDE BEENDET · GLEICHSTAND (${nextP1.totalStrokes} SCHLÄGE)!`
+                ? `GLEICHSTAND (${nextP1.totalStrokes} SCHLÄGE)!`
                 : `SIEG FÜR ${(winP === 1 ? p1Name : effectiveP2Name).toUpperCase()}!`,
-            subline: `Endstand nach ${holes.length} Löchern: ${p1Name} ${nextP1.totalStrokes} (${formatToPar(
+            subline: `${p1Name}: ${nextP1.totalStrokes} (${formatToPar(
               nextP1.scoreToPar
-            )}) vs. ${effectiveP2Name} ${nextP2.totalStrokes} (${formatToPar(nextP2.scoreToPar)})`,
+            )}) vs. ${effectiveP2Name}: ${nextP2.totalStrokes} (${formatToPar(
+              nextP2.scoreToPar
+            )})`,
             actorPlayer: winP === 2 ? 2 : 1,
           };
 
@@ -958,6 +964,7 @@ export default function DartsGolfClient({
           setP2State(nextP2);
           setLastAction(finalBanner);
           setWinnerPlayer(winP);
+          setScoreInput('');
           setIsGameFinished(true);
           persistFinishedMatch(nextP1, nextP2, winP, holes, gameSessionId);
           return;
@@ -990,8 +997,8 @@ export default function DartsGolfClient({
           id: Date.now(),
           tone: 'hole_out',
           icon: '⛳',
-          headline: `LOCH ${currentHole.holeNumber} BEENDET (${p1LastRes.strokes} : ${p2LastRes.strokes}) ➔ LOCH ${nextHole.holeNumber} (${nextHole.startDistance} M)`,
-          subline: `Weiter auf Bahn ${nextHole.holeNumber} (${nextHole.name} · Par ${nextHole.par} · ${nextHole.startDistance} m)!`,
+          headline: `LOCH ${currentHole.holeNumber} (${p1LastRes.strokes}:${p2LastRes.strokes}) ➔ LOCH ${nextHole.holeNumber}: ${nextHole.startDistance} M`,
+          subline: `${nextHole.name} · Par ${nextHole.par}`,
           actorPlayer: 1,
         };
 
@@ -999,30 +1006,22 @@ export default function DartsGolfClient({
         setP2State(nextP2);
         setCurrentHoleIndex(nextHoleIdx);
         setActivePlayer(1);
-        setSelectedMultiplier(1);
+        setScoreInput('');
         setLastAction(nextHoleBanner);
         return;
       }
 
-      // Falls dieses Loch noch nicht für beide beendet ist: Prüfen ob Spielerwechsel dran ist
-      const turnFinished = ownDoneOnHole || own.currentTurnShots.length >= 3;
-      let nextActive: 1 | 2 = activePlayer;
-
-      if (turnFinished) {
-        if (!oppDoneOnHole) {
-          nextActive = activePlayer === 1 ? 2 : 1;
-          opp.currentTurnShots = [];
-        } else {
-          // Gegner ist schon im Loch, aktiver Spieler startet nächste 3er-Aufnahme am selben Loch
-          nextActive = activePlayer;
-          own.currentTurnShots = [];
-        }
-      }
+      // Sofortiger Spielerwechsel nach jedem Schlag (1 Aufnahme = 1 Schlag), solange der andere noch nicht im Loch ist
+      const nextActive: 1 | 2 = !oppDoneOnHole
+        ? activePlayer === 1
+          ? 2
+          : 1
+        : activePlayer;
 
       setP1State(nextP1);
       setP2State(nextP2);
       setActivePlayer(nextActive);
-      setSelectedMultiplier(1);
+      setScoreInput('');
       setLastAction(banner);
     },
     [
@@ -1042,147 +1041,7 @@ export default function DartsGolfClient({
     ]
   );
 
-  // Restliche Darts der Aufnahme als Miss (0 m) werten
-  const handleRestMiss = () => {
-    if (isGameFinished || isBotThrowing) return;
-    const own = activePlayer === 1 ? p1State : p2State;
-    const thrownInTurn = own.currentTurnShots.length >= 3 ? 0 : own.currentTurnShots.length;
-    const remaining = Math.max(1, 3 - thrownInTurn);
-    // Wenn nur 1 Dart übrig ist, normaler Miss
-    if (remaining === 1) {
-      executeDartShot('MISS', 0);
-      return;
-    }
-
-    // Snapshot vor den gebündelten Misses sichern
-    const snap: GolfSnapshot = {
-      activePlayer,
-      currentHoleIndex,
-      p1State: cloneGolfPlayerState(p1State),
-      p2State: cloneGolfPlayerState(p2State),
-      lastAction,
-      winnerPlayer,
-      isGameFinished,
-    };
-    setUndoStack((prev) => [...prev.slice(-49), snap]);
-
-    const nextP1 = cloneGolfPlayerState(p1State);
-    const nextP2 = cloneGolfPlayerState(p2State);
-    const ownNext = activePlayer === 1 ? nextP1 : nextP2;
-    const oppNext = activePlayer === 1 ? nextP2 : nextP1;
-    const actorName = activePlayer === 1 ? p1Name : effectiveP2Name;
-    const currentHole = holes[currentHoleIndex];
-
-    if (ownNext.currentTurnShots.length >= 3) ownNext.currentTurnShots = [];
-
-    for (let i = 0; i < remaining; i += 1) {
-      if (ownNext.currentHoleHoledOut || ownNext.currentHolePickedUp) break;
-      ownNext.currentHoleStrokes += 1;
-      ownNext.totalStrokes += 1;
-      const reachedMax = ownNext.currentHoleStrokes >= MAX_STROKES_PER_HOLE;
-      if (reachedMax) {
-        ownNext.currentHolePickedUp = true;
-        ownNext.currentDistance = 0;
-      }
-      const sh: GolfDartShot = {
-        strokeNumber: ownNext.currentHoleStrokes,
-        dartInTurn: (ownNext.currentTurnShots.length + 1) as 1 | 2 | 3,
-        label: 'MISS',
-        value: 0,
-        distanceBefore: ownNext.currentDistance,
-        distanceAfter: ownNext.currentDistance,
-        overshot: false,
-        holedOut: false,
-        pickedUp: reachedMax,
-      };
-      ownNext.currentTurnShots.push(sh);
-      ownNext.currentHoleAllShots.push(sh);
-    }
-
-    const completedParOwn = ownNext.completedHoles.reduce((a, h) => a + h.par, 0);
-    ownNext.totalParPlayed = completedParOwn + currentHole.par;
-    ownNext.scoreToPar = ownNext.totalStrokes - ownNext.totalParPlayed;
-
-    triggerSound('miss');
-
-    const ownDone = ownNext.currentHoleHoledOut || ownNext.currentHolePickedUp;
-    const oppDone = oppNext.currentHoleHoledOut || oppNext.currentHolePickedUp;
-
-    if (ownDone && oppDone) {
-      // Beide fertig -> Loch abschließen
-      finalizeHoleForPlayer(nextP1, currentHole);
-      finalizeHoleForPlayer(nextP2, currentHole);
-      if (nextP1.currentHoleStrokes < nextP2.currentHoleStrokes) nextP1.holesWon += 1;
-      else if (nextP2.currentHoleStrokes < nextP1.currentHoleStrokes) nextP2.holesWon += 1;
-
-      if (currentHoleIndex >= holes.length - 1) {
-        let winP: 1 | 2 | 'draw' = 'draw';
-        if (nextP1.totalStrokes < nextP2.totalStrokes) winP = 1;
-        else if (nextP2.totalStrokes < nextP1.totalStrokes) winP = 2;
-
-        setP1State(nextP1);
-        setP2State(nextP2);
-        setWinnerPlayer(winP);
-        setIsGameFinished(true);
-        persistFinishedMatch(nextP1, nextP2, winP, holes, gameSessionId);
-        return;
-      }
-
-      const nextHoleIdx = currentHoleIndex + 1;
-      const nextHole = holes[nextHoleIdx];
-      nextP1.currentDistance = nextHole.startDistance;
-      nextP1.currentHoleStrokes = 0;
-      nextP1.currentHoleOvershoots = 0;
-      nextP1.currentHoleHoledOut = false;
-      nextP1.currentHolePickedUp = false;
-      nextP1.currentTurnShots = [];
-      nextP1.currentHoleAllShots = [];
-
-      nextP2.currentDistance = nextHole.startDistance;
-      nextP2.currentHoleStrokes = 0;
-      nextP2.currentHoleOvershoots = 0;
-      nextP2.currentHoleHoledOut = false;
-      nextP2.currentHolePickedUp = false;
-      nextP2.currentTurnShots = [];
-      nextP2.currentHoleAllShots = [];
-
-      setP1State(nextP1);
-      setP2State(nextP2);
-      setCurrentHoleIndex(nextHoleIdx);
-      setActivePlayer(1);
-      setLastAction({
-        id: Date.now(),
-        tone: 'info',
-        icon: '⛳',
-        headline: `WEITER ZU LOCH ${nextHole.holeNumber} (${nextHole.startDistance} M)`,
-        subline: `${nextHole.name} · Par ${nextHole.par}`,
-        actorPlayer: 1,
-      });
-      return;
-    }
-
-    let nextActive: 1 | 2 = activePlayer;
-    if (!oppDone) {
-      nextActive = activePlayer === 1 ? 2 : 1;
-      oppNext.currentTurnShots = [];
-    } else {
-      ownNext.currentTurnShots = [];
-    }
-
-    setP1State(nextP1);
-    setP2State(nextP2);
-    setActivePlayer(nextActive);
-    setLastAction({
-      id: Date.now(),
-      tone: 'miss',
-      icon: '✕',
-      headline: 'AUFNAHME BEENDET (0 M)',
-      subline: `${actorName} liegt weiterhin bei ${ownNext.currentDistance} m.`,
-      actorPlayer: activePlayer,
-    });
-  };
-
-  // Automatischer Computer-Zug im 1vsComputer-Modus
+  // Automatischer Computer-Zug (genau 1 Aufnahme) im 1vsComputer-Modus
   useEffect(() => {
     if (
       !isGameStarted ||
@@ -1196,9 +1055,9 @@ export default function DartsGolfClient({
 
     setIsBotThrowing(true);
     const timer = setTimeout(() => {
-      const botShot = simulateGolfBotDart(p2State.currentDistance, botDifficulty);
-      executeDartShot(botShot.label, botShot.value, true);
-    }, 680);
+      const botVisit = simulateGolfBotVisit(p2State.currentDistance, botDifficulty);
+      submitVisitScore(botVisit.value, true);
+    }, 750);
 
     return () => clearTimeout(timer);
   }, [
@@ -1209,7 +1068,65 @@ export default function DartsGolfClient({
     p2State.currentDistance,
     p2State.currentHoleStrokes,
     botDifficulty,
-    executeDartShot,
+    submitVisitScore,
+  ]);
+
+  // Numpad Handler
+  const parsedInput = scoreInput === '' ? null : Number(scoreInput);
+  const isInputValid = parsedInput !== null && isValidThreeDartScore(parsedInput);
+  const hasInputError =
+    scoreInput !== '' && parsedInput !== null && !isValidThreeDartScore(parsedInput);
+
+  const handleDigitPress = useCallback((digit: string) => {
+    setScoreInput((prev) => {
+      if (prev.length >= 3) return prev;
+      if (prev === '0') return digit;
+      return prev + digit;
+    });
+  }, []);
+
+  const handleBackspace = useCallback(() => {
+    setScoreInput((prev) => prev.slice(0, -1));
+  }, []);
+
+  const handleClearInput = useCallback(() => {
+    setScoreInput('');
+  }, []);
+
+  const handleConfirmInput = useCallback(() => {
+    if (!isInputValid || parsedInput === null || isBotThrowing || isGameFinished) return;
+    submitVisitScore(parsedInput, false);
+  }, [isBotThrowing, isGameFinished, isInputValid, parsedInput, submitVisitScore]);
+
+  // Tastatur-Support für 0–9, Backspace, Escape, Enter
+  useEffect(() => {
+    if (!isGameStarted || isGameFinished) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isBotThrowing) return;
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleDigitPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleBackspace();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClearInput();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirmInput();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    handleBackspace,
+    handleClearInput,
+    handleConfirmInput,
+    handleDigitPress,
+    isBotThrowing,
+    isGameFinished,
+    isGameStarted,
   ]);
 
   // =========================================================================
@@ -1307,7 +1224,7 @@ export default function DartsGolfClient({
                   Lions Darts-Golf (18 Holes)
                 </h1>
                 <p className="text-xs sm:text-sm text-emerald-300 font-semibold">
-                  Zufällige Loch-Distanzen · Check mit Single/Double/Triple/Bull · Überwurf fliegt übers Loch!
+                  55–300 m Zufallsdistanzen · Geworfene Gesamtzahl (0–180) eingeben · Überwurf fliegt übers Loch!
                 </p>
               </div>
             </div>
@@ -1334,14 +1251,14 @@ export default function DartsGolfClient({
           <div className="p-4 rounded-2xl bg-slate-950/70 border border-emerald-400/30 space-y-1.5">
             <div className="text-xs sm:text-sm font-black text-emerald-300 flex items-center gap-2">
               <Flag className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Die Darts-Golf Overshoot-Regel (Kein Bust!)</span>
+              <span>Klassisches Eingabepad &amp; Overshoot-Regel</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Jedes Loch hat eine zufällige Entfernung in Metern. Du darfst mit{' '}
-              <strong>Single, Doppel, Triple oder Bull</strong> exakt auf <strong>0 m</strong>{' '}
-              einlochen. Wirfst du zu weit (z. B. <strong>25 m Rest</strong> und du triffst{' '}
-              <strong>Triple 20 = 60 m</strong>), fliegt der Ball übers Loch hinaus und du stehst bei{' '}
-              <strong>35 m Rest</strong> (<code>|25 − 60| = 35 m</code>)!
+              Jede 3-Dart-Aufnahme zählt als <strong>1 Schlag</strong>. Gib die geworfene
+              Gesamtpunktzahl (<code>0–180</code>) am Numpad ein – der Rest wird automatisch im Kopf
+              ausgeworfen. Checken ist über jedes Feld erlaubt. Wirfst du mehr Meter als Rest
+              (z. B. <strong>25 m</strong> Rest mit <strong>60 m</strong>), fliegt der Ball übers
+              Loch und du stehst bei <strong>35 m Rest</strong>!
             </p>
           </div>
 
@@ -1469,7 +1386,7 @@ export default function DartsGolfClient({
             )}
           </div>
 
-          {/* Platzlänge: 18 Löcher (Standard) vs. 9 Löcher */}
+          {/* Platzlänge: 18 Löcher vs. 9 Löcher */}
           <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="text-sm font-black text-emerald-200">
@@ -1559,58 +1476,58 @@ export default function DartsGolfClient({
   }
 
   // =========================================================================
-  // ANSICHT 2: AKTIVES SPIEL (TABLET-COCKPIT)
+  // ANSICHT 2: SCHLANKES TABLET-UI MIT KLASSISCHEM 0–9 EINGABEPAD
   // =========================================================================
   const currentHole = holes[Math.min(holes.length - 1, Math.max(0, currentHoleIndex))];
   const ownState = activePlayer === 1 ? p1State : p2State;
   const ownName = activePlayer === 1 ? p1Name : effectiveP2Name;
-  const chk = getDirectCheckoutOptions(ownState.currentDistance);
-  const caddyTip = getCaddyAdvice(ownState.currentDistance);
-
-  // Schnell-Drives & Putts
-  const quickShots = [
-    { label: 'T20', value: 60 },
-    { label: 'T19', value: 57 },
-    { label: 'T18', value: 54 },
-    { label: 'BULL', value: 50 },
-    { label: '25', value: 25 },
-    { label: 'S20', value: 20 },
-  ];
-
-  const numbersDesc = Array.from({ length: 20 }, (_, i) => 20 - i);
 
   return (
-    <div className="max-w-4xl mx-auto px-2.5 sm:px-5 space-y-3.5 animate-fadeIn">
-      {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-slate-900/85 border border-white/10">
-        <div className="flex flex-wrap items-center gap-2">
+    <div className="max-w-3xl mx-auto px-2.5 sm:px-4 space-y-3 animate-fadeIn">
+      {/* 1. Schlanke Top-Leiste */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-slate-900/85 border border-white/10">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={handleAbortToSetup}
-            className="min-h-[44px] px-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-white/10"
+            className="min-h-[42px] px-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-white/10"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Abbruch / Clubhaus</span>
+            <span>Abbruch</span>
           </button>
 
           <span className="px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-400/35 text-cyan-300 font-mono text-xs font-black">
-            BOARD {activeBoard}
+            B{activeBoard}
           </span>
           <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/35 text-emerald-200 font-mono text-xs font-black">
-            ⛳ LOCH {currentHole.holeNumber} / {holes.length} · PAR {currentHole.par}
+            ⛳ Loch {currentHole.holeNumber}/{holes.length} · Par {currentHole.par} ({currentHole.startDistance} m)
           </span>
           {restoredFromCache && (
             <span className="hidden sm:inline px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 text-[10px] font-bold">
-              ✓ Wiederhergestellt
+              ✓ Cache
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowScorecard((v) => !v)}
+            data-ui-id="DARTSGOLF.PLAY.SCORECARD_TOGGLE"
+            className={`min-h-[42px] px-3 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              showScorecard
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+                : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>📋 Scorecard</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setSoundEnabled((v) => !v)}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 cursor-pointer"
+            className="min-h-[42px] min-w-[42px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 cursor-pointer"
           >
             {soundEnabled ? (
               <Volume2 className="w-4 h-4 text-emerald-400" />
@@ -1622,35 +1539,130 @@ export default function DartsGolfClient({
           <button
             type="button"
             onClick={() => setShowHelp((v) => !v)}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 cursor-pointer"
+            className="min-h-[42px] min-w-[42px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 cursor-pointer"
           >
             <HelpCircle className="w-4 h-4 text-amber-300" />
           </button>
         </div>
       </div>
 
-      {/* Hilfe-Box */}
+      {/* Optional aufklappbare Hilfe-Box */}
       {showHelp && (
-        <div className="rounded-2xl p-4 bg-slate-900/95 border border-emerald-400/40 text-xs sm:text-sm text-slate-200 space-y-1.5">
-          <div className="font-black text-emerald-300">⛳ Spielregeln: Lions Darts-Golf</div>
+        <div className="rounded-2xl p-3.5 bg-slate-900/95 border border-emerald-400/40 text-xs text-slate-200 space-y-1">
+          <div className="font-black text-emerald-300">⛳ Kurzregeln: Lions Darts-Golf</div>
           <p>
-            <strong>1. Einlochen (0 m):</strong> Du darfst die Restdistanz mit jedem Feld (Single,
-            Doppel, Triple, 25 oder Bullseye 50) exakt auf <strong>0 m</strong> checken.
-          </p>
-          <p>
-            <strong>2. Überflug (Overshoot):</strong> Wirfst du mehr Meter als die Restdistanz,
-            fliegt der Ball übers Loch hinaus: <code>Neue Distanz = |Rest − Wurf|</code> (z. B. 25 m
-            Rest mit T20 = 60 m ➔ 35 m Rest).
-          </p>
-          <p>
-            <strong>3. Wertung:</strong> Jeder geworfene Dart zählt als 1 Schlag. Nach {holes.length}{' '}
-            Löchern gewinnt der Spieler mit den wenigsten Gesamtschlägen!
+            1 Aufnahme (3 Darts) = 1 Schlag. Gesamtpunktzahl <code>0–180</code> eintippen &amp; mit{' '}
+            <strong>✓ OK</strong> bestätigen. Jeder Treffer auf Rest 0 m locht ein. Bei Überwurf gilt{' '}
+            <code>|Rest − Wurf|</code>.
           </p>
         </div>
       )}
 
-      {/* Beide Spieler-Statuskarten */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Optional aufklappbare 18-Loch Scorecard */}
+      {showScorecard && (
+        <div className="rounded-2xl bg-slate-900/90 border border-emerald-400/35 p-2.5 overflow-x-auto animate-fadeIn">
+          <table className="w-full text-center font-mono text-[10px] sm:text-[11px] border-collapse">
+            <thead>
+              <tr className="text-slate-400 border-b border-white/10">
+                <th className="py-1 px-1.5 text-left">LOCH</th>
+                {holes.map((h, idx) => (
+                  <th
+                    key={h.holeNumber}
+                    className={`py-1 px-1 ${
+                      idx === currentHoleIndex
+                        ? 'text-cyan-300 font-black bg-cyan-500/15 rounded-t'
+                        : ''
+                    }`}
+                  >
+                    {h.holeNumber}
+                  </th>
+                ))}
+                <th className="py-1 px-1.5 text-amber-300">TOT</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              <tr className="text-slate-500">
+                <td className="py-1 px-1.5 text-left font-bold">PAR</td>
+                {holes.map((h) => (
+                  <td key={h.holeNumber} className="py-1 px-1">
+                    {h.par}
+                  </td>
+                ))}
+                <td className="py-1 px-1.5 font-bold text-slate-400">{coursePar}</td>
+              </tr>
+              <tr>
+                <td className="py-1 px-1.5 text-left font-black text-emerald-300 truncate max-w-[85px]">
+                  {p1Name}
+                </td>
+                {holes.map((h, idx) => {
+                  const res = p1State.completedHoles.find((c) => c.holeNumber === h.holeNumber);
+                  if (!res) {
+                    return (
+                      <td
+                        key={h.holeNumber}
+                        className={`py-1 px-1 ${
+                          idx === currentHoleIndex ? 'text-cyan-300 font-black' : 'text-slate-600'
+                        }`}
+                      >
+                        {idx === currentHoleIndex && p1State.currentHoleStrokes > 0
+                          ? p1State.currentHoleStrokes
+                          : '·'}
+                      </td>
+                    );
+                  }
+                  const term = getGolfTermForScore(res.strokes, h.par);
+                  return (
+                    <td key={h.holeNumber} className="py-1 px-0.5">
+                      <span className={`inline-block px-1 rounded border font-black ${term.colorClass}`}>
+                        {res.strokes}
+                      </span>
+                    </td>
+                  );
+                })}
+                <td className="py-1 px-1.5 font-black text-white">
+                  {p1State.totalStrokes} ({formatToPar(p1State.scoreToPar)})
+                </td>
+              </tr>
+              <tr>
+                <td className="py-1 px-1.5 text-left font-black text-amber-300 truncate max-w-[85px]">
+                  {gameMode === '1vsComputer' ? 'Bot' : p2Name}
+                </td>
+                {holes.map((h, idx) => {
+                  const res = p2State.completedHoles.find((c) => c.holeNumber === h.holeNumber);
+                  if (!res) {
+                    return (
+                      <td
+                        key={h.holeNumber}
+                        className={`py-1 px-1 ${
+                          idx === currentHoleIndex ? 'text-cyan-300 font-black' : 'text-slate-600'
+                        }`}
+                      >
+                        {idx === currentHoleIndex && p2State.currentHoleStrokes > 0
+                          ? p2State.currentHoleStrokes
+                          : '·'}
+                      </td>
+                    );
+                  }
+                  const term = getGolfTermForScore(res.strokes, h.par);
+                  return (
+                    <td key={h.holeNumber} className="py-1 px-0.5">
+                      <span className={`inline-block px-1 rounded border font-black ${term.colorClass}`}>
+                        {res.strokes}
+                      </span>
+                    </td>
+                  );
+                })}
+                <td className="py-1 px-1.5 font-black text-white">
+                  {p2State.totalStrokes} ({formatToPar(p2State.scoreToPar)})
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* 2. Kompaktes Dual-Scoreboard */}
+      <div className="grid grid-cols-2 gap-2.5">
         {[1, 2].map((pNum) => {
           const isP1 = pNum === 1;
           const st = isP1 ? p1State : p2State;
@@ -1665,44 +1677,37 @@ export default function DartsGolfClient({
           return (
             <div
               key={pNum}
-              className={`rounded-2xl p-3.5 border-2 transition-all ${
+              className={`rounded-2xl p-3 sm:p-3.5 border-2 transition-all ${
                 isWin
                   ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]'
                   : isAct
                   ? isP1
-                    ? 'bg-emerald-950/45 border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.28)]'
-                    : 'bg-amber-950/45 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
+                    ? 'bg-emerald-950/45 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.28)]'
+                    : 'bg-amber-950/45 border-amber-400 shadow-[0_0_24px_rgba(251,191,36,0.25)]'
                   : 'bg-slate-900/65 border-white/10 opacity-85'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-sm sm:text-base font-black text-white truncate">{name}</div>
-                  <div className="text-[11px] font-mono mt-0.5 flex flex-wrap items-center gap-1.5">
+                  <div className="text-xs sm:text-sm font-black text-white truncate">{name}</div>
+                  <div className="text-[11px] font-mono mt-0.5">
                     {st.currentHoleHoledOut ? (
                       <span className="text-emerald-300 font-black">
-                        ⛳ Im Loch ({st.currentHoleStrokes} Schl.)
+                        ⛳ Im Loch ({st.currentHoleStrokes})
                       </span>
                     ) : isAct ? (
                       <span className={`${isP1 ? 'text-emerald-300' : 'text-amber-300'} font-black`}>
-                        🏌️‍♂️ Am Schlag ({st.currentHoleStrokes}. Schl.)
+                        🏌️‍♂️ AM SCHLAG
                       </span>
                     ) : (
-                      <span className="text-slate-400">
-                        Rest: {st.currentDistance} m ({st.currentHoleStrokes} Schl.)
-                      </span>
-                    )}
-                    {lastSh?.overshot && !st.currentHoleHoledOut && (
-                      <span className="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-400/60 text-amber-200 text-[10px] font-black">
-                        💨 Überflug
-                      </span>
+                      <span className="text-slate-400">Wartet</span>
                     )}
                   </div>
                 </div>
 
                 <div className="text-right font-mono shrink-0">
                   <div
-                    className={`text-xl sm:text-2xl font-black ${
+                    className={`text-sm sm:text-base font-black ${
                       st.scoreToPar < 0
                         ? 'text-emerald-400'
                         : st.scoreToPar === 0
@@ -1710,9 +1715,37 @@ export default function DartsGolfClient({
                         : 'text-rose-400'
                     }`}
                   >
-                    {formatToPar(st.scoreToPar)}
+                    {formatToPar(st.scoreToPar)}{' '}
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      ({st.totalStrokes} Schl.)
+                    </span>
                   </div>
-                  <div className="text-[10px] text-slate-400">{st.totalStrokes} Schläge</div>
+                </div>
+              </div>
+
+              <div className="mt-2 pt-2 border-t border-white/10 flex items-baseline justify-between gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                  Restdistanz
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {lastSh?.overshot && !st.currentHoleHoledOut && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/60 text-amber-200 font-mono text-[10px] font-black">
+                      💨 Überflug
+                    </span>
+                  )}
+                  <span
+                    className={`text-2xl sm:text-3xl font-black font-mono ${
+                      st.currentHoleHoledOut
+                        ? 'text-emerald-400'
+                        : isAct
+                        ? isP1
+                          ? 'text-emerald-300'
+                          : 'text-amber-300'
+                        : 'text-white'
+                    }`}
+                  >
+                    {st.currentDistance} m
+                  </span>
                 </div>
               </div>
             </div>
@@ -1720,10 +1753,10 @@ export default function DartsGolfClient({
         })}
       </div>
 
-      {/* Live Action Banner */}
+      {/* 3. Kompakter 1-Zeilen-Statusbanner */}
       {lastAction && (
         <div
-          className={`rounded-2xl px-4 py-2.5 border text-center transition-all ${
+          className={`rounded-xl px-3.5 py-2 border text-center truncate transition-all ${
             lastAction.tone === 'eagle'
               ? 'bg-amber-950/85 border-amber-400 text-amber-100'
               : lastAction.tone === 'hole_out'
@@ -1737,120 +1770,21 @@ export default function DartsGolfClient({
               : 'bg-slate-900/75 border-white/15 text-slate-200'
           }`}
         >
-          <span className="text-xs sm:text-sm font-black uppercase tracking-wider mr-2">
+          <span className="text-xs font-black uppercase tracking-wider mr-2">
             {lastAction.icon} {lastAction.headline}
           </span>
-          <span className="text-xs sm:text-sm opacity-95">{lastAction.subline}</span>
+          <span className="text-xs opacity-95">{lastAction.subline}</span>
         </div>
       )}
 
-      {/* Kompakte 18-Loch Scorecard am Tablet */}
-      <div className="rounded-2xl bg-slate-900/80 border border-white/10 p-2.5 overflow-x-auto">
-        <table className="w-full text-center font-mono text-[10px] sm:text-[11px] border-collapse">
-          <thead>
-            <tr className="text-slate-400 border-b border-white/10">
-              <th className="py-1 px-1.5 text-left">LOCH</th>
-              {holes.map((h, idx) => (
-                <th
-                  key={h.holeNumber}
-                  className={`py-1 px-1 ${
-                    idx === currentHoleIndex ? 'text-cyan-300 font-black bg-cyan-500/15 rounded-t' : ''
-                  }`}
-                >
-                  {h.holeNumber}
-                </th>
-              ))}
-              <th className="py-1 px-1.5 text-amber-300">TOT</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            <tr className="text-slate-500">
-              <td className="py-1 px-1.5 text-left font-bold">PAR</td>
-              {holes.map((h) => (
-                <td key={h.holeNumber} className="py-1 px-1">
-                  {h.par}
-                </td>
-              ))}
-              <td className="py-1 px-1.5 font-bold text-slate-400">{coursePar}</td>
-            </tr>
-            <tr>
-              <td className="py-1 px-1.5 text-left font-black text-emerald-300 truncate max-w-[85px]">
-                {p1Name}
-              </td>
-              {holes.map((h, idx) => {
-                const res = p1State.completedHoles.find((c) => c.holeNumber === h.holeNumber);
-                if (!res) {
-                  return (
-                    <td
-                      key={h.holeNumber}
-                      className={`py-1 px-1 ${
-                        idx === currentHoleIndex ? 'text-cyan-300 font-black' : 'text-slate-600'
-                      }`}
-                    >
-                      {idx === currentHoleIndex && p1State.currentHoleStrokes > 0
-                        ? p1State.currentHoleStrokes
-                        : '·'}
-                    </td>
-                  );
-                }
-                const term = getGolfTermForScore(res.strokes, h.par);
-                return (
-                  <td key={h.holeNumber} className="py-1 px-0.5">
-                    <span className={`inline-block px-1 rounded border font-black ${term.colorClass}`}>
-                      {res.strokes}
-                    </span>
-                  </td>
-                );
-              })}
-              <td className="py-1 px-1.5 font-black text-white">
-                {p1State.totalStrokes} ({formatToPar(p1State.scoreToPar)})
-              </td>
-            </tr>
-            <tr>
-              <td className="py-1 px-1.5 text-left font-black text-amber-300 truncate max-w-[85px]">
-                {gameMode === '1vsComputer' ? 'Bot' : p2Name}
-              </td>
-              {holes.map((h, idx) => {
-                const res = p2State.completedHoles.find((c) => c.holeNumber === h.holeNumber);
-                if (!res) {
-                  return (
-                    <td
-                      key={h.holeNumber}
-                      className={`py-1 px-1 ${
-                        idx === currentHoleIndex ? 'text-cyan-300 font-black' : 'text-slate-600'
-                      }`}
-                    >
-                      {idx === currentHoleIndex && p2State.currentHoleStrokes > 0
-                        ? p2State.currentHoleStrokes
-                        : '·'}
-                    </td>
-                  );
-                }
-                const term = getGolfTermForScore(res.strokes, h.par);
-                return (
-                  <td key={h.holeNumber} className="py-1 px-0.5">
-                    <span className={`inline-block px-1 rounded border font-black ${term.colorClass}`}>
-                      {res.strokes}
-                    </span>
-                  </td>
-                );
-              })}
-              <td className="py-1 px-1.5 font-black text-white">
-                {p2State.totalStrokes} ({formatToPar(p2State.scoreToPar)})
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Sieger-Screen am Tablet */}
+      {/* Sieger-Screen */}
       {isGameFinished && winnerPlayer && (
         <div className="rounded-3xl p-6 bg-gradient-to-br from-emerald-950/85 via-slate-900/95 to-amber-950/80 border-2 border-emerald-400 text-center space-y-4 shadow-2xl">
           <div className="text-4xl">🏆⛳</div>
           <div>
             <h2 className="text-2xl sm:text-3xl font-black text-white">
               {winnerPlayer === 'draw'
-                ? 'Unentschieden nach 18 Löchern!'
+                ? 'Unentschieden!'
                 : `Green Jacket für ${winnerPlayer === 1 ? p1Name : effectiveP2Name}!`}
             </h2>
             <p className="text-xs sm:text-sm text-emerald-200 mt-1">
@@ -1890,248 +1824,119 @@ export default function DartsGolfClient({
         </div>
       )}
 
-      {/* Aktives Wurf-Deck */}
+      {/* 4. Klassisches Dart-Eingabepad (Numpad 0–9) */}
       {!isGameFinished && (
-        <>
-          {/* Aktuelles Loch & Restdistanz-Anzeige */}
-          <div className="rounded-3xl p-4 sm:p-5 bg-gradient-to-br from-[#062118] via-slate-950 to-[#181306] border-2 border-emerald-400/45 text-center space-y-2 shadow-2xl">
-            <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-mono font-black uppercase tracking-widest text-emerald-300">
-              <span>
-                ⛳ Loch {currentHole.holeNumber}/{holes.length} · {currentHole.name}
-              </span>
-              <span>•</span>
-              <span className="text-amber-300">
-                Par {currentHole.par} (Start: {currentHole.startDistance} m)
-              </span>
+        isBotThrowing ? (
+          <div className="rounded-3xl p-8 bg-slate-900/85 border-2 border-amber-400/50 text-center space-y-2 animate-pulse">
+            <div className="text-3xl">🤖⛳</div>
+            <div className="text-base sm:text-lg font-black text-amber-300">
+              {effectiveP2Name} schlägt aus {p2State.currentDistance} m Entfernung...
             </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 py-1">
-              <div className="text-xs font-mono text-slate-300">
-                Am Schlag: <strong className="text-white text-sm">{ownName}</strong> (Schlag{' '}
-                {ownState.currentHoleStrokes + 1})
-              </div>
-              <div className="text-4xl sm:text-6xl font-black font-mono text-emerald-300 drop-shadow-[0_0_20px_rgba(16,185,129,0.5)]">
-                {ownState.currentDistance} m
-              </div>
+            <div className="text-xs text-slate-400 font-mono">
+              Schlag {p2State.currentHoleStrokes + 1} (3-Dart-Aufnahme)
             </div>
-
-            <p className="text-xs sm:text-sm font-mono font-bold text-cyan-200">{caddyTip}</p>
           </div>
-
-          {/* 3-Dart-Aufnahme + Korrektur (Undo) */}
-          <div className="grid grid-cols-12 gap-2 items-center">
-            <div className="col-span-8 sm:col-span-9 grid grid-cols-3 gap-2">
-              {[0, 1, 2].map((idx) => {
-                const sh = ownState.currentTurnShots[idx];
-                const isNext = idx === ownState.currentTurnShots.length;
-                return (
-                  <div
-                    key={idx}
-                    className={`min-h-[52px] px-2 py-1.5 rounded-xl border flex flex-col items-center justify-center font-mono ${
-                      sh
-                        ? sh.holedOut
-                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-100'
-                          : sh.overshot
-                          ? 'bg-amber-500/25 border-amber-400 text-amber-100'
-                          : sh.value === 0
-                          ? 'bg-red-950/70 border-red-500/60 text-red-200'
-                          : 'bg-cyan-500/20 border-cyan-400 text-cyan-100'
-                        : isNext
-                        ? 'bg-emerald-500/10 border-emerald-400 text-emerald-300 animate-pulse'
-                        : 'bg-slate-950/60 border-white/10 text-slate-500'
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold opacity-80">
-                      Dart {idx + 1}
-                    </span>
-                    <span className="text-xs font-black truncate max-w-full">
-                      {sh
-                        ? `${sh.label} (→${sh.distanceAfter}m)`
-                        : isNext
-                        ? isBotThrowing
-                          ? '🤖 Bot zielt...'
-                          : 'Bereit'
-                        : '•'}
-                    </span>
+        ) : (
+          <div className="rounded-3xl p-3.5 sm:p-4 bg-slate-900/90 border-2 border-white/15 shadow-2xl space-y-3">
+            {/* Eingabezeile über dem Pad */}
+            <div className="px-4 py-3 rounded-2xl bg-slate-950/90 border border-white/15 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs sm:text-sm font-black text-white truncate">
+                  Am Schlag: <span className="text-emerald-300">{ownName}</span>
+                </div>
+                <div className="text-xs font-mono text-slate-300">
+                  Rest: <strong className="text-white">{ownState.currentDistance} m</strong> · Schlag{' '}
+                  {ownState.currentHoleStrokes + 1}
+                </div>
+                {hasInputError && (
+                  <div className="text-[11px] font-mono font-bold text-rose-400 mt-0.5">
+                    Nur gültige 3-Dart-Werte 0–180
                   </div>
-                );
-              })}
+                )}
+              </div>
+
+              <div
+                className={`min-w-[110px] text-right font-mono text-4xl sm:text-5xl font-black tracking-tight px-3 py-1 rounded-xl border ${
+                  hasInputError
+                    ? 'bg-rose-950/60 border-rose-500 text-rose-300'
+                    : scoreInput !== ''
+                    ? 'bg-emerald-950/50 border-emerald-400/70 text-emerald-300'
+                    : 'bg-slate-900/80 border-white/10 text-slate-400'
+                }`}
+              >
+                {scoreInput || '0'}
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={undoStack.length === 0 || isBotThrowing}
-              className="col-span-4 sm:col-span-3 min-h-[52px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white border border-white/15 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Korrektur</span>
-            </button>
+            {/* Riesiges 3×4 Numpad */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                <button
+                  key={digit}
+                  type="button"
+                  onClick={() => handleDigitPress(digit)}
+                  data-ui-id={`DARTSGOLF.NUMPAD.${digit}`}
+                  className="min-h-[68px] sm:min-h-[76px] rounded-2xl bg-slate-800/95 hover:bg-slate-700 active:scale-[0.97] border border-white/15 text-white font-mono text-2xl sm:text-3xl font-black shadow-lg transition-all cursor-pointer"
+                >
+                  {digit}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={handleBackspace}
+                data-ui-id="DARTSGOLF.NUMPAD.BACKSPACE"
+                className="min-h-[68px] sm:min-h-[76px] rounded-2xl bg-rose-950/80 hover:bg-rose-900/90 active:scale-[0.97] border border-rose-500/50 text-rose-200 font-mono text-xl sm:text-2xl font-black flex items-center justify-center shadow-lg transition-all cursor-pointer"
+                aria-label="Letzte Ziffer löschen"
+              >
+                <Delete className="w-7 h-7" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDigitPress('0')}
+                data-ui-id="DARTSGOLF.NUMPAD.0"
+                className="min-h-[68px] sm:min-h-[76px] rounded-2xl bg-slate-800/95 hover:bg-slate-700 active:scale-[0.97] border border-white/15 text-white font-mono text-2xl sm:text-3xl font-black shadow-lg transition-all cursor-pointer"
+              >
+                0
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmInput}
+                disabled={!isInputValid}
+                data-ui-id="DARTSGOLF.NUMPAD.OK"
+                className="min-h-[68px] sm:min-h-[76px] rounded-2xl bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:border-white/10 active:scale-[0.97] border-2 border-emerald-200 text-slate-950 font-mono text-xl sm:text-2xl font-black shadow-xl shadow-emerald-500/20 transition-all cursor-pointer disabled:cursor-not-allowed"
+              >
+                ✓ OK
+              </button>
+            </div>
+
+            {/* 1 kompakte Aktionszeile darunter */}
+            <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                data-ui-id="DARTSGOLF.PLAY.UNDO_BTN"
+                className="min-h-[50px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-100 border border-white/15 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>↩ Letzten Schlag korrigieren</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearInput}
+                disabled={scoreInput === ''}
+                data-ui-id="DARTSGOLF.PLAY.CLEAR_BTN"
+                className="min-h-[50px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 border border-white/15 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <span>C Eingabe leeren</span>
+              </button>
+            </div>
           </div>
-
-          {isBotThrowing ? (
-            <div className="rounded-3xl p-8 bg-slate-900/85 border-2 border-amber-400/50 text-center space-y-2 animate-pulse">
-              <div className="text-3xl">🤖⛳</div>
-              <div className="text-base sm:text-lg font-black text-amber-300">
-                {effectiveP2Name} schlägt aus {p2State.currentDistance} m Entfernung...
-              </div>
-              <div className="text-xs text-slate-400 font-mono">
-                Schlag {p2State.currentHoleStrokes + 1} läuft automatisch
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* 1. SMART 1-TAP PUTT / CHECKOUT BUTTON (wenn mit 1 Dart direkt auf 0 checkbar!) */}
-              {chk.canCheckoutInOne && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    executeDartShot(chk.primaryLabel.replace('Single ', 'S'), chk.value)
-                  }
-                  data-ui-id="DARTSGOLF.PLAY.DIRECT_HOLEOUT_BTN"
-                  className="w-full min-h-[74px] px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-teal-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-slate-950 border-2 border-emerald-100 font-black text-base sm:text-xl flex flex-col items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.4)] cursor-pointer active:scale-[0.98] transition-all"
-                >
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="w-6 h-6" />
-                    <span>⛳ EINGELOCHT! ({ownState.currentDistance} m gecheckt → 0 m!)</span>
-                  </span>
-                  <span className="text-xs font-mono opacity-85">
-                    Erlaubte Check-Felder: {chk.allOptionsText}
-                  </span>
-                </button>
-              )}
-
-              {/* 2. SCHNELL-DRIVES & BULL / MISS LEISTE (1-Tap ohne Umschalten) */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                {quickShots.map((q) => {
-                  const newDist = Math.abs(ownState.currentDistance - q.value);
-                  const isOver = q.value > ownState.currentDistance;
-                  const isHole = newDist === 0;
-                  return (
-                    <button
-                      key={q.label}
-                      type="button"
-                      onClick={() => executeDartShot(q.label, q.value)}
-                      className={`min-h-[58px] px-2 py-2 rounded-xl border-2 font-mono flex flex-col items-center justify-center transition-all cursor-pointer active:scale-95 ${
-                        isHole
-                          ? 'bg-emerald-500/30 border-emerald-300 text-emerald-100 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
-                          : isOver
-                          ? 'bg-amber-950/60 border-amber-400/60 text-amber-200 hover:bg-amber-900/70'
-                          : 'bg-slate-900/90 hover:bg-slate-800 border-cyan-400/40 text-white'
-                      }`}
-                    >
-                      <span className="text-xs sm:text-sm font-black">
-                        {q.label} <span className="opacity-75 text-[10px]">({q.value}m)</span>
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold ${
-                          isHole
-                            ? 'text-emerald-300'
-                            : isOver
-                            ? 'text-amber-300'
-                            : 'text-cyan-300'
-                        }`}
-                      >
-                        {isHole ? '⛳ ➔ 0m!' : isOver ? `💨 ➔ ${newDist}m` : `➔ ${newDist}m`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 3. RING-WAHL (SINGLE 1× / DOUBLE 2× / TRIPLE 3×) */}
-              <div className="grid grid-cols-3 gap-2">
-                {([1, 2, 3] as const).map((mult) => (
-                  <button
-                    key={mult}
-                    type="button"
-                    onClick={() => setSelectedMultiplier(mult)}
-                    className={`min-h-[52px] px-3 py-2 rounded-xl border-2 font-mono font-black text-xs sm:text-sm transition-all cursor-pointer ${
-                      selectedMultiplier === mult
-                        ? mult === 1
-                          ? 'bg-cyan-500 text-slate-950 border-cyan-200 shadow-lg'
-                          : mult === 2
-                          ? 'bg-rose-500 text-white border-rose-200 shadow-lg'
-                          : 'bg-amber-400 text-slate-950 border-amber-100 shadow-lg'
-                        : 'bg-slate-900/80 text-slate-300 border-white/10 hover:text-white'
-                    }`}
-                  >
-                    {mult === 1
-                      ? 'SINGLE (1×)'
-                      : mult === 2
-                      ? 'DOUBLE (2×)'
-                      : 'TRIPLE (3×)'}
-                  </button>
-                ))}
-              </div>
-
-              {/* 4. ZAHLEN-MATRIX 20..1 MIT LIVE-RESTDISTANZ & ÜBERFLUG-VORSCHAU */}
-              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                {numbersDesc.map((num) => {
-                  const val = num * selectedMultiplier;
-                  const prefix =
-                    selectedMultiplier === 3 ? 'T' : selectedMultiplier === 2 ? 'D' : 'S';
-                  const lbl = `${prefix}${num}`;
-                  const nextDist = Math.abs(ownState.currentDistance - val);
-                  const isOver = val > ownState.currentDistance;
-                  const isHole = nextDist === 0;
-
-                  return (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => executeDartShot(lbl, val)}
-                      className={`min-h-[60px] px-2 py-2 rounded-xl border-2 font-mono flex flex-col items-center justify-center transition-all cursor-pointer active:scale-95 ${
-                        isHole
-                          ? 'bg-emerald-500/35 border-emerald-300 text-white shadow-[0_0_18px_rgba(16,185,129,0.5)]'
-                          : isOver
-                          ? 'bg-slate-900/90 hover:bg-amber-950/60 border-amber-500/45 text-amber-100'
-                          : 'bg-slate-900/90 hover:bg-slate-800 border-white/15 text-white'
-                      }`}
-                    >
-                      <div className="text-sm sm:text-base font-black leading-tight">
-                        {lbl}{' '}
-                        <span className="text-[11px] font-normal text-slate-400">({val}m)</span>
-                      </div>
-                      <div
-                        className={`text-[10px] font-bold mt-0.5 ${
-                          isHole
-                            ? 'text-emerald-300 font-black'
-                            : isOver
-                            ? 'text-amber-300'
-                            : 'text-cyan-300'
-                        }`}
-                      >
-                        {isHole ? '⛳ ➔ 0 m!' : isOver ? `💨 ➔ ${nextDist} m` : `➔ ${nextDist} m`}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 5. MISS (0 m) & RESTLICHE DARTS MISS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => executeDartShot('MISS', 0)}
-                  data-ui-id="DARTSGOLF.PLAY.MISS_BTN"
-                  className="min-h-[60px] px-4 py-3 rounded-2xl bg-red-600/90 hover:bg-red-500 text-white border-2 border-red-400 font-black text-sm sm:text-base flex items-center justify-center cursor-pointer active:scale-98"
-                >
-                  <span>✕ MISS / 0 METER (Bleibt bei {ownState.currentDistance} m)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRestMiss}
-                  data-ui-id="DARTSGOLF.PLAY.REST_MISS_BTN"
-                  className="min-h-[60px] px-4 py-3 rounded-2xl bg-rose-950/90 hover:bg-rose-900 text-rose-100 border-2 border-rose-500/70 font-black text-sm sm:text-base flex items-center justify-center cursor-pointer active:scale-98"
-                >
-                  <span>✕✕✕ Restliche Darts Miss (0 m)</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+        )
       )}
     </div>
   );
