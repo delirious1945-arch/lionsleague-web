@@ -28,7 +28,7 @@ import HolographicDartsGolfCockpit from '@/components/HolographicDartsGolfCockpi
 import {
   createInitialGolfPlayerState,
   generateGolfCourse,
-} from '@/app/training/dartsgolf/types';
+} from '@/app/special/dartsgolf/types';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;

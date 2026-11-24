@@ -9,13 +9,11 @@ import {
   GolfBotDifficulty,
   GolfDartShot,
   GolfGameMode,
-  GolfHistoryItem,
   GolfHoleDefinition,
   GolfHolePlayerResult,
   GolfHolesCount,
   GolfLastActionBanner,
   GolfPlayerState,
-  GolfSessionSavePayload,
   MAX_STROKES_PER_HOLE,
   cloneGolfPlayerState,
   createInitialGolfPlayerState,
@@ -25,7 +23,6 @@ import {
   isValidThreeDartScore,
   simulateGolfBotVisit,
 } from './types';
-import { saveDartsGolfSessionAction } from './actions';
 import {
   ArrowLeft,
   ArrowRight,
@@ -36,7 +33,6 @@ import {
   HelpCircle,
   RotateCcw,
   Sparkles,
-  Trophy,
   Tv,
   Users,
   Volume2,
@@ -44,11 +40,9 @@ import {
 } from 'lucide-react';
 
 const CACHE_KEY = 'lions_active_dartsgolf_session_v2';
-const OFFLINE_QUEUE_KEY = 'lions_dartsgolf_offline_queue_v1';
 
 interface DartsGolfClientProps {
   players: Player[];
-  initialHistory: GolfHistoryItem[];
   currentUser?: { name?: string; role?: string; id?: number } | null;
 }
 
@@ -116,19 +110,8 @@ function playGolfSound(kind: SoundKind) {
   } catch {}
 }
 
-function enqueueOfflineGolf(payloads: GolfSessionSavePayload[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
-    const queue: GolfSessionSavePayload[][] = raw ? JSON.parse(raw) : [];
-    queue.push(payloads);
-    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
-  } catch {}
-}
-
 export default function DartsGolfClient({
   players,
-  initialHistory,
   currentUser,
 }: DartsGolfClientProps) {
   const validPlayers = players.filter((p) => !p.name.startsWith('Board '));
@@ -156,8 +139,6 @@ export default function DartsGolfClient({
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [showScorecard, setShowScorecard] = useState<boolean>(false);
   const [scoreInput, setScoreInput] = useState<string>('');
-  const [historyList, setHistoryList] = useState<GolfHistoryItem[]>(initialHistory || []);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   // Strikte User-Arretierung im 1vsComputer-Modus (AGENTS.md §12.5)
   useEffect(() => {
@@ -221,33 +202,9 @@ export default function DartsGolfClient({
       localStorage.setItem('lions_tablet_board', b);
       localStorage.setItem('lions_active_board', b);
       localStorage.setItem('lions_active_board_dartsgolf', b);
-      window.history.replaceState(null, '', `/training/dartsgolf?board=${b}`);
+      window.history.replaceState(null, '', `/special/dartsgolf?board=${b}`);
     } catch {}
   };
-
-  // Offline-Queue beim Start synchronisieren
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const syncQueue = async () => {
-      try {
-        const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
-        if (!raw) return;
-        const queue: GolfSessionSavePayload[][] = JSON.parse(raw);
-        if (!Array.isArray(queue) || queue.length === 0) return;
-        const remaining: GolfSessionSavePayload[][] = [];
-        for (const item of queue) {
-          const res = await saveDartsGolfSessionAction(item);
-          if (!res.success) remaining.push(item);
-        }
-        if (remaining.length === 0) {
-          localStorage.removeItem(OFFLINE_QUEUE_KEY);
-        } else {
-          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
-        }
-      } catch {}
-    };
-    syncQueue();
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
@@ -553,95 +510,6 @@ export default function DartsGolfClient({
     activeBoard,
   ]);
 
-  // Speichern nach Spielende
-  const persistFinishedMatch = useCallback(
-    async (
-      finalP1: GolfPlayerState,
-      finalP2: GolfPlayerState,
-      winPlayer: 1 | 2 | 'draw',
-      courseHoles: GolfHoleDefinition[],
-      sId: string
-    ) => {
-      const todayIso = new Date().toISOString();
-      const totalPar = courseHoles.reduce((acc, h) => acc + h.par, 0);
-      const p1Obj = validPlayers.find(
-        (p) => p.name.trim().toLowerCase() === p1Name.trim().toLowerCase()
-      );
-      const p2Obj = validPlayers.find(
-        (p) => p.name.trim().toLowerCase() === p2Name.trim().toLowerCase()
-      );
-
-      const payloads: GolfSessionSavePayload[] = [
-        {
-          session_id: sId,
-          player_id: p1Obj?.id ?? null,
-          player_name: p1Name.trim(),
-          opponent_name: effectiveP2Name,
-          game_mode: gameMode,
-          is_computer: gameMode === '1vsComputer' ? 1 : 0,
-          computer_level:
-            gameMode === '1vsComputer' ? GOLF_BOT_CONFIGS[botDifficulty].name : null,
-          holes_count: courseHoles.length,
-          course_par: totalPar,
-          total_strokes: finalP1.totalStrokes,
-          score_to_par: finalP1.scoreToPar,
-          holes_won: finalP1.holesWon,
-          eagles_count: finalP1.eaglesOrBetter,
-          birdies_count: finalP1.birdies,
-          pars_count: finalP1.pars,
-          bogeys_count: finalP1.bogeys + finalP1.doubleBogeysOrWorse,
-          overshoots_count: finalP1.totalOvershoots,
-          is_winner: winPlayer === 1 ? 1 : 0,
-          hole_details: finalP1.completedHoles,
-          training_date: todayIso,
-        },
-      ];
-
-      if (gameMode === '1vs1') {
-        payloads.push({
-          session_id: sId,
-          player_id: p2Obj?.id ?? null,
-          player_name: p2Name.trim(),
-          opponent_name: p1Name.trim(),
-          game_mode: '1vs1',
-          is_computer: 0,
-          computer_level: null,
-          holes_count: courseHoles.length,
-          course_par: totalPar,
-          total_strokes: finalP2.totalStrokes,
-          score_to_par: finalP2.scoreToPar,
-          holes_won: finalP2.holesWon,
-          eagles_count: finalP2.eaglesOrBetter,
-          birdies_count: finalP2.birdies,
-          pars_count: finalP2.pars,
-          bogeys_count: finalP2.bogeys + finalP2.doubleBogeysOrWorse,
-          overshoots_count: finalP2.totalOvershoots,
-          is_winner: winPlayer === 2 ? 1 : 0,
-          hole_details: finalP2.completedHoles,
-          training_date: todayIso,
-        });
-      }
-
-      try {
-        const res = await saveDartsGolfSessionAction(payloads);
-        if (res.success) {
-          setSaveMessage('✓ Scorecard in Vereinsdatenbank gespeichert!');
-          setHistoryList((prev) => [
-            ...payloads.map((p, idx) => ({ ...p, id: Date.now() + idx })),
-            ...prev,
-          ]);
-        } else {
-          enqueueOfflineGolf(payloads);
-          setSaveMessage('ℹ️ Lokal im Offline-Puffer gesichert (Auto-Sync aktiv).');
-        }
-      } catch {
-        enqueueOfflineGolf(payloads);
-        setSaveMessage('ℹ️ Lokal im Offline-Puffer gesichert (Auto-Sync aktiv).');
-      }
-    },
-    [botDifficulty, effectiveP2Name, gameMode, p1Name, p2Name, validPlayers]
-  );
-
   // Neues Spiel starten
   const handleStartGame = () => {
     const cleanP1 = p1Name.trim() || 'Spieler 1';
@@ -669,7 +537,6 @@ export default function DartsGolfClient({
     } catch {}
     setCachedSessionToResume(null);
     setRestoredFromCache(false);
-    setSaveMessage(null);
     setHoles(newCourse);
     setCurrentHoleIndex(0);
     setActivePlayer(1);
@@ -966,7 +833,6 @@ export default function DartsGolfClient({
           setWinnerPlayer(winP);
           setScoreInput('');
           setIsGameFinished(true);
-          persistFinishedMatch(nextP1, nextP2, winP, holes, gameSessionId);
           return;
         }
 
@@ -1028,14 +894,12 @@ export default function DartsGolfClient({
       activePlayer,
       currentHoleIndex,
       effectiveP2Name,
-      gameSessionId,
       holes,
       isGameFinished,
       lastAction,
       p1Name,
       p1State,
       p2State,
-      persistFinishedMatch,
       triggerSound,
       winnerPlayer,
     ]
@@ -1140,12 +1004,12 @@ export default function DartsGolfClient({
         {/* Top Navigation */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10">
           <Link
-            href={`/training?board=${activeBoard}`}
+            href={`/special?board=${activeBoard}`}
             data-ui-id="DARTSGOLF.SETUP.BACK_BTN"
             className="flex items-center gap-2 px-3.5 py-2 min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Zurück zur Trainings-Arena</span>
+            <span>Zurück zur Event-Arena</span>
           </Link>
 
           <Link
@@ -1393,7 +1257,7 @@ export default function DartsGolfClient({
                 Turnier-Distanz (Anzahl Löcher)
               </div>
               <div className="text-[11px] text-slate-400 mt-0.5">
-                18 Löcher (Par 72) zählen offiziell für das TV-Ranking &amp; den Monats-Lostopf (+1 Spiel)
+                Wähle die volle 18-Loch-Meisterschaftsrunde (Par 72) oder die schnelle 9-Loch-Kurzrunde (Par 36).
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1408,7 +1272,7 @@ export default function DartsGolfClient({
                       : 'bg-slate-900 text-slate-300 border border-white/15'
                   }`}
                 >
-                  {cnt === 18 ? '18 Löcher (Par 72 · Offiziell)' : '9 Löcher (Par 36 · Kurzrunde)'}
+                  {cnt === 18 ? '18 Löcher (Par 72 · Vollrunde)' : '9 Löcher (Par 36 · Kurzrunde)'}
                 </button>
               ))}
             </div>
@@ -1426,51 +1290,6 @@ export default function DartsGolfClient({
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Letzte Ergebnisse (Historie) */}
-        {historyList.length > 0 && (
-          <div className="rounded-3xl p-5 bg-slate-900/75 border border-white/10 space-y-3">
-            <h3 className="text-sm font-black text-white flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-amber-400" />
-              <span>Letzte Clubhaus-Scorecards (Lions Darts-Golf)</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              {historyList.slice(0, 6).map((h, i) => (
-                <div
-                  key={`${h.session_id}_${i}`}
-                  className="p-3 rounded-2xl bg-slate-950/80 border border-white/10 flex items-center justify-between gap-2"
-                >
-                  <div>
-                    <div className="font-black text-white">
-                      {h.player_name}{' '}
-                      <span className="text-slate-400 font-normal">
-                        vs. {h.opponent_name || 'Computer'}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      {h.holes_count} Löcher · 🐦 {h.birdies_count + h.eagles_count} Birdies/Eagles · 💨{' '}
-                      {h.overshoots_count} Überflüge
-                    </div>
-                  </div>
-                  <div className="text-right font-mono shrink-0">
-                    <div
-                      className={`text-sm font-black ${
-                        h.score_to_par < 0
-                          ? 'text-emerald-400'
-                          : h.score_to_par === 0
-                          ? 'text-white'
-                          : 'text-rose-400'
-                      }`}
-                    >
-                      {formatToPar(h.score_to_par)} ({h.total_strokes})
-                    </div>
-                    <div className="text-[10px] text-slate-500">Par {h.course_par}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -1791,9 +1610,6 @@ export default function DartsGolfClient({
               {p1Name}: {p1State.totalStrokes} Schläge ({formatToPar(p1State.scoreToPar)}) •{' '}
               {effectiveP2Name}: {p2State.totalStrokes} Schläge ({formatToPar(p2State.scoreToPar)})
             </p>
-            {saveMessage && (
-              <p className="text-xs font-mono font-bold text-amber-300 mt-2">{saveMessage}</p>
-            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">

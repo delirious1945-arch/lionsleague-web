@@ -13,7 +13,7 @@ import {
   MAX_STROKES_PER_HOLE,
   formatToPar,
   getGolfTermForScore,
-} from '@/app/training/dartsgolf/types';
+} from '@/app/special/dartsgolf/types';
 
 export interface HolographicDartsGolfProps {
   boardId: string;

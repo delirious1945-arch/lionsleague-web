@@ -168,34 +168,6 @@ export interface GolfLiveData {
   winnerName?: string | null;
 }
 
-export interface GolfSessionSavePayload {
-  session_id: string;
-  player_id?: number | null;
-  player_name: string;
-  opponent_name: string | null;
-  game_mode: GolfGameMode;
-  is_computer: number;
-  computer_level: string | null;
-  holes_count: number;
-  course_par: number;
-  total_strokes: number;
-  score_to_par: number;
-  holes_won: number;
-  eagles_count: number;
-  birdies_count: number;
-  pars_count: number;
-  bogeys_count: number;
-  overshoots_count: number;
-  is_winner: number;
-  hole_details: GolfHolePlayerResult[];
-  training_date: string;
-}
-
-export interface GolfHistoryItem extends GolfSessionSavePayload {
-  id: number;
-  created_at?: string;
-}
-
 const HOLE_NAMES_18: { name: string; hazardHint: string }[] = [
   { name: 'Aller-Abschlag', hazardHint: 'Breites Fairway zum Auftakt' },
   { name: 'Kiefern-Schneise', hazardHint: 'Vorsicht vor dem Überflug ins Unterholz' },

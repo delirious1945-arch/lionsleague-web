@@ -58,7 +58,8 @@ export default function SpecialHubClient({
         localStorage.getItem('lions_active_board_tannenbaum') ||
         localStorage.getItem('lions_active_board_adventskalender') ||
         localStorage.getItem('lions_active_board_rudolph') ||
-        localStorage.getItem('lions_active_board_bingo');
+        localStorage.getItem('lions_active_board_bingo') ||
+        localStorage.getItem('lions_active_board_dartsgolf');
       if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
         return saved;
       }
@@ -76,6 +77,7 @@ export default function SpecialHubClient({
         localStorage.setItem('lions_active_board_adventskalender', b);
         localStorage.setItem('lions_active_board_rudolph', b);
         localStorage.setItem('lions_active_board_bingo', b);
+        localStorage.setItem('lions_active_board_dartsgolf', b);
         window.history.replaceState(null, '', `/special?board=${b}`);
       } catch {}
     }
@@ -468,7 +470,7 @@ export default function SpecialHubClient({
 
             <div className="relative z-10">
               <Link
-                href={`/training/dartsgolf?board=${activeBoard}`}
+                href={`/special/dartsgolf?board=${activeBoard}`}
                 data-ui-id="SPECIAL.GAME_DARTSGOLF.START_BTN"
                 className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >

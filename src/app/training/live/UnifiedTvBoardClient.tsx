@@ -329,8 +329,7 @@ export default function UnifiedTvBoardClient({
     (initialData.todayFussballMatches?.length || 0) +
     (initialData.todayStellenCheckenLeaderboard?.length || 0) +
     (initialData.todayScoringLeiterLeaderboard?.length || 0) +
-    (initialData.todayDarts99Leaderboard?.length || 0) +
-    (initialData.todayDartsGolfLeaderboard?.length || 0)
+    (initialData.todayDarts99Leaderboard?.length || 0)
   );
 
   // Digital-Uhr
@@ -389,8 +388,7 @@ export default function UnifiedTvBoardClient({
         (result.todayFussballMatches?.length || 0) +
         (result.todayStellenCheckenLeaderboard?.length || 0) +
         (result.todayScoringLeiterLeaderboard?.length || 0) +
-        (result.todayDarts99Leaderboard?.length || 0) +
-        (result.todayDartsGolfLeaderboard?.length || 0);
+        (result.todayDarts99Leaderboard?.length || 0);
       if (currentTotal > prevSessionTotalRef.current) {
         playLivePing();
       }
@@ -651,21 +649,6 @@ export default function UnifiedTvBoardClient({
               }`}
             >
               <span>99 Darts</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setViewMode('dartsgolf');
-                if (timeframe === 'archive') setTimeframe('today');
-              }}
-              data-ui-id="TV_BOARD.NAV.TAB_DARTSGOLF"
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                viewMode === 'dartsgolf' && timeframe !== 'archive'
-                  ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-green-500 text-slate-950 font-black shadow-[0_2px_15px_rgba(16,185,129,0.28)]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
-              }`}
-            >
-              <span>⛳ Darts-Golf</span>
             </button>
 
             <button
@@ -1940,151 +1923,6 @@ export default function UnifiedTvBoardClient({
                   </div>
                 )}
               </div>
-
-              {/* TABELLE 7: LIONS DARTS-GOLF (18 HOLES) */}
-              <div data-ui-id="TV_BOARD.QUADRANT.DARTSGOLF_CARD" className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-4 sm:p-5 flex flex-col lg:col-span-2">
-                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-white/[0.07]">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-400/[0.12] border border-emerald-400/35 flex items-center justify-center text-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
-                      ⛳
-                    </div>
-                    <div>
-                      <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-                        <span>Lions Darts-Golf</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-400/[0.12] text-emerald-300 font-bold border border-emerald-400/25">
-                          18 Holes · Par 72
-                        </span>
-                      </h2>
-                      <p className="text-[11px] text-slate-400">
-                        Zufalls-Lochdistanzen • Check mit Single/Double/Triple/Bull • Überwurf = |Rest − Wurf|
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setViewMode('dartsgolf')}
-                    className="px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-emerald-300 border border-white/[0.09] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                    title="Zur detaillierten Darts-Golf Übersicht"
-                  >
-                    <span>Details</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {(!data.todayDartsGolfLeaderboard || data.todayDartsGolfLeaderboard.length === 0) ? (
-                  <div className="flex-1 min-h-[140px] flex flex-col items-center justify-center text-center p-6 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
-                    <div className="text-4xl mb-2">⛳</div>
-                    <h3 className="text-base font-bold text-slate-200">
-                      Noch keine 18-Loch Golfrunden heute
-                    </h3>
-                    <p className="text-xs text-slate-400 max-w-md mt-1">
-                      Sobald ein Spieler eine 18-Loch-Runde Lions Darts-Golf beendet, erscheint die Scorecard hier live auf dem TV-Board!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs sm:text-sm">
-                      <thead>
-                        <tr className="border-b border-white/[0.07] text-slate-400 uppercase text-[10px] tracking-wider">
-                          <th className="py-2.5 px-2 text-center w-12">Platz</th>
-                          <th className="py-2.5 px-3">Golfer</th>
-                          <th className="py-2.5 px-2 text-center">To Par</th>
-                          <th className="py-2.5 px-3 text-right">Schläge</th>
-                          <th className="py-2.5 px-2 text-center hidden sm:table-cell">🦅 / 🐦 / ⛳</th>
-                          <th className="py-2.5 px-2 text-right hidden sm:table-cell">Überflüge</th>
-                          <th className="py-2.5 px-2 text-right text-slate-500">Zeit</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/[0.05] font-medium">
-                        {data.todayDartsGolfLeaderboard.map((row, idx) => {
-                          const photo = getPlayerPhotoUrl(row.player_name);
-                          const initials = getPlayerInitials(row.player_name);
-                          const toParStr =
-                            row.score_to_par === 0
-                              ? 'E'
-                              : row.score_to_par > 0
-                              ? `+${row.score_to_par}`
-                              : `${row.score_to_par}`;
-                          return (
-                            <tr
-                              key={row.session_id + '_dg_' + idx}
-                              className={`transition-colors hover:bg-white/[0.04] ${
-                                row.rank === 1
-                                  ? 'bg-emerald-400/[0.08]'
-                                  : row.rank === 2
-                                  ? 'bg-white/[0.03]'
-                                  : row.rank === 3
-                                  ? 'bg-amber-900/[0.12]'
-                                  : ''
-                              }`}
-                            >
-                              <td className="py-3 px-2 text-center">
-                                {renderRankBadge(row.rank, row.isShared)}
-                              </td>
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center font-bold text-[10px] text-emerald-300">
-                                    {photo ? (
-                                      <Image src={photo} alt={row.player_name} width={32} height={32} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <span>{initials}</span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <div className="font-black text-white text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
-                                      <span>{row.player_name}</span>
-                                      {row.attempt_nr > 1 && (
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/[0.06] text-emerald-300 border border-white/[0.1]">
-                                          #{row.attempt_nr}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {row.opponent_name && (
-                                      <div className="text-[10px] text-slate-400">
-                                        vs. {row.opponent_name}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3 px-2 text-center font-mono">
-                                <span
-                                  className={`px-2 py-0.5 rounded-lg border text-xs font-black ${
-                                    row.score_to_par < 0
-                                      ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300'
-                                      : row.score_to_par === 0
-                                      ? 'bg-white/10 border-white/20 text-white'
-                                      : 'bg-rose-500/15 border-rose-400/40 text-rose-300'
-                                  }`}
-                                >
-                                  {toParStr}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-right">
-                                <span className="font-mono font-black text-sm sm:text-base text-white">
-                                  {row.total_strokes}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-mono ml-1">
-                                  (Par {row.course_par})
-                                </span>
-                              </td>
-                              <td className="py-3 px-2 text-center hidden sm:table-cell font-mono text-slate-300 text-xs">
-                                {row.eagles_count} / {row.birdies_count} / {row.pars_count}
-                              </td>
-                              <td className="py-3 px-2 text-right hidden sm:table-cell font-mono text-amber-300 font-bold">
-                                💨 {row.overshoots_count}
-                              </td>
-                              <td className="py-3 px-2 text-right text-[11px] font-mono text-slate-500">
-                                {row.time_label || '-'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         )}
@@ -3093,157 +2931,6 @@ export default function UnifiedTvBoardClient({
         )}
 
         {/* ========================================================
-            VIEW 4D: LIONS DARTS-GOLF (18 HOLES) DETAILANSICHT
-            ======================================================== */}
-        {viewMode === 'dartsgolf' && (
-          <div className="space-y-6">
-            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_50px_rgba(0,0,0,0.55)] p-5 sm:p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-5 border-b border-white/[0.07]">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-400/[0.12] border border-emerald-400/35 flex items-center justify-center text-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]">
-                    ⛳
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-xl sm:text-2xl font-black text-white">
-                        Lions Darts-Golf (18 Holes) • Clubhaus-Leaderboard
-                      </h2>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-400/[0.12] text-emerald-300 border border-emerald-400/25 text-xs font-black">
-                        18 Löcher · Par 72 · Stroke Play
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-                      Wertung: Niedrigste Schlagzahl (Darts) relativ zu Par gewinnt • Check mit jedem Feld • Überwurf = <code>|Rest − Wurf|</code>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Link
-                    href="/training/dartsgolf"
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-slate-950 font-black text-xs shadow-[0_8px_20px_rgba(16,185,129,0.25)] transition-all"
-                  >
-                    Golfrunde starten
-                  </Link>
-                  <button
-                    onClick={() => setViewMode('both')}
-                    className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/[0.09] text-xs font-bold transition-all cursor-pointer"
-                  >
-                    ← Zurück
-                  </button>
-                </div>
-              </div>
-
-              {(!data.todayDartsGolfLeaderboard || data.todayDartsGolfLeaderboard.length === 0) ? (
-                <div className="py-16 text-center space-y-3 bg-white/[0.02] rounded-2xl border border-dashed border-white/[0.08]">
-                  <div className="text-4xl">⛳</div>
-                  <div className="text-base sm:text-lg font-black text-white">
-                    Noch keine 18-Loch Darts-Golf Runden für diesen Zeitraum erfasst
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
-                    Spiele am Board 18 Löcher gegen den Computer-Golfbot oder im 1vs1 Flight – die Scorecard erscheint sofort hier!
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/[0.07] text-[10px] uppercase tracking-wider text-slate-400 font-black">
-                        <th className="py-3 px-3">Platz</th>
-                        <th className="py-3 px-3">Golfer</th>
-                        <th className="py-3 px-3 text-center">Score (To Par)</th>
-                        <th className="py-3 px-3 text-right">Schläge</th>
-                        <th className="py-3 px-3 text-center">Eagles / Birdies / Pars</th>
-                        <th className="py-3 px-3 text-center">Lochsiege</th>
-                        <th className="py-3 px-3 text-right">Überflüge</th>
-                        <th className="py-3 px-3 text-right">Zeit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.05] text-xs sm:text-sm">
-                      {data.todayDartsGolfLeaderboard.map((row, idx) => {
-                        const photoUrl = getPlayerPhotoUrl(row.player_name);
-                        const toParStr =
-                          row.score_to_par === 0
-                            ? 'E'
-                            : row.score_to_par > 0
-                            ? `+${row.score_to_par}`
-                            : `${row.score_to_par}`;
-                        return (
-                          <tr
-                            key={row.session_id + '_dg_detail_' + idx}
-                            className={`transition-colors ${
-                              row.rank === 1
-                                ? 'bg-emerald-400/[0.08] hover:bg-emerald-400/[0.12]'
-                                : 'hover:bg-white/[0.04]'
-                            }`}
-                          >
-                            <td className="py-3.5 px-3 whitespace-nowrap">
-                              {renderRankBadge(row.rank, row.isShared)}
-                            </td>
-                            <td className="py-3.5 px-3">
-                              <div className="flex items-center gap-3">
-                                <div className="relative w-9 h-9 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.12] shrink-0 flex items-center justify-center">
-                                  {photoUrl ? (
-                                    <Image src={photoUrl} alt={row.player_name} fill className="object-cover" />
-                                  ) : (
-                                    <span className="text-xs font-black text-emerald-300">
-                                      {getPlayerInitials(row.player_name)}
-                                    </span>
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="font-black text-white text-sm sm:text-base">
-                                    {row.player_name}
-                                  </div>
-                                  <div className="text-[11px] text-slate-400">
-                                    {row.attempt_label} {row.opponent_name ? `• vs. ${row.opponent_name}` : ''}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-3 text-center font-mono">
-                              <span
-                                className={`px-3 py-1 rounded-xl border text-sm font-black ${
-                                  row.score_to_par < 0
-                                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                                    : row.score_to_par === 0
-                                    ? 'bg-white/10 border-white/20 text-white'
-                                    : 'bg-rose-500/15 border-rose-400/50 text-rose-300'
-                                }`}
-                              >
-                                {toParStr}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-3 text-right font-mono">
-                              <span className="text-lg font-black text-white">{row.total_strokes}</span>
-                              <span className="text-xs text-slate-400 ml-1">/ Par {row.course_par}</span>
-                            </td>
-                            <td className="py-3.5 px-3 text-center font-mono font-bold">
-                              <span className="text-amber-300">🦅 {row.eagles_count}</span> ·{' '}
-                              <span className="text-emerald-300">🐦 {row.birdies_count}</span> ·{' '}
-                              <span className="text-slate-300">⛳ {row.pars_count}</span>
-                            </td>
-                            <td className="py-3.5 px-3 text-center font-mono font-bold text-cyan-300">
-                              🏆 {row.holes_won}
-                            </td>
-                            <td className="py-3.5 px-3 text-right font-mono font-bold text-amber-300">
-                              💨 {row.overshoots_count}
-                            </td>
-                            <td className="py-3.5 px-3 text-right font-mono text-xs text-slate-400">
-                              {row.time_label}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================
             VIEW 5: ARCHIV & KALENDER (DATUMSAUSWAHL & PROTOKOLL)
             ======================================================== */}
         {viewMode === 'archive' && (
@@ -3647,62 +3334,6 @@ export default function UnifiedTvBoardClient({
                             </div>
                           </div>
                         ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Lions Darts-Golf Spiele */}
-                  <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.09] p-4 shadow-xl flex flex-col">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.07]">
-                      <h4 className="text-sm font-black text-emerald-300 flex items-center gap-1.5">
-                        <span>⛳ Darts-Golf</span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          ({data.currentArchiveDayDetail.dartsgolfGames?.length || 0})
-                        </span>
-                      </h4>
-                    </div>
-
-                    {!data.currentArchiveDayDetail.dartsgolfGames ||
-                    data.currentArchiveDayDetail.dartsgolfGames.length === 0 ? (
-                      <div className="text-xs text-slate-500 py-6 text-center">
-                        Keine Darts-Golf Runden an diesem Tag
-                      </div>
-                    ) : (
-                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[400px] pr-1">
-                        {data.currentArchiveDayDetail.dartsgolfGames.map((g, idx) => {
-                          const toParStr =
-                            g.scoreToPar === 0
-                              ? 'E'
-                              : g.scoreToPar > 0
-                              ? `+${g.scoreToPar}`
-                              : `${g.scoreToPar}`;
-                          return (
-                            <div
-                              key={g.id + '_dg_' + idx}
-                              className="bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.07] flex items-center justify-between text-xs"
-                            >
-                              <div>
-                                <div className="font-bold text-white flex items-center gap-1.5">
-                                  <span>{g.playerName}</span>
-                                  <span className="text-[10px] font-mono px-1.5 rounded bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-400/30">
-                                    {g.holesCount} Löcher
-                                  </span>
-                                </div>
-                                {g.opponentName && (
-                                  <div className="text-[10px] text-slate-400">vs. {g.opponentName}</div>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <div className="font-mono font-black text-emerald-300 text-sm">
-                                  {toParStr} ({g.totalStrokes} Schl.)
-                                </div>
-                                <div className="text-[10px] text-slate-500 font-mono">
-                                  🐦 {g.birdiesOrBetter} • 💨 {g.overshootsCount} • {g.time}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
                       </div>
                     )}
                   </div>
