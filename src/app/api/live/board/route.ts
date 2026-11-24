@@ -4,9 +4,9 @@ import { sql } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 const BOARD_UI_VERSION =
-  process.env.VERCEL_GIT_COMMIT_SHA || '2026-11-20-rudolph-v3-routes';
+  process.env.VERCEL_GIT_COMMIT_SHA || '2026-11-24-dartsgolf-v1';
 
-export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'tannenbaum' | 'adventskalender' | 'rudolph' | 'bingo';
+export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'tannenbaum' | 'adventskalender' | 'rudolph' | 'bingo' | 'dartsgolf';
 
 export interface UnifiedLiveState {
   boardId: string;
@@ -29,6 +29,7 @@ export interface UnifiedLiveState {
   adventskalenderData?: any;
   rudolphData?: any;
   bingoData?: any;
+  dartsgolfData?: any;
   // Direct access fields for UI components
   currentTarget?: string;
   currentTargetIndex?: number;

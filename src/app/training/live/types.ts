@@ -1,4 +1,4 @@
-export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'archive';
+export type UnifiedTvViewMode = 'both' | 'doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'dartsgolf' | 'archive';
 
 export type UnifiedTvTimeframe = 'today' | 'month' | 'all' | 'archive';
 
@@ -135,12 +135,34 @@ export interface TvDarts99Row {
   isShared: boolean;
 }
 
+export interface TvDartsGolfRow {
+  session_id: string;
+  player_name: string;
+  opponent_name?: string | null;
+  game_mode: '1vsComputer' | '1vs1';
+  holes_count: number;
+  course_par: number;
+  attempt_nr: number;
+  attempt_label: string;
+  time_label: string;
+  total_strokes: number;
+  score_to_par: number;
+  holes_won: number;
+  eagles_count: number;
+  birdies_count: number;
+  pars_count: number;
+  bogeys_count: number;
+  overshoots_count: number;
+  rank: number;
+  isShared: boolean;
+}
+
 export interface ArchiveTrainingDaySummary {
   dateStr: string; // YYYY-MM-DD
   dayLabel: string; // e.g. "Donnerstag, 22. Okt."
   totalSessions: number;
   uniquePlayersCount: number;
-  gamesList: ('doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99')[];
+  gamesList: ('doppelquote' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'dartsgolf')[];
 }
 
 export interface ArchiveDayDetail {
@@ -222,6 +244,19 @@ export interface ArchiveDayDetail {
     pointsPerDart: number;
     time: string;
   }[];
+  dartsgolfGames?: {
+    id: string;
+    playerName: string;
+    opponentName?: string | null;
+    gameMode: string;
+    holesCount: number;
+    coursePar: number;
+    totalStrokes: number;
+    scoreToPar: number;
+    birdiesOrBetter: number;
+    overshootsCount: number;
+    time: string;
+  }[];
 }
 
 export interface UnifiedTvBoardData {
@@ -235,6 +270,7 @@ export interface UnifiedTvBoardData {
   todayStellenCheckenLeaderboard: TvStellenCheckenRow[];
   todayScoringLeiterLeaderboard: TvScoringLeiterRow[];
   todayDarts99Leaderboard: TvDarts99Row[];
+  todayDartsGolfLeaderboard?: TvDartsGolfRow[];
   hasTodayData: boolean;
   hasMonthData: boolean;
   availableArchiveDays: ArchiveTrainingDaySummary[];

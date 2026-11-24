@@ -233,6 +233,30 @@ export async function getCompletedGamesByPlayerForMonth(monthKey: string): Promi
     // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
   }
 
+  // 7. Lions Darts-Golf (nur reguläre 18-Loch-Runden gemäß §12.4 AGENTS.md)
+  try {
+    const dgRows = await sql`
+      SELECT player_name, player_id, count(*)::int as cnt
+      FROM training_dartsgolf
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND COALESCE(holes_count, 18) >= 18
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${monthKey}
+        AND player_name NOT LIKE 'Computer%'
+        AND player_name NOT LIKE 'Bot%'
+      GROUP BY player_name, player_id
+    `;
+
+    for (const r of dgRows) {
+      const name = String(r.player_name).trim();
+      const current = playerStats.get(name) || { playerId: r.player_id ?? null, count: 0 };
+      current.count += Number(r.cnt);
+      if (r.player_id && !current.playerId) current.playerId = r.player_id;
+      playerStats.set(name, current);
+    }
+  } catch {
+    // Falls Tabelle noch nicht initialisiert wurde, leise fortfahren
+  }
+
   return playerStats;
 }
 
@@ -551,13 +575,16 @@ export interface PlayerMonthlyTrainingStat {
   darts99Solo: number;
   darts991vs1: number;
   totalDarts99: number;
+  dartsgolfSolo?: number;
+  dartsgolf1vs1?: number;
+  totalDartsgolf?: number;
   totalCompletedGames: number;
   isQualified: boolean;
   isBlockedByPastWin: boolean;
   isMonthWinner: boolean;
   gamesList: {
     id: number;
-    gameType: 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99';
+    gameType: 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'dartsgolf';
     gameMode: string;
     opponentName: string | null;
     date: string;
@@ -632,6 +659,18 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       WHERE is_aborted IS NULL OR is_aborted = 0;
     `;
     for (const r of d99MonthRows) {
+      if (r.m && typeof r.m === 'string' && r.m.length === 7) {
+        monthSet.add(r.m);
+      }
+    }
+  } catch {}
+  try {
+    const dgMonthRows = await sql`
+      SELECT DISTINCT COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) AS m
+      FROM training_dartsgolf
+      WHERE is_aborted IS NULL OR is_aborted = 0;
+    `;
+    for (const r of dgMonthRows) {
       if (r.m && typeof r.m === 'string' && r.m.length === 7) {
         monthSet.add(r.m);
       }
@@ -744,6 +783,26 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
     `;
   } catch {
     darts99Sessions = [];
+  }
+
+  let dartsgolfSessions: any[] = [];
+  try {
+    dartsgolfSessions = await sql`
+      SELECT 
+        id, session_id, player_name, opponent_name, game_mode, is_computer, computer_level,
+        holes_count, course_par, total_strokes, score_to_par, holes_won,
+        eagles_count, birdies_count, pars_count, bogeys_count, overshoots_count,
+        training_date, created_at, is_winner
+      FROM training_dartsgolf
+      WHERE (is_aborted IS NULL OR is_aborted = 0)
+        AND COALESCE(holes_count, 18) >= 18
+        AND COALESCE(NULLIF(SUBSTRING(training_date, 1, 7), ''), TO_CHAR(created_at, 'YYYY-MM')) = ${selectedMonthKey}
+        AND player_name NOT LIKE 'Computer%'
+        AND player_name NOT LIKE 'Bot%'
+      ORDER BY COALESCE(training_date, created_at::text) DESC;
+    `;
+  } catch {
+    dartsgolfSessions = [];
   }
 
   // 4. Sperrfrist & Gewinner des Monats ermitteln
@@ -1135,6 +1194,70 @@ export async function getAdminTrainingOverviewData(customMonthKey?: string): Pro
       opponentName: s.opponent_name || null,
       date: s.training_date || s.created_at,
       summary: `99 Darts (Ziel ${s.target_number || 20}): ${s.total_points || 0}/297 Pkt • ${s.triples_count || 0}T/${s.doubles_count || 0}D/${s.singles_count || 0}S`,
+      isWinner: Number(s.is_winner ?? 0),
+    });
+  }
+
+  // Lions Darts-Golf zuweisen
+  for (const s of dartsgolfSessions) {
+    const name = String(s.player_name).trim();
+    if (name.toLowerCase().startsWith('computer')) continue;
+    let stat = statsMap.get(name);
+    if (!stat) {
+      stat = {
+        playerName: name,
+        playerId: null,
+        team: 'Gast',
+        doublesSolo: 0,
+        doubles1vs1: 0,
+        totalDoubles: 0,
+        pdcSolo: 0,
+        pdc1vs1: 0,
+        totalPdc: 0,
+        fussballSolo: 0,
+        fussball1vs1: 0,
+        totalFussball: 0,
+        stellenCheckenSolo: 0,
+        stellenChecken1vs1: 0,
+        totalStellenChecken: 0,
+        scoringLeiterSolo: 0,
+        scoringLeiter1vs1: 0,
+        totalScoringLeiter: 0,
+        darts99Solo: 0,
+        darts991vs1: 0,
+        totalDarts99: 0,
+        dartsgolfSolo: 0,
+        dartsgolf1vs1: 0,
+        totalDartsgolf: 0,
+        totalCompletedGames: 0,
+        isQualified: false,
+        isBlockedByPastWin: blockedPlayers.has(name),
+        isMonthWinner: winnerName === name,
+        gamesList: [],
+      };
+      statsMap.set(name, stat);
+    }
+
+    const isBot = s.game_mode === '1vsComputer' || Number(s.is_computer || 0) === 1;
+    if (isBot) {
+      stat.dartsgolfSolo = (stat.dartsgolfSolo || 0) + 1;
+    } else {
+      stat.dartsgolf1vs1 = (stat.dartsgolf1vs1 || 0) + 1;
+    }
+    stat.totalDartsgolf = (stat.totalDartsgolf || 0) + 1;
+    stat.totalCompletedGames += 1;
+
+    const toParNum = Number(s.score_to_par || 0);
+    const toParStr = toParNum === 0 ? 'E' : toParNum > 0 ? `+${toParNum}` : `${toParNum}`;
+    stat.gamesList.push({
+      id: Number(s.id),
+      gameType: 'dartsgolf',
+      gameMode: isBot ? 'vs. Computer' : '1vs1',
+      opponentName: s.opponent_name || (isBot ? 'Computer' : 'Gegner'),
+      date: s.training_date || s.created_at,
+      summary: `Darts-Golf (${s.holes_count || 18} Löcher): ${s.total_strokes} Schläge (${toParStr}) • ${
+        Number(s.eagles_count || 0) + Number(s.birdies_count || 0)
+      } Birdies/Eagles`,
       isWinner: Number(s.is_winner ?? 0),
     });
   }

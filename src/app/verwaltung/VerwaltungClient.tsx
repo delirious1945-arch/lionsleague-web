@@ -76,6 +76,7 @@ export default function VerwaltungClient({
   trainingStellenChecken = [],
   trainingScoringLeiter = [],
   trainingDarts99 = [],
+  trainingDartsgolf = [],
   trainingBiomechanics = [],
   adminTrainingOverview,
 }: {
@@ -87,6 +88,7 @@ export default function VerwaltungClient({
   trainingStellenChecken?: any[];
   trainingScoringLeiter?: any[];
   trainingDarts99?: any[];
+  trainingDartsgolf?: any[];
   trainingBiomechanics?: any[];
   adminTrainingOverview?: AdminTrainingOverviewData;
 }) {
@@ -100,7 +102,7 @@ export default function VerwaltungClient({
 
   const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'training'>(defaultTab);
   const [trainingGameType, setTrainingGameType] = useState<
-    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'biomechanics'
+    'all' | 'doubles' | 'pdc' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'dartsgolf' | 'biomechanics'
   >('all');
   const [trainingPlayerFilter, setTrainingPlayerFilter] = useState<string>('all');
   const [expandedTrainingKey, setExpandedTrainingKey] = useState<string | number | null>(null);
@@ -550,6 +552,7 @@ export default function VerwaltungClient({
             ...trainingStellenChecken.map((s: any) => s.player_name),
             ...trainingScoringLeiter.map((s: any) => s.player_name),
             ...trainingDarts99.map((d: any) => d.player_name),
+            ...trainingDartsgolf.map((g: any) => g.player_name),
             ...trainingBiomechanics.map((b: any) => b.playerName),
           ].filter(Boolean))
         ).sort();
@@ -561,6 +564,7 @@ export default function VerwaltungClient({
           ...trainingStellenChecken.map((s: any) => ({ ...s, gameType: 'stellen_checken' })),
           ...trainingScoringLeiter.map((s: any) => ({ ...s, gameType: 'scoring_leiter' })),
           ...trainingDarts99.map((d: any) => ({ ...d, gameType: 'darts_99' })),
+          ...trainingDartsgolf.map((g: any) => ({ ...g, gameType: 'dartsgolf' })),
           ...trainingBiomechanics.map((b: any) => ({
             ...b,
             gameType: 'biomechanics',
@@ -660,6 +664,14 @@ export default function VerwaltungClient({
                   <ExternalLink size={12} />
                 </Link>
                 <Link
+                  href="/training/dartsgolf"
+                  data-ui-id="VERWALTUNG.TRAINING.LINK_DARTSGOLF"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <span>⛳ Darts-Golf</span>
+                  <ExternalLink size={12} />
+                </Link>
+                <Link
                   href="/video"
                   data-ui-id="VERWALTUNG.TRAINING.LINK_VIDEO"
                   className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
@@ -693,7 +705,7 @@ export default function VerwaltungClient({
                   {combinedSessions.length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5">
-                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&amp;C · {trainingScoringLeiter.length} SL · {trainingDarts99.length} 99D · {trainingBiomechanics.length} Video
+                  {trainingDoubles.length} DQ · {trainingPdc.length} PDC · {trainingFussball.length} FB · {trainingStellenChecken.length} S&amp;C · {trainingScoringLeiter.length} SL · {trainingDarts99.length} 99D · {trainingDartsgolf.length} Golf · {trainingBiomechanics.length} Video
                 </div>
               </div>
 
@@ -804,6 +816,17 @@ export default function VerwaltungClient({
                   99 Darts ({trainingDarts99.length})
                 </button>
                 <button
+                  onClick={() => setTrainingGameType('dartsgolf')}
+                  data-ui-id="VERWALTUNG.TRAINING.FILTER_DARTSGOLF_BTN"
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    trainingGameType === 'dartsgolf'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Darts-Golf ({trainingDartsgolf.length})
+                </button>
+                <button
                   onClick={() => setTrainingGameType('biomechanics')}
                   data-ui-id="VERWALTUNG.TRAINING.FILTER_BIOMECHANICS_BTN"
                   className={`px-3 py-1 rounded-md font-bold transition-all ${
@@ -856,6 +879,7 @@ export default function VerwaltungClient({
                   const isStellenChecken = s.gameType === 'stellen_checken';
                   const isScoringLeiter = s.gameType === 'scoring_leiter';
                   const isDarts99 = s.gameType === 'darts_99';
+                  const isDartsgolf = s.gameType === 'dartsgolf';
                   const isBiomechanics = s.gameType === 'biomechanics';
                   const isAborted = Boolean(s.is_aborted);
                   const sessionKey = s.session_id ? `${s.session_id}_${s.player_name}_${idx}` : `s_${idx}`;
@@ -902,6 +926,8 @@ export default function VerwaltungClient({
                                 ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                                 : isDarts99
                                 ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                : isDartsgolf
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                 : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                             }`}
                           >
@@ -917,6 +943,8 @@ export default function VerwaltungClient({
                               ? '🪜 Scoring-Leiter'
                               : isDarts99
                               ? '🎯 99 Darts'
+                              : isDartsgolf
+                              ? '⛳ Darts-Golf'
                               : '🎥 KI-Wurfanalyse'}
                           </span>
                           <span className="font-bold text-white text-sm">{s.player_name}</span>
@@ -1005,6 +1033,22 @@ export default function VerwaltungClient({
                               </span>
                               <div className="text-[10px] text-slate-400">
                                 Ziel {s.target_number || 20} · {s.triples_count || 0}T/{s.doubles_count || 0}D/{s.singles_count || 0}S
+                              </div>
+                            </div>
+                          )}
+
+                          {isDartsgolf && (
+                            <div className="text-right">
+                              <span className="text-emerald-300 font-black text-sm font-mono">
+                                {Number(s.score_to_par || 0) === 0
+                                  ? 'E'
+                                  : Number(s.score_to_par || 0) > 0
+                                  ? `+${s.score_to_par}`
+                                  : s.score_to_par}{' '}
+                                ({s.total_strokes} Schl.)
+                              </span>
+                              <div className="text-[10px] text-slate-400">
+                                {s.holes_count || 18} Löcher · 🐦 {(s.eagles_count || 0) + (s.birdies_count || 0)} · 💨 {s.overshoots_count || 0} Überflüge
                               </div>
                             </div>
                           )}
@@ -1465,6 +1509,57 @@ export default function VerwaltungClient({
                                     >
                                       <div className="text-[8px] opacity-75">#{r.round || rIdx + 1}</div>
                                       <div className="text-white text-xs">{r.points ?? 0}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {isDartsgolf && (
+                            <div className="space-y-2.5">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Score &amp; Schläge</div>
+                                  <div className="text-sm font-black text-emerald-400">
+                                    {Number(s.score_to_par || 0) === 0
+                                      ? 'Even Par (E)'
+                                      : Number(s.score_to_par || 0) > 0
+                                      ? `+${s.score_to_par}`
+                                      : s.score_to_par}{' '}
+                                    · {s.total_strokes} Schläge (Par {s.course_par || 72})
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Birdies / Pars / Bogeys</div>
+                                  <div className="text-sm font-black text-amber-400">
+                                    🦅 {s.eagles_count || 0} · 🐦 {s.birdies_count || 0} · ⛳ {s.pars_count || 0} · 🟨 {s.bogeys_count || 0}
+                                  </div>
+                                </div>
+                                <div className="bg-slate-950/70 border border-white/10 p-2 rounded-lg">
+                                  <div className="text-[10px] text-slate-400">Lochsiege &amp; Überflüge</div>
+                                  <div className="text-sm font-black text-cyan-400">
+                                    🏆 {s.holes_won || 0} Löcher · 💨 {s.overshoots_count || 0} Überflüge
+                                  </div>
+                                </div>
+                              </div>
+                              {Array.isArray(s.hole_details) && s.hole_details.length > 0 && (
+                                <div className="grid grid-cols-6 sm:grid-cols-9 gap-1 text-center">
+                                  {s.hole_details.map((h: any, hIdx: number) => (
+                                    <div
+                                      key={hIdx}
+                                      className={`py-1 px-0.5 rounded border text-[10px] font-mono font-bold ${
+                                        Number(h.toPar || 0) < 0
+                                          ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200'
+                                          : Number(h.toPar || 0) === 0
+                                          ? 'bg-slate-950/80 border-white/15 text-white'
+                                          : 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                                      }`}
+                                    >
+                                      <div className="text-[8px] opacity-75">
+                                        L{h.holeNumber || hIdx + 1} (P{h.par} · {h.startDistance}m)
+                                      </div>
+                                      <div className="text-xs font-black">{h.strokes} Schl.</div>
                                     </div>
                                   ))}
                                 </div>

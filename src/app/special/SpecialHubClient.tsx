@@ -419,6 +419,64 @@ export default function SpecialHubClient({
               </Link>
             </div>
           </div>
+
+          <div
+            data-ui-id="SPECIAL.GAME_DARTSGOLF.CARD"
+            className="group relative overflow-hidden rounded-3xl border border-emerald-500/35 bg-gradient-to-br from-slate-900/95 via-emerald-950/30 to-slate-900/95 p-6 sm:p-7 flex flex-col justify-between gap-6 shadow-2xl shadow-emerald-950/30 hover:border-emerald-400/55 transition-all lg:col-span-2"
+          >
+            <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-400/35 flex items-center justify-center text-3xl shadow-inner shrink-0">
+                    ⛳
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        18 Holes · Par 72
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-800/80 text-slate-300 border border-slate-700">
+                        1 vs. Computer &amp; 1 vs. 1
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                      Lions Darts-Golf (18 Holes)
+                    </h3>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300 leading-relaxed">
+                18 Bahnen mit zufällig generierten Loch-Entfernungen (40–168 m). Checke die Restdistanz
+                mit Single, Doppel, Triple oder Bull exakt auf 0 m! Wirfst du zu weit (z. B. 25 m Rest
+                und T20 = 60 m), fliegt der Ball übers Loch hinaus auf 35 m Rest!
+              </p>
+
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  ⛳ 18 Löcher Zufallsdistanz
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  💨 Overshoot = |Rest − Wurf|
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  🤖 4 Golf-Bots &amp; 1vs1
+                </span>
+              </div>
+            </div>
+
+            <div className="relative z-10">
+              <Link
+                href={`/training/dartsgolf?board=${activeBoard}`}
+                data-ui-id="SPECIAL.GAME_DARTSGOLF.START_BTN"
+                className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <span>Golfrunde starten</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Demnächst in dieser Arena */}

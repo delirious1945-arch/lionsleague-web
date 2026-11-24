@@ -239,6 +239,7 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
               <th className="py-3 px-2 text-center">Stellen & Checken (Solo / 1vs1)</th>
               <th className="py-3 px-2 text-center">Scoring-Leiter (Solo / 1vs1)</th>
               <th className="py-3 px-2 text-center">99 Darts (Solo / 1vs1)</th>
+              <th className="py-3 px-2 text-center">Darts-Golf (Bot / 1vs1)</th>
               <th className="py-3 px-3 text-center">Gesamt</th>
               <th className="py-3 px-3">Fortschritt (Ziel: {targetGames})</th>
               <th className="py-3 px-3 text-right">Lostopf-Status</th>
@@ -348,6 +349,16 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                           <strong className="text-white">{p.totalDarts99 || 0}</strong>{' '}
                           <span className="text-[11px] text-slate-400">
                             ({p.darts99Solo || 0}s / {p.darts991vs1 || 0}d)
+                          </span>
+                        </span>
+                      </td>
+
+                      {/* Darts-Golf */}
+                      <td className="py-3.5 px-2 text-center">
+                        <span className="font-mono font-semibold">
+                          <strong className="text-white">{p.totalDartsgolf || 0}</strong>{' '}
+                          <span className="text-[11px] text-slate-400">
+                            ({p.dartsgolfSolo || 0}b / {p.dartsgolf1vs1 || 0}d)
                           </span>
                         </span>
                       </td>
@@ -466,6 +477,8 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                                             ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                                             : g.gameType === 'darts_99'
                                             ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                            : g.gameType === 'dartsgolf'
+                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                             : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                         }`}>
                                           {g.gameType === 'doubles'
@@ -478,6 +491,8 @@ export default function AdminTrainingOverview({ initialData }: AdminTrainingOver
                                             ? '🪜 Scoring-Leiter'
                                             : g.gameType === 'darts_99'
                                             ? '🎯 99 Darts'
+                                            : g.gameType === 'dartsgolf'
+                                            ? '⛳ Darts-Golf'
                                             : '⚽ Fußball'}
                                         </span>
                                         <span className="font-bold text-white">

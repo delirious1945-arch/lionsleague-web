@@ -24,6 +24,11 @@ import {
   createBingoCard,
   createInitialBingoPlayerState,
 } from '@/app/special/bingo/types';
+import HolographicDartsGolfCockpit from '@/components/HolographicDartsGolfCockpit';
+import {
+  createInitialGolfPlayerState,
+  generateGolfCourse,
+} from '@/app/training/dartsgolf/types';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -671,6 +676,42 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         lastAction={bg.lastAction ?? null}
         winnerPlayer={bg.winnerPlayer ?? null}
         winnerName={bg.winnerName ?? null}
+        currentTime={currentTime}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 12. SPIEL: LIONS DARTS-GOLF (18 HOLES)
+  // =========================================================================
+  if (liveState.gameType === 'dartsgolf') {
+    const dg = liveState.dartsgolfData || {};
+    const holesCount = dg.holesCount === 9 ? 9 : 18;
+    const courseHoles =
+      Array.isArray(dg.holes) && dg.holes.length > 0
+        ? dg.holes
+        : generateGolfCourse(holesCount);
+    const fallbackPlayer = createInitialGolfPlayerState(courseHoles[0]?.startDistance || 90);
+
+    return (
+      <HolographicDartsGolfCockpit
+        boardId={boardId}
+        p1Name={p1Name}
+        p2Name={p2Name || 'Computer'}
+        activePlayer={activePlayer}
+        holesCount={holesCount}
+        currentHoleIndex={Number(dg.currentHoleIndex || 0)}
+        coursePar={Number(dg.coursePar || (holesCount === 9 ? 36 : 72))}
+        holes={courseHoles}
+        isComputer={Boolean(dg.isComputer)}
+        computerLevel={dg.computerLevel || 'clubmeister'}
+        p1={dg.p1 || fallbackPlayer}
+        p2={dg.p2 || fallbackPlayer}
+        lastAction={dg.lastAction ?? null}
+        winnerPlayer={dg.winnerPlayer ?? null}
+        winnerName={dg.winnerName ?? null}
         currentTime={currentTime}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
