@@ -2,10 +2,11 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RotateCcw, Tv } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Tv, ExternalLink } from 'lucide-react';
 import { Player } from '@/lib/data';
 import { UserSession } from '@/app/actions';
 import {
+  RALLY_ITEM_META,
   RALLY_ITEM_OPTIONS,
   RallyEventBanner,
   RallyGameMode,
@@ -16,6 +17,7 @@ import {
   applyRallyNextRunner,
   applyRallyScore,
   createInitialRallyState,
+  getAutoDetectedItem,
   pruneExpiredEffects,
 } from './types';
 import {
@@ -37,8 +39,7 @@ interface SavedRallySession {
   controlTeam: RallyTeamNumber;
 }
 
-const STORAGE_KEY = 'lions_active_dartsrally_session_v2';
-const QUICK_SCORES = [26, 41, 45, 60, 81, 85, 100, 140, 180] as const;
+const STORAGE_KEY = 'lions_active_dartsrally_session_v3';
 
 function ProgressBar({
   team,
@@ -85,9 +86,11 @@ export default function DartsRallyClient({
     [players]
   );
 
-  // Setup-Konfiguration
+  // Setup-Konfiguration: 2 TV-Boards für Board vs. Board
   const [boardId, setBoardId] = useState<string>('1');
-  const [mode, setMode] = useState<RallyGameMode>('single_board');
+  const [board1Id, setBoard1Id] = useState<string>('1');
+  const [board2Id, setBoard2Id] = useState<string>('2');
+  const [mode, setMode] = useState<RallyGameMode>('board_vs_board');
   const [targetDistance, setTargetDistance] = useState<RallyTargetDistance>(1000);
   const [team1Name, setTeam1Name] = useState<string>('Team Rot');
   const [team2Name, setTeam2Name] = useState<string>('Team Gold');
@@ -98,28 +101,28 @@ export default function DartsRallyClient({
     return [first, second];
   });
   const [team2Members, setTeam2Members] = useState<string[]>(() => {
-    const used = new Set([
-      currentUser?.name?.trim() || '',
-      validPlayers[0]?.name || '',
-    ]);
-    const pool = validPlayers.filter((p) => !used.has(p.name)).map((p) => p.name);
-    if (pool.length >= 2) return [pool[0], pool[1]];
-    if (pool.length === 1) return [pool[0], 'Gastspieler'];
-    return ['Spieler 3', 'Spieler 4'];
+    const candidateA = validPlayers.find(
+      (p) => p.name !== currentUser?.name?.trim()
+    )?.name;
+    const candidateB = validPlayers.find(
+      (p) => p.name !== currentUser?.name?.trim() && p.name !== candidateA
+    )?.name;
+    return [candidateA || 'Spieler 3', candidateB || 'Spieler 4'];
   });
+
   const [team1Draft, setTeam1Draft] = useState<string>('');
   const [team2Draft, setTeam2Draft] = useState<string>('');
 
   // Laufender Spielzustand
   const [phase, setPhase] = useState<'setup' | 'racing'>('setup');
   const [rally, setRally] = useState<RallyLiveState>(() =>
-    createInitialRallyState()
+    createInitialRallyState({ board1Id: '1', board2Id: '2', gameMode: 'board_vs_board' })
   );
   const [history, setHistory] = useState<RallyLiveState[]>([]);
   const [controlTeam, setControlTeam] = useState<RallyTeamNumber>(1);
   const [savedSession, setSavedSession] = useState<SavedRallySession | null>(null);
 
-  // Eingabe & Effekte
+  // Eingabe & Effekte (Ausschließlich vergrößertes Numpad)
   const [scoreInput, setScoreInput] = useState<string>('');
   const [selectedItem, setSelectedItem] = useState<RallyItemType | null>(null);
   const [error, setError] = useState<string>('');
@@ -146,7 +149,7 @@ export default function DartsRallyClient({
     } catch {}
   }, []);
 
-  // 250ms-Takt für Buff-/Debuff-Sekunden-Countdowns
+  // 250ms-Takt für Buff-/Debuff-Countdowns
   useEffect(() => {
     if (phase !== 'racing') return;
     const timer = setInterval(() => setNow(Date.now()), 250);
@@ -187,31 +190,46 @@ export default function DartsRallyClient({
     []
   );
 
-  const syncToBoardLive = useCallback(async (state: RallyLiveState) => {
-    try {
-      await fetch('/api/live/board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boardId: state.boardId,
-          sessionId: state.sessionId,
-          gameType: 'dartsrally',
-          gameTitle: `Darts Rally (${state.targetDistance.toLocaleString('de-DE')} Pkt)`,
-          status: state.winnerTeam ? 'completed' : 'playing',
-          p1Name: state.team1.teamName,
-          p2Name: state.team2.teamName,
-          activePlayer: state.activeTeam,
-          scoreP1: state.team1.score,
-          scoreP2: state.team2.score,
-          dartsrallyData: state,
-        }),
-      });
-    } catch (err) {
-      console.error('Fehler beim Live-Board-Sync von Darts Rally:', err);
-    }
-  }, []);
+  // Live-Sync an BEIDE TV-Boards bei Board vs. Board
+  const syncToBoardLive = useCallback(
+    async (state: RallyLiveState) => {
+      try {
+        const targetBoards =
+          state.gameMode === 'board_vs_board'
+            ? Array.from(
+                new Set([state.board1Id || board1Id, state.board2Id || board2Id].filter(Boolean))
+              )
+            : [state.boardId || boardId];
 
-  // 12s Heartbeat während laufendem Rennen (verhindert TV-Auto-Standby)
+        await Promise.all(
+          targetBoards.map((bid) =>
+            fetch('/api/live/board', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                boardId: bid,
+                sessionId: state.sessionId,
+                gameType: 'dartsrally',
+                gameTitle: `Darts Rally (${state.targetDistance.toLocaleString('de-DE')} Pkt)`,
+                status: state.winnerTeam ? 'completed' : 'playing',
+                p1Name: state.team1.teamName,
+                p2Name: state.team2.teamName,
+                activePlayer: state.activeTeam,
+                scoreP1: state.team1.score,
+                scoreP2: state.team2.score,
+                dartsrallyData: { ...state, boardId: bid },
+              }),
+            })
+          )
+        );
+      } catch (err) {
+        console.error('Fehler beim Live-Board-Sync von Darts Rally:', err);
+      }
+    },
+    [board1Id, board2Id, boardId]
+  );
+
+  // 12s Heartbeat
   useEffect(() => {
     if (phase !== 'racing' || rally.winnerTeam) return;
     const heartbeat = setInterval(() => {
@@ -220,13 +238,6 @@ export default function DartsRallyClient({
     }, 12000);
     return () => clearInterval(heartbeat);
   }, [phase, rally, syncToBoardLive]);
-
-  const handleSelectBoard = (nextBoard: string) => {
-    setBoardId(nextBoard);
-    try {
-      localStorage.setItem('lions_active_board', nextBoard);
-    } catch {}
-  };
 
   const addMemberToTeam = (teamNum: RallyTeamNumber, name: string) => {
     const clean = name.trim();
@@ -255,8 +266,13 @@ export default function DartsRallyClient({
   };
 
   const handleStartRace = () => {
+    const activeBoardForTablet =
+      mode === 'board_vs_board' ? (controlTeam === 1 ? board1Id : board2Id) : boardId;
+
     const initial = createInitialRallyState({
-      boardId,
+      boardId: activeBoardForTablet,
+      board1Id,
+      board2Id,
       targetDistance,
       gameMode: mode,
       team1Name,
@@ -284,7 +300,9 @@ export default function DartsRallyClient({
     setRally(savedSession.rally);
     setHistory(savedSession.history || []);
     setBoardId(savedSession.rally.boardId || '1');
-    setMode(savedSession.rally.gameMode || 'single_board');
+    setBoard1Id(savedSession.rally.board1Id || '1');
+    setBoard2Id(savedSession.rally.board2Id || '2');
+    setMode(savedSession.rally.gameMode || 'board_vs_board');
     setTargetDistance(savedSession.rally.targetDistance || 1000);
     setControlTeam(savedSession.controlTeam || savedSession.rally.activeTeam || 1);
     setSavedSession(null);
@@ -313,6 +331,8 @@ export default function DartsRallyClient({
   const handleRematch = () => {
     const rematch = createInitialRallyState({
       boardId: rally.boardId,
+      board1Id: rally.board1Id,
+      board2Id: rally.board2Id,
       targetDistance: rally.targetDistance,
       gameMode: rally.gameMode,
       team1Name: rally.team1.teamName,
@@ -339,21 +359,35 @@ export default function DartsRallyClient({
   const opponent = effectiveTeam === 1 ? rally.team2 : rally.team1;
   const tone = effectiveTeam === 1 ? 'red' : 'gold';
 
-  const freeze = getRallyEffect(ownTeam, 'freeze', now);
-  const banana = getRallyEffect(ownTeam, 'banana', now);
+  const ausgebremst =
+    getRallyEffect(ownTeam, 'ausgebremst', now) ||
+    getRallyEffect(ownTeam, 'freeze', now);
+  const spitzenbruch =
+    getRallyEffect(ownTeam, 'spitzenbruch', now) ||
+    getRallyEffect(ownTeam, 'banana', now);
   const turbo = getRallyEffect(ownTeam, 'turbo', now);
-  const shield = getRallyEffect(ownTeam, 'shield', now);
-  const fogOwn = Boolean(getRallyEffect(ownTeam, 'fog', now));
-  const fogOpponent = Boolean(getRallyEffect(opponent, 'fog', now));
-  const frozenFor = getRallySecondsLeft(freeze, now);
+  const shield =
+    getRallyEffect(ownTeam, 'schild', now) || getRallyEffect(ownTeam, 'shield', now);
+  const fogOwn = Boolean(
+    getRallyEffect(ownTeam, 'fog', now) || getRallyEffect(ownTeam, 'ausgebremst', now)
+  );
+  const fogOpponent = Boolean(
+    getRallyEffect(opponent, 'fog', now) || getRallyEffect(opponent, 'ausgebremst', now)
+  );
+  const frozenFor = getRallySecondsLeft(ausgebremst, now);
   const activeRunner = ownTeam.members[ownTeam.activeMemberIndex] || 'Werfer';
-  const inputDisabled = Boolean(freeze) || Boolean(rally.winnerTeam);
+  const inputDisabled = Boolean(ausgebremst) || Boolean(rally.winnerTeam);
+
+  // Automatische Score-Erkennung für Turbo (>= 121), Schild (Schnapszahl >= 77) oder Ausgebremst (100-120)
+  const currentTypedScore = Number(scoreInput || 0);
+  const autoDetectedItem = getAutoDetectedItem(currentTypedScore);
+  const activeEffectiveItem = selectedItem || autoDetectedItem;
 
   const submitScore = (explicitValue?: number) => {
     if (inputDisabled) return;
     const raw = explicitValue !== undefined ? explicitValue : Number(scoreInput || 0);
     if (!Number.isFinite(raw) || raw < 0 || raw > 180) {
-      setError('Bitte einen gültigen 3-Dart-Score zwischen 0 und 180 eingeben.');
+      setError('Bitte einen gültigen Score zwischen 0 und 180 eingeben.');
       return;
     }
     setError('');
@@ -406,27 +440,51 @@ export default function DartsRallyClient({
     setError('');
     setScoreInput((prev) => {
       const candidate = prev === '0' ? digit : (prev + digit).slice(0, 3);
+      if (Number(candidate) > 180) return prev;
       return candidate;
     });
   };
 
   return (
     <div className="dr-rally-root is-tablet forced-dark">
+      {/* Oben: Kompakte Navigation */}
       <div className="dr-top-nav">
         <Link href="/special" className="dr-back-link">
           <ArrowLeft className="w-4 h-4" />
-          <span>Zurück zur Event-Arena</span>
+          <span>Event-Arena</span>
         </Link>
 
         <div className="dr-nav-actions">
-          <Link
-            href={`/board/${boardId}`}
-            target="_blank"
-            className="dr-nav-btn is-tv-link"
-          >
-            <Tv className="w-4 h-4" />
-            <span>TV-Monitor Board {boardId}</span>
-          </Link>
+          {mode === 'board_vs_board' ? (
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/board/${board1Id}`}
+                target="_blank"
+                className="dr-nav-btn is-tv-link"
+              >
+                <Tv className="w-3.5 h-3.5 text-rose-400" />
+                <span>TV 1 (Board {board1Id})</span>
+              </Link>
+              <Link
+                href={`/board/${board2Id}`}
+                target="_blank"
+                className="dr-nav-btn is-tv-link"
+              >
+                <Tv className="w-3.5 h-3.5 text-amber-400" />
+                <span>TV 2 (Board {board2Id})</span>
+              </Link>
+            </div>
+          ) : (
+            <Link
+              href={`/board/${boardId}`}
+              target="_blank"
+              className="dr-nav-btn is-tv-link"
+            >
+              <Tv className="w-4 h-4" />
+              <span>TV Board {boardId}</span>
+            </Link>
+          )}
+
           {phase === 'racing' && (
             <button
               type="button"
@@ -434,7 +492,7 @@ export default function DartsRallyClient({
               className="dr-nav-btn"
             >
               <RotateCcw className="w-4 h-4" />
-              <span>Setup / Neu</span>
+              <span>Setup</span>
             </button>
           )}
         </div>
@@ -451,11 +509,10 @@ export default function DartsRallyClient({
                   {savedSession.rally.team2.teamName} ({savedSession.rally.team2.score})
                 </h2>
                 <p>
-                  Board {savedSession.rally.boardId} · Ziel{' '}
-                  {savedSession.rally.targetDistance.toLocaleString('de-DE')} Punkte ·{' '}
+                  Ziel {savedSession.rally.targetDistance.toLocaleString('de-DE')} Punkte ·{' '}
                   {savedSession.rally.gameMode === 'single_board'
-                    ? '1 Board (Wechselnd)'
-                    : 'Board vs. Board'}
+                    ? `1 Board (${savedSession.rally.boardId})`
+                    : `Board ${savedSession.rally.board1Id || 1} vs. Board ${savedSession.rally.board2Id || 2}`}
                 </p>
               </div>
               <div className="dr-resume-actions">
@@ -480,31 +537,41 @@ export default function DartsRallyClient({
           <div className="dr-setup-card">
             <div className="dr-setup-hero">
               <div>
-                <small>LIONS WINTER SERIES · TEAM-STAFFEL</small>
+                <small>LIONS WINTER SERIES · HIGHSPEED-STAFFEL</small>
                 <h1>Darts Rally – Setup</h1>
               </div>
               <span className="dr-field-label">
-                Zielpunkte mit Items, Sabotage &amp; TV-Live-Rennen
+                Renndistanz, 2 TV-Monitore &amp; Motorsport-Items
               </span>
             </div>
 
             <div className="dr-setup-grid">
+              {/* Spielmodus */}
               <div className="dr-field-group">
-                <span className="dr-field-label">TV-Board wählen</span>
+                <span className="dr-field-label">Spielmodus</span>
                 <div className="dr-pill-row">
-                  {['1', '2', '3', '4', '5'].map((id) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => handleSelectBoard(id)}
-                      className={`dr-choice-btn ${boardId === id ? 'is-active' : ''}`}
-                    >
-                      Board {id}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setMode('board_vs_board')}
+                    className={`dr-choice-btn is-gold ${
+                      mode === 'board_vs_board' ? 'is-active' : ''
+                    }`}
+                  >
+                    Board vs. Board (2 TVs)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('single_board')}
+                    className={`dr-choice-btn ${
+                      mode === 'single_board' ? 'is-active' : ''
+                    }`}
+                  >
+                    1 Board · Wechselnd
+                  </button>
                 </div>
               </div>
 
+              {/* Renndistanz */}
               <div className="dr-field-group">
                 <span className="dr-field-label">Renndistanz</span>
                 <div className="dr-pill-row">
@@ -523,35 +590,73 @@ export default function DartsRallyClient({
                 </div>
               </div>
 
-              <div className="dr-field-group">
-                <span className="dr-field-label">Spielmodus</span>
-                <div className="dr-pill-row">
-                  <button
-                    type="button"
-                    onClick={() => setMode('single_board')}
-                    className={`dr-choice-btn ${
-                      mode === 'single_board' ? 'is-active' : ''
-                    }`}
-                  >
-                    1 Board · Wechselnd
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode('board_vs_board')}
-                    className={`dr-choice-btn is-gold ${
-                      mode === 'board_vs_board' ? 'is-active' : ''
-                    }`}
-                  >
-                    Board vs. Board
-                  </button>
+              {/* TV-Board Zuordnung bei Board vs. Board */}
+              {mode === 'board_vs_board' ? (
+                <>
+                  <div className="dr-field-group">
+                    <span className="dr-field-label text-rose-400 font-bold">
+                      🔴 TV-Board für Team 1 (Rot)
+                    </span>
+                    <div className="dr-pill-row">
+                      {['1', '2', '3', '4', '5'].map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setBoard1Id(id)}
+                          className={`dr-choice-btn ${board1Id === id ? 'is-active' : ''}`}
+                        >
+                          Board {id}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="dr-field-group">
+                    <span className="dr-field-label text-amber-400 font-bold">
+                      🟡 TV-Board für Team 2 (Gold)
+                    </span>
+                    <div className="dr-pill-row">
+                      {['1', '2', '3', '4', '5'].map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setBoard2Id(id)}
+                          className={`dr-choice-btn is-gold ${
+                            board2Id === id ? 'is-active' : ''
+                          }`}
+                        >
+                          Board {id}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="dr-field-group">
+                  <span className="dr-field-label">TV-Board wählen</span>
+                  <div className="dr-pill-row">
+                    {['1', '2', '3', '4', '5'].map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setBoardId(id)}
+                        className={`dr-choice-btn ${boardId === id ? 'is-active' : ''}`}
+                      >
+                        Board {id}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
+            {/* Teamaufstellung */}
             <div className="dr-teams-grid">
               {/* Team Rot */}
               <div className="dr-team-box red">
-                <span className="dr-field-label">Team 01 (Rot)</span>
+                <span className="dr-field-label">
+                  Team 01 (Rot) {mode === 'board_vs_board' && `· TV Board ${board1Id}`}
+                </span>
                 <input
                   type="text"
                   value={team1Name}
@@ -615,7 +720,9 @@ export default function DartsRallyClient({
 
               {/* Team Gold */}
               <div className="dr-team-box gold">
-                <span className="dr-field-label">Team 02 (Gold)</span>
+                <span className="dr-field-label">
+                  Team 02 (Gold) {mode === 'board_vs_board' && `· TV Board ${board2Id}`}
+                </span>
                 <input
                   type="text"
                   value={team2Name}
@@ -681,30 +788,34 @@ export default function DartsRallyClient({
             <button
               type="button"
               onClick={handleStartRace}
-              className="dr-start-btn"
+              className="dr-start-btn cursor-pointer"
             >
               🏁 Rennen starten ({targetDistance.toLocaleString('de-DE')} Punkte)
             </button>
           </div>
         </div>
       ) : (
+        /* AKTIVES TABLET-COCKPIT (Kompakt & Vergrößertes Numpad) */
         <section
-          className={`tablet-stage tablet-team-${tone}`}
+          className={`tablet-stage tablet-team-${tone} is-compact`}
           aria-label="Tablet-Cockpit"
         >
           <div className="tablet-glow" />
           <div className="tablet-shell">
             <div className="tablet-screen">
+              {/* Kompakter Header */}
               <header className="cockpit-header">
                 <div className="brand-lockup">
                   <div className="brand-mark">
-                    <RallyIcon name="flag" size={20} />
+                    <RallyIcon name="flag" size={18} />
                   </div>
                   <div>
                     <small>DARTS RALLY</small>
                     <strong>
                       {ownTeam.teamName.toUpperCase()}{' '}
-                      <span>· BOARD {rally.boardId}</span>
+                      <span>
+                        · {mode === 'board_vs_board' ? `TV ${effectiveTeam === 1 ? rally.board1Id || board1Id : rally.board2Id || board2Id}` : `BOARD ${rally.boardId}`}
+                      </span>
                     </strong>
                   </div>
                 </div>
@@ -721,7 +832,7 @@ export default function DartsRallyClient({
                     disabled={history.length === 0}
                     onClick={handleUndo}
                   >
-                    ↩ Korrektur
+                    ↩ Undo
                   </button>
                   <button
                     type="button"
@@ -729,34 +840,32 @@ export default function DartsRallyClient({
                     disabled={inputDisabled}
                     onClick={handleNextRunner}
                   >
-                    Werfer wechseln
+                    Werfer
                   </button>
                 </div>
               </header>
 
+              {/* Umschalter welches Team dieses Tablet bedient (Board vs Board) */}
               {rally.gameMode === 'board_vs_board' && (
                 <div className="dr-team-switch">
                   <button
                     type="button"
                     onClick={() => setControlTeam(1)}
-                    className={`dr-choice-btn ${
-                      controlTeam === 1 ? 'is-active' : ''
-                    }`}
+                    className={`dr-choice-btn ${controlTeam === 1 ? 'is-active' : ''}`}
                   >
-                    Steuere: {rally.team1.teamName} ({rally.team1.score})
+                    Steuere: {rally.team1.teamName} (TV {rally.board1Id || board1Id})
                   </button>
                   <button
                     type="button"
                     onClick={() => setControlTeam(2)}
-                    className={`dr-choice-btn is-gold ${
-                      controlTeam === 2 ? 'is-active' : ''
-                    }`}
+                    className={`dr-choice-btn is-gold ${controlTeam === 2 ? 'is-active' : ''}`}
                   >
-                    Steuere: {rally.team2.teamName} ({rally.team2.score})
+                    Steuere: {rally.team2.teamName} (TV {rally.board2Id || board2Id})
                   </button>
                 </div>
               )}
 
+              {/* Rennstrecken-Fortschrittsbalken */}
               <div className="race-strip">
                 <ProgressBar
                   concealed={fogOwn}
@@ -783,93 +892,77 @@ export default function DartsRallyClient({
                 />
               </div>
 
+              {/* Status & Buffs */}
               <div className="status-row">
                 <div className="status-live">
-                  <span /> LIVE · {rally.targetDistance.toLocaleString('de-DE')} PKT
-                </div>
-                <div className="sync-state">
-                  <RallyIcon name="sync" size={14} /> TV + TABLET SYNCHRON
+                  <span /> {rally.targetDistance.toLocaleString('de-DE')} PKT
                 </div>
                 {turbo && (
                   <div className="buff">
-                    <RallyIcon name="bolt" size={15} /> TURBO{' '}
-                    {getRallySecondsLeft(turbo, now)}s
+                    <RallyIcon name="bolt" size={14} /> TURBO {getRallySecondsLeft(turbo, now)}s
                   </div>
                 )}
                 {shield && (
                   <div className="shield">
-                    <RallyIcon name="shield" size={15} /> SCHILD AKTIV
+                    <RallyIcon name="shield" size={14} /> SCHILD AKTIV
                   </div>
                 )}
-                {banana && <div className="banana-status">DART 3 GESPERRT</div>}
+                {spitzenbruch && (
+                  <div className="banana-status">💥 SPITZENBRUCH (NUR 2 DARTS)</div>
+                )}
               </div>
 
-              <div className="item-selector">
+              {/* Kompakte Item-Treffermuster-Schnellwahl */}
+              <div className="item-selector is-compact">
                 <div className="item-selector-label">
-                  <small>ITEM-ERKENNUNG</small>
-                  <strong>Treffermuster markieren</strong>
+                  <small>TREFFERMUSTER</small>
+                  <strong>Spezial-Wurf:</strong>
                 </div>
-                {RALLY_ITEM_OPTIONS.map((item) => (
-                  <button
-                    type="button"
-                    key={item.type}
-                    disabled={inputDisabled}
-                    className={
-                      selectedItem === item.type ? `selected ${item.type}` : ''
-                    }
-                    onClick={() =>
-                      setSelectedItem((curr) =>
-                        curr === item.type ? null : item.type
-                      )
-                    }
-                    title={item.trigger}
-                  >
-                    <span>{item.label}</span>
-                    <small>{item.trigger}</small>
-                  </button>
-                ))}
-              </div>
-
-              <div className="input-grid">
-                <section className="score-panel">
-                  <div className="panel-title">
-                    <div>
-                      <small>SCHNELLEINGABE</small>
-                      <strong>Aufnahme wählen</strong>
-                    </div>
-                    <span>{selectedItem ? 'ITEM GEKOPPELT' : '1 TAP'}</span>
-                  </div>
-                  <div className="quick-grid">
-                    {QUICK_SCORES.map((value) => (
+                <div className="item-pills-row">
+                  {RALLY_ITEM_OPTIONS.map((item) => {
+                    const isSelected = selectedItem === item.type;
+                    const isAuto = !selectedItem && autoDetectedItem === item.type;
+                    return (
                       <button
                         type="button"
-                        key={value}
+                        key={item.type}
                         disabled={inputDisabled}
-                        onClick={() => submitScore(value)}
+                        className={`item-pill-btn ${isSelected ? 'is-selected' : ''} ${
+                          isAuto ? 'is-auto' : ''
+                        } ${item.type}`}
+                        onClick={() =>
+                          setSelectedItem((curr) => (curr === item.type ? null : item.type))
+                        }
+                        title={item.trigger}
                       >
-                        {value}
+                        <span className="item-pill-name">{item.label}</span>
+                        <small className="item-pill-desc">{item.trigger}</small>
                       </button>
-                    ))}
-                    <button
-                      type="button"
-                      className="miss"
-                      disabled={inputDisabled}
-                      onClick={() => submitScore(0)}
-                    >
-                      MISS <small>0</small>
-                    </button>
-                  </div>
-                </section>
+                    );
+                  })}
+                </div>
+              </div>
 
+              {/* Großes zentrales Manuelles Numpad (Schnelleingabe komplett entfernt) */}
+              <div className="input-grid is-keypad-only">
                 <section className="keypad-panel">
+                  {/* Großes Display */}
                   <div className="score-display">
-                    <div>
-                      <small>MANUELLE EINGABE</small>
+                    <div className="score-display-meta">
+                      <small>PUNKTE-EINGABE</small>
                       <span>MAX 180</span>
                     </div>
-                    <strong>{scoreInput || '—'}</strong>
+                    <strong className="score-display-val">{scoreInput || '0'}</strong>
+                    {activeEffectiveItem && (
+                      <span className="auto-detect-pill">
+                        ⚡ {RALLY_ITEM_META[activeEffectiveItem].headline} (
+                        {RALLY_ITEM_META[activeEffectiveItem].trigger})
+                      </span>
+                    )}
                   </div>
-                  <div className="keypad">
+
+                  {/* Große Tasten */}
+                  <div className="keypad is-enlarged">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
                       <button
                         type="button"
@@ -882,6 +975,7 @@ export default function DartsRallyClient({
                     ))}
                     <button
                       type="button"
+                      className="key-clear"
                       disabled={inputDisabled}
                       onClick={() => {
                         setScoreInput('');
@@ -899,26 +993,39 @@ export default function DartsRallyClient({
                     </button>
                     <button
                       type="button"
+                      className="key-backspace"
                       disabled={inputDisabled}
                       onClick={() => setScoreInput((curr) => curr.slice(0, -1))}
                     >
                       ←
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    className="confirm"
-                    disabled={inputDisabled}
-                    onClick={() => submitScore()}
-                  >
-                    <span>BESTÄTIGEN</span>
-                    <small>AUFNAHME WERTEN</small>
-                  </button>
+
+                  {/* Aktionen: 0 (Miss) & Bestätigen */}
+                  <div className="keypad-actions">
+                    <button
+                      type="button"
+                      className="miss-btn"
+                      disabled={inputDisabled}
+                      onClick={() => submitScore(0)}
+                    >
+                      0 (MISS)
+                    </button>
+                    <button
+                      type="button"
+                      className="confirm"
+                      disabled={inputDisabled}
+                      onClick={() => submitScore()}
+                    >
+                      <span>AUFNAHME WERTEN (ENTER)</span>
+                    </button>
+                  </div>
                 </section>
               </div>
 
               {error && <div className="action-error">{error}</div>}
 
+              {/* Stafetten-Buzzer unten */}
               <button
                 type="button"
                 className="relay-button"
@@ -926,7 +1033,7 @@ export default function DartsRallyClient({
                 onClick={handleNextRunner}
               >
                 <span className="relay-icon">
-                  <RallyIcon name="users" size={21} />
+                  <RallyIcon name="users" size={20} />
                 </span>
                 <span>
                   <small>AUFNAHME BEENDET</small>
@@ -937,63 +1044,58 @@ export default function DartsRallyClient({
                 </b>
               </button>
 
-              {freeze && (
+              {/* Freeze-Sperre bei Ausgebremst */}
+              {ausgebremst && (
                 <div className="tablet-freeze-lock">
                   <div>
                     <RallyIcon name="bolt" size={36} />
-                    <small>BOARD-FREEZE</small>
-                    <strong>GEFROREN · {frozenFor}s</strong>
+                    <small>BOXENSTOPP / AUSGEBREMST</small>
+                    <strong>GESPERRT · {frozenFor}s</strong>
                     <span>WURF-STOPP</span>
                   </div>
                 </div>
               )}
 
+              {/* Sieger-Screen */}
               {rally.winnerTeam && (
-                <div className="winner-overlay">
+                <div className="tablet-winner-screen">
                   <div>
-                    <RallyIcon name="flag" size={44} />
-                    <small>ZIELLINIE ERREICHT</small>
-                    <strong>
+                    <small>RENNDEKLASSIERUNG</small>
+                    <h2>
                       {rally.winnerTeam === 1
-                        ? rally.team1.teamName
-                        : rally.team2.teamName}
-                    </strong>
-                    <span>GEWINNT DIE DARTS RALLY</span>
-                    <div className="winner-scores">
-                      <div>
-                        <small>{rally.team1.teamName}</small>
-                        <b>{rally.team1.score.toLocaleString('de-DE')} PKT</b>
-                      </div>
-                      <div>
-                        <small>{rally.team2.teamName}</small>
-                        <b>{rally.team2.score.toLocaleString('de-DE')} PKT</b>
-                      </div>
-                    </div>
+                        ? rally.team1.teamName.toUpperCase()
+                        : rally.team2.teamName.toUpperCase()}{' '}
+                      GEWINNT DIE RALLYE!
+                    </h2>
+                    <p>
+                      Endstand: {rally.team1.score} zu {rally.team2.score} Punkte ·{' '}
+                      {rally.targetDistance.toLocaleString('de-DE')} Pkt erreicht
+                    </p>
                     <div className="winner-actions">
                       <button
                         type="button"
                         onClick={handleRematch}
                         className="dr-btn-resume"
                       >
-                        🔄 Revanche starten
+                        🏁 Revanche starten
                       </button>
                       <button
                         type="button"
                         onClick={handleAbortToSetup}
                         className="dr-btn-discard"
                       >
-                        ⚙️ Zurück zum Setup
+                        Zum Setup
                       </button>
                     </div>
                   </div>
                 </div>
               )}
+
+              <RallyItemEffectOverlay event={effectEvent} />
             </div>
           </div>
         </section>
       )}
-
-      <RallyItemEffectOverlay event={effectEvent} />
     </div>
   );
 }

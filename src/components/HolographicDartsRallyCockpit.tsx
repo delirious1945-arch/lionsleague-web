@@ -110,7 +110,7 @@ export function RallyItemEffectOverlay({
 }) {
   if (!event) return null;
 
-  if (event.itemType === 'rocket') {
+  if (event.itemType === 'reifenplatzer' || event.itemType === 'rocket') {
     return (
       <div key={event.id} className={`item-fx rocket-fx team-${event.actorTeam}`}>
         <div className="rocket-projectile">
@@ -120,22 +120,21 @@ export function RallyItemEffectOverlay({
       </div>
     );
   }
-  if (event.itemType === 'freeze') {
+  if (event.itemType === 'ausgebremst' || event.itemType === 'freeze' || event.itemType === 'fog') {
     return (
       <div key={event.id} className="item-fx freeze-fx">
         {[0, 1, 2, 3, 4, 5, 6].map((idx) => (
           <i key={idx} style={{ animationDelay: `${idx * 45}ms` }} />
         ))}
-        <strong>BOARD FREEZE</strong>
+        <strong>AUSGEBREMST</strong>
       </div>
     );
   }
-  if (event.itemType === 'fog') {
+  if (event.itemType === 'darttausch') {
     return (
-      <div key={event.id} className="item-fx fog-fx">
-        <span />
-        <span />
-        <span />
+      <div key={event.id} className="item-fx energy-fx turbo-fx">
+        <RallyIcon name="sync" size={48} />
+        <strong>DARTTAUSCH!</strong>
       </div>
     );
   }
@@ -147,7 +146,7 @@ export function RallyItemEffectOverlay({
       </div>
     );
   }
-  if (event.itemType === 'shield') {
+  if (event.itemType === 'schild' || event.itemType === 'shield') {
     return (
       <div key={event.id} className="item-fx energy-fx shield-fx">
         <RallyIcon name="shield" size={50} />
@@ -155,7 +154,7 @@ export function RallyItemEffectOverlay({
       </div>
     );
   }
-  if (event.itemType === 'banana') {
+  if (event.itemType === 'spitzenbruch' || event.itemType === 'banana') {
     return (
       <div key={event.id} className="item-fx banana-fx">
         <span>03</span>

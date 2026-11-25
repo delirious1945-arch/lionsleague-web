@@ -5,11 +5,16 @@ export type RallyGameMode = 'board_vs_board' | 'single_board';
 export type RallyTargetDistance = 750 | 1000 | 1500;
 
 export type RallyItemType =
+  | 'spitzenbruch'
+  | 'darttausch'
+  | 'ausgebremst'
+  | 'reifenplatzer'
+  | 'turbo'
+  | 'schild'
   | 'banana'
   | 'freeze'
   | 'fog'
   | 'rocket'
-  | 'turbo'
   | 'shield';
 
 export interface RallyEffect {
@@ -44,6 +49,8 @@ export interface RallyTeamSnapshot {
 export interface RallyLiveState {
   sessionId: string;
   boardId: string;
+  board1Id?: string; // TV-Board für Team 1
+  board2Id?: string; // TV-Board für Team 2
   targetDistance: RallyTargetDistance;
   gameMode: RallyGameMode;
   status: 'live' | 'finished';
@@ -53,6 +60,19 @@ export interface RallyLiveState {
   winnerTeam: RallyTeamNumber | null;
   lastEvent: RallyEventBanner | null;
   syncedAt: string;
+}
+
+export function isSchnapszahl(score: number): boolean {
+  if (score < 77) return false;
+  const digits = score.toString().split('');
+  return digits.every((d) => d === digits[0]);
+}
+
+export function getAutoDetectedItem(score: number): RallyItemType | null {
+  if (score >= 121) return 'turbo';
+  if (isSchnapszahl(score)) return 'schild';
+  if (score >= 100 && score <= 120) return 'ausgebremst';
+  return null;
 }
 
 export const RALLY_ITEM_META: Record<
@@ -65,57 +85,93 @@ export const RALLY_ITEM_META: Record<
     detail: string;
   }
 > = {
-  banana: {
-    type: 'banana',
-    label: 'Banane',
+  spitzenbruch: {
+    type: 'spitzenbruch',
+    label: 'Spitzenbruch',
     trigger: '2× Triple',
-    headline: 'BANANENSCHALE',
-    detail: 'Der nächste Gegner wirft nur 2 Darts',
+    headline: 'SPITZENBRUCH',
+    detail: 'Der nächste gegnerische Werfer darf nur 2 Darts werfen',
   },
-  freeze: {
-    type: 'freeze',
-    label: 'Frost',
+  darttausch: {
+    type: 'darttausch',
+    label: 'Darttausch',
     trigger: 'Bullseye 50',
-    headline: 'FROST-BLITZ',
-    detail: 'Gegnerisches Board für 10 Sekunden eingefroren',
+    headline: 'DARTTAUSCH',
+    detail: 'Jeder Spieler gibt seine Darts an den Hintermann weiter',
   },
-  fog: {
-    type: 'fog',
-    label: 'Nebel',
-    trigger: '100+ Punkte',
-    headline: 'SCHNEESTURM',
-    detail: 'Gegnerischer Punktestand für 20 Sekunden verdeckt',
+  ausgebremst: {
+    type: 'ausgebremst',
+    label: 'Ausgebremst',
+    trigger: '100–120 Pkt',
+    headline: 'AUSGEBREMST',
+    detail: 'Gegnerisches Tablet für 20 Sekunden komplett gesperrt',
   },
-  rocket: {
-    type: 'rocket',
-    label: 'Rakete',
+  reifenplatzer: {
+    type: 'reifenplatzer',
+    label: 'Reifenplatzer',
     trigger: 'Doppel + Triple',
-    headline: 'LENKRAKETE',
-    detail: '75 Punkte erfolgreich übertragen',
+    headline: 'REIFENPLATZER',
+    detail: '75 Punkte erfolgreich übertragen (-75 Gegner, +75 Team)',
   },
   turbo: {
     type: 'turbo',
     label: 'Turbo',
-    trigger: '3× gleiche Zahl',
+    trigger: 'Score ≥ 121',
     headline: 'TURBO-BOOSTER',
     detail: 'Doppelte Punkte für 20 Sekunden aktiviert',
   },
-  shield: {
-    type: 'shield',
+  schild: {
+    type: 'schild',
     label: 'Schild',
-    trigger: '2× die 18',
-    headline: 'EIS-SCHILD',
+    trigger: 'Schnapszahl ab 77',
+    headline: 'TITAN-SCHILD',
+    detail: 'Der nächste Angriff wird automatisch geblockt',
+  },
+  // Abwärtskompatible Aliase
+  banana: {
+    type: 'spitzenbruch',
+    label: 'Spitzenbruch',
+    trigger: '2× Triple',
+    headline: 'SPITZENBRUCH',
+    detail: 'Der nächste gegnerische Werfer darf nur 2 Darts werfen',
+  },
+  freeze: {
+    type: 'darttausch',
+    label: 'Darttausch',
+    trigger: 'Bullseye 50',
+    headline: 'DARTTAUSCH',
+    detail: 'Jeder Spieler gibt seine Darts an den Hintermann weiter',
+  },
+  fog: {
+    type: 'ausgebremst',
+    label: 'Ausgebremst',
+    trigger: '100–120 Pkt',
+    headline: 'AUSGEBREMST',
+    detail: 'Gegnerisches Tablet für 20 Sekunden komplett gesperrt',
+  },
+  rocket: {
+    type: 'reifenplatzer',
+    label: 'Reifenplatzer',
+    trigger: 'Doppel + Triple',
+    headline: 'REIFENPLATZER',
+    detail: '75 Punkte erfolgreich übertragen',
+  },
+  shield: {
+    type: 'schild',
+    label: 'Schild',
+    trigger: 'Schnapszahl ab 77',
+    headline: 'TITAN-SCHILD',
     detail: 'Der nächste Angriff wird automatisch geblockt',
   },
 };
 
 export const RALLY_ITEM_OPTIONS: Array<(typeof RALLY_ITEM_META)[RallyItemType]> = [
-  RALLY_ITEM_META.banana,
-  RALLY_ITEM_META.freeze,
-  RALLY_ITEM_META.fog,
-  RALLY_ITEM_META.rocket,
+  RALLY_ITEM_META.spitzenbruch,
+  RALLY_ITEM_META.darttausch,
+  RALLY_ITEM_META.ausgebremst,
+  RALLY_ITEM_META.reifenplatzer,
   RALLY_ITEM_META.turbo,
-  RALLY_ITEM_META.shield,
+  RALLY_ITEM_META.schild,
 ];
 
 export function createInitialRallyTeam(
@@ -138,6 +194,8 @@ export function createInitialRallyTeam(
 export function createInitialRallyState(params?: {
   sessionId?: string;
   boardId?: string;
+  board1Id?: string;
+  board2Id?: string;
   targetDistance?: RallyTargetDistance;
   gameMode?: RallyGameMode;
   team1Name?: string;
@@ -150,6 +208,8 @@ export function createInitialRallyState(params?: {
   return {
     sessionId: params?.sessionId || `rally-${now}`,
     boardId: params?.boardId || '1',
+    board1Id: params?.board1Id || '1',
+    board2Id: params?.board2Id || '2',
     targetDistance: params?.targetDistance || 1000,
     gameMode: params?.gameMode || 'single_board',
     status: 'live',
@@ -185,6 +245,8 @@ export function cloneRallyState(state: RallyLiveState): RallyLiveState {
   return {
     sessionId: state.sessionId,
     boardId: state.boardId,
+    board1Id: state.board1Id,
+    board2Id: state.board2Id,
     targetDistance: state.targetDistance,
     gameMode: state.gameMode,
     status: state.status,
@@ -236,25 +298,41 @@ export function applyRallyScore(
   const actorTeam = next[actorKey];
   const oppTeam = next[oppKey];
 
-  const banana = actorTeam.activeDebuffs.find((e) => e.type === 'banana');
+  const spitzenbruch = actorTeam.activeDebuffs.find(
+    (e) => e.type === 'spitzenbruch' || e.type === 'banana'
+  );
   const turbo = actorTeam.activeBuffs.some((e) => e.type === 'turbo');
 
   const baseScore = Math.max(0, Math.min(180, Math.round(rawScore)));
   actorTeam.score += turbo ? baseScore * 2 : baseScore;
-  actorTeam.totalDartsThrown += banana ? 2 : 3;
+  actorTeam.totalDartsThrown += spitzenbruch ? 2 : 3;
 
-  if (banana) {
-    actorTeam.activeDebuffs = actorTeam.activeDebuffs.filter((e) => e.id !== banana.id);
+  if (spitzenbruch) {
+    actorTeam.activeDebuffs = actorTeam.activeDebuffs.filter(
+      (e) => e.id !== spitzenbruch.id
+    );
   }
 
-  if (itemType) {
+  // Automatisches Item ableiten falls kein manuelles Item gewählt
+  const effectiveItem = itemType || getAutoDetectedItem(baseScore) || undefined;
+
+  if (effectiveItem) {
     actorTeam.itemsUsedCount += 1;
     const effectId = `fx-${now}-${Math.random().toString(36).slice(2, 7)}`;
-    const meta = RALLY_ITEM_META[itemType];
+    const meta = RALLY_ITEM_META[effectiveItem];
     let blocked = false;
 
-    if (itemType === 'rocket' || itemType === 'freeze') {
-      const shield = oppTeam.activeBuffs.find((e) => e.type === 'shield');
+    // Angriffe, die vom Schild geblockt werden können
+    if (
+      effectiveItem === 'reifenplatzer' ||
+      effectiveItem === 'rocket' ||
+      effectiveItem === 'ausgebremst' ||
+      effectiveItem === 'freeze' ||
+      effectiveItem === 'fog'
+    ) {
+      const shield = oppTeam.activeBuffs.find(
+        (e) => e.type === 'schild' || e.type === 'shield'
+      );
       if (shield) {
         oppTeam.activeBuffs = oppTeam.activeBuffs.filter((e) => e.id !== shield.id);
         blocked = true;
@@ -262,46 +340,57 @@ export function applyRallyScore(
     }
 
     if (!blocked) {
-      if (itemType === 'banana') {
+      if (effectiveItem === 'spitzenbruch' || effectiveItem === 'banana') {
         oppTeam.activeDebuffs.push({
           id: effectId,
-          type: itemType,
+          type: 'spitzenbruch',
           sourceTeam: team,
           targetTeam: opponent,
           remainingTurns: 1,
         });
-      } else if (itemType === 'freeze' || itemType === 'fog') {
-        const duration = itemType === 'freeze' ? 10_000 : 20_000;
+      } else if (
+        effectiveItem === 'ausgebremst' ||
+        effectiveItem === 'freeze' ||
+        effectiveItem === 'fog'
+      ) {
         oppTeam.activeDebuffs.push({
           id: effectId,
-          type: itemType,
+          type: 'ausgebremst',
           sourceTeam: team,
           targetTeam: opponent,
-          expiresAt: new Date(now + duration).toISOString(),
+          expiresAt: new Date(now + 20_000).toISOString(),
         });
-      } else if (itemType === 'rocket') {
+      } else if (effectiveItem === 'reifenplatzer' || effectiveItem === 'rocket') {
         const transfer = Math.min(75, oppTeam.score);
         oppTeam.score -= transfer;
         actorTeam.score += transfer;
-      } else if (itemType === 'turbo' || itemType === 'shield') {
+      } else if (effectiveItem === 'turbo') {
         actorTeam.activeBuffs.push({
           id: effectId,
-          type: itemType,
+          type: 'turbo',
           sourceTeam: team,
           targetTeam: team,
-          expiresAt:
-            itemType === 'turbo' ? new Date(now + 20_000).toISOString() : undefined,
+          expiresAt: new Date(now + 20_000).toISOString(),
         });
+      } else if (effectiveItem === 'schild' || effectiveItem === 'shield') {
+        actorTeam.activeBuffs.push({
+          id: effectId,
+          type: 'schild',
+          sourceTeam: team,
+          targetTeam: team,
+        });
+      } else if (effectiveItem === 'darttausch') {
+        // Darttausch ist ein globales Event: Jeder wechselt Darts
       }
     }
 
     next.lastEvent = {
       id: effectId,
-      itemType: blocked ? 'shield' : itemType,
+      itemType: blocked ? 'schild' : effectiveItem,
       actorTeam: blocked ? opponent : team,
       text: blocked ? 'ANGRIFF GEBLOCKT' : meta.headline,
       detail: blocked
-        ? `${oppTeam.teamName} wehrt den Angriff mit dem Eis-Schild ab`
+        ? `${oppTeam.teamName} wehrt den Angriff mit dem Titan-Schild ab!`
         : meta.detail,
       createdAt: new Date(now).toISOString(),
     };

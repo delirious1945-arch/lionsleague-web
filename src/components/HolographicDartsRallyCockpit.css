@@ -794,6 +794,138 @@
   color: #fde68a;
 }
 
+.dr-rally-root .tablet-stage.is-compact {
+  padding: 8px 10px 12px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.dr-rally-root .tablet-stage.is-compact .tablet-screen {
+  padding: 10px 14px 10px;
+}
+
+.dr-rally-root .input-grid.is-keypad-only {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.dr-rally-root .input-grid.is-keypad-only .keypad-panel {
+  width: 100%;
+  max-width: 480px;
+  padding: 12px 14px;
+}
+
+.dr-rally-root .keypad.is-enlarged {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.dr-rally-root .keypad.is-enlarged button {
+  min-height: 64px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.dr-rally-root .keypad-actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dr-rally-root .keypad-actions .miss-btn {
+  min-height: 60px;
+  font-size: 18px;
+  font-weight: 800;
+  border: 1px solid #dc2626;
+  color: #fecaca;
+  background: linear-gradient(145deg, #521414, #220909);
+  letter-spacing: .08em;
+  transition: all .15s ease;
+  cursor: pointer;
+}
+
+.dr-rally-root .keypad-actions .miss-btn:hover {
+  border-color: #ef4444;
+  background: linear-gradient(145deg, #6b1818, #2a0b0b);
+}
+
+.dr-rally-root .keypad-actions .confirm {
+  min-height: 60px;
+  margin-top: 0;
+  font-size: 19px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dr-rally-root .item-selector.is-compact {
+  min-height: auto;
+  margin-top: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #0b0d0d;
+}
+
+.dr-rally-root .item-pills-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.dr-rally-root .item-pill-btn {
+  min-height: 48px;
+  padding: 4px 6px;
+  border: 1px solid #303332;
+  color: #aeb2af;
+  background: #141616;
+  text-align: center;
+  transition: all .15s ease;
+  cursor: pointer;
+}
+
+.dr-rally-root .item-pill-btn .item-pill-name {
+  display: block;
+  font: 800 13px 'Barlow Condensed', sans-serif;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.dr-rally-root .item-pill-btn .item-pill-desc {
+  display: block;
+  font-size: 9px;
+  color: #797e7b;
+}
+
+.dr-rally-root .item-pill-btn.is-selected {
+  border-color: #dc443b;
+  color: white;
+  background: linear-gradient(145deg, #4b1512, #1b0e0d);
+  box-shadow: 0 0 12px rgba(220, 68, 59, .3);
+}
+
+.dr-rally-root .item-pill-btn.is-auto {
+  border-color: #e5b34b;
+  color: #fef08a;
+  background: linear-gradient(145deg, #422d08, #181104);
+  box-shadow: 0 0 12px rgba(229, 179, 75, .3);
+}
+
+.dr-rally-root .auto-detect-pill {
+  font-size: 11px;
+  color: #fde047;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
 .dr-rally-root .input-grid {
   margin-top: 12px;
   display: grid;
@@ -2058,7 +2190,139 @@
     grid-template-columns: 1fr;
   }
 
-  .dr-rally-root .input-grid {
+  .dr-rally-root .tablet-stage.is-compact {
+  padding: 8px 10px 12px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.dr-rally-root .tablet-stage.is-compact .tablet-screen {
+  padding: 10px 14px 10px;
+}
+
+.dr-rally-root .input-grid.is-keypad-only {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.dr-rally-root .input-grid.is-keypad-only .keypad-panel {
+  width: 100%;
+  max-width: 480px;
+  padding: 12px 14px;
+}
+
+.dr-rally-root .keypad.is-enlarged {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.dr-rally-root .keypad.is-enlarged button {
+  min-height: 64px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.dr-rally-root .keypad-actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dr-rally-root .keypad-actions .miss-btn {
+  min-height: 60px;
+  font-size: 18px;
+  font-weight: 800;
+  border: 1px solid #dc2626;
+  color: #fecaca;
+  background: linear-gradient(145deg, #521414, #220909);
+  letter-spacing: .08em;
+  transition: all .15s ease;
+  cursor: pointer;
+}
+
+.dr-rally-root .keypad-actions .miss-btn:hover {
+  border-color: #ef4444;
+  background: linear-gradient(145deg, #6b1818, #2a0b0b);
+}
+
+.dr-rally-root .keypad-actions .confirm {
+  min-height: 60px;
+  margin-top: 0;
+  font-size: 19px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dr-rally-root .item-selector.is-compact {
+  min-height: auto;
+  margin-top: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #0b0d0d;
+}
+
+.dr-rally-root .item-pills-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.dr-rally-root .item-pill-btn {
+  min-height: 48px;
+  padding: 4px 6px;
+  border: 1px solid #303332;
+  color: #aeb2af;
+  background: #141616;
+  text-align: center;
+  transition: all .15s ease;
+  cursor: pointer;
+}
+
+.dr-rally-root .item-pill-btn .item-pill-name {
+  display: block;
+  font: 800 13px 'Barlow Condensed', sans-serif;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.dr-rally-root .item-pill-btn .item-pill-desc {
+  display: block;
+  font-size: 9px;
+  color: #797e7b;
+}
+
+.dr-rally-root .item-pill-btn.is-selected {
+  border-color: #dc443b;
+  color: white;
+  background: linear-gradient(145deg, #4b1512, #1b0e0d);
+  box-shadow: 0 0 12px rgba(220, 68, 59, .3);
+}
+
+.dr-rally-root .item-pill-btn.is-auto {
+  border-color: #e5b34b;
+  color: #fef08a;
+  background: linear-gradient(145deg, #422d08, #181104);
+  box-shadow: 0 0 12px rgba(229, 179, 75, .3);
+}
+
+.dr-rally-root .auto-detect-pill {
+  font-size: 11px;
+  color: #fde047;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+.dr-rally-root .input-grid {
     grid-template-columns: 1fr;
   }
 
