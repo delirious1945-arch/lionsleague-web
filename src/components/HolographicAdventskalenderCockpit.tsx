@@ -3,11 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import {
+  AdventsCurseType,
   AdventsDartEvent,
   AdventsDoorState,
   AdventsLastActionBanner,
   AdventsPlayerState,
   countOpenDoors,
+  getDoorTargetLabel,
 } from '@/app/special/adventskalender/types';
 
 export interface HolographicAdventskalenderProps {
@@ -82,17 +84,77 @@ function getDartChipStyle(ev: AdventsDartEvent) {
   return 'bg-red-950/75 border-red-500/65 text-red-200';
 }
 
+const CURSE_BADGE_META: Record<
+  AdventsCurseType,
+  { icon: string; badge: string; short: string; cls: string }
+> = {
+  one_dart: {
+    icon: '🎯',
+    badge: 'NUR 1 DART',
+    short: 'Nur 1 Dart',
+    cls: 'bg-rose-600/35 border-rose-400 text-rose-100',
+  },
+  two_darts: {
+    icon: '❄️',
+    badge: 'NUR 2 DARTS',
+    short: 'Nur 2 Darts',
+    cls: 'bg-sky-600/30 border-sky-400 text-sky-100',
+  },
+  sitting: {
+    icon: '🪑',
+    badge: 'IM SITZEN',
+    short: 'Im Sitzen',
+    cls: 'bg-amber-600/30 border-amber-400 text-amber-100',
+  },
+  skip_round: {
+    icon: '⛄',
+    badge: 'RUNDE AUSSETZEN',
+    short: 'Aussetzen',
+    cls: 'bg-cyan-600/35 border-cyan-300 text-cyan-50',
+  },
+  spin_360: {
+    icon: '🌪️',
+    badge: '360° DREHWURM',
+    short: '360° Drehwurm',
+    cls: 'bg-purple-600/35 border-purple-400 text-purple-100',
+  },
+  wrong_hand: {
+    icon: '🧦',
+    badge: 'FALSCHE HAND',
+    short: 'Falsche Hand',
+    cls: 'bg-red-600/30 border-red-400 text-red-100',
+  },
+};
+
 function CurrentTurnRow({
   darts,
   isActive,
-  hasTwoDartsCurse,
+  activeCurses = [],
   accentColor = 'red',
 }: {
   darts: AdventsDartEvent[];
   isActive: boolean;
-  hasTwoDartsCurse: boolean;
+  activeCurses?: AdventsCurseType[];
   accentColor?: 'red' | 'amber';
 }) {
+  if (activeCurses.includes('skip_round')) {
+    return (
+      <div className="relative overflow-hidden rounded-xl border-2 border-cyan-300/85 bg-gradient-to-r from-sky-950/95 via-cyan-900/85 to-sky-950/95 px-3 py-2.5 text-center font-mono shadow-[0_0_24px_rgba(56,189,248,0.45)] animate-pulse">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(255,255,255,0.22),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(186,230,253,0.25),transparent_45%)]" />
+        <div className="relative z-10 flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wider text-cyan-100">
+          <span className="animate-bounce">⛄</span>
+          <span>SCHNEEWEHE · RUNDE AUSSETZEN</span>
+          <span className="animate-bounce">❄️</span>
+        </div>
+        <div className="relative z-10 text-[10px] font-bold text-cyan-200/90 mt-0.5">
+          0 Darts · Eingeschneit!
+        </div>
+      </div>
+    );
+  }
+
+  const hasOneDartCurse = activeCurses.includes('one_dart');
+  const hasTwoDartsCurse = activeCurses.includes('two_darts');
   const pulseBorder =
     accentColor === 'amber'
       ? 'bg-amber-500/10 border-amber-400/75 text-amber-300 animate-pulse'
@@ -101,14 +163,18 @@ function CurrentTurnRow({
   return (
     <div className="grid grid-cols-3 gap-2 w-full">
       {[0, 1, 2].map((idx) => {
-        if (idx === 2 && hasTwoDartsCurse) {
+        if ((hasOneDartCurse && idx >= 1) || (hasTwoDartsCurse && idx === 2)) {
           return (
             <div
               key={idx}
               className="py-2 px-1.5 rounded-xl border-2 border-sky-400/70 bg-sky-950/75 text-center font-mono text-sky-200 flex flex-col items-center justify-center"
             >
-              <div className="text-xs font-black leading-tight">❄️</div>
-              <div className="text-[10px] font-black uppercase leading-tight">EINGEFROREN</div>
+              <div className="text-xs font-black leading-tight">
+                {hasOneDartCurse ? '🎯' : '❄️'}
+              </div>
+              <div className="text-[10px] font-black uppercase leading-tight">
+                {hasOneDartCurse ? 'GESPERRT' : 'EINGEFROREN'}
+              </div>
             </div>
           );
         }
@@ -147,41 +213,46 @@ function CurrentTurnRow({
 function ActionBannerBox({ lastAction }: { lastAction?: AdventsLastActionBanner | null }) {
   if (!lastAction) {
     return (
-      <div className="rounded-2xl bg-slate-900/70 border border-amber-400/30 px-4 py-3 text-center backdrop-blur-xl">
+      <div className="rounded-2xl bg-slate-900/70 border border-amber-400/30 px-4 py-2.5 text-center backdrop-blur-xl">
         <div className="text-xs font-mono uppercase tracking-widest text-amber-300 font-black">
-          🚪 Kalender bereit
+          🚪 24-Türchen Kalender bereit
         </div>
         <div className="text-xs sm:text-sm text-slate-200 mt-0.5">
-          Wirf die Zahlen 1–12 auf dem Board, um die Türchen zu öffnen!
+          Wirf die Zahlen 1–20, Doppel (21), Triple (22) oder Bull (23/24), um die Türchen zu öffnen!
         </div>
       </div>
     );
   }
 
-  let boxCls = 'bg-slate-900/80 border-white/20 text-slate-100';
+  let boxCls = 'bg-slate-900/85 border-white/25 text-slate-100';
   if (lastAction.tone === 'grinch') {
     boxCls =
       'bg-gradient-to-r from-purple-950/90 via-rose-950/85 to-purple-950/90 border-purple-400 text-purple-100 shadow-[0_0_38px_rgba(192,132,252,0.5)] animate-pulse';
   } else if (lastAction.tone === 'curse') {
     boxCls =
-      'bg-sky-950/85 border-sky-400 text-sky-100 shadow-[0_0_35px_rgba(56,189,248,0.45)] animate-pulse';
+      'bg-gradient-to-r from-sky-950/90 via-cyan-950/85 to-sky-950/90 border-sky-400 text-sky-100 shadow-[0_0_35px_rgba(56,189,248,0.45)] animate-pulse';
   } else if (lastAction.tone === 'jackpot' || lastAction.tone === 'win') {
     boxCls =
-      'bg-amber-950/85 border-amber-400 text-amber-100 shadow-[0_0_35px_rgba(251,191,36,0.45)]';
+      'bg-gradient-to-r from-amber-950/90 via-yellow-950/80 to-amber-950/90 border-amber-400 text-amber-100 shadow-[0_0_35px_rgba(251,191,36,0.45)]';
   } else if (lastAction.tone === 'good') {
     boxCls =
-      'bg-emerald-950/80 border-emerald-400 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.38)]';
+      'bg-gradient-to-r from-emerald-950/85 via-teal-950/80 to-emerald-950/85 border-emerald-400 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.38)]';
   } else if (lastAction.tone === 'niete' || lastAction.tone === 'miss') {
     boxCls = 'bg-red-950/75 border-red-500/70 text-red-100';
   }
 
   return (
-    <div className={`rounded-2xl border-2 px-4 py-3 text-center backdrop-blur-2xl transition-all ${boxCls}`}>
-      <div className="text-sm sm:text-lg font-black tracking-wide uppercase leading-tight flex items-center justify-center gap-2">
-        <span>{lastAction.icon}</span>
+    <div className={`rounded-2xl border-2 px-4 py-2.5 text-center backdrop-blur-2xl transition-all ${boxCls}`}>
+      <div className="text-sm sm:text-base lg:text-lg font-black tracking-wide uppercase leading-tight flex items-center justify-center gap-2 flex-wrap">
+        <span className="text-lg sm:text-xl">{lastAction.icon}</span>
+        {lastAction.doorNumber && (
+          <span className="px-2 py-0.5 rounded-md bg-black/35 border border-white/20 font-mono text-xs">
+            TÜR #{lastAction.doorNumber}
+          </span>
+        )}
         <span>{lastAction.headline}</span>
       </div>
-      <div className="text-xs sm:text-sm font-semibold opacity-95 mt-1 leading-snug">
+      <div className="text-xs sm:text-sm font-semibold opacity-95 mt-0.5 leading-snug">
         {lastAction.subline}
       </div>
     </div>
@@ -198,42 +269,78 @@ function CalendarGrid({
   is1vs1: boolean;
 }) {
   return (
-    <div className="grid grid-cols-4 gap-2.5 sm:gap-3.5 w-full">
+    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 sm:gap-2.5 w-full">
       {doors.map((door) => {
         const isHighlighted = highlightedDoor === door.number;
+        const target = getDoorTargetLabel(door.number);
 
         if (!door.isOpen) {
           return (
             <div
               key={door.number}
-              className="relative aspect-[4/3] min-h-[82px] sm:min-h-[104px] rounded-2xl bg-gradient-to-br from-[#3b0d14] via-[#1c0910] to-[#0b0914] border-2 border-amber-400/55 shadow-[0_10px_28px_rgba(0,0,0,0.65),inset_0_0_18px_rgba(251,191,36,0.16)] flex flex-col items-center justify-center p-2 overflow-hidden"
+              className={`relative min-h-[68px] sm:min-h-[78px] lg:min-h-[86px] rounded-xl sm:rounded-2xl flex flex-col items-center justify-center p-1.5 sm:p-2 overflow-hidden border-2 ${
+                target.isSpecial
+                  ? 'bg-gradient-to-br from-[#1f1238] via-[#120d26] to-[#0b0914] border-cyan-300/70 shadow-[0_8px_24px_rgba(0,0,0,0.65),inset_0_0_16px_rgba(34,211,238,0.18)]'
+                  : 'bg-gradient-to-br from-[#3b0d14] via-[#1c0910] to-[#0b0914] border-amber-400/55 shadow-[0_8px_24px_rgba(0,0,0,0.65),inset_0_0_16px_rgba(251,191,36,0.16)]'
+              }`}
             >
-              {/* Goldener Innenrahmen (Kalendertür-Optik) */}
-              <div className="pointer-events-none absolute inset-1.5 rounded-xl border border-amber-300/35 border-dashed" />
+              {/* Goldener / Cyan Innenrahmen (Kalendertür-Optik) */}
+              <div
+                className={`pointer-events-none absolute inset-1 rounded-lg sm:rounded-xl border border-dashed ${
+                  target.isSpecial ? 'border-cyan-300/40' : 'border-amber-300/35'
+                }`}
+              />
               {/* Kerzenschimmer oben */}
-              <div className="pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2 w-12 h-8 bg-amber-400/20 blur-lg rounded-full" />
-              {/* Kleiner goldener Türgriff rechts */}
-              <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24]" />
+              <div
+                className={`pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-6 blur-lg rounded-full ${
+                  target.isSpecial ? 'bg-cyan-400/25' : 'bg-amber-400/20'
+                }`}
+              />
+              {/* Kleiner Türgriff rechts */}
+              <div
+                className={`pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full ${
+                  target.isSpecial
+                    ? 'bg-cyan-300 shadow-[0_0_8px_#22d3ee]'
+                    : 'bg-amber-300 shadow-[0_0_8px_#fbbf24]'
+                }`}
+              />
 
-              <span className="relative z-10 text-3xl sm:text-4xl lg:text-5xl font-black font-mono text-amber-200 drop-shadow-[0_2px_12px_rgba(251,191,36,0.5)]">
-                {door.number}
-              </span>
-              <span className="relative z-10 text-[9px] sm:text-[10px] font-mono uppercase tracking-widest text-amber-400/80 font-bold mt-0.5">
-                TÜRCHEN
-              </span>
+              {target.isSpecial ? (
+                <>
+                  <span className="relative z-10 text-[10px] font-mono font-black text-cyan-300/90 leading-none">
+                    #{door.number}
+                  </span>
+                  <span className="relative z-10 text-xs sm:text-sm lg:text-base font-black font-mono text-white tracking-tight leading-tight mt-0.5 drop-shadow-[0_2px_10px_rgba(34,211,238,0.45)]">
+                    {target.label}
+                  </span>
+                  <span className="relative z-10 text-[9px] font-mono font-bold text-cyan-200/80 leading-tight truncate max-w-full">
+                    {target.subLabel}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="relative z-10 text-2xl sm:text-3xl lg:text-[2rem] font-black font-mono text-amber-200 leading-none drop-shadow-[0_2px_12px_rgba(251,191,36,0.5)]">
+                    {door.number}
+                  </span>
+                  <span className="relative z-10 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider text-amber-400/80 font-bold mt-0.5">
+                    {target.subLabel}
+                  </span>
+                </>
+              )}
             </div>
           );
         }
 
         const ownerBorder = !is1vs1
-          ? 'border-red-400/80 shadow-[0_0_20px_rgba(239,68,68,0.28)]'
+          ? 'border-red-400/80 shadow-[0_0_18px_rgba(239,68,68,0.28)]'
           : door.openedBy === 1
-          ? 'border-red-400/85 shadow-[0_0_20px_rgba(239,68,68,0.3)]'
-          : 'border-amber-400/85 shadow-[0_0_20px_rgba(251,191,36,0.3)]';
+          ? 'border-red-400/85 shadow-[0_0_18px_rgba(239,68,68,0.3)]'
+          : 'border-amber-400/85 shadow-[0_0_18px_rgba(251,191,36,0.3)]';
 
-        const ownerPillCls = !is1vs1 || door.openedBy === 1
-          ? 'bg-red-500/25 text-red-200 border-red-400/50'
-          : 'bg-amber-500/25 text-amber-200 border-amber-400/50';
+        const ownerPillCls =
+          !is1vs1 || door.openedBy === 1
+            ? 'bg-red-500/25 text-red-200 border-red-400/50'
+            : 'bg-amber-500/25 text-amber-200 border-amber-400/50';
 
         const toneBadgeCls =
           door.reward.tone === 'jackpot'
@@ -249,24 +356,27 @@ function CalendarGrid({
         return (
           <div
             key={door.number}
-            className={`relative aspect-[4/3] min-h-[82px] sm:min-h-[104px] rounded-2xl bg-slate-950/90 border-2 ${ownerBorder} ${
+            className={`relative min-h-[68px] sm:min-h-[78px] lg:min-h-[86px] rounded-xl sm:rounded-2xl bg-slate-950/90 border-2 ${ownerBorder} ${
               isHighlighted ? 'ring-2 ring-amber-300 scale-[1.03] animate-pulse' : ''
-            } flex flex-col items-center justify-between p-2 sm:p-2.5 text-center transition-all`}
+            } flex flex-col items-center justify-between p-1.5 sm:p-2 text-center transition-all`}
           >
-            <div className="flex items-center justify-between w-full text-[10px] font-mono font-black">
-              <span className="text-slate-400">#{door.number}</span>
+            <div className="flex items-center justify-between w-full text-[9px] sm:text-[10px] font-mono font-black gap-1">
+              <span className="text-slate-400 truncate">
+                #{door.number}
+                {target.isSpecial ? `·${target.label}` : ''}
+              </span>
               {is1vs1 && door.openedBy && (
-                <span className={`px-1.5 py-0.2 rounded border text-[9px] ${ownerPillCls}`}>
+                <span className={`px-1 rounded border text-[9px] shrink-0 ${ownerPillCls}`}>
                   P{door.openedBy}
                 </span>
               )}
             </div>
 
-            <div className="text-2xl sm:text-3xl leading-none my-auto">
+            <div className="text-xl sm:text-2xl leading-none my-auto">
               {door.reward.icon}
             </div>
 
-            <div className={`text-[10px] sm:text-xs font-mono font-black uppercase leading-tight truncate max-w-full ${toneBadgeCls}`}>
+            <div className={`text-[9px] sm:text-[10px] font-mono font-black uppercase leading-tight truncate max-w-full ${toneBadgeCls}`}>
               {door.reward.shortBadge}
             </div>
           </div>
@@ -318,29 +428,42 @@ export default function HolographicAdventskalenderCockpit({
   const safeP2 = p2 || p1;
   const openCount = countOpenDoors(doors);
 
+  const totalDoors = doors.length || 24;
+
   const renderCurseBadges = (state: AdventsPlayerState) => {
     const active = state.activeCurses || [];
     const pending = state.pendingCurses || [];
+    const shields = state.shieldsCount ?? 0;
 
-    if (active.length === 0 && pending.length === 0) return null;
+    if (active.length === 0 && pending.length === 0 && shields <= 0) return null;
 
     return (
       <div className="space-y-1.5 pt-1">
-        {active.includes('wrong_hand') && (
-          <div className="px-3 py-1.5 rounded-xl bg-red-600/30 border-2 border-red-400 text-red-100 font-mono text-[11px] font-black text-center animate-pulse">
-            🧦 AKTIVER FLUCH: FALSCHE HAND!
+        {shields > 0 && (
+          <div className="px-3 py-1 rounded-xl bg-emerald-500/25 border-2 border-emerald-300 text-emerald-100 font-mono text-[11px] font-black text-center shadow-[0_0_16px_rgba(16,185,129,0.35)]">
+            🛡️ SCHUTZSCHILD ×{shields}
           </div>
         )}
-        {active.includes('two_darts') && (
-          <div className="px-3 py-1.5 rounded-xl bg-sky-600/30 border-2 border-sky-400 text-sky-100 font-mono text-[11px] font-black text-center animate-pulse">
-            ❄️ AKTIVER FLUCH: NUR 2 DARTS!
-          </div>
-        )}
+        {active.map((curse) => {
+          const meta = CURSE_BADGE_META[curse];
+          if (!meta) return null;
+          return (
+            <div
+              key={`act-${curse}`}
+              className={`px-3 py-1.5 rounded-xl border-2 font-mono text-[11px] font-black text-center animate-pulse ${meta.cls}`}
+            >
+              {meta.icon} AKTIVER FLUCH: {meta.badge}!
+            </div>
+          );
+        })}
         {pending.length > 0 && (
           <div className="px-2.5 py-1 rounded-lg bg-slate-950/75 border border-sky-400/40 text-sky-200 font-mono text-[10px] font-bold text-center">
             ⏳ Nächste Aufn.:{' '}
             {pending
-              .map((c) => (c === 'wrong_hand' ? '🧦 Falsche Hand' : '❄️ Nur 2 Darts'))
+              .map((c) => {
+                const meta = CURSE_BADGE_META[c];
+                return meta ? `${meta.icon} ${meta.short}` : c;
+              })
               .join(' + ')}
           </div>
         )}
@@ -468,7 +591,7 @@ export default function HolographicAdventskalenderCockpit({
           <CurrentTurnRow
             darts={state.currentTurnDarts || []}
             isActive={isAct}
-            hasTwoDartsCurse={(state.activeCurses || []).includes('two_darts')}
+            activeCurses={state.activeCurses || []}
             accentColor={isP1 ? 'red' : 'amber'}
           />
         </div>
@@ -528,7 +651,7 @@ export default function HolographicAdventskalenderCockpit({
           </span>
           <span className="text-slate-500">•</span>
           <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-emerald-300">
-            {openCount}/12 OFFEN
+            {openCount}/{totalDoors} OFFEN
           </span>
         </div>
 
@@ -599,7 +722,7 @@ export default function HolographicAdventskalenderCockpit({
                     Türchen / Darts
                   </span>
                   <div className="text-2xl font-black font-mono text-cyan-300">
-                    {openCount}/12
+                    {openCount}/{totalDoors}
                     <span className="text-xs text-amber-300 block">{p1.dartsThrown} Darts</span>
                   </div>
                 </div>
@@ -608,7 +731,7 @@ export default function HolographicAdventskalenderCockpit({
               <CurrentTurnRow
                 darts={p1.currentTurnDarts || []}
                 isActive={!winnerPlayer}
-                hasTwoDartsCurse={(p1.activeCurses || []).includes('two_darts')}
+                activeCurses={p1.activeCurses || []}
                 accentColor="red"
               />
             </div>
@@ -662,7 +785,7 @@ export default function HolographicAdventskalenderCockpit({
                 </div>
                 <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
                   <div className="text-[10px] text-slate-400 uppercase">Türchen</div>
-                  <div className="text-xl font-black text-amber-300">{openCount}/12</div>
+                  <div className="text-xl font-black text-amber-300">{openCount}/{totalDoors}</div>
                 </div>
                 <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
                   <div className="text-[10px] text-slate-400 uppercase">Runden</div>

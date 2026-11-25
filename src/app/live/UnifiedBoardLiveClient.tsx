@@ -622,7 +622,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
   if (liveState.gameType === 'adventskalender') {
     const ak = liveState.adventskalenderData || {};
     const fallbackPlayer = createInitialAdventsPlayerState();
-    const fallbackDoors = Array.isArray(ak.doors) && ak.doors.length === 12
+    const fallbackDoors = Array.isArray(ak.doors) && ak.doors.length === 24
       ? ak.doors
       : createShuffledDoors(is1vs1 ? '1vs1' : 'solo');
 

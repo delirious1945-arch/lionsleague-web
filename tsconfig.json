@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "test_env"]
+  "exclude": ["node_modules", "test_env", "UI-Funspiele"]
 }

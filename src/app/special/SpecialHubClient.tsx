@@ -299,7 +299,7 @@ export default function SpecialHubClient({
                         Der verhexte Adventskalender
                       </h3>
                       <span className="text-xs font-semibold text-amber-300">
-                        12 Mystery-Türchen (Zahlen 1–12)
+                        24 Mystery-Türchen (1–20, Doppel, Triple &amp; Bull)
                       </span>
                     </div>
                   </div>
@@ -309,18 +309,20 @@ export default function SpecialHubClient({
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                  Öffne mit Treffern auf <strong className="text-amber-300">1 bis 12</strong> die 12
-                  Kalendertürchen! Dahinter stecken{' '}
-                  <strong className="text-emerald-300">Schoko-Punkte (+30 bis +60)</strong>, der{' '}
-                  <strong className="text-amber-300">Weihnachtsstern (×2)</strong> und der{' '}
-                  <strong className="text-red-300">Wichtel-Dieb (-25/+25)</strong>.
+                  Öffne mit Treffern auf <strong className="text-amber-300">1 bis 20</strong>,{' '}
+                  <strong className="text-cyan-300">Doppel (21)</strong>, <strong className="text-cyan-300">Triple (22)</strong>{' '}
+                  &amp; <strong className="text-cyan-300">Bull (23/24)</strong> alle 24 Türchen! Dahinter warten{' '}
+                  <strong className="text-emerald-300">Punkte (+25 bis +75)</strong>,{' '}
+                  <strong className="text-emerald-300">Schutz-Engel (2× Schild)</strong> und der{' '}
+                  <strong className="text-red-300">Geschenke-Räuber (Steal 50)</strong>.
                 </p>
 
                 <div className="rounded-2xl bg-slate-950/60 border border-purple-400/30 px-3.5 py-2.5 text-xs text-purple-200/95 flex items-center gap-2">
                   <span>👹</span>
                   <span>
-                    <strong>Party-Chaos:</strong> Der <strong>Grinch</strong> tauscht eiskalt die Punktestände und{' '}
-                    <strong>Knecht Ruprecht</strong> erzwingt die falsche Hand!
+                    <strong>Party-Chaos &amp; 6 Flüche:</strong> Der <strong>Grinch</strong> tauscht Punkte, dazu drohen{' '}
+                    <strong>Im Sitzen</strong>, <strong>Nur 1 Dart</strong>, <strong>Runde aussetzen</strong>,{' '}
+                    <strong>360°-Drehwurm</strong> &amp; <strong>Falsche Hand</strong>!
                   </span>
                 </div>
               </div>

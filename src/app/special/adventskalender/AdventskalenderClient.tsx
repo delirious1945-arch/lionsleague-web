@@ -5,16 +5,19 @@ import Link from 'next/link';
 import { Player } from '@/lib/data';
 import { generateSessionId } from '@/lib/liveSession';
 import {
+  AdventsCurseType,
   AdventsDartEvent,
   AdventsDoorNumber,
   AdventsDoorState,
   AdventsLastActionBanner,
   AdventsPlayerState,
+  AdventsRewardKind,
   cloneAdventsPlayerState,
   cloneDoors,
   countOpenDoors,
   createInitialAdventsPlayerState,
   createShuffledDoors,
+  getDoorTargetLabel,
 } from './types';
 import {
   ArrowLeft,
@@ -50,6 +53,89 @@ interface TurnSnapshot {
 }
 
 type SoundKind = 'good' | 'jackpot' | 'grinch' | 'curse' | 'niete' | 'miss' | 'win';
+
+const CURSE_UI_META: Record<
+  AdventsCurseType,
+  {
+    icon: string;
+    badge: string;
+    short: string;
+    warning: string;
+    chipCls: string;
+  }
+> = {
+  wrong_hand: {
+    icon: '🧦',
+    badge: 'FALSCHE HAND!',
+    short: 'Falsche Hand',
+    warning: 'wirft diese Aufnahme mit der FALSCHEN HAND!',
+    chipCls: 'bg-red-600/35 border-red-400 text-red-100',
+  },
+  two_darts: {
+    icon: '❄️',
+    badge: 'NUR 2 DARTS!',
+    short: 'Nur 2 Darts',
+    warning: 'hat diese Aufnahme NUR 2 DARTS!',
+    chipCls: 'bg-sky-600/35 border-sky-400 text-sky-100',
+  },
+  one_dart: {
+    icon: '🎯',
+    badge: 'NUR 1 DART!',
+    short: 'Nur 1 Dart',
+    warning: 'hat diese Aufnahme NUR 1 DART!',
+    chipCls: 'bg-rose-600/35 border-rose-400 text-rose-100',
+  },
+  sitting: {
+    icon: '🪑',
+    badge: 'IM SITZEN!',
+    short: 'Im Sitzen',
+    warning: 'muss diese Aufnahme IM SITZEN werfen!',
+    chipCls: 'bg-amber-600/35 border-amber-400 text-amber-100',
+  },
+  skip_round: {
+    icon: '⛄',
+    badge: 'AUSSETZEN!',
+    short: 'Runde aussetzen',
+    warning: 'ist EINGESCHNEIT und setzt diese Runde aus (0 Darts)!',
+    chipCls: 'bg-cyan-600/35 border-cyan-300 text-cyan-50',
+  },
+  spin_360: {
+    icon: '🌪️',
+    badge: '360° DREHWURM!',
+    short: '360° Drehung',
+    warning: 'muss sich vor dem Wurf 360° DREHEN (Drehwurm)!',
+    chipCls: 'bg-purple-600/35 border-purple-400 text-purple-100',
+  },
+};
+
+const CURSE_REWARD_MAP: Partial<Record<AdventsRewardKind, AdventsCurseType>> = {
+  curse_wrong_hand: 'wrong_hand',
+  curse_two_darts: 'two_darts',
+  curse_one_dart: 'one_dart',
+  curse_sitting: 'sitting',
+  curse_skip_round: 'skip_round',
+  curse_spin_360: 'spin_360',
+};
+
+const POINTS_REWARD_MAP: Partial<Record<AdventsRewardKind, { points: number; isJackpot: boolean; label: string }>> = {
+  points_25: { points: 25, isJackpot: false, label: 'Schoko-Nikolaus-Punkte' },
+  points_30: { points: 30, isJackpot: false, label: 'Schoko-Punkte' },
+  points_35: { points: 35, isJackpot: false, label: 'Zimtstern-Punkte' },
+  points_40: { points: 40, isJackpot: false, label: 'Vanillekipferl-Punkte' },
+  solo_bonus_45: { points: 45, isJackpot: false, label: 'Nikolaus-Stiefel-Punkte' },
+  points_50: { points: 50, isJackpot: false, label: 'Geschenk-Punkte' },
+  points_55: { points: 55, isJackpot: false, label: 'Wichtel-Punkte' },
+  points_60: { points: 60, isJackpot: true, label: 'Glühwein-Jackpot-Punkte' },
+  points_65: { points: 65, isJackpot: true, label: 'Glühwein-Jackpot-Punkte' },
+  points_75: { points: 75, isJackpot: true, label: 'Rentier-Schlitten-Jackpot' },
+};
+
+function getMaxDartsForCurses(curses: AdventsCurseType[]): number {
+  if (curses.includes('skip_round')) return 0;
+  if (curses.includes('one_dart')) return 1;
+  if (curses.includes('two_darts')) return 2;
+  return 3;
+}
 
 function createAdventsSound(kind: SoundKind) {
   if (typeof window === 'undefined') return;
@@ -223,7 +309,12 @@ export default function AdventskalenderClient({
           cached &&
           cached.isGameStarted &&
           !cached.isGameFinished &&
-          (cached.p1State?.dartsThrown > 0 || cached.p2State?.dartsThrown > 0)
+          Array.isArray(cached.doors) &&
+          cached.doors.length === 24 &&
+          (cached.p1State?.dartsThrown > 0 ||
+            cached.p2State?.dartsThrown > 0 ||
+            cached.p1State?.roundsPlayed > 0 ||
+            cached.p2State?.roundsPlayed > 0)
         ) {
           setCachedSessionToResume(cached);
         }
@@ -443,7 +534,10 @@ export default function AdventskalenderClient({
     if (
       isGameStarted &&
       !isGameFinished &&
-      (p1State.dartsThrown > 0 || p2State.dartsThrown > 0)
+      (p1State.dartsThrown > 0 ||
+        p2State.dartsThrown > 0 ||
+        p1State.roundsPlayed > 0 ||
+        p2State.roundsPlayed > 0)
     ) {
       try {
         localStorage.setItem(
@@ -513,8 +607,8 @@ export default function AdventskalenderClient({
       headline: 'KALENDER GEMISCHT!',
       subline:
         gameMode === '1vs1'
-          ? `${cleanP1} eröffnet gegen ${cleanP2} – wirf die Zahlen 1 bis 12!`
-          : `${cleanP1} startet die Kalender-Jagd auf die Zahlen 1 bis 12!`,
+          ? `${cleanP1} eröffnet gegen ${cleanP2} – wirf 1–20, Doppel (21), Triple (22) & Bull (23/24)!`
+          : `${cleanP1} startet die 24-Türchen-Jagd auf 1–20, Doppel, Triple & Bull!`,
       actorPlayer: 1,
     };
 
@@ -559,7 +653,7 @@ export default function AdventskalenderClient({
       setActiveBoard(c.activeBoard);
     }
     setGameMode(c.gameMode === 'solo' ? 'solo' : '1vs1');
-    setMaxRounds(c.maxRounds === 4 || c.maxRounds === 5 ? c.maxRounds : null);
+    setMaxRounds(typeof c.maxRounds === 'number' && c.maxRounds > 0 ? c.maxRounds : null);
     setP1Name(c.p1Name || defaultP1);
     setP2Name(c.p2Name || 'Gastspieler');
     setIsGuestP1(Boolean(c.isGuestP1));
@@ -568,7 +662,7 @@ export default function AdventskalenderClient({
     setRoundNumber(Number(c.roundNumber || 1));
     setIsSuddenDeath(Boolean(c.isSuddenDeath));
     setDoors(
-      Array.isArray(c.doors) && c.doors.length === 12
+      Array.isArray(c.doors) && c.doors.length === 24
         ? c.doors
         : createShuffledDoors(c.gameMode === 'solo' ? 'solo' : '1vs1')
     );
@@ -650,7 +744,7 @@ export default function AdventskalenderClient({
     let winPlayer: 1 | 2 | 'draw' | null = null;
     let finalBanner = banner;
 
-    const allOpened = countOpenDoors(nextDoors) >= 12;
+    const allOpened = countOpenDoors(nextDoors) >= 24;
 
     if (allOpened) {
       ownAfter.roundsPlayed += 1;
@@ -669,7 +763,7 @@ export default function AdventskalenderClient({
         localStorage.removeItem(CACHE_KEY);
       } catch {}
     } else {
-      const maxDartsForOwn = ownAfter.activeCurses.includes('two_darts') ? 2 : 3;
+      const maxDartsForOwn = getMaxDartsForCurses(ownAfter.activeCurses);
 
       if (ownAfter.currentTurnDarts.length >= maxDartsForOwn) {
         ownAfter.roundsPlayed += 1;
@@ -740,9 +834,11 @@ export default function AdventskalenderClient({
     setIsGameFinished(winPlayer !== null);
   };
 
-  // A) Tipp auf Kalendertürchen 1..12
+  // A) Tipp auf Kalendertürchen 1..24
   const handleDoorHit = (doorNum: AdventsDoorNumber) => {
     if (isGameFinished) return;
+    const currentOwn = activePlayer === 1 ? p1State : p2State;
+    if (currentOwn.activeCurses.includes('skip_round')) return;
     pushSnapshot();
 
     const nextDoors = cloneDoors(doors);
@@ -753,11 +849,16 @@ export default function AdventskalenderClient({
     const activeName = activePlayer === 1 ? p1Name : p2Name;
     const oppName = activePlayer === 1 ? p2Name : p1Name;
 
-    const curMaxDarts = own.activeCurses.includes('two_darts') ? 2 : 3;
+    const curMaxDarts = getMaxDartsForCurses(own.activeCurses);
     if (own.currentTurnDarts.length >= curMaxDarts) own.currentTurnDarts = [];
 
     const door = nextDoors.find((d) => d.number === doorNum);
     if (!door) return;
+
+    const targetMeta = getDoorTargetLabel(doorNum);
+    const doorTitleLabel = targetMeta.isSpecial
+      ? `TÜRCHEN ${doorNum} (${targetMeta.label})`
+      : `TÜRCHEN ${doorNum}`;
 
     if (door.isOpen) {
       own.dartsThrown += 1;
@@ -774,7 +875,7 @@ export default function AdventskalenderClient({
         doorNumber: doorNum,
         tone: 'niete',
         icon: '🕯️',
-        headline: `TÜRCHEN ${doorNum} SCHON LEER`,
+        headline: `${doorTitleLabel} SCHON LEER`,
         subline: `${activeName} trifft das bereits geöffnete Türchen ${doorNum} – keine Punkte.`,
         actorPlayer: activePlayer,
       };
@@ -798,161 +899,196 @@ export default function AdventskalenderClient({
       tone: rw.tone,
     };
 
-    let banner: AdventsLastActionBanner = {
+    const banner: AdventsLastActionBanner = {
       id: Date.now(),
       doorNumber: doorNum,
       tone: rw.tone,
       icon: rw.icon,
-      headline: `TÜRCHEN ${doorNum}: ${rw.title.toUpperCase()}!`,
+      headline: `${doorTitleLabel}: ${rw.title.toUpperCase()}!`,
       subline: '',
       actorPlayer: activePlayer,
     };
 
-    switch (rw.kind) {
-      case 'points_30':
-        own.score += 30;
+    const pointsMeta = POINTS_REWARD_MAP[rw.kind];
+    const curseType = CURSE_REWARD_MAP[rw.kind];
+
+    if (pointsMeta) {
+      own.score += pointsMeta.points;
+      playSound(pointsMeta.isJackpot ? 'jackpot' : 'good');
+      banner.subline = `${activeName} ${pointsMeta.isJackpot ? 'räumt' : 'schnappt sich'} +${pointsMeta.points} ${pointsMeta.label} ab (Stand: ${own.score})!`;
+    } else if (curseType) {
+      const meta = CURSE_UI_META[curseType];
+      const targetPlayer = gameMode === '1vs1' ? opp : own;
+      const targetName = gameMode === '1vs1' ? oppName : activeName;
+      if ((targetPlayer.shieldsCount ?? 0) > 0) {
+        targetPlayer.shieldsCount = (targetPlayer.shieldsCount ?? 1) - 1;
+        ev = { ...ev, subLabel: '🛡️ GEBLOCKT', tone: 'good' };
         playSound('good');
-        banner.subline = `${activeName} schnappt sich +30 Schoko-Punkte (Stand: ${own.score})!`;
-        break;
-
-      case 'points_40':
-        own.score += 40;
-        playSound('good');
-        banner.subline = `${activeName} kassiert +40 Zimtstern-Punkte (Stand: ${own.score})!`;
-        break;
-
-      case 'points_50':
-        own.score += 50;
-        playSound('good');
-        banner.subline = `${activeName} packt +50 Geschenk-Punkte aus (Stand: ${own.score})!`;
-        break;
-
-      case 'points_60':
-        own.score += 60;
-        playSound('jackpot');
-        banner.subline = `${activeName} räumt +60 Glühwein-Jackpot-Punkte ab (Stand: ${own.score})!`;
-        break;
-
-      case 'solo_bonus_45':
-        own.score += 45;
-        playSound('good');
-        banner.subline = `${activeName} findet +45 Punkte im Nikolaus-Stiefel (Stand: ${own.score})!`;
-        break;
-
-      case 'steal_25': {
-        const stolen = Math.min(25, opp.score);
-        opp.score -= stolen;
-        own.score += 25;
-        playSound('good');
-        banner.subline =
-          stolen > 0
-            ? `${activeName} bekommt +25 Pkt und stiehlt ${oppName} ${stolen} Pkt!`
-            : `${activeName} ergattert +25 Wichtel-Punkte!`;
-        break;
-      }
-
-      case 'bell_bless_35': {
-        const hadCurses = own.activeCurses.length + own.pendingCurses.length > 0;
-        own.score += 35;
-        own.activeCurses = [];
-        own.pendingCurses = [];
-        playSound('good');
-        banner.subline = hadCurses
-          ? `${activeName} erhält +35 Pkt UND wird von allen Flüchen geheilt!`
-          : `${activeName} erhält +35 Glöckchen-Punkte (Schutz vor Flüchen)!`;
-        break;
-      }
-
-      case 'double_star': {
-        if (own.score > 0) {
-          own.score *= 2;
-          banner.subline = `${activeName} VERDOPPELT auf sensationelle ${own.score} Punkte!`;
-        } else {
-          own.score += 40;
-          banner.subline = `${activeName} startet mit +40 Weihnachtsstern-Punkten!`;
+        banner.tone = 'good';
+        banner.icon = '🛡️';
+        banner.headline = '🛡️ FLUCH ABGEWEHRT!';
+        banner.subline = `${targetName} wehrt ${rw.title} (${meta.badge}) mit 1 Schutzschild ab (noch ${targetPlayer.shieldsCount})!`;
+      } else {
+        if (!targetPlayer.pendingCurses.includes(curseType)) {
+          targetPlayer.pendingCurses.push(curseType);
         }
-        playSound('jackpot');
-        break;
+        playSound('curse');
+        banner.headline = `${meta.icon} ${rw.title.toUpperCase()}: ${meta.badge}`;
+        banner.subline = `${targetName} ${meta.warning}`;
       }
+    } else {
+      switch (rw.kind) {
+        case 'bell_bless_30':
+        case 'bell_bless_35':
+        case 'bell_bless_45': {
+          const pts = rw.kind === 'bell_bless_45' ? 45 : rw.kind === 'bell_bless_35' ? 35 : 30;
+          const hadCurses = own.activeCurses.length + own.pendingCurses.length > 0;
+          own.score += pts;
+          own.activeCurses = [];
+          own.pendingCurses = [];
+          playSound('good');
+          banner.subline = hadCurses
+            ? `${activeName} erhält +${pts} Pkt UND wird von allen Flüchen geheilt!`
+            : `${activeName} erhält +${pts} Glöckchen-Punkte (von allen Flüchen befreit)!`;
+          break;
+        }
 
-      case 'grinch_swap': {
-        const tmp = own.score;
-        own.score = opp.score;
-        opp.score = tmp;
-        own.grinchHits += 1;
-        playSound('grinch');
-        banner.headline = '👹 DER GRINCH TAUSCHT DIE PUNKTE!';
-        banner.subline = `${activeName} & ${oppName} tauschen eiskalt die Punktestände (${opp.score} ⇄ ${own.score})!`;
-        break;
-      }
+        case 'shield_angel': {
+          own.shieldsCount = (own.shieldsCount ?? 0) + 2;
+          playSound('good');
+          banner.headline = '🛡️ SCHUTZ-ENGEL: +2 SCHILDE!';
+          banner.subline = `${activeName} erhält 2 Schutzschilde (gesamt: ${own.shieldsCount}) gegen Flüche & Diebstahl!`;
+          break;
+        }
 
-      case 'grinch_trap_30': {
-        own.score = Math.max(0, own.score - 30);
-        own.grinchHits += 1;
-        playSound('grinch');
-        banner.headline = '😈 GRINCH-FALLE! -30 PKT';
-        banner.subline = `${activeName} tappt in die Grinch-Falle – neuer Stand: ${own.score} Pkt!`;
-        break;
-      }
+        case 'steal_25':
+        case 'steal_50': {
+          const isSteal50 = rw.kind === 'steal_50';
+          if (gameMode === '1vs1' && (opp.shieldsCount ?? 0) > 0) {
+            opp.shieldsCount = (opp.shieldsCount ?? 1) - 1;
+            ev = { ...ev, subLabel: '🛡️ GEBLOCKT', tone: 'niete' };
+            playSound('curse');
+            banner.tone = 'good';
+            banner.icon = '🛡️';
+            banner.headline = '🛡️ DIEBSTAHL ABGEWEHRT!';
+            banner.subline = `${oppName} blockt den ${rw.title} mit 1 Schutzschild ab (noch ${opp.shieldsCount})!`;
+          } else if (isSteal50) {
+            const stolen = Math.min(50, opp.score);
+            opp.score -= stolen;
+            own.score += stolen;
+            playSound(stolen > 0 ? 'jackpot' : 'good');
+            banner.subline =
+              stolen > 0
+                ? `${activeName} raubt ${oppName} ganze ${stolen} Punkte (Stand: ${own.score})!`
+                : `${activeName} will 50 Pkt klauen, aber ${oppName} hat 0 Punkte!`;
+          } else {
+            const stolen = Math.min(25, opp.score);
+            opp.score -= stolen;
+            own.score += 25;
+            playSound('good');
+            banner.subline =
+              stolen > 0
+                ? `${activeName} bekommt +25 Pkt und stiehlt ${oppName} ${stolen} Pkt!`
+                : `${activeName} ergattert +25 Wichtel-Punkte!`;
+          }
+          break;
+        }
 
-      case 'solo_gamble': {
-        const lucky = Math.random() >= 0.5;
-        if (lucky) {
-          own.score += 80;
+        case 'double_star': {
+          if (own.score > 0) {
+            own.score *= 2;
+            banner.subline = `${activeName} VERDOPPELT auf sensationelle ${own.score} Punkte!`;
+          } else {
+            own.score += 40;
+            banner.subline = `${activeName} startet mit +40 Weihnachtsstern-Punkten!`;
+          }
           playSound('jackpot');
-          ev = { ...ev, subLabel: '+80 LUCKY!', tone: 'jackpot' };
-          banner.tone = 'jackpot';
-          banner.headline = '🎲 GRINCH-ROULETTE: JACKPOT +80!';
-          banner.subline = `${activeName} gewinnt beim Roulette +80 Pkt (Stand: ${own.score})!`;
-        } else {
-          own.score = Math.floor(own.score / 2);
+          break;
+        }
+
+        case 'grinch_swap': {
+          const tmp = own.score;
+          own.score = opp.score;
+          opp.score = tmp;
           own.grinchHits += 1;
           playSound('grinch');
-          ev = { ...ev, subLabel: '½ HALBIERT', tone: 'grinch' };
-          banner.headline = '👹 GRINCH-ROULETTE: HALBIERT!';
-          banner.subline = `Der Grinch halbiert ${activeName}s Konto auf ${own.score} Pkt!`;
+          banner.headline = '👹 DER GRINCH TAUSCHT DIE PUNKTE!';
+          banner.subline = `${activeName} & ${oppName} tauschen eiskalt die Punktestände (${opp.score} ⇄ ${own.score})!`;
+          break;
         }
-        break;
-      }
 
-      case 'curse_wrong_hand': {
-        const targetPlayer = gameMode === '1vs1' ? opp : own;
-        const targetName = gameMode === '1vs1' ? oppName : activeName;
-        if (!targetPlayer.pendingCurses.includes('wrong_hand')) {
-          targetPlayer.pendingCurses.push('wrong_hand');
+        case 'roulette_duel': {
+          const lucky = Math.random() >= 0.5;
+          if (lucky) {
+            own.score += 60;
+            playSound('jackpot');
+            ev = { ...ev, subLabel: '+60 GLÜCK!', tone: 'jackpot' };
+            banner.tone = 'jackpot';
+            banner.headline = '🎲 WICHTEL-ROULETTE: +60 PKT!';
+            banner.subline = `${activeName} gewinnt beim Wichtel-Roulette +60 Pkt (Stand: ${own.score})!`;
+          } else {
+            own.score = Math.max(0, own.score - 30);
+            own.grinchHits += 1;
+            playSound('grinch');
+            ev = { ...ev, subLabel: '-30 PECH!', tone: 'grinch' };
+            banner.tone = 'grinch';
+            banner.headline = '🎲 WICHTEL-ROULETTE: -30 PKT!';
+            banner.subline = `Pech beim Wichtel-Roulette! ${activeName} verliert 30 Pkt (Stand: ${own.score})!`;
+          }
+          break;
         }
-        playSound('curse');
-        banner.headline = '🧦 KNECHT RUPRECHT: FALSCHE HAND!';
-        banner.subline = `${targetName} muss die nächste Aufnahme mit der FALSCHEN HAND werfen!`;
-        break;
-      }
 
-      case 'curse_two_darts': {
-        const targetPlayer = gameMode === '1vs1' ? opp : own;
-        const targetName = gameMode === '1vs1' ? oppName : activeName;
-        if (!targetPlayer.pendingCurses.includes('two_darts')) {
-          targetPlayer.pendingCurses.push('two_darts');
+        case 'grinch_trap_30':
+        case 'grinch_trap_50': {
+          const penalty = rw.kind === 'grinch_trap_50' ? 50 : 30;
+          own.score = Math.max(0, own.score - penalty);
+          own.grinchHits += 1;
+          playSound('grinch');
+          banner.headline =
+            rw.kind === 'grinch_trap_50'
+              ? '🥶 EISZAPFEN-SCHOCK! -50 PKT'
+              : '😈 GRINCH-FALLE! -30 PKT';
+          banner.subline = `${activeName} verliert sofort ${penalty} Punkte – neuer Stand: ${own.score} Pkt!`;
+          break;
         }
-        playSound('curse');
-        banner.headline = '❄️ SCHNEESTURM: NUR 2 DARTS!';
-        banner.subline = `${targetName} hat in der nächsten Aufnahme nur 2 DARTS!`;
-        break;
-      }
 
-      case 'niete_0':
-      default:
-        playSound('niete');
-        banner.subline = `${activeName} öffnet nur verbrannte Plätzchen (0 Punkte).`;
-        break;
+        case 'solo_gamble': {
+          const lucky = Math.random() >= 0.5;
+          if (lucky) {
+            own.score += 80;
+            playSound('jackpot');
+            ev = { ...ev, subLabel: '+80 LUCKY!', tone: 'jackpot' };
+            banner.tone = 'jackpot';
+            banner.headline = '🎲 GRINCH-ROULETTE: JACKPOT +80!';
+            banner.subline = `${activeName} gewinnt beim Roulette +80 Pkt (Stand: ${own.score})!`;
+          } else {
+            own.score = Math.floor(own.score / 2);
+            own.grinchHits += 1;
+            playSound('grinch');
+            ev = { ...ev, subLabel: '½ HALBIERT', tone: 'grinch' };
+            banner.headline = '👹 GRINCH-ROULETTE: HALBIERT!';
+            banner.subline = `Der Grinch halbiert ${activeName}s Konto auf ${own.score} Pkt!`;
+          }
+          break;
+        }
+
+        case 'niete_0':
+        default:
+          playSound('niete');
+          banner.subline = `${activeName} öffnet nur verbrannte Plätzchen (0 Punkte).`;
+          break;
+      }
     }
 
     own.currentTurnDarts.push(ev);
     commitTurnStep(nextDoors, nextP1, nextP2, banner);
   };
 
-  // B) Fehlwurf (13–20 / Daneben)
+  // B) Fehlwurf (Daneben)
   const handleMiss = () => {
     if (isGameFinished) return;
+    const currentOwn = activePlayer === 1 ? p1State : p2State;
+    if (currentOwn.activeCurses.includes('skip_round')) return;
     pushSnapshot();
 
     const nextDoors = cloneDoors(doors);
@@ -961,7 +1097,7 @@ export default function AdventskalenderClient({
     const own = activePlayer === 1 ? nextP1 : nextP2;
     const activeName = activePlayer === 1 ? p1Name : p2Name;
 
-    const maxDarts = own.activeCurses.includes('two_darts') ? 2 : 3;
+    const maxDarts = getMaxDartsForCurses(own.activeCurses);
     if (own.currentTurnDarts.length >= maxDarts) own.currentTurnDarts = [];
 
     own.dartsThrown += 1;
@@ -979,7 +1115,7 @@ export default function AdventskalenderClient({
       tone: 'miss',
       icon: '✕',
       headline: 'DANEBEN',
-      subline: `${activeName} trifft kein Kalendertürchen (1–12).`,
+      subline: `${activeName} trifft kein Kalendertürchen (1–24).`,
       actorPlayer: activePlayer,
     };
 
@@ -989,6 +1125,8 @@ export default function AdventskalenderClient({
   // C) Restliche Darts dieser Aufnahme als Miss buchen
   const handleRestMiss = () => {
     if (isGameFinished) return;
+    const currentOwn = activePlayer === 1 ? p1State : p2State;
+    if (currentOwn.activeCurses.includes('skip_round')) return;
     pushSnapshot();
 
     const nextDoors = cloneDoors(doors);
@@ -997,7 +1135,7 @@ export default function AdventskalenderClient({
     const own = activePlayer === 1 ? nextP1 : nextP2;
     const activeName = activePlayer === 1 ? p1Name : p2Name;
 
-    const maxDarts = own.activeCurses.includes('two_darts') ? 2 : 3;
+    const maxDarts = getMaxDartsForCurses(own.activeCurses);
     const existing = own.currentTurnDarts.length >= maxDarts ? 0 : own.currentTurnDarts.length;
     if (existing === 0) own.currentTurnDarts = [];
     const remaining = Math.max(1, maxDarts - existing);
@@ -1020,6 +1158,35 @@ export default function AdventskalenderClient({
       icon: '✕',
       headline: 'AUFNAHME DANEBEN',
       subline: `${activeName} beendet die Aufnahme ohne weiteres Türchen.`,
+      actorPlayer: activePlayer,
+    };
+
+    commitTurnStep(nextDoors, nextP1, nextP2, banner);
+  };
+
+  // D) Runde wegen Schneewehen-Fluch (skip_round) mit 0 Darts aussetzen
+  const handleSkipRound = () => {
+    if (isGameFinished) return;
+    const currentOwn = activePlayer === 1 ? p1State : p2State;
+    if (!currentOwn.activeCurses.includes('skip_round')) return;
+    pushSnapshot();
+
+    const nextDoors = cloneDoors(doors);
+    const nextP1 = cloneAdventsPlayerState(p1State);
+    const nextP2 = cloneAdventsPlayerState(p2State);
+    const own = activePlayer === 1 ? nextP1 : nextP2;
+    const activeName = activePlayer === 1 ? p1Name : p2Name;
+
+    own.currentTurnDarts = [];
+    playSound('curse');
+
+    const banner: AdventsLastActionBanner = {
+      id: Date.now(),
+      doorNumber: null,
+      tone: 'curse',
+      icon: '⛄',
+      headline: 'EINGESCHNEIT! RUNDE AUSGESETZT',
+      subline: `${activeName} steckt in der Schneewehe und wird mit 0 Darts weitergeschaltet.`,
       actorPlayer: activePlayer,
     };
 
@@ -1077,7 +1244,7 @@ export default function AdventskalenderClient({
                   ) : (
                     <> ({cachedSessionToResume.p1State?.score ?? 0} Pkt)</>
                   )}{' '}
-                  • {countOpenDoors(cachedSessionToResume.doors || [])}/12 Türchen offen • Runde{' '}
+                  • {countOpenDoors(cachedSessionToResume.doors || [])}/24 Türchen offen • Runde{' '}
                   {cachedSessionToResume.roundNumber || 1}
                 </p>
               </div>
@@ -1114,7 +1281,7 @@ export default function AdventskalenderClient({
                   Der verhexte Adventskalender
                 </h1>
                 <p className="text-xs sm:text-sm text-amber-300 font-semibold">
-                  12 Mystery-Türchen (Zahlen 1–12) · Schoko-Punkte, Grinch-Tausch &amp; Knecht Ruprecht!
+                  24 Mystery-Türchen (1–20, Doppel, Triple, Bull) · Schilde, Steal, Grinch &amp; Flüche!
                 </p>
               </div>
             </div>
@@ -1263,13 +1430,14 @@ export default function AdventskalenderClient({
           <div className="space-y-2">
             <label className="text-xs font-mono font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Spiellänge (Endet automatisch, wenn alle 12 Türchen offen sind)</span>
+              <span>Spiellänge (Endet automatisch, wenn alle 24 Türchen offen sind)</span>
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { val: 4, label: '4 Runden', sub: 'Schnell · Party-Standard' },
-                { val: 5, label: '5 Runden', sub: 'Mittel · Mehr Spannung' },
-                { val: null, label: 'Alle 12 Türchen', sub: 'Open End bis Tür 12' },
+                { val: 4, label: '4 Runden (8 Türen)', sub: 'Schnell · Party-Duell' },
+                { val: 6, label: '6 Runden (12 Türen)', sub: 'Mittel · Taktik & Chaos' },
+                { val: 8, label: '8 Runden (16 Türen)', sub: 'Lang · Große Punktejagd' },
+                { val: null, label: 'Alle 24 Türchen', sub: 'Voller Kalender bis Tür 24' },
               ].map((opt) => (
                 <button
                   key={String(opt.val)}
@@ -1310,8 +1478,11 @@ export default function AdventskalenderClient({
   const ownState = activePlayer === 1 ? p1State : p2State;
   const ownName = activePlayer === 1 ? p1Name : p2Name;
   const openCount = countOpenDoors(doors);
+  const totalDoors = doors.length || 24;
+  const hasSkipRoundCurse = ownState.activeCurses.includes('skip_round');
+  const hasOneDartCurse = ownState.activeCurses.includes('one_dart');
   const hasTwoDartsCurse = ownState.activeCurses.includes('two_darts');
-  const hasWrongHandCurse = ownState.activeCurses.includes('wrong_hand');
+  const activeHeaderCurses = ownState.activeCurses;
 
   return (
     <div className="max-w-5xl mx-auto px-2.5 sm:px-5 space-y-3.5 animate-fadeIn">
@@ -1338,8 +1509,20 @@ export default function AdventskalenderClient({
               : `RUNDE ${roundNumber}`}
           </span>
           <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/35 text-emerald-200 font-mono text-xs font-black">
-            {openCount}/12 OFFEN
+            {openCount}/{totalDoors} OFFEN
           </span>
+          {!isGameFinished &&
+            activeHeaderCurses.map((c) => {
+              const meta = CURSE_UI_META[c];
+              return (
+                <span
+                  key={`hdr-${c}`}
+                  className={`px-2.5 py-1 rounded-lg border font-mono text-xs font-black animate-pulse ${meta.chipCls}`}
+                >
+                  {meta.icon} {meta.badge}
+                </span>
+              );
+            })}
           {restoredFromCache && (
             <span className="hidden sm:inline px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 text-[10px] font-bold">
               ✓ Wiederhergestellt
@@ -1371,16 +1554,19 @@ export default function AdventskalenderClient({
       {/* Regel-Hilfe Box */}
       {showHelp && (
         <div className="rounded-2xl p-4 bg-slate-900/95 border border-amber-400/40 text-xs sm:text-sm text-slate-200 space-y-1.5">
-          <div className="font-black text-amber-300">🚪 Spielregeln: Der verhexte Adventskalender</div>
+          <div className="font-black text-amber-300">🚪 Spielregeln: Der verhexte Adventskalender (24 Türchen)</div>
           <p>
-            1. Wirf am Dartboard die Zahlen <strong>1 bis 12</strong> (Single, Double oder Triple egal), um das
-            jeweilige Kalendertürchen zu öffnen. Zahlen 13–20 zählen als Miss.
+            1. Wirf am Dartboard die Zahlen <strong>1 bis 20</strong> (Single, Double oder Triple egal) sowie{' '}
+            <strong>Doppel (Tür 21)</strong>, <strong>Triple (Tür 22)</strong>, <strong>Single Bull 25 (Tür 23)</strong>{' '}
+            und <strong>Bullseye 50 / D20 (Tür 24)</strong>!
           </p>
           <p>
-            2. Hinter den Türchen warten <strong>Schoko-Punkte (+30 bis +60)</strong>, der{' '}
-            <strong>Weihnachtsstern (×2)</strong>, der <strong>Wichtel-Dieb (-25/+25)</strong> oder gemeine Fallen:
-            der <strong>Grinch (Punkte-Tausch!)</strong> und <strong>Knecht Ruprecht</strong> (nächste Aufnahme mit
-            falscher Hand oder nur 2 Darts).
+            2. Hinter den 24 Türchen warten <strong>Punkte (+25 bis +75)</strong>, der{' '}
+            <strong>Schutz-Engel (2× Schild gegen Flüche &amp; Diebstahl)</strong>, der{' '}
+            <strong>Weihnachtsstern (×2)</strong>, der <strong>Geschenke-Räuber (klaut bis zu 50 Pkt)</strong>,{' '}
+            <strong>Wichtel-Roulette (+60 / -30)</strong>, der <strong>Grinch (Punkte-Tausch!)</strong> sowie 6 fiese
+            Flüche (<strong>Falsche Hand</strong>, <strong>Nur 2 Darts</strong>, <strong>Nur 1 Dart</strong>,{' '}
+            <strong>Im Sitzen</strong>, <strong>Runde aussetzen</strong> &amp; <strong>360°-Drehwurm</strong>).
           </p>
           <p>3. Bereits geöffnete Türchen bleiben leer. Wer am Ende die meisten Punkte hat, gewinnt!</p>
         </div>
@@ -1394,6 +1580,7 @@ export default function AdventskalenderClient({
           const name = isP1 ? p1Name : p2Name;
           const isAct = !isGameFinished && activePlayer === pNum;
           const isWin = winnerPlayer === pNum;
+          const shields = st.shieldsCount ?? 0;
 
           return (
             <div
@@ -1437,24 +1624,35 @@ export default function AdventskalenderClient({
                 </div>
               </div>
 
-              {(st.activeCurses.length > 0 || st.pendingCurses.length > 0) && (
+              {(shields > 0 || st.activeCurses.length > 0 || st.pendingCurses.length > 0) && (
                 <div className="flex flex-wrap gap-1.5 mt-2 font-mono text-[10px] font-black">
-                  {st.activeCurses.map((c) => (
-                    <span
-                      key={`act-${c}`}
-                      className="px-2 py-0.5 rounded-md bg-red-600/35 border border-red-400 text-red-100"
-                    >
-                      {c === 'wrong_hand' ? '🧦 FALSCHE HAND!' : '❄️ NUR 2 DARTS!'}
+                  {shields > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/25 border border-emerald-300 text-emerald-100">
+                      🛡️ SCHUTZSCHILD ×{shields}
                     </span>
-                  ))}
-                  {st.pendingCurses.map((c) => (
-                    <span
-                      key={`pend-${c}`}
-                      className="px-2 py-0.5 rounded-md bg-sky-950/80 border border-sky-400/50 text-sky-200"
-                    >
-                      ⏳ Nächste: {c === 'wrong_hand' ? 'Falsche Hand' : '2 Darts'}
-                    </span>
-                  ))}
+                  )}
+                  {st.activeCurses.map((c) => {
+                    const meta = CURSE_UI_META[c];
+                    return (
+                      <span
+                        key={`act-${c}`}
+                        className={`px-2 py-0.5 rounded-md border ${meta.chipCls}`}
+                      >
+                        {meta.icon} {meta.badge}
+                      </span>
+                    );
+                  })}
+                  {st.pendingCurses.map((c) => {
+                    const meta = CURSE_UI_META[c];
+                    return (
+                      <span
+                        key={`pend-${c}`}
+                        className="px-2 py-0.5 rounded-md bg-sky-950/80 border border-sky-400/50 text-sky-200"
+                      >
+                        ⏳ Nächste: {meta.icon} {meta.short}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1463,17 +1661,29 @@ export default function AdventskalenderClient({
       </div>
 
       {/* Prominenter Fluch-Hinweisbalken für den aktiven Werfer */}
-      {!isGameFinished && (hasWrongHandCurse || hasTwoDartsCurse) && (
-        <div className="rounded-2xl px-4 py-3 bg-gradient-to-r from-sky-950/90 via-red-950/85 to-sky-950/90 border-2 border-sky-400 text-center space-y-1 animate-pulse shadow-[0_0_25px_rgba(56,189,248,0.35)]">
-          {hasWrongHandCurse && (
-            <div className="text-xs sm:text-sm font-black text-red-200 uppercase tracking-wide">
-              🧦 ACHTUNG: {ownName} wirft diese Aufnahme mit der FALSCHEN HAND!
-            </div>
-          )}
-          {hasTwoDartsCurse && (
-            <div className="text-xs sm:text-sm font-black text-sky-200 uppercase tracking-wide">
-              ❄️ ACHTUNG: {ownName} hat diese Aufnahme nur 2 DARTS!
-            </div>
+      {!isGameFinished && ownState.activeCurses.length > 0 && (
+        <div className="rounded-2xl px-4 py-3 bg-gradient-to-r from-sky-950/90 via-red-950/85 to-purple-950/90 border-2 border-sky-400 text-center space-y-2 animate-pulse shadow-[0_0_25px_rgba(56,189,248,0.35)]">
+          {ownState.activeCurses.map((c) => {
+            const meta = CURSE_UI_META[c];
+            return (
+              <div
+                key={`warn-${c}`}
+                className="text-xs sm:text-sm font-black text-white uppercase tracking-wide"
+              >
+                {meta.icon} ACHTUNG: {ownName} {meta.warning}
+              </div>
+            );
+          })}
+
+          {hasSkipRoundCurse && (
+            <button
+              type="button"
+              onClick={handleSkipRound}
+              data-ui-id="ADVENT.PLAY.SKIP_ROUND_BTN"
+              className="w-full min-h-[56px] px-5 py-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.99]"
+            >
+              <span>⛄ Eingeschneit! Runde aussetzen (0 Darts weiter)</span>
+            </button>
           )}
         </div>
       )}
@@ -1515,7 +1725,7 @@ export default function AdventskalenderClient({
                   } Punkten!`}
             </h2>
             <p className="text-xs sm:text-sm text-amber-200 mt-1">
-              {openCount}/12 Türchen geöffnet · Runde {roundNumber}
+              {openCount}/{totalDoors} Türchen geöffnet · Runde {roundNumber}
               {gameMode === '1vs1' ? ` • Endstand ${p1State.score} : ${p2State.score}` : ''}
             </p>
           </div>
@@ -1548,56 +1758,68 @@ export default function AdventskalenderClient({
         </div>
       )}
 
-      {/* Aktuelle Aufnahme + Korrektur + 12 Türchen Grid */}
+      {/* Aktuelle Aufnahme + Korrektur + 24 Türchen Grid */}
       {!isGameFinished && (
         <>
           <div className="grid grid-cols-12 gap-2 items-center">
-            <div className="col-span-8 sm:col-span-9 grid grid-cols-3 gap-2">
-              {[0, 1, 2].map((idx) => {
-                if (idx === 2 && hasTwoDartsCurse) {
+            {hasSkipRoundCurse ? (
+              <div className="col-span-8 sm:col-span-9 min-h-[52px] px-3 py-2 rounded-xl border-2 border-cyan-300 bg-gradient-to-r from-sky-950 via-cyan-900/90 to-sky-950 flex items-center justify-center gap-2 font-mono text-xs sm:text-sm font-black text-cyan-100 animate-pulse">
+                <span>⛄</span>
+                <span>EINGESCHNEIT · RUNDE AUSSETZEN (0 DARTS)</span>
+                <span>❄️</span>
+              </div>
+            ) : (
+              <div className="col-span-8 sm:col-span-9 grid grid-cols-3 gap-2">
+                {[0, 1, 2].map((idx) => {
+                  if ((hasOneDartCurse && idx >= 1) || (hasTwoDartsCurse && idx === 2)) {
+                    return (
+                      <div
+                        key={idx}
+                        className="min-h-[52px] px-2 py-1.5 rounded-xl border-2 border-sky-400/70 bg-sky-950/75 flex flex-col items-center justify-center font-mono text-sky-200"
+                      >
+                        <span className="text-[10px] font-black">
+                          {hasOneDartCurse ? '🎯' : '❄️'} Dart {idx + 1}
+                        </span>
+                        <span className="text-[10px] font-black uppercase">
+                          {hasOneDartCurse ? 'GESPERRT' : 'EINGEFROREN'}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  const ev = ownState.currentTurnDarts[idx];
+                  const isNext = idx === ownState.currentTurnDarts.length;
+
                   return (
                     <div
                       key={idx}
-                      className="min-h-[52px] px-2 py-1.5 rounded-xl border-2 border-sky-400/70 bg-sky-950/75 flex flex-col items-center justify-center font-mono text-sky-200"
+                      className={`min-h-[52px] px-2 py-1.5 rounded-xl border flex flex-col items-center justify-center font-mono ${
+                        ev
+                          ? ev.tone === 'miss' || ev.tone === 'niete'
+                            ? 'bg-red-950/70 border-red-500/60 text-red-200'
+                            : ev.tone === 'grinch'
+                            ? 'bg-purple-500/25 border-purple-400 text-purple-100'
+                            : ev.tone === 'curse'
+                            ? 'bg-sky-500/25 border-sky-400 text-sky-100'
+                            : ev.tone === 'jackpot'
+                            ? 'bg-amber-500/25 border-amber-400 text-amber-100'
+                            : 'bg-emerald-500/20 border-emerald-400 text-emerald-100'
+                          : isNext
+                          ? 'bg-amber-500/10 border-amber-400 text-amber-300 animate-pulse'
+                          : 'bg-slate-950/60 border-white/10 text-slate-500'
+                      }`}
                     >
-                      <span className="text-[10px] font-black">❄️ Dart 3</span>
-                      <span className="text-[10px] font-black uppercase">EINGEFROREN</span>
+                      <span className="text-[10px] font-bold opacity-80">
+                        {ev ? ev.label : `Dart ${idx + 1}`}
+                      </span>
+                      <span className="text-[11px] sm:text-xs font-black truncate max-w-full">
+                        {ev ? ev.subLabel : isNext ? 'Bereit' : '•'}
+                      </span>
                     </div>
                   );
-                }
-
-                const ev = ownState.currentTurnDarts[idx];
-                const isNext = idx === ownState.currentTurnDarts.length;
-
-                return (
-                  <div
-                    key={idx}
-                    className={`min-h-[52px] px-2 py-1.5 rounded-xl border flex flex-col items-center justify-center font-mono ${
-                      ev
-                        ? ev.tone === 'miss' || ev.tone === 'niete'
-                          ? 'bg-red-950/70 border-red-500/60 text-red-200'
-                          : ev.tone === 'grinch'
-                          ? 'bg-purple-500/25 border-purple-400 text-purple-100'
-                          : ev.tone === 'curse'
-                          ? 'bg-sky-500/25 border-sky-400 text-sky-100'
-                          : ev.tone === 'jackpot'
-                          ? 'bg-amber-500/25 border-amber-400 text-amber-100'
-                          : 'bg-emerald-500/20 border-emerald-400 text-emerald-100'
-                        : isNext
-                        ? 'bg-amber-500/10 border-amber-400 text-amber-300 animate-pulse'
-                        : 'bg-slate-950/60 border-white/10 text-slate-500'
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold opacity-80">
-                      {ev ? ev.label : `Dart ${idx + 1}`}
-                    </span>
-                    <span className="text-[11px] sm:text-xs font-black truncate max-w-full">
-                      {ev ? ev.subLabel : isNext ? 'Bereit' : '•'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                })}
+              </div>
+            )}
 
             <button
               type="button"
@@ -1610,29 +1832,52 @@ export default function AdventskalenderClient({
             </button>
           </div>
 
-          {/* 4x3 Adventskalender Touch-Grid (1 bis 12) */}
-          <div className="rounded-3xl p-4 sm:p-6 bg-gradient-to-b from-[#230910]/90 via-slate-950/95 to-slate-950 border-2 border-amber-500/35 space-y-3 shadow-2xl">
+          {/* 6x4 / 4x6 Adventskalender Touch-Grid (1 bis 24) */}
+          <div className="rounded-3xl p-3.5 sm:p-5 bg-gradient-to-b from-[#230910]/90 via-slate-950/95 to-slate-950 border-2 border-amber-500/35 space-y-3 shadow-2xl">
             <div className="text-center text-xs font-mono uppercase tracking-widest text-amber-300 font-bold">
-              🎯 {ownName} wirft ({ownState.score} Pkt) — Tipp getroffenes Türchen (1–12):
+              🎯 {ownName} wirft ({ownState.score} Pkt) — Tipp getroffenes Türchen (1–24):
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 sm:gap-2.5">
               {doors.map((door) => {
+                const target = getDoorTargetLabel(door.number);
+
                 if (!door.isOpen) {
                   return (
                     <button
                       key={door.number}
                       type="button"
+                      disabled={hasSkipRoundCurse}
                       onClick={() => handleDoorHit(door.number)}
                       data-ui-id={`ADVENT.PLAY.DOOR_${door.number}`}
-                      className="min-h-[76px] sm:min-h-[88px] rounded-2xl bg-gradient-to-br from-[#450e17] via-[#260a12] to-slate-950 hover:from-[#5c1320] hover:to-slate-900 border-2 border-amber-400/65 hover:border-amber-300 shadow-lg flex flex-col items-center justify-center p-2 cursor-pointer active:scale-95 transition-all"
+                      className={`min-h-[66px] sm:min-h-[76px] rounded-2xl border-2 shadow-lg flex flex-col items-center justify-center p-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-35 disabled:cursor-not-allowed ${
+                        target.isSpecial
+                          ? 'bg-gradient-to-br from-[#231245] via-[#130e2b] to-slate-950 hover:from-[#2f1859] hover:to-slate-900 border-cyan-300/75 hover:border-cyan-200'
+                          : 'bg-gradient-to-br from-[#450e17] via-[#260a12] to-slate-950 hover:from-[#5c1320] hover:to-slate-900 border-amber-400/65 hover:border-amber-300'
+                      }`}
                     >
-                      <span className="text-2xl sm:text-3xl font-black font-mono text-amber-200 leading-none">
-                        {door.number}
-                      </span>
-                      <span className="text-[10px] font-mono font-bold text-amber-400/90 mt-1">
-                        🚪 ÖFFNEN
-                      </span>
+                      {target.isSpecial ? (
+                        <>
+                          <span className="text-[10px] font-mono font-black text-cyan-300 leading-none">
+                            #{door.number}
+                          </span>
+                          <span className="text-xs sm:text-sm font-black font-mono text-white leading-tight mt-0.5">
+                            {target.label}
+                          </span>
+                          <span className="text-[9px] font-mono font-bold text-cyan-200/85 truncate max-w-full">
+                            {target.subLabel}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl sm:text-2xl font-black font-mono text-amber-200 leading-none">
+                            {door.number}
+                          </span>
+                          <span className="text-[9px] font-mono font-bold text-amber-400/90 mt-1 truncate max-w-full">
+                            {target.subLabel}
+                          </span>
+                        </>
+                      )}
                     </button>
                   );
                 }
@@ -1646,12 +1891,16 @@ export default function AdventskalenderClient({
                   <button
                     key={door.number}
                     type="button"
+                    disabled={hasSkipRoundCurse}
                     onClick={() => handleDoorHit(door.number)}
                     data-ui-id={`ADVENT.PLAY.DOOR_${door.number}`}
-                    className={`min-h-[76px] sm:min-h-[88px] rounded-2xl border-2 ${ownerCls} opacity-75 hover:opacity-95 flex flex-col items-center justify-between p-2 cursor-pointer active:scale-95 transition-all font-mono`}
+                    className={`min-h-[66px] sm:min-h-[76px] rounded-2xl border-2 ${ownerCls} opacity-75 hover:opacity-95 flex flex-col items-center justify-between p-1.5 cursor-pointer active:scale-95 transition-all font-mono disabled:opacity-35 disabled:cursor-not-allowed`}
                   >
-                    <div className="flex items-center justify-between w-full text-[10px] font-black text-slate-400">
-                      <span>#{door.number}</span>
+                    <div className="flex items-center justify-between w-full text-[9px] sm:text-[10px] font-black text-slate-400 gap-0.5">
+                      <span className="truncate">
+                        #{door.number}
+                        {target.isSpecial ? `·${target.label}` : ''}
+                      </span>
                       {gameMode === '1vs1' && door.openedBy && (
                         <span
                           className={
@@ -1662,8 +1911,8 @@ export default function AdventskalenderClient({
                         </span>
                       )}
                     </div>
-                    <span className="text-xl leading-none">{door.reward.icon}</span>
-                    <span className="text-[10px] font-black text-slate-200 truncate max-w-full">
+                    <span className="text-lg sm:text-xl leading-none">{door.reward.icon}</span>
+                    <span className="text-[9px] sm:text-[10px] font-black text-slate-200 truncate max-w-full">
                       {door.reward.shortBadge}
                     </span>
                   </button>
@@ -1676,18 +1925,20 @@ export default function AdventskalenderClient({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
+              disabled={hasSkipRoundCurse}
               onClick={handleMiss}
               data-ui-id="ADVENT.PLAY.MISS_BTN"
-              className="min-h-[60px] px-5 py-3 rounded-2xl bg-red-600/85 hover:bg-red-500 text-white border-2 border-red-400 font-black text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98]"
+              className="min-h-[60px] px-5 py-3 rounded-2xl bg-red-600/85 hover:bg-red-500 text-white border-2 border-red-400 font-black text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98] disabled:opacity-35 disabled:cursor-not-allowed"
             >
-              <span>✕ DANEBEN (13–20 / MISS)</span>
+              <span>✕ DANEBEN (KEIN TREFFER / MISS)</span>
             </button>
 
             <button
               type="button"
+              disabled={hasSkipRoundCurse}
               onClick={handleRestMiss}
               data-ui-id="ADVENT.PLAY.REST_MISS_BTN"
-              className="min-h-[60px] px-5 py-3 rounded-2xl bg-rose-950/90 hover:bg-rose-900 text-rose-100 border-2 border-rose-500/70 font-black text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98]"
+              className="min-h-[60px] px-5 py-3 rounded-2xl bg-rose-950/90 hover:bg-rose-900 text-rose-100 border-2 border-rose-500/70 font-black text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98] disabled:opacity-35 disabled:cursor-not-allowed"
             >
               <span>✕✕✕ Restliche Darts Miss</span>
             </button>
