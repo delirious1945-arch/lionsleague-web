@@ -12,6 +12,12 @@ import {
   Trees,
   Clock,
 } from 'lucide-react';
+import {
+  isPlayerSlug,
+  getBoardDisplayName,
+  getPlayerSlug,
+  getPlayerBySlug,
+} from '@/lib/playerSlugs';
 
 interface SpecialHubClientProps {
   user: UserSession;
@@ -45,26 +51,36 @@ export default function SpecialHubClient({
   user,
   initialBoard,
 }: SpecialHubClientProps) {
+  const userSlug = user?.name ? getPlayerSlug(user.name) : null;
+  const userPlayer = userSlug ? getPlayerBySlug(userSlug) : null;
+
   const [activeBoard, setActiveBoard] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlBoard = urlParams.get('board');
-      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+      const urlBoard = urlParams.get('board')?.trim().toLowerCase();
+      if (urlBoard && (['1', '2', '3', '4', '5'].includes(urlBoard) || isPlayerSlug(urlBoard))) {
         return urlBoard;
       }
-      const saved =
+      const saved = (
         localStorage.getItem('lions_tablet_board') ||
         localStorage.getItem('lions_active_board') ||
         localStorage.getItem('lions_active_board_tannenbaum') ||
         localStorage.getItem('lions_active_board_adventskalender') ||
         localStorage.getItem('lions_active_board_rudolph') ||
         localStorage.getItem('lions_active_board_bingo') ||
-        localStorage.getItem('lions_active_board_dartsgolf');
-      if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
+        localStorage.getItem('lions_active_board_dartsgolf')
+      )?.trim().toLowerCase();
+      if (saved && (['1', '2', '3', '4', '5'].includes(saved) || isPlayerSlug(saved))) {
         return saved;
       }
+      if (userSlug) {
+        return userSlug;
+      }
     }
-    return initialBoard && ['1', '2', '3', '4', '5'].includes(initialBoard) ? initialBoard : '1';
+    const cleanInit = initialBoard?.trim().toLowerCase();
+    return cleanInit && (['1', '2', '3', '4', '5'].includes(cleanInit) || isPlayerSlug(cleanInit))
+      ? cleanInit
+      : userSlug || '1';
   });
 
   const handleSelectBoard = (b: string) => {
@@ -152,7 +168,7 @@ export default function SpecialHubClient({
             className="flex items-center gap-2 px-3.5 py-2 min-h-[44px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-400/40 text-xs font-bold transition-all shadow-sm"
           >
             <Tv className="w-4 h-4 text-cyan-400" />
-            <span>TV-Monitor Board {activeBoard}</span>
+            <span>TV-Monitor {getBoardDisplayName(activeBoard)}</span>
           </Link>
         </div>
 
@@ -161,17 +177,31 @@ export default function SpecialHubClient({
           data-ui-id="SPECIAL.BOARD.SELECTOR"
           className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-slate-900/65 backdrop-blur-xl border border-emerald-500/25 shadow-lg"
         >
-          <div className="flex items-center gap-2.5 text-xs sm:text-sm font-bold text-slate-200">
-            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/35 text-emerald-300 font-mono font-black">
-              BOARD {activeBoard}
+          <div className="flex items-center gap-2.5 text-xs sm:text-sm font-bold text-slate-200 flex-wrap">
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/35 text-emerald-300 font-mono font-black uppercase">
+              {getBoardDisplayName(activeBoard)}
             </span>
-            <span>Dieses Tablet steuert TV-Monitor Board {activeBoard}</span>
+            <span>Dieses Tablet steuert TV-Monitor: {getBoardDisplayName(activeBoard)}</span>
             <span className="hidden md:inline text-slate-400 font-normal">
               (Angemeldet: {user.name})
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {userPlayer && (
+              <button
+                type="button"
+                onClick={() => handleSelectBoard(userPlayer.slug)}
+                className={`min-h-[52px] px-3 rounded-xl font-mono text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  activeBoard === userPlayer.slug
+                    ? 'bg-emerald-500 text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.5)] scale-105'
+                    : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/30'
+                }`}
+                title={`Mein persönlicher Monitor (${userPlayer.slug.toUpperCase()})`}
+              >
+                👤 Mein Monitor ({userPlayer.slug.toUpperCase()})
+              </button>
+            )}
             {['1', '2', '3', '4', '5'].map((b) => (
               <button
                 key={b}
@@ -183,7 +213,7 @@ export default function SpecialHubClient({
                     : 'bg-slate-950/70 hover:bg-slate-800 text-slate-300 border border-white/10'
                 }`}
               >
-                B{b}
+                Board {b}
               </button>
             ))}
           </div>
@@ -215,7 +245,7 @@ export default function SpecialHubClient({
                         🎄 Lions Tannenbaum
                       </h3>
                       <span className="text-xs font-semibold text-amber-300">
-                        Inspiriert vom Tannenbaumkegeln
+                        Exklusiv-Besitz · 6/11 vs. Alle 11
                       </span>
                     </div>
                   </div>
@@ -225,20 +255,20 @@ export default function SpecialHubClient({
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                  Duell an einem <strong className="text-emerald-300">gemeinsamen Tannenbaum</strong> (Links{' '}
-                  <strong className="text-red-300">Rot</strong> vs. Rechts{' '}
-                  <strong className="text-amber-300">Gold</strong>): Bringe alle{' '}
-                  <strong className="text-emerald-300">9 Kugeln (12–20)</strong> sowie den{' '}
-                  <strong className="text-amber-300">Baumstamm (beliebiges Doppel)</strong> zum Leuchten! Sobald alle
-                  10 Lichter brennen, setzt du mit <strong className="text-amber-300">Bull oder D20</strong> den Stern
-                  auf die Spitze.
+                  Erobere vollfarbige <strong className="text-emerald-300">Exklusiv-Elemente</strong> (
+                  <strong className="text-red-300">Rot</strong> vs. <strong className="text-amber-300">Gold</strong>):
+                  9 Kugeln (12–20), der <strong className="text-amber-300">Baumstamm (beliebiges Doppel)</strong> sowie
+                  der <strong className="text-amber-300">Stern (Bull/D20, ab Start werfbar)</strong>! Wähle zwischen{' '}
+                  <strong className="text-emerald-300">6 von 11</strong> (Schnell-Duell) oder{' '}
+                  <strong className="text-amber-300">Alle 11 Elementen</strong>.
                 </p>
 
-                <div className="rounded-2xl bg-slate-950/60 border border-amber-400/25 px-3.5 py-2.5 text-xs text-amber-200/95 flex items-center gap-2">
+                <div className="rounded-2xl bg-slate-950/60 border border-orange-400/30 px-3.5 py-2.5 text-xs text-orange-200/95 flex items-center gap-2">
                   <span>🔥</span>
                   <span>
-                    <strong>Party-Clou (1-Tap):</strong> Ein direktes <strong>Triple</strong> auf eine gegnerische
-                    Kugelhälfte klaut dem Kontrahenten sofort wieder das Licht!
+                    <strong>D/T-Klau &amp; Abprall-Schutz:</strong> Freie Kugeln sicherst du mit jedem Treffer. Bei
+                    gegnerischen Kugeln prallt ein Single ab — erst <strong>Doppel oder Triple</strong> klaut sie
+                    komplett!
                   </span>
                 </div>
               </div>

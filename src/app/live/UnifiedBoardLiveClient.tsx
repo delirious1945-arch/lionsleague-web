@@ -29,6 +29,7 @@ import {
   createInitialGolfPlayerState,
   generateGolfCourse,
 } from '@/app/special/dartsgolf/types';
+import { getPlayerBySlug, isPlayerSlug } from '@/lib/playerSlugs';
 
 interface UnifiedBoardLiveProps {
   initialBoardId?: string;
@@ -71,16 +72,17 @@ function mergeIncomingLiveState(prev: UnifiedLiveState, incoming: UnifiedLiveSta
 
 export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: UnifiedBoardLiveProps) {
   const [boardId, setBoardId] = useState<string>(() => {
-    if (typeof window !== 'undefined' && initialBoardId === '1') {
+    const cleanInitial = (initialBoardId || '1').trim().toLowerCase();
+    if (typeof window !== 'undefined' && cleanInitial === '1') {
       const saved = localStorage.getItem('lions_monitor_board');
-      if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
-        return saved;
+      if (saved && (['1', '2', '3', '4', '5'].includes(saved) || isPlayerSlug(saved))) {
+        return saved.toLowerCase();
       }
     }
-    return initialBoardId;
+    return cleanInitial;
   });
   const [liveState, setLiveState] = useState<UnifiedLiveState>({
-    boardId: initialBoardId,
+    boardId: (initialBoardId || '1').trim().toLowerCase(),
     status: 'idle',
     gameType: 'idle',
     updatedAt: 0,
@@ -233,6 +235,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
   const is1vs1 = liveState.gameMode === '1vs1';
   const activePlayer = liveState.activePlayer || 1;
   const activeName = is1vs1 ? (activePlayer === 1 ? p1Name : p2Name) : p1Name;
+  const playerInfo = getPlayerBySlug(boardId);
 
   // =========================================================================
   // 1. STANDBY SCREEN (Wenn kein Spiel aktiv ist)
@@ -248,9 +251,23 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
 
         <div className="relative z-10 flex items-center justify-between w-full border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <span className="text-xl sm:text-2xl font-black tracking-wider text-cyan-400 font-mono">
-              BOARD {boardId}
-            </span>
+            {playerInfo ? (
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400 text-cyan-300 font-mono text-xs sm:text-sm font-bold tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                  PERSÖNLICHER MONITOR
+                </span>
+                <span className="text-xl sm:text-2xl font-black tracking-wider text-white font-mono uppercase">
+                  {playerInfo.name} <span className="text-cyan-400">({playerInfo.slug.toUpperCase()})</span>
+                </span>
+              </div>
+            ) : (
+              <span className="text-xl sm:text-2xl font-black tracking-wider text-cyan-400 font-mono">
+                BOARD {boardId}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 font-mono text-xs text-slate-400">
+            <span>{currentTime}</span>
           </div>
         </div>
 
@@ -261,15 +278,19 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
 
           <div className="space-y-3 max-w-xl">
             <p className="text-xl sm:text-3xl text-cyan-300 font-mono tracking-widest animate-pulse font-black drop-shadow-[0_0_20px_rgba(6,182,212,0.5)]">
-              Warte auf Spielbeginn am Board {boardId}...
+              {playerInfo
+                ? `Warte auf Spielbeginn von ${playerInfo.name}...`
+                : `Warte auf Spielbeginn am Board ${boardId}...`}
             </p>
             <span className="text-sm sm:text-base text-slate-300 block pt-1 font-medium">
-              Starte einfach ein beliebiges Spiel am Tablet. Der Bildschirm schaltet automatisch um.
+              {playerInfo
+                ? `Starte einfach am Tablet mit deinem Login (${playerInfo.name}). Dieser Bildschirm schaltet automatisch um.`
+                : `Starte einfach ein beliebiges Spiel am Tablet. Der Bildschirm schaltet automatisch um.`}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 pt-2">
-            <span className="text-xs text-slate-400 font-mono mr-2">BOARD WÄHLEN:</span>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <span className="text-xs text-slate-400 font-mono mr-2">KANAL:</span>
             {['1', '2', '3', '4', '5'].map((b) => (
               <button
                 key={b}
@@ -283,11 +304,24 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
                 {b}
               </button>
             ))}
+            {playerInfo && (
+              <button
+                key={playerInfo.slug}
+                onClick={() => handleSelectBoard(playerInfo.slug)}
+                className={`px-3 h-10 rounded-xl font-mono text-sm font-black transition-all cursor-pointer ${
+                  boardId === playerInfo.slug
+                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.6)] scale-105'
+                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10'
+                }`}
+              >
+                {playerInfo.slug.toUpperCase()}
+              </button>
+            )}
           </div>
         </div>
 
         <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 font-mono border-t border-white/10 pt-4">
-          <span>AUTO-SWITCHING LIVE BOARD</span>
+          <span>{playerInfo ? `PERSÖNLICHER MONITOR · ${playerInfo.slug.toUpperCase()}` : 'AUTO-SWITCHING LIVE BOARD'}</span>
           <span>CHECKOUT BATTLE · PDC CHALLENGE · FUßBALL · STELLEN &amp; CHECKEN · SCORING-LEITER · 99 DARTS</span>
         </div>
       </div>
@@ -321,7 +355,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
           </div>
           <div className="flex items-center gap-2 sm:gap-3 px-5 py-2 rounded-full bg-slate-900/60 backdrop-blur-2xl border border-cyan-400/40 shadow-[0_0_25px_rgba(6,182,212,0.3)]">
             <span className="text-xs sm:text-sm font-black font-mono tracking-wider text-cyan-300">
-              BOARD {boardId}
+              {playerInfo ? `${playerInfo.slug.toUpperCase()} · ${playerInfo.name}` : `BOARD ${boardId}`}
             </span>
             <span className="text-slate-500">•</span>
             <span className="text-xs sm:text-sm font-black tracking-wider text-white uppercase">
@@ -569,6 +603,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         roundNumber={Number(tb.roundNumber || liveState.currentRound || 1)}
         tripleExtinguishEnabled={tb.tripleExtinguishEnabled ?? true}
         starTarget={tb.starTarget === 'D20' ? 'D20' : 'BULL'}
+        winCondition={tb.winCondition === 'all_11' ? 'all_11' : 'majority_6'}
         p1={tb.p1 || fallbackPlayer}
         p2={tb.p2 || fallbackPlayer}
         lastAction={tb.lastAction ?? null}

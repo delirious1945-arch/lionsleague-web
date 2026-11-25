@@ -10,6 +10,8 @@ export const TANNENBAUM_ROWS: readonly (readonly TannenbaumBallNumber[])[] = [
 
 export type TannenbaumStarTarget = 'BULL' | 'D20';
 
+export type TannenbaumWinCondition = 'all_11' | 'majority_6';
+
 export type TannenbaumNodeId =
   | 'STAR'
   | 'TRUNK'
@@ -33,15 +35,22 @@ export interface TannenbaumDartEvent {
   kind:
     | 'ball_lit'
     | 'ball_already_lit'
+    | 'ball_blocked_single'
+    | 'ball_stolen'
     | 'triple_extinguish'
     | 'triple_double_hit'
     | 'trunk_lit'
+    | 'trunk_stolen'
     | 'trunk_already_lit'
+    | 'star_lit'
+    | 'star_stolen'
+    | 'star_already_lit'
     | 'star_win'
     | 'miss';
   label: string;
   target?: TannenbaumNodeId;
   isTriple?: boolean;
+  isDouble?: boolean;
   extinguishedOpponentBall?: TannenbaumBallNumber | null;
 }
 
@@ -67,6 +76,7 @@ export interface TannenbaumLastActionBanner {
 export interface TannenbaumLiveData {
   tripleExtinguishEnabled: boolean;
   starTarget: TannenbaumStarTarget;
+  winCondition?: TannenbaumWinCondition;
   roundNumber: number;
   p1: TannenbaumPlayerState;
   p2: TannenbaumPlayerState;
@@ -129,6 +139,27 @@ export function countTotalLit(tree: TannenbaumTreeState): number {
  */
 export function isStarUnlocked(tree: TannenbaumTreeState): boolean {
   return countLitBaseElements(tree) === 10;
+}
+
+/**
+ * Liefert die benötigte Anzahl erleuchteter Exklusiv-Elemente zum Sieg (6 von 11 oder 11 von 11).
+ */
+export function getRequiredLitToWin(
+  winCondition: TannenbaumWinCondition,
+  is1vs1: boolean
+): number {
+  return is1vs1 && winCondition === 'majority_6' ? 6 : 11;
+}
+
+/**
+ * Prüft anhand der gewählten Siegbedingung, ob der Spieler den Tannenbaum gewonnen hat.
+ */
+export function hasPlayerWonTree(
+  tree: TannenbaumTreeState,
+  winCondition: TannenbaumWinCondition,
+  is1vs1: boolean
+): boolean {
+  return countTotalLit(tree) >= getRequiredLitToWin(winCondition, is1vs1);
 }
 
 /**
