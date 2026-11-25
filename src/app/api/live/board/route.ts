@@ -204,6 +204,51 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, state: idlePayload });
     }
 
+    // 1b. Schutz vor leeren Heartbeats: niemals Spielernamen oder Spielstand überschreiben
+    const isBareHeartbeat =
+      data.heartbeat === true ||
+      (!data.p1Name &&
+        !data.doppelquoteData &&
+        !data.pdcData &&
+        !data.fussballData &&
+        !data.stellenCheckenData &&
+        !data.darts99Data &&
+        !data.tannenbaumData &&
+        !data.adventskalenderData &&
+        !data.rudolphData &&
+        !data.bingoData &&
+        !data.dartsgolfData &&
+        !data.dartsrallyData);
+
+    if (isBareHeartbeat) {
+      try {
+        await sql`
+          UPDATE board_live_sessions
+          SET updated_at = ${now},
+              payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('updatedAt', ${now}::bigint)
+          WHERE board_id = ${boardId}
+            AND session_id = ${sessionId}
+            AND game_type = ${gameType};
+        `;
+      } catch (dbErr) {
+        console.error('Database heartbeat error in /api/live/board:', dbErr);
+      }
+
+      const existingFallback = inMemoryFallback[boardId];
+      if (
+        existingFallback &&
+        existingFallback.sessionId === sessionId &&
+        existingFallback.gameType === gameType
+      ) {
+        inMemoryFallback[boardId] = {
+          ...existingFallback,
+          updatedAt: now,
+        };
+      }
+
+      return NextResponse.json({ ok: true, heartbeat: true });
+    }
+
     // 2. Aktives Spiel-Update mit sauberem Snapshot (kein Vermischen mit alten Spieldaten!)
     const payload: UnifiedLiveState = {
       ...data,

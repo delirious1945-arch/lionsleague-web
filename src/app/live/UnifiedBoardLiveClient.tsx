@@ -69,6 +69,21 @@ function mergeIncomingLiveState(prev: UnifiedLiveState, incoming: UnifiedLiveSta
     return prev;
   }
 
+  // 3. Schutz vor teilweisen / leeren Heartbeats: niemals bekannte Namen/Spieldaten überschreiben
+  if (
+    prev.status === 'playing' &&
+    prev.sessionId === incoming.sessionId &&
+    prev.gameType === incoming.gameType &&
+    (!incoming.p1Name || (incoming as any).heartbeat === true)
+  ) {
+    return {
+      ...prev,
+      ...incoming,
+      p1Name: incoming.p1Name || prev.p1Name,
+      p2Name: incoming.p2Name || prev.p2Name,
+    };
+  }
+
   return incoming;
 }
 
@@ -232,7 +247,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     return () => clearInterval(watchdog);
   }, [boardId]);
 
-  const p1Name = (liveState.p1Name || 'Sebastian Kirsch').trim();
+  const p1Name = (liveState.p1Name || 'Spieler 1').trim();
   const p2Name = (liveState.p2Name || 'Gastspieler').trim();
   const is1vs1 = liveState.gameMode === '1vs1';
   const activePlayer = liveState.activePlayer || 1;

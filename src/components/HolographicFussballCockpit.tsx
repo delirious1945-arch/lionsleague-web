@@ -106,7 +106,7 @@ function parseOpponentName(rawName: string, aiLevel?: string) {
 export default function HolographicFussballCockpit({
   boardId,
   boardLabel,
-  p1Name = 'Sebastian Kirste',
+  p1Name = 'Spieler 1',
   p2Name = 'Gegner',
   scoreP1,
   scoreP2,

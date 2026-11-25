@@ -146,7 +146,7 @@ export default function DoppelquoteLiveMonitorClient({ initialBoardId = '1' }: D
   const curTarget = liveState.currentTarget || 'D20';
   const targetInfo = TARGET_ANGLES[curTarget] || TARGET_ANGLES.D20;
   const is1vs1 = liveState.gameMode === '1vs1';
-  const rawP1Name = (liveState.p1Name || 'Sebastian Kirsch').trim();
+  const rawP1Name = (liveState.p1Name || 'Spieler 1').trim();
   const rawP2Name = (liveState.p2Name || 'Gastspieler').trim();
 
   // Name in Vorname und Nachname teilen für zweizeiligen Look wie im Entwurf

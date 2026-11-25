@@ -117,7 +117,7 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
     return () => clearInterval(interval);
   }, [boardId]);
 
-  const rawP1Name = (liveState.p1Name || 'Sebastian Kirsch').trim();
+  const rawP1Name = (liveState.p1Name || 'Spieler 1').trim();
   const rawP2Name = (liveState.p2Name || 'Bot-Gegner').trim();
   const scoreP1 = liveState.scoreP1 ?? 0;
   const scoreP2 = liveState.scoreP2 ?? 0;

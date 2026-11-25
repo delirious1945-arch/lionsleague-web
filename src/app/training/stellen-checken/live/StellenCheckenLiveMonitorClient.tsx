@@ -120,7 +120,7 @@ export default function StellenCheckenLiveMonitorClient({ initialBoardId = '1' }
     return () => clearInterval(interval);
   }, [boardId]);
 
-  const rawP1Name = (liveState.p1Name || 'Sebastian Kirsch').trim();
+  const rawP1Name = (liveState.p1Name || 'Spieler 1').trim();
   const rawP2Name = (liveState.p2Name || 'Gastspieler').trim();
   const is1vs1 = liveState.gameMode === '1vs1';
   const activePlayer = liveState.activePlayer || 1;

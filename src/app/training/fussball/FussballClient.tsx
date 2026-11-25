@@ -307,24 +307,37 @@ export default function FussballClient({ players, initialHistory, currentUser }:
     };
   }, [sendStandbySignal]);
 
-  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten
+  const latestLivePayloadRef = useRef<any>(null);
+
+  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten (mit vollständigem Snapshot!)
   useEffect(() => {
     if (!isGameStarted || gameOver) return;
     const interval = setInterval(() => {
+      const effectiveP2Name =
+        gameMode === '1vsComputer'
+          ? `Computer (${DIFFICULTY_CONFIGS[computerDifficulty].name})`
+          : p2Name;
+      const heartbeatPayload = latestLivePayloadRef.current
+        ? { ...latestLivePayloadRef.current, updatedAt: Date.now() }
+        : {
+            boardId: activeBoard,
+            sessionId: gameSessionId,
+            status: 'playing',
+            gameType: 'fussball',
+            gameMode,
+            p1Name,
+            p2Name: effectiveP2Name,
+            heartbeat: true,
+            updatedAt: Date.now(),
+          };
       fetch('/api/live/board', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boardId: activeBoard,
-          sessionId: gameSessionId,
-          status: 'playing',
-          gameType: 'fussball',
-          updatedAt: Date.now(),
-        }),
+        body: JSON.stringify(heartbeatPayload),
       }).catch(() => {});
     }, 4000);
     return () => clearInterval(interval);
-  }, [isGameStarted, gameOver, activeBoard, gameSessionId]);
+  }, [isGameStarted, gameOver, activeBoard, gameSessionId, gameMode, p1Name, p2Name, computerDifficulty]);
 
   // Live Sync Push
   useEffect(() => {
@@ -348,6 +361,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
       winner: gameOver ? (p1Goals >= targetGoals ? p1Name : (gameMode === '1vsComputer' ? 'Computer' : p2Name)) : undefined,
       updatedAt: Date.now(),
     };
+    latestLivePayloadRef.current = payload;
 
     try {
       liveBroadcastRef.current?.postMessage(payload);

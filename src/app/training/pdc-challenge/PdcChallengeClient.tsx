@@ -371,24 +371,33 @@ export default function PdcChallengeClient({
     };
   }, [sendStandbySignal]);
 
-  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten
+  const latestLivePayloadRef = useRef<any>(null);
+
+  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten (mit vollständigem Snapshot!)
   useEffect(() => {
     if (!isPlaying || isCompleted) return;
     const interval = setInterval(() => {
+      const heartbeatPayload = latestLivePayloadRef.current
+        ? { ...latestLivePayloadRef.current, updatedAt: Date.now() }
+        : {
+            boardId: activeBoard,
+            sessionId: gameSessionId,
+            status: 'playing',
+            gameType: 'pdc_challenge',
+            gameMode,
+            p1Name,
+            p2Name,
+            heartbeat: true,
+            updatedAt: Date.now(),
+          };
       fetch('/api/live/board', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boardId: activeBoard,
-          sessionId: gameSessionId,
-          status: 'playing',
-          gameType: 'pdc_challenge',
-          updatedAt: Date.now(),
-        }),
+        body: JSON.stringify(heartbeatPayload),
       }).catch(() => {});
     }, 4000);
     return () => clearInterval(interval);
-  }, [isPlaying, isCompleted, activeBoard, gameSessionId]);
+  }, [isPlaying, isCompleted, activeBoard, gameSessionId, gameMode, p1Name, p2Name]);
 
   // Live Sync Push
   useEffect(() => {
@@ -436,6 +445,7 @@ export default function PdcChallengeClient({
       p2Score: p2Stats.totalScore,
       updatedAt: Date.now(),
     };
+    latestLivePayloadRef.current = payload;
 
     try {
       liveBroadcastRef.current?.postMessage(payload);

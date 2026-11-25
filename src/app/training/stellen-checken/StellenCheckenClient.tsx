@@ -278,24 +278,33 @@ export default function StellenCheckenClient({
     };
   }, [sendStandbySignal]);
 
-  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten
+  const latestLivePayloadRef = useRef<any>(null);
+
+  // Heartbeat alle 4 Sekunden während aktiven Spiels, um Monitor-Watchdog frisch zu halten (mit vollständigem Snapshot!)
   useEffect(() => {
     if (!isGameStarted || isGameFinished) return;
     const interval = setInterval(() => {
+      const heartbeatPayload = latestLivePayloadRef.current
+        ? { ...latestLivePayloadRef.current, updatedAt: Date.now() }
+        : {
+            boardId: activeBoard,
+            sessionId: gameSessionId,
+            status: 'playing',
+            gameType: 'stellen_checken',
+            gameMode,
+            p1Name,
+            p2Name,
+            heartbeat: true,
+            updatedAt: Date.now(),
+          };
       fetch('/api/live/board', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boardId: activeBoard,
-          sessionId: gameSessionId,
-          status: 'playing',
-          gameType: 'stellen_checken',
-          updatedAt: Date.now(),
-        }),
+        body: JSON.stringify(heartbeatPayload),
       }).catch(() => {});
     }, 4000);
     return () => clearInterval(interval);
-  }, [isGameStarted, isGameFinished, activeBoard, gameSessionId]);
+  }, [isGameStarted, isGameFinished, activeBoard, gameSessionId, gameMode, p1Name, p2Name]);
 
   // Live-Sync State-Broadcaster: Sendet sofort & verzögerungsfrei an /api/live/board
   const broadcastLiveState = (
@@ -339,6 +348,7 @@ export default function StellenCheckenClient({
       presetId: presetIdToUse,
       updatedAt: Date.now(),
     };
+    latestLivePayloadRef.current = payload;
 
     try {
       liveBroadcastRef.current?.postMessage(payload);
