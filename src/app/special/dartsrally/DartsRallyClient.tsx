@@ -122,6 +122,14 @@ export default function DartsRallyClient({
   const [controlTeam, setControlTeam] = useState<RallyTeamNumber>(1);
   const [savedSession, setSavedSession] = useState<SavedRallySession | null>(null);
 
+  // Radar für Tablet 2: Laufendes Rennen auf dem eigenen Board aufspüren
+  const [discoveredLiveRally, setDiscoveredLiveRally] = useState<{
+    serverState: RallyLiveState;
+    detectedOnBoard: string;
+    recommendedTeam: RallyTeamNumber;
+  } | null>(null);
+  const [dismissedSessionId, setDismissedSessionId] = useState<string | null>(null);
+
   // Eingabe & Effekte (Ausschließlich vergrößertes Numpad)
   const [scoreInput, setScoreInput] = useState<string>('');
   const [selectedItem, setSelectedItem] = useState<RallyItemType | null>(null);
@@ -130,13 +138,27 @@ export default function DartsRallyClient({
   const [effectEvent, setEffectEvent] = useState<RallyEventBanner | null>(null);
   const lastEventIdRef = useRef<string | null>(null);
 
-  // Initiales Board & Crash-/Wisch-Schutz prüfen
+  // Initiales Board & Crash-/Wisch-Schutz & URL-Parameter prüfen
   useEffect(() => {
     try {
-      const savedBoard = localStorage.getItem('lions_active_board');
-      if (savedBoard && ['1', '2', '3', '4', '5'].includes(savedBoard)) {
-        setBoardId(savedBoard);
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlBoard = searchParams.get('board')?.trim();
+      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+        setBoardId(urlBoard);
+        if (urlBoard === '2') {
+          setControlTeam(2);
+          setBoard2Id('2');
+        } else if (urlBoard === '1') {
+          setControlTeam(1);
+          setBoard1Id('1');
+        }
+      } else {
+        const savedBoard = localStorage.getItem('lions_active_board');
+        if (savedBoard && ['1', '2', '3', '4', '5'].includes(savedBoard)) {
+          setBoardId(savedBoard);
+        }
       }
+
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as SavedRallySession;
@@ -148,27 +170,6 @@ export default function DartsRallyClient({
       }
     } catch {}
   }, []);
-
-  // 250ms-Takt für Buff-/Debuff-Countdowns
-  useEffect(() => {
-    if (phase !== 'racing') return;
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
-  }, [phase]);
-
-  // Item-Effekt-Overlay triggern
-  useEffect(() => {
-    const incoming = rally.lastEvent;
-    if (!incoming?.id || incoming.id === lastEventIdRef.current) return;
-    lastEventIdRef.current = incoming.id;
-    setEffectEvent(incoming);
-  }, [rally.lastEvent]);
-
-  useEffect(() => {
-    if (!effectEvent) return;
-    const timer = setTimeout(() => setEffectEvent(null), 2600);
-    return () => clearTimeout(timer);
-  }, [effectEvent]);
 
   const persistSession = useCallback(
     (nextRally: RallyLiveState, nextHistory: RallyLiveState[], nextTeam: RallyTeamNumber) => {
@@ -228,6 +229,126 @@ export default function DartsRallyClient({
     },
     [board1Id, board2Id, boardId]
   );
+
+  // 1. SETUP-RADAR: Fragt alle 1.5s ab, ob auf diesem Board bereits ein Rennen gestartet wurde (Tablet 2 Auto-Find)
+  useEffect(() => {
+    if (phase !== 'setup') return;
+    let isCancelled = false;
+
+    const checkLiveRadar = async () => {
+      try {
+        const res = await fetch(`/api/live/board?board=${boardId}&t=${Date.now()}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (
+          !isCancelled &&
+          data.gameType === 'dartsrally' &&
+          data.status === 'playing' &&
+          data.dartsrallyData
+        ) {
+          const srv = data.dartsrallyData as RallyLiveState;
+          if (srv.sessionId && srv.sessionId !== dismissedSessionId && !srv.winnerTeam) {
+            let recTeam: RallyTeamNumber = 1;
+            if (srv.board2Id === boardId) {
+              recTeam = 2;
+            } else if (srv.board1Id === boardId) {
+              recTeam = 1;
+            } else {
+              recTeam = boardId === '2' ? 2 : 1;
+            }
+            setDiscoveredLiveRally({
+              serverState: srv,
+              detectedOnBoard: boardId,
+              recommendedTeam: recTeam,
+            });
+          }
+        }
+      } catch {}
+    };
+
+    void checkLiveRadar();
+    const interval = setInterval(checkLiveRadar, 1500);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [phase, boardId, dismissedSessionId]);
+
+  // 2. BIDIREKTIONALER LIVE-SYNC WÄHREND DES RENNENS: Fragt jede Sekunde den Server nach Updates vom gegnerischen Tablet ab
+  useEffect(() => {
+    if (phase !== 'racing' || rally.winnerTeam) return;
+    let isCancelled = false;
+
+    const syncFromServer = async () => {
+      try {
+        const targetBoard =
+          controlTeam === 1
+            ? (rally.board1Id || board1Id)
+            : (rally.board2Id || board2Id);
+
+        const res = await fetch(`/api/live/board?board=${targetBoard}&t=${Date.now()}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (
+          !isCancelled &&
+          data.gameType === 'dartsrally' &&
+          data.dartsrallyData
+        ) {
+          const srv = data.dartsrallyData as RallyLiveState;
+          if (srv.sessionId === rally.sessionId) {
+            const hasServerChange =
+              srv.team1.score !== rally.team1.score ||
+              srv.team2.score !== rally.team2.score ||
+              srv.team1.totalDartsThrown !== rally.team1.totalDartsThrown ||
+              srv.team2.totalDartsThrown !== rally.team2.totalDartsThrown ||
+              srv.winnerTeam !== rally.winnerTeam ||
+              srv.activeTeam !== rally.activeTeam ||
+              Boolean(srv.lastEvent?.id && srv.lastEvent.id !== rally.lastEvent?.id);
+
+            if (hasServerChange) {
+              setRally(srv);
+              persistSession(srv, history, controlTeam);
+              if (srv.lastEvent?.id && srv.lastEvent.id !== lastEventIdRef.current) {
+                lastEventIdRef.current = srv.lastEvent.id;
+                setEffectEvent(srv.lastEvent);
+              }
+            }
+          }
+        }
+      } catch {}
+    };
+
+    const poll = setInterval(syncFromServer, 1000);
+    return () => {
+      isCancelled = true;
+      clearInterval(poll);
+    };
+  }, [phase, rally, controlTeam, board1Id, board2Id, history, persistSession]);
+
+  // 250ms-Takt für Buff-/Debuff-Countdowns
+  useEffect(() => {
+    if (phase !== 'racing') return;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // Item-Effekt-Overlay triggern
+  useEffect(() => {
+    const incoming = rally.lastEvent;
+    if (!incoming?.id || incoming.id === lastEventIdRef.current) return;
+    lastEventIdRef.current = incoming.id;
+    setEffectEvent(incoming);
+  }, [rally.lastEvent]);
+
+  useEffect(() => {
+    if (!effectEvent) return;
+    const timer = setTimeout(() => setEffectEvent(null), 2600);
+    return () => clearTimeout(timer);
+  }, [effectEvent]);
 
   // 12s Heartbeat
   useEffect(() => {
@@ -326,6 +447,30 @@ export default function DartsRallyClient({
     setScoreInput('');
     setSelectedItem(null);
     setError('');
+  };
+
+  const handleJoinDiscoveredRally = (discovered: {
+    serverState: RallyLiveState;
+    detectedOnBoard: string;
+    recommendedTeam: RallyTeamNumber;
+  }) => {
+    lastEventIdRef.current = discovered.serverState.lastEvent?.id || null;
+    setRally(discovered.serverState);
+    setHistory([]);
+    setBoardId(discovered.detectedOnBoard);
+    setBoard1Id(discovered.serverState.board1Id || '1');
+    setBoard2Id(discovered.serverState.board2Id || '2');
+    setMode(discovered.serverState.gameMode || 'board_vs_board');
+    setTargetDistance(discovered.serverState.targetDistance || 1000);
+    setControlTeam(discovered.recommendedTeam);
+    setDiscoveredLiveRally(null);
+    setPhase('racing');
+    persistSession(discovered.serverState, [], discovered.recommendedTeam);
+  };
+
+  const handleDismissDiscoveredRally = (sessionId: string) => {
+    setDismissedSessionId(sessionId);
+    setDiscoveredLiveRally(null);
   };
 
   const handleRematch = () => {
@@ -500,6 +645,40 @@ export default function DartsRallyClient({
 
       {phase === 'setup' ? (
         <div className="dr-setup-wrap">
+          {/* Radar-Banner für Tablet 2 Auto-Join */}
+          {discoveredLiveRally && (
+            <div className="dr-live-radar-banner">
+              <div className="radar-info">
+                <span className="radar-badge">📡 LIVE-RENNEN GEFUNDEN</span>
+                <h3>
+                  {discoveredLiveRally.serverState.team1.teamName} (TV {discoveredLiveRally.serverState.board1Id || '1'})
+                  {' '}vs.{' '}
+                  {discoveredLiveRally.serverState.team2.teamName} (TV {discoveredLiveRally.serverState.board2Id || '2'})
+                </h3>
+                <p>
+                  Ziel: {discoveredLiveRally.serverState.targetDistance.toLocaleString('de-DE')} Punkte ·{' '}
+                  Stand: 🔴 {discoveredLiveRally.serverState.team1.score} : 🟡 {discoveredLiveRally.serverState.team2.score} Pkt
+                </p>
+              </div>
+              <div className="radar-actions">
+                <button
+                  type="button"
+                  onClick={() => handleJoinDiscoveredRally(discoveredLiveRally)}
+                  className="dr-btn-radar-join"
+                >
+                  ▶ Als {discoveredLiveRally.recommendedTeam === 1 ? discoveredLiveRally.serverState.team1.teamName : discoveredLiveRally.serverState.team2.teamName} beitreten
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDismissDiscoveredRally(discoveredLiveRally.serverState.sessionId)}
+                  className="dr-btn-radar-dismiss"
+                >
+                  ✕ Ignorieren
+                </button>
+              </div>
+            </div>
+          )}
+
           {savedSession && (
             <div className="dr-resume-banner">
               <div>

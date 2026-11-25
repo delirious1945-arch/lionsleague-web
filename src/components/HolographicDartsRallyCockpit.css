@@ -794,6 +794,82 @@
   color: #fde68a;
 }
 
+.dr-rally-root .dr-live-radar-banner {
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  border: 1px solid #10b981;
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.92), rgba(6, 36, 28, 0.96));
+  box-shadow: 0 0 35px rgba(16, 185, 129, 0.3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dr-rally-root .dr-live-radar-banner .radar-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.2);
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.dr-rally-root .dr-live-radar-banner h3 {
+  margin: 0;
+  font: italic 900 22px/1.1 'Barlow Condensed', sans-serif;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dr-rally-root .dr-live-radar-banner p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #d1fae5;
+}
+
+.dr-rally-root .dr-live-radar-banner .radar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dr-rally-root .dr-btn-radar-join {
+  min-height: 52px;
+  padding: 0 24px;
+  border: 1px solid #34d399;
+  color: #064e3b;
+  background: #34d399;
+  font: 800 16px 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.45);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dr-rally-root .dr-btn-radar-join:hover {
+  background: #6ee7b7;
+  transform: translateY(-1px);
+}
+
+.dr-rally-root .dr-btn-radar-dismiss {
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #d1fae5;
+  background: transparent;
+  font: 700 13px 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .dr-rally-root .tablet-stage.is-compact {
   padding: 8px 10px 12px;
   max-width: 960px;
@@ -2190,7 +2266,83 @@
     grid-template-columns: 1fr;
   }
 
-  .dr-rally-root .tablet-stage.is-compact {
+  .dr-rally-root .dr-live-radar-banner {
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  border: 1px solid #10b981;
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.92), rgba(6, 36, 28, 0.96));
+  box-shadow: 0 0 35px rgba(16, 185, 129, 0.3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dr-rally-root .dr-live-radar-banner .radar-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.2);
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.dr-rally-root .dr-live-radar-banner h3 {
+  margin: 0;
+  font: italic 900 22px/1.1 'Barlow Condensed', sans-serif;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dr-rally-root .dr-live-radar-banner p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #d1fae5;
+}
+
+.dr-rally-root .dr-live-radar-banner .radar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dr-rally-root .dr-btn-radar-join {
+  min-height: 52px;
+  padding: 0 24px;
+  border: 1px solid #34d399;
+  color: #064e3b;
+  background: #34d399;
+  font: 800 16px 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.45);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dr-rally-root .dr-btn-radar-join:hover {
+  background: #6ee7b7;
+  transform: translateY(-1px);
+}
+
+.dr-rally-root .dr-btn-radar-dismiss {
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #d1fae5;
+  background: transparent;
+  font: 700 13px 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.dr-rally-root .tablet-stage.is-compact {
   padding: 8px 10px 12px;
   max-width: 960px;
   margin: 0 auto;
