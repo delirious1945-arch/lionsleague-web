@@ -269,7 +269,7 @@ export default function HolographicTannenbaumCockpit({
         <div className="player-card__inner">
           <div className="player-kicker">
             <span>Spieler 0{playerNum}</span>
-            <i />
+            <i className={isAct ? 'active-dot' : undefined} />
             {isWinner ? 'Sieger' : isAct ? 'Am Wurf' : 'Bereit'}
           </div>
 
@@ -397,16 +397,6 @@ export default function HolographicTannenbaumCockpit({
 
   const bannerNodeBadge = formatNodeBadge(lastAction?.affectedNode, starTarget);
   const bannerModifier = getBannerModifier(lastAction);
-
-  const bullSubLabel = starExt
-    ? 'Geklaut'
-    : starOwner === 1
-    ? is1vs1
-      ? p1First
-      : 'Erobert'
-    : starOwner === 2
-    ? p2First
-    : 'Start';
 
   const trunkOwnerLabel =
     trunkOwner === 1
@@ -597,7 +587,6 @@ export default function HolographicTannenbaumCockpit({
                 />
               </svg>
               <div className="bull-content">
-                <span>{bullSubLabel}</span>
                 <b>{starTarget}</b>
               </div>
             </div>

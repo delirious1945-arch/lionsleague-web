@@ -511,6 +511,25 @@
   background: currentColor;
 }
 
+.tb-lodge-root .player-kicker i.active-dot {
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 10px currentColor;
+  animation: tb-dot-ping 1.6s ease-in-out infinite;
+}
+
+@keyframes tb-dot-ping {
+  50% {
+    opacity: .45;
+    transform: scale(1.25);
+  }
+}
+
+.tb-lodge-root .player-card.is-active .player-kicker {
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .tb-lodge-root .player-card--red.is-active .player-kicker {
   color: #ee6669;
 }
@@ -528,6 +547,30 @@
   flex-direction: column;
   margin-top: 31px;
   line-height: .98;
+  transition: background .3s ease, border-color .3s ease;
+}
+
+.tb-lodge-root .player-card.is-active .player-name {
+  padding: 10px 14px;
+  margin-inline: -14px;
+  border-left: 4px solid var(--red);
+  background: linear-gradient(90deg, rgba(233, 75, 80, .18), transparent 90%);
+  border-radius: 0 6px 6px 0;
+}
+
+.tb-lodge-root .player-card--gold.is-active .player-name {
+  border-left-color: var(--gold);
+  background: linear-gradient(90deg, rgba(201, 162, 79, .2), transparent 90%);
+}
+
+.tb-lodge-root .player-card--red.is-active .player-name strong {
+  color: #ffffff;
+  text-shadow: 0 0 24px rgba(240, 80, 85, .65);
+}
+
+.tb-lodge-root .player-card--gold.is-active .player-name strong {
+  color: #fff9e6;
+  text-shadow: 0 0 24px rgba(226, 192, 108, .65);
 }
 
 .tb-lodge-root .player-name strong {
@@ -802,7 +845,8 @@
   flex: 1;
   min-height: 400px;
   max-height: 580px;
-  margin-top: 8px;
+  margin-top: 32px;
+  margin-bottom: 10px;
 }
 
 .tb-lodge-root .tree-board::before {
@@ -816,13 +860,13 @@
 .tb-lodge-root .bull {
   position: absolute;
   z-index: 4;
-  top: -2%;
+  top: -3%;
   left: 50%;
   width: 94px;
   height: 94px;
   display: grid;
   place-items: center;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   background: transparent;
   border: none;
   transition: filter .3s ease, transform .3s ease;
@@ -845,25 +889,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-top: 6px;
+  padding-top: 5px;
   text-align: center;
   text-shadow: 0 2px 6px rgba(0, 0, 0, .85);
 }
 
-.tb-lodge-root .bull-content span {
-  max-width: 54px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #e6cf96;
-  font: 600 8px 'DM Mono', monospace;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
 .tb-lodge-root .bull-content b {
   color: #ffffff;
-  font: 800 13px/1.05 'DM Mono', monospace;
+  font: 800 16px/1 'DM Mono', monospace;
   letter-spacing: .04em;
   text-transform: uppercase;
 }
@@ -1011,34 +1044,46 @@
 .tb-lodge-root .rule-tag {
   position: absolute;
   left: 50%;
-  bottom: 3%;
+  bottom: 0%;
   transform: translateX(-50%);
+  width: 96px;
+  min-height: 112px;
+  padding: 12px 10px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  border: 1px solid rgba(221, 178, 74, .42);
-  color: #a1a5a1;
-  background: rgba(7, 9, 9, .84);
+  justify-content: center;
+  gap: 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(225, 198, 139, .58);
+  color: #d6c7a8;
+  background:
+    radial-gradient(circle at 35% 22%, rgba(255, 255, 255, .2), transparent 24%),
+    radial-gradient(circle at 40% 30%, #5b4932, #171613 58%, #050606 100%);
+  box-shadow: 0 7px 18px rgba(0, 0, 0, .7), inset -6px -8px 14px rgba(0, 0, 0, .45), inset 3px 3px 10px rgba(255, 225, 162, .08);
   backdrop-filter: blur(10px);
-  font: 500 7px 'DM Mono', monospace;
+  font: 600 10px 'DM Mono', monospace;
   letter-spacing: .14em;
   text-transform: uppercase;
+  text-align: center;
   white-space: nowrap;
   transition: border-color .3s ease, background .3s ease, box-shadow .3s ease;
 }
 
 .tb-lodge-root .rule-tag strong {
-  color: #e0c479;
-  font-size: 8px;
-  font-weight: 700;
+  color: #f3e4bd;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .06em;
 }
 
 .tb-lodge-root .rule-tag.is-p1 {
-  border-color: rgba(239, 80, 82, .75);
-  background: rgba(82, 12, 16, .88);
+  border-color: #ff6a65;
+  background:
+    radial-gradient(circle at 35% 22%, rgba(255, 255, 255, .36), transparent 22%),
+    radial-gradient(circle at 40% 30%, #ef6b62, #a21f28 60%, #3e090d);
   color: #fecaca;
-  box-shadow: 0 0 24px rgba(233, 75, 80, .42);
+  box-shadow: 0 0 0 4px rgba(224, 67, 70, .14), 0 0 28px rgba(237, 70, 71, .68);
 }
 
 .tb-lodge-root .rule-tag.is-p1 strong {
@@ -1046,10 +1091,12 @@
 }
 
 .tb-lodge-root .rule-tag.is-p2 {
-  border-color: rgba(235, 194, 92, .78);
-  background: rgba(74, 52, 12, .88);
+  border-color: #f4d27a;
+  background:
+    radial-gradient(circle at 35% 22%, rgba(255, 255, 255, .36), transparent 22%),
+    radial-gradient(circle at 40% 30%, #f5d27a, #b78122 60%, #422806);
   color: #fef08a;
-  box-shadow: 0 0 24px rgba(201, 162, 79, .42);
+  box-shadow: 0 0 0 4px rgba(201, 162, 79, .16), 0 0 28px rgba(219, 177, 78, .68);
 }
 
 .tb-lodge-root .rule-tag.is-p2 strong {
@@ -1063,12 +1110,12 @@
 
 .tb-lodge-root .capture-banner {
   width: min(100%, 600px);
-  min-height: 84px;
+  min-height: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 17px;
-  padding: 13px 24px;
+  padding: 16px 26px;
   border: 1px solid rgba(210, 176, 94, .42);
   background: linear-gradient(100deg, rgba(15, 18, 17, .88), rgba(32, 26, 18, .82), rgba(15, 18, 17, .88));
   backdrop-filter: blur(18px);
@@ -1129,21 +1176,23 @@
 
 .tb-lodge-root .capture-banner span {
   color: #d5bb79;
-  font: 500 8px 'DM Mono', monospace;
-  letter-spacing: .17em;
+  font: 700 clamp(13px, 1.15vw, 17px) 'DM Mono', monospace;
+  letter-spacing: .12em;
   text-transform: uppercase;
 }
 
 .tb-lodge-root .capture-banner strong {
   color: #f7f2e7;
-  font: 500 24px/1 'DM Mono', monospace;
+  font: 700 clamp(26px, 2.2vw, 34px)/1 'DM Mono', monospace;
 }
 
 .tb-lodge-root .capture-banner p {
   grid-column: 1 / -1;
-  margin: 5px 0 0;
-  color: #a5aaa5;
-  font-size: 10px;
+  margin: 6px 0 0;
+  color: #e2e4df;
+  font-size: clamp(13px, 1.15vw, 17px);
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .tb-lodge-root .rules {
