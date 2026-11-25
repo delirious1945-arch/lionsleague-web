@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { UserSession } from '@/app/actions';
+import { getBoardNumberFromSessionName } from '@/lib/session';
 import {
   ArrowLeft,
   ArrowRight,
@@ -51,8 +52,10 @@ export default function SpecialHubClient({
   user,
   initialBoard,
 }: SpecialHubClientProps) {
+  const sessionBoardNum = getBoardNumberFromSessionName(user?.name);
   const userSlug = user?.name ? getPlayerSlug(user.name) : null;
-  const userPlayer = userSlug ? getPlayerBySlug(userSlug) : null;
+  const validUserSlug = userSlug && isPlayerSlug(userSlug) ? userSlug : null;
+  const userPlayer = validUserSlug ? getPlayerBySlug(validUserSlug) : null;
 
   const [activeBoard, setActiveBoard] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -74,14 +77,17 @@ export default function SpecialHubClient({
       if (saved && (['1', '2', '3', '4', '5'].includes(saved) || isPlayerSlug(saved))) {
         return saved;
       }
-      if (userSlug) {
-        return userSlug;
+      if (sessionBoardNum) {
+        return sessionBoardNum;
+      }
+      if (validUserSlug) {
+        return validUserSlug;
       }
     }
     const cleanInit = initialBoard?.trim().toLowerCase();
     return cleanInit && (['1', '2', '3', '4', '5'].includes(cleanInit) || isPlayerSlug(cleanInit))
       ? cleanInit
-      : userSlug || '1';
+      : sessionBoardNum || validUserSlug || '1';
   });
 
   const handleSelectBoard = (b: string) => {
@@ -159,7 +165,7 @@ export default function SpecialHubClient({
 
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-[11px] font-black uppercase tracking-wider">
               <Lock className="w-3 h-3" />
-              <span>Admin-Only · Geheim</span>
+              <span>Admin &amp; Board 4/5 · Geheim</span>
             </span>
           </div>
 

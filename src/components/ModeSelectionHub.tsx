@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { UserSession, logoutAction } from '@/app/actions';
+import { canAccessSpecialArena } from '@/lib/session';
 import { useRouter } from 'next/navigation';
 import { LogOut, Settings, SunMoon, ShieldCheck, Sparkles, Lock } from 'lucide-react';
 import DynamicRankingTileContent from './DynamicRankingTileContent';
@@ -18,6 +19,7 @@ interface ModeSelectionHubProps {
 
 export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin }: ModeSelectionHubProps) {
   const router = useRouter();
+  const canAccessSpecial = canAccessSpecialArena(user);
 
   const handleLogout = async () => {
     await logoutAction();
@@ -195,16 +197,16 @@ export default function ModeSelectionHub({ user, bannerWinner, unacknowledgedWin
           </div>
         </div>
 
-        {/* Kachel 4: Geheimes Feature II (Coming Soon / Komplett unkenntlich, nur für Admins anwählbar) */}
+        {/* Kachel 4: Geheimes Feature II (Coming Soon / Komplett unkenntlich, nur für Admins sowie Board 4 und Board 5 anwählbar) */}
         <div
           onClick={() => {
-            if (user.role === 'admin') {
+            if (canAccessSpecial) {
               router.push('/special');
             }
           }}
           data-ui-id="HOME.TILES.SPECIAL_CARD"
           className={`group relative flex flex-col justify-end w-full h-full min-h-[220px] rounded-3xl overflow-hidden border-2 shadow-2xl select-none transition-all duration-300 ${
-            user.role === 'admin'
+            canAccessSpecial
               ? 'border-amber-500/40 hover:border-amber-400 cursor-pointer hover:scale-[1.01] active:scale-[0.99]'
               : 'border-slate-700/60 cursor-not-allowed pointer-events-none'
           }`}

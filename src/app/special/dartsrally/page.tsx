@@ -2,6 +2,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSessionAction } from '@/app/actions';
+import { canAccessSpecialArena } from '@/lib/session';
 import { getPlayers } from '@/lib/data';
 import DartsRallyClient from './DartsRallyClient';
 
@@ -14,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function DartsRallyPage() {
   const session = await getSessionAction();
-  if (!session || session.role !== 'admin') {
+  if (!session || !canAccessSpecialArena(session)) {
     redirect('/');
   }
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSessionAction } from '@/app/actions';
+import { canAccessSpecialArena } from '@/lib/session';
 import SpecialHubClient from './SpecialHubClient';
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ interface PageProps {
 
 export default async function SpecialHubPage({ searchParams }: PageProps) {
   const session = await getSessionAction();
-  if (!session || session.role !== 'admin') {
+  if (!session || !canAccessSpecialArena(session)) {
     redirect('/');
   }
 
