@@ -163,6 +163,7 @@ export default function HolographicScoringLeiterCockpit({
       }
       secondary={`AUFNAHME ${displayVisit} / ${MAX_VISITS_PER_LEVEL}`}
       progressDots={progressDots}
+      progressStyle="capsules"
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}

@@ -77,6 +77,7 @@ export default function HolographicStellenCheckenCockpit({
       statsDetail="CHECKS VERWANDELT"
       secondary={`${quote.toFixed(1)}%`}
       progressDots={progressDots}
+      progressStyle="circles"
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}

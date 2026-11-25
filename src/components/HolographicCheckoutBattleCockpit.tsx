@@ -39,13 +39,14 @@ export default function HolographicCheckoutBattleCockpit({
   onToggleFullscreen,
 }: HolographicCheckoutBattleProps) {
   const safeRound = Math.max(1, Math.min(currentRound, totalRounds));
+  const roundProgressPct = Math.round((safeRound / Math.max(1, totalRounds)) * 100);
 
   return (
     <TrainingMonitorShell
       boardId={boardId}
       boardLabel={boardLabel}
       gameName="CHECKOUT BATTLE"
-      headerTitle="DOPPELQUOTE"
+      headerTitle=""
       counter={`AUFNAHME ${safeRound}/${totalRounds}`}
       kind="board"
       playerName={activeName}
@@ -56,6 +57,7 @@ export default function HolographicCheckoutBattleCockpit({
       statsTitle="DOPPELQUOTE"
       statsValue={`${quote.toFixed(1)}%`}
       statsDetail={thrown > 0 ? `${hits} TREFFER / ${thrown} DARTS` : undefined}
+      goldProgressPct={roundProgressPct}
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}

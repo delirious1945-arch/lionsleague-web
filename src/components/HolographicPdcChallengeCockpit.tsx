@@ -39,13 +39,14 @@ export default function HolographicPdcChallengeCockpit({
   const centerLabel =
     currentPart === 2 ? 'DOPPEL' : currentPart === 3 ? 'SHANGHAI' : 'ZIEL';
   const safeVisit = Math.max(1, Math.min(currentVisit, totalVisits));
+  const visitProgressPct = Math.round((safeVisit / Math.max(1, totalVisits)) * 100);
 
   return (
     <TrainingMonitorShell
       boardId={boardId}
       boardLabel={boardLabel}
       gameName={`PDC CHALLENGE${currentPart ? ` · TEIL ${currentPart}` : ''}`}
-      headerTitle="PDC CHALLENGE"
+      headerTitle=""
       counter={`AUFNAHME ${safeVisit}/${totalVisits}`}
       kind="board"
       playerName={activeName}
@@ -56,6 +57,7 @@ export default function HolographicPdcChallengeCockpit({
       statsTitle="PUNKTESTAND"
       statsValue={String(currentScore)}
       statsSuffix="/ 100"
+      goldProgressPct={visitProgressPct}
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}
