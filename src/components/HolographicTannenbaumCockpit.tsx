@@ -547,27 +547,6 @@ export default function HolographicTannenbaumCockpit({
         {renderPlayerCard(1, is1vs1 ? p1Name : activeName || p1Name, p1, p1Lit)}
 
         <section className="board-stage" aria-label="Tannenbaum-Spielbrett">
-          <div className="versus">
-            {is1vs1 ? (
-              <>
-                <span>
-                  <i className="red-dot" /> {p1First}
-                </span>
-                <small>gegen</small>
-                <span>
-                  {p2First} <i className="gold-dot" />
-                </span>
-              </>
-            ) : (
-              <>
-                <span>
-                  <i className="red-dot" /> {activeName || p1Name}
-                </span>
-                <small>Solo</small>
-              </>
-            )}
-          </div>
-
           <div className="tree-board">
             <div
               className={`bull${starOwner === 1 ? ' is-p1' : starOwner === 2 ? ' is-p2' : ''}${
@@ -575,8 +554,52 @@ export default function HolographicTannenbaumCockpit({
               }`}
               aria-label={`Spitze ${starTarget}`}
             >
-              <span>{bullSubLabel}</span>
-              <b>{starTarget}</b>
+              <svg className="bull-svg" viewBox="0 0 100 100" aria-hidden="true">
+                <defs>
+                  <radialGradient id="tb-star-neutral" cx="42%" cy="35%" r="70%">
+                    <stop offset="0%" stopColor="#6a5438" />
+                    <stop offset="55%" stopColor="#1d1b16" />
+                    <stop offset="100%" stopColor="#070808" />
+                  </radialGradient>
+                  <radialGradient id="tb-star-p1" cx="40%" cy="35%" r="72%">
+                    <stop offset="0%" stopColor="#fecaca" />
+                    <stop offset="35%" stopColor="#ef6b62" />
+                    <stop offset="78%" stopColor="#a21f28" />
+                    <stop offset="100%" stopColor="#3e090d" />
+                  </radialGradient>
+                  <radialGradient id="tb-star-p2" cx="40%" cy="35%" r="72%">
+                    <stop offset="0%" stopColor="#fef08a" />
+                    <stop offset="40%" stopColor="#f5d27a" />
+                    <stop offset="80%" stopColor="#b78122" />
+                    <stop offset="100%" stopColor="#6b3f04" />
+                  </radialGradient>
+                </defs>
+                <polygon
+                  points="50,5 62,35.4 94.7,37.5 69.5,58.3 77.6,90 50,72.5 22.4,90 30.5,58.3 5.3,37.5 38,35.4"
+                  fill={
+                    starOwner === 1
+                      ? 'url(#tb-star-p1)'
+                      : starOwner === 2
+                      ? 'url(#tb-star-p2)'
+                      : 'url(#tb-star-neutral)'
+                  }
+                  stroke={
+                    starExt
+                      ? '#38bdf8'
+                      : starOwner === 1
+                      ? '#ff6a65'
+                      : starOwner === 2
+                      ? '#f4d27a'
+                      : '#e3c57c'
+                  }
+                  strokeWidth={starExt ? '3' : '2.2'}
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <div className="bull-content">
+                <span>{bullSubLabel}</span>
+                <b>{starTarget}</b>
+              </div>
             </div>
 
             {BALL_TARGETS.map(({ num, x, y }) => {

@@ -815,63 +815,81 @@
 
 .tb-lodge-root .bull {
   position: absolute;
-  z-index: 2;
-  top: 3%;
+  z-index: 4;
+  top: -2%;
   left: 50%;
-  width: 58px;
-  height: 58px;
+  width: 94px;
+  height: 94px;
+  display: grid;
+  place-items: center;
+  transform: translateX(-50%);
+  background: transparent;
+  border: none;
+  transition: filter .3s ease, transform .3s ease;
+}
+
+.tb-lodge-root .bull-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, .75));
+  transition: filter .3s ease;
+}
+
+.tb-lodge-root .bull-content {
+  position: relative;
+  z-index: 2;
   display: flex;
-  transform: translateX(-50%) rotate(45deg);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(227, 197, 124, .56);
-  color: #e6cf96;
-  background: rgba(14, 16, 15, .85);
-  box-shadow: 0 0 30px rgba(210, 173, 89, .12);
-  transition: border-color .3s ease, background .3s ease, box-shadow .3s ease, transform .3s ease;
+  padding-top: 6px;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .85);
 }
 
-.tb-lodge-root .bull span,
-.tb-lodge-root .bull b {
-  transform: rotate(-45deg);
-  text-align: center;
-  max-width: 52px;
+.tb-lodge-root .bull-content span {
+  max-width: 54px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tb-lodge-root .bull span {
-  font: 500 6px 'DM Mono', monospace;
-  letter-spacing: .1em;
+  color: #e6cf96;
+  font: 600 8px 'DM Mono', monospace;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
-.tb-lodge-root .bull b {
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.tb-lodge-root .bull.is-p1 {
-  border-color: #ff6a65;
+.tb-lodge-root .bull-content b {
   color: #ffffff;
-  background: radial-gradient(circle at 35% 35%, #ef6b62, #a21f28 65%, #3e090d);
-  box-shadow: 0 0 0 5px rgba(224, 67, 70, .14), 0 0 32px rgba(237, 70, 71, .68);
+  font: 800 13px/1.05 'DM Mono', monospace;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
-.tb-lodge-root .bull.is-p2 {
-  border-color: #f4d27a;
-  color: #fffbeb;
-  background: radial-gradient(circle at 35% 35%, #f5d27a, #b78122 65%, #422806);
-  box-shadow: 0 0 0 5px rgba(201, 162, 79, .16), 0 0 32px rgba(219, 177, 78, .68);
+.tb-lodge-root .bull.is-p1 .bull-svg {
+  filter: drop-shadow(0 0 22px rgba(237, 70, 71, .72)) drop-shadow(0 8px 18px rgba(0, 0, 0, .7));
 }
 
-.tb-lodge-root .bull.is-stolen {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 6px rgba(56, 189, 248, .28), 0 0 34px rgba(56, 189, 248, .85);
-  animation: tb-pulse-ice 1.5s ease-in-out infinite;
+.tb-lodge-root .bull.is-p2 .bull-svg {
+  filter: drop-shadow(0 0 22px rgba(219, 177, 78, .72)) drop-shadow(0 8px 18px rgba(0, 0, 0, .7));
+}
+
+.tb-lodge-root .bull.is-p1 .bull-content span,
+.tb-lodge-root .bull.is-p2 .bull-content span {
+  color: #ffffff;
+}
+
+.tb-lodge-root .bull.is-stolen .bull-svg {
+  filter: drop-shadow(0 0 26px rgba(56, 189, 248, .92));
+  animation: tb-star-ice 1.5s ease-in-out infinite;
+}
+
+@keyframes tb-star-ice {
+  50% {
+    filter: drop-shadow(0 0 36px rgba(56, 189, 248, 1));
+  }
 }
 
 .tb-lodge-root .target {
@@ -1132,26 +1150,26 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 7px;
-  margin-top: 9px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .tb-lodge-root .rules span {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, .1);
-  color: #a5aaa6;
-  background: rgba(5, 8, 9, .68);
+  gap: 9px;
+  padding: 9px 15px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  color: #eceae3;
+  background: rgba(5, 8, 9, .84);
   backdrop-filter: blur(10px);
-  font: 500 7px 'DM Mono', monospace;
-  letter-spacing: .03em;
+  font: 700 clamp(12px, 1.05vw, 15px) 'DM Mono', monospace;
+  letter-spacing: .04em;
 }
 
 .tb-lodge-root .rules i {
-  width: 6px;
-  height: 6px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 
@@ -1478,8 +1496,8 @@
   }
 
   .tb-lodge-root .rules span {
-    padding-inline: 7px;
-    font-size: 6px;
+    padding: 6px 9px;
+    font-size: 10px;
   }
 
   .tb-lodge-root .player-card {
