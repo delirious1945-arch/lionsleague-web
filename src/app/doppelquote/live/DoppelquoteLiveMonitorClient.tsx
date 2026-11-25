@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Maximize2, Minimize2 } from 'lucide-react';
-import HolographicDartboard from '@/components/HolographicDartboard';
+import HolographicCheckoutBattleCockpit from '@/components/HolographicCheckoutBattleCockpit';
 
 export interface DoppelquoteLiveState {
   status: 'idle' | 'playing' | 'completed';
@@ -494,135 +494,28 @@ export default function DoppelquoteLiveMonitorClient({ initialBoardId = '1' }: D
   }
 
   // =========================================================================
-  // PHASE 2: LIVE MATCH – FUTURISTIC GLASS COCKPIT (1:1 PARITÄT ZU BILD 4 SOLL)
+  // PHASE 2: LIVE MATCH – NEUES CHECKOUT BATTLE TV-COCKPIT
   // =========================================================================
+  const activeName = is1vs1 ? (activePlayer === 1 ? rawP1Name : rawP2Name) : rawP1Name;
+  const activeQuote = is1vs1 ? (activePlayer === 1 ? p1Quote : p2Quote) : p1Quote;
+  const activeHits = is1vs1 ? (activePlayer === 1 ? p1Hits : p2Hits) : p1Hits;
+  const activeThrown = is1vs1 ? (activePlayer === 1 ? p1Thrown : p2Thrown) : p1Thrown;
+
   return (
-    <div className="w-screen h-screen min-h-screen text-white flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden select-none font-sans">
-      {stageLighting}
-
-      {/* =================================================================== */}
-      {/* 1. TOP HEADER: ZENTRIERTE, SCHWEBENDE CYBER-GLAS-KAPSEL (WIE IM SOLL) */}
-      {/* =================================================================== */}
-      <header className="relative z-30 pt-2 flex items-center justify-center">
-        <div className="px-8 sm:px-12 py-3 rounded-2xl bg-slate-900/60 backdrop-blur-3xl border border-cyan-400/50 shadow-[0_0_35px_rgba(6,182,212,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] flex items-center justify-center gap-3 text-xs sm:text-sm font-black font-mono tracking-widest text-cyan-200 uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-          <span>BOARD {boardId}</span>
-          <span className="text-cyan-400/60">•</span>
-          <span>LIONS WEYHAUSEN</span>
-          <span className="text-cyan-400/60">•</span>
-          <span className="text-amber-300">AUFNAHME {currentRound}/10</span>
-        </div>
-
-        {/* Vollbild-Button dezent oben rechts in der Ecke */}
-        <button
-          onClick={toggleFullscreen}
-          className="absolute right-4 top-4 p-2.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.15] border border-white/15 text-slate-300 hover:text-white transition-all cursor-pointer backdrop-blur-2xl"
-          title="Vollbild"
-        >
-          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-        </button>
-      </header>
-
-      {/* =================================================================== */}
-      {/* 2. DAS COCKPIT-HERZ: 3 ELEMENTE HORIZONTAL AUF EINER LINIE (WIE IM SOLL) */}
-      {/* =================================================================== */}
-      <main className="my-auto w-full max-w-6xl mx-auto flex items-center justify-center gap-4 sm:gap-8 lg:gap-12 relative z-20 px-4">
-        
-        {/* ----------------------------------------------------------------- */}
-        {/* LINKER FLÜGEL: SPIELERNAME (FROSTED GLASS MIT SCHWUNG ZUM KREIS) */}
-        {/* ----------------------------------------------------------------- */}
-        <div
-          className={`w-64 sm:w-80 lg:w-96 h-64 sm:h-80 rounded-[2.5rem] backdrop-blur-3xl transition-all duration-700 relative overflow-hidden flex flex-col items-center justify-center p-6 text-center shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.35)] ${
-            activePlayer === 1
-              ? 'bg-slate-900/65 border-2 border-cyan-400/70 shadow-[0_0_60px_rgba(6,182,212,0.35)] scale-[1.02]'
-              : 'bg-slate-900/40 border border-white/15 opacity-60'
-          }`}
-          style={{
-            // Organische Lichtkante wie im Entwurf
-            borderRightWidth: '3px',
-            borderRightColor: 'rgba(0, 229, 255, 0.6)',
-          }}
-        >
-          {/* Subtiler oberer Glanzstreifen */}
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent" />
-
-          {/* Spieler Vorname & Nachname in monumentaler zweizeiliger Typografie */}
-          <div className="flex flex-col items-center justify-center space-y-1">
-            <span className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
-              {p1Parts.first}
-            </span>
-            {p1Parts.last && (
-              <span className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
-                {p1Parts.last}
-              </span>
-            )}
-          </div>
-
-          {/* Dezent am Oche Status */}
-          {activePlayer === 1 && (
-            <div className="mt-4 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 font-mono text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.5)]">
-              AM OCHE
-            </div>
-          )}
-        </div>
-
-        {/* ----------------------------------------------------------------- */}
-        {/* ZENTRUM: HOLOGRAFISCHES DARTBOARD-RAD MIT RADIALEN SEGMENTEN */}
-        {/* ----------------------------------------------------------------- */}
-        <div className="relative shrink-0 flex items-center justify-center">
-          {/* Äußerer Leuchtring */}
-          <div className="absolute -inset-6 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none animate-pulse" />
-
-          {/* DETAILREICHES HOLOGRAFISCHES TURNIER-DARTBOARD */}
-          <HolographicDartboard
-            target={curTarget}
-            className="w-80 h-80 sm:w-[400px] sm:h-[400px] lg:w-[460px] lg:h-[460px]"
-          />
-        </div>
-
-        {/* ----------------------------------------------------------------- */}
-        {/* RECHTER FLÜGEL: DOPPELQUOTE 0.0% (FROSTED GLASS MIT GOLD-LEISTE) */}
-        {/* ----------------------------------------------------------------- */}
-        <div
-          className="w-64 sm:w-80 lg:w-96 h-64 sm:h-80 rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.35),0_0_50px_rgba(0,255,136,0.2)] relative overflow-hidden flex flex-col items-center justify-center p-6 text-center"
-          style={{
-            // Organische Lichtkante links wie im Entwurf
-            borderLeftWidth: '3px',
-            borderLeftColor: 'rgba(0, 229, 255, 0.6)',
-          }}
-        >
-          {/* Subtiler oberer Glanzstreifen */}
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent" />
-
-          {/* RIESIGE NEON-GRÜNE QUOTE (EXAKT WIE IM SOLL-BILD) */}
-          <div className="flex flex-col items-center justify-center">
-            <span
-              className="text-6xl sm:text-7xl lg:text-8xl font-black font-mono tracking-tighter"
-              style={{
-                color: '#00ff88',
-                textShadow: '0 0 40px rgba(0, 255, 136, 0.9), 0 0 80px rgba(0, 255, 136, 0.4)',
-              }}
-            >
-              {p1Quote.toFixed(1)}%
-            </span>
-          </div>
-
-          {/* Goldener Akzentstreifen am unteren Rand (wie im Soll-Bild!) */}
-          <div className="absolute bottom-4 left-1/4 right-1/4 h-1.5 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 shadow-[0_0_20px_rgba(251,191,36,0.9)]" />
-        </div>
-
-      </main>
-
-      {/* =================================================================== */}
-      {/* 3. FOOTER: MINIMALISTISCHE STATUSLEISTE */}
-      {/* =================================================================== */}
-      <footer className="relative z-20 flex items-center justify-between text-xs font-mono text-cyan-300/60 border-t border-white/[0.08] pt-3 px-4">
-        <span>LIONS WEYHAUSEN · CHECKOUT BATTLE</span>
-        <span>{currentTime}</span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" />
-          <span>FUTURISTIC HUD LIVE</span>
-        </span>
-      </footer>
-    </div>
+    <HolographicCheckoutBattleCockpit
+      boardId={boardId}
+      activeName={activeName}
+      is1vs1={is1vs1}
+      activePlayer={activePlayer}
+      currentTarget={curTarget}
+      currentRound={currentRound}
+      totalRounds={10}
+      quote={activeQuote}
+      hits={activeHits}
+      thrown={activeThrown}
+      currentTime={currentTime}
+      isFullscreen={isFullscreen}
+      onToggleFullscreen={toggleFullscreen}
+    />
   );
 }

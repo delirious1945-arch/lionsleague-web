@@ -1,124 +1,30 @@
 'use client';
 
 import React from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import TrainingMonitorShell, {
+  TrainingMonitorDotState,
+  extractTargetNumber,
+} from '@/components/TrainingMonitorShell';
 
 export interface HolographicStellenCheckenProps {
   boardId: string;
+  boardLabel?: string;
   activeName: string;
   is1vs1?: boolean;
   activePlayer?: 1 | 2;
-  currentVisit: number; // z.B. 4
-  totalVisits?: number; // z.B. 15
-  currentNumber: number; // z.B. 64
-  recommendedRoute: string; // z.B. "T16 ➔ D8"
-  checksCount: number; // z.B. 5
+  currentVisit: number; // z. B. 4
+  totalVisits?: number; // z. B. 15
+  currentNumber: number; // z. B. 64
+  recommendedRoute: string; // z. B. "T16 ➔ D8"
+  checksCount: number; // z. B. 5
+  currentTime?: string;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
 }
 
-// 20 Dartboard Segmente im Uhrzeigersinn ab 12:00 Uhr (0°)
-const DARTBOARD_NUMBERS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
-
-interface ParsedTarget {
-  ring: 'triple' | 'double' | 'single' | 'bull';
-  number: number;
-}
-
-// Hilfsfunktion: Ring-Sektor als SVG-Pfad
-function getAnnularSectorPath(
-  cx: number,
-  cy: number,
-  rIn: number,
-  rOut: number,
-  startDeg: number,
-  endDeg: number
-): string {
-  const startRad = (startDeg * Math.PI) / 180;
-  const endRad = (endDeg * Math.PI) / 180;
-
-  const x1Out = cx + rOut * Math.sin(startRad);
-  const y1Out = cy - rOut * Math.cos(startRad);
-  const x2Out = cx + rOut * Math.sin(endRad);
-  const y2Out = cy - rOut * Math.cos(endRad);
-
-  const x1In = cx + rIn * Math.sin(startRad);
-  const y1In = cy - rIn * Math.cos(startRad);
-  const x2In = cx + rIn * Math.sin(endRad);
-  const y2In = cy - rIn * Math.cos(endRad);
-
-  return `M ${x1Out.toFixed(2)} ${y1Out.toFixed(2)} A ${rOut} ${rOut} 0 0 1 ${x2Out.toFixed(2)} ${y2Out.toFixed(2)} L ${x2In.toFixed(2)} ${y2In.toFixed(2)} A ${rIn} ${rIn} 0 0 0 ${x1In.toFixed(2)} ${y1In.toFixed(2)} Z`;
-}
-
-// Hilfsfunktion: Eck-Klammern (HUD Brackets ⌜ ⌝ ⌞ ⌟) um ein Segment
-function getSectorCorners(
-  cx: number,
-  cy: number,
-  rIn: number,
-  rOut: number,
-  startDeg: number,
-  endDeg: number
-) {
-  const startRad = (startDeg * Math.PI) / 180;
-  const endRad = (endDeg * Math.PI) / 180;
-
-  return {
-    c1Out: { x: cx + rOut * Math.sin(startRad), y: cy - rOut * Math.cos(startRad) },
-    c2Out: { x: cx + rOut * Math.sin(endRad), y: cy - rOut * Math.cos(endRad) },
-    c1In: { x: cx + rIn * Math.sin(startRad), y: cy - rIn * Math.cos(startRad) },
-    c2In: { x: cx + rIn * Math.sin(endRad), y: cy - rIn * Math.cos(endRad) },
-  };
-}
-
-// Route parsen: z.B. "T16 ➔ D8 (oder T14 ➔ D11)"
-function parseRoute(routeStr: string): {
-  primary: ParsedTarget[];
-  secondary: ParsedTarget[];
-  primaryTokens: string[];
-} {
-  const parts = routeStr.split(/\(oder\s*/i);
-  const primaryText = parts[0].trim();
-  const secondaryText = parts[1] ? parts[1].replace(/\)$/, '').trim() : '';
-
-  const parseTokens = (text: string): { targets: ParsedTarget[]; tokens: string[] } => {
-    const rawTokens = text.split(/➔|->|\s+/).map((t) => t.trim()).filter(Boolean);
-    const targets: ParsedTarget[] = [];
-    const tokens: string[] = [];
-
-    for (const tok of rawTokens) {
-      const upper = tok.toUpperCase();
-      tokens.push(tok);
-      if (upper.includes('BULL')) {
-        targets.push({ ring: 'bull', number: 50 });
-      } else if (upper.startsWith('T')) {
-        const num = parseInt(upper.slice(1), 10);
-        if (!isNaN(num) && num >= 1 && num <= 20) targets.push({ ring: 'triple', number: num });
-      } else if (upper.startsWith('D')) {
-        const num = parseInt(upper.slice(1), 10);
-        if (!isNaN(num) && num >= 1 && num <= 20) targets.push({ ring: 'double', number: num });
-      } else if (upper.startsWith('S')) {
-        const num = parseInt(upper.slice(1), 10);
-        if (!isNaN(num) && num >= 1 && num <= 25) targets.push({ ring: 'single', number: num });
-      } else {
-        const num = parseInt(upper, 10);
-        if (!isNaN(num) && num >= 1 && num <= 20) targets.push({ ring: 'single', number: num });
-      }
-    }
-    return { targets, tokens };
-  };
-
-  const p = parseTokens(primaryText);
-  const s = secondaryText ? parseTokens(secondaryText) : { targets: [], tokens: [] };
-
-  return {
-    primary: p.targets,
-    secondary: s.targets,
-    primaryTokens: p.tokens,
-  };
-}
-
 export default function HolographicStellenCheckenCockpit({
   boardId,
+  boardLabel,
   activeName,
   is1vs1 = false,
   activePlayer = 1,
@@ -127,501 +33,53 @@ export default function HolographicStellenCheckenCockpit({
   currentNumber,
   recommendedRoute,
   checksCount,
+  currentTime,
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicStellenCheckenProps) {
-  // Name in 2 Zeilen aufteilen und dynamisch skalieren
-  const nameParts = activeName.trim().split(' ');
-  const firstName = nameParts[0] || 'Sebastian';
-  const lastName = nameParts.slice(1).join(' ') || '';
-  const maxNameLen = Math.max(firstName.length, lastName.length);
-  const nameSizeClass =
-    maxNameLen > 14
-      ? 'text-2xl sm:text-3xl lg:text-4xl'
-      : maxNameLen > 10
-      ? 'text-3xl sm:text-4xl lg:text-5xl'
-      : 'text-3xl sm:text-5xl lg:text-6xl';
+  const safeTotal = Math.max(1, totalVisits);
+  const safeVisit = Math.max(1, Math.min(currentVisit, safeTotal));
+  const quote =
+    currentVisit > 1 || checksCount > 0
+      ? Math.min(100, (checksCount / safeVisit) * 100)
+      : 0;
 
-  // Prozentquote: Exakt wie im Soll-Bild (5/15 = 33.3%)
-  const checkPct = totalVisits > 0 ? ((checksCount / totalVisits) * 100).toFixed(1) : '0.0';
+  const formattedRoute = recommendedRoute
+    .replace(/➔/g, '→')
+    .replace(/\s+→\s+/g, '  →  ');
 
-  // Route parsen
-  const { primary, secondary, primaryTokens } = parseRoute(recommendedRoute);
-  const activeRouteNumbers = new Set(primary.map((p) => p.number));
-
-  // Dartboard Geometrie (500 x 500 ViewBox, Zentrum 250, 250)
-  const cx = 250;
-  const cy = 250;
-  const rDoubleIn = 186;
-  const rDoubleOut = 206;
-  const rTripleIn = 114;
-  const rTripleOut = 138;
-  const rSingleOuterIn = 138;
-  const rSingleOuterOut = 186;
-  const rSingleInnerIn = 40;
-  const rSingleInnerOut = 114;
-
-  // Hilfsfunktion: Ring-Radien für Target ermitteln
-  const getRadiiForTarget = (ring: 'triple' | 'double' | 'single' | 'bull') => {
-    if (ring === 'triple') return { rIn: rTripleIn, rOut: rTripleOut };
-    if (ring === 'double') return { rIn: rDoubleIn, rOut: rDoubleOut };
-    if (ring === 'bull') return { rIn: 0, rOut: 36 };
-    return { rIn: rSingleOuterIn, rOut: rSingleOuterOut };
-  };
+  const progressDots: TrainingMonitorDotState[] = Array.from(
+    { length: safeTotal },
+    (_, idx) => {
+      if (idx < safeVisit - 1) return 'hit';
+      if (idx === safeVisit - 1) return 'current';
+      return 'pending';
+    }
+  );
 
   return (
-    <div className="fixed inset-0 z-50 w-full h-full bg-[#040711] text-white flex flex-col justify-between p-4 sm:p-6 overflow-hidden select-none font-sans">
-      {/* =================================================================== */}
-      {/* 1. VOLUMETRISCHE GOD RAYS & CYBER-ATMOSPHÄRE (EXAKT WIE IM SOLL) */}
-      {/* =================================================================== */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* Tiefer Space-Hintergrund */}
-        <div className="absolute inset-0 bg-[#040711]" />
-
-        {/* Volumetrischer Lichtstrahl von links oben */}
-        <div
-          className="absolute -top-24 left-[10%] w-[480px] h-[900px] pointer-events-none opacity-45 mix-blend-screen"
-          style={{
-            background:
-              'linear-gradient(145deg, rgba(6, 182, 212, 0.55) 0%, rgba(6, 182, 212, 0.12) 45%, transparent 75%)',
-            clipPath: 'polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%)',
-            filter: 'blur(32px)',
-            transform: 'rotate(-8deg)',
-          }}
-        />
-
-        {/* Volumetrischer Lichtstrahl von rechts oben */}
-        <div
-          className="absolute -top-24 right-[10%] w-[480px] h-[900px] pointer-events-none opacity-45 mix-blend-screen"
-          style={{
-            background:
-              'linear-gradient(215deg, rgba(6, 182, 212, 0.55) 0%, rgba(6, 182, 212, 0.12) 45%, transparent 75%)',
-            clipPath: 'polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%)',
-            filter: 'blur(32px)',
-            transform: 'rotate(8deg)',
-          }}
-        />
-
-        {/* Zentraler Leuchtkegel hinter der holografischen Matrix */}
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] rounded-full pointer-events-none opacity-70"
-          style={{
-            background:
-              'radial-gradient(circle, rgba(0, 229, 255, 0.22) 0%, rgba(255, 51, 85, 0.15) 35%, transparent 70%)',
-            filter: 'blur(60px)',
-          }}
-        />
-
-        {/* Subtiles 48px HUD-Raster */}
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:48px_48px] opacity-35" />
-      </div>
-
-      {/* =================================================================== */}
-      {/* 2. TOP HEADER: ZENTRIERTE, SCHWEBENDE GLASS-KAPSEL (WIE IM SOLL) */}
-      {/* =================================================================== */}
-      <header className="relative z-30 pt-2 flex items-center justify-center">
-        <div className="px-8 sm:px-14 py-2.5 rounded-full bg-slate-900/60 backdrop-blur-3xl border-2 border-cyan-300/70 shadow-[0_0_35px_rgba(6,182,212,0.45),inset_0_1px_2px_rgba(255,255,255,0.6)] flex items-center justify-center gap-3 text-xs sm:text-sm font-black font-mono tracking-widest text-cyan-200 uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-          <span>BOARD {boardId}</span>
-          <span className="text-cyan-400/60">•</span>
-          <span>LIONS WEYHAUSEN</span>
-          <span className="text-cyan-400/60">•</span>
-          <span>STELLEN &amp; CHECKEN</span>
-          <span className="text-cyan-400/60">•</span>
-          <span className="text-cyan-300">
-            AUFNAHME {currentVisit}/{totalVisits}
-          </span>
-        </div>
-
-        {/* Dezent versteckter Vollbild-Button oben rechts */}
-        {onToggleFullscreen && (
-          <button
-            onClick={onToggleFullscreen}
-            className="absolute right-4 top-4 p-2.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.15] border border-white/15 text-slate-300 hover:text-white transition-all cursor-pointer backdrop-blur-2xl"
-            title="Vollbild"
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        )}
-      </header>
-
-      {/* =================================================================== */}
-      {/* 3. DAS COCKPIT-HERZ: 3 HORIZONTALE ELEMENTE (1:1 PARITÄT ZUM SOLL) */}
-      {/* =================================================================== */}
-      <main className="my-auto w-full max-w-7xl mx-auto flex items-center justify-center relative z-20 px-2 sm:px-4">
-        <div className="relative flex items-center justify-center w-full">
-          {/* --------------------------------------------------------------- */}
-          {/* LINKER FLÜGEL: SPIELER-CARD (PERFEKT ZENTRIERT & EDEL) */}
-          {/* --------------------------------------------------------------- */}
-          <div
-            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] py-6 pl-6 pr-10 sm:py-8 sm:pl-8 sm:pr-12 flex flex-col items-center justify-center text-center -mr-8 overflow-hidden"
-          >
-            {/* Oberer Lichtglanz */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
-
-            {/* Spielername zentriert in monumentaler Typografie */}
-            <div className="flex flex-col items-center justify-center max-w-full">
-              <span className={`${nameSizeClass} font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)] truncate max-w-full`}>
-                {firstName}
-              </span>
-              {lastName && (
-                <span className={`${nameSizeClass} font-black text-white tracking-tight leading-none drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)] mt-1 sm:mt-1.5 truncate max-w-full`}>
-                  {lastName}
-                </span>
-              )}
-            </div>
-
-            {/* Status Badge */}
-            <div className="mt-4 sm:mt-5">
-              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-950/80 border-2 border-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.5)] text-cyan-300 font-mono text-xs sm:text-sm font-black tracking-widest">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#ff3366] animate-pulse" />
-                <span>🎯 AM WURF</span>
-              </span>
-            </div>
-          </div>
-
-          {/* --------------------------------------------------------------- */}
-          {/* ZENTRUM: HOLOGRAFISCHES DARTBOARD-RADAR (1:1 SOLL-BILD) */}
-          {/* --------------------------------------------------------------- */}
-          <div className="relative z-20 w-[360px] h-[360px] sm:w-[440px] sm:h-[440px] lg:w-[500px] lg:h-[500px] shrink-0 flex items-center justify-center select-none pointer-events-none">
-            {/* Äußerer Leuchtring */}
-            <div className="absolute -inset-4 rounded-full bg-cyan-500/15 blur-2xl animate-pulse pointer-events-none" />
-
-            {/* SVG RADAR DARTBOARD */}
-            <svg
-              viewBox="0 0 500 500"
-              className="w-full h-full drop-shadow-[0_0_50px_rgba(0,229,255,0.5)] select-none pointer-events-none"
-            >
-              <defs>
-                <filter id="cyanNeonGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="6" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-                <filter id="coralNeonGlow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feGaussianBlur stdDeviation="8" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-
-              {/* Äußere HUD Rahmen-Kreise & 72 Grad-Ticks (alle 5°) */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r="245"
-                fill="none"
-                stroke="#00e5ff"
-                strokeWidth="0.9"
-                strokeOpacity="0.25"
-                strokeDasharray="6 6"
-              />
-              <circle
-                cx={cx}
-                cy={cy}
-                r="238"
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth="1.2"
-                strokeOpacity="0.35"
-                strokeDasharray="48 16 12 16"
-              />
-              {Array.from({ length: 72 }).map((_, i) => {
-                const deg = i * 5;
-                const rad = (deg * Math.PI) / 180;
-                const isMajor = deg % 90 === 0;
-                const isSectorCenter = deg % 18 === 0;
-                const r1 = isMajor ? 248 : isSectorCenter ? 242 : 239;
-                const r2 = isMajor ? 216 : isSectorCenter ? 235 : 236;
-                return (
-                  <line
-                    key={`hud-tick-${i}`}
-                    x1={cx + r1 * Math.sin(rad)}
-                    y1={cy - r1 * Math.cos(rad)}
-                    x2={cx + r2 * Math.sin(rad)}
-                    y2={cy - r2 * Math.cos(rad)}
-                    stroke="#00e5ff"
-                    strokeWidth={isMajor ? 2 : isSectorCenter ? 1.1 : 0.7}
-                    strokeOpacity={isMajor ? 0.85 : isSectorCenter ? 0.45 : 0.22}
-                  />
-                );
-              })}
-              <circle
-                cx={cx}
-                cy={cy}
-                r="214"
-                fill="rgba(2, 7, 18, 0.92)"
-                stroke="#00e5ff"
-                strokeWidth="2.2"
-                strokeOpacity="0.65"
-                filter="url(#cyanNeonGlow)"
-              />
-
-              {/* 20 DARTBOARD NUMMERN ENTLANG DES ÄUSSEREN KREISES */}
-              {DARTBOARD_NUMBERS.map((num, i) => {
-                const ang = i * 18;
-                const rad = (ang * Math.PI) / 180;
-                const numX = cx + 225 * Math.sin(rad);
-                const numY = cy - 225 * Math.cos(rad);
-                const isRouteNum = activeRouteNumbers.has(num);
-                return (
-                  <g key={num}>
-                    {isRouteNum && (
-                      <circle
-                        cx={numX}
-                        cy={numY}
-                        r="11.5"
-                        fill="rgba(255, 51, 102, 0.25)"
-                        stroke="#ff3366"
-                        strokeWidth="1.2"
-                      />
-                    )}
-                    <text
-                      x={numX}
-                      y={numY}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fill={isRouteNum ? '#ff85a1' : '#bae6fd'}
-                      fontSize={isRouteNum ? '15.5' : '13.5'}
-                      fontFamily="monospace"
-                      fontWeight="900"
-                      fillOpacity={isRouteNum ? '1' : '0.88'}
-                      style={isRouteNum ? { filter: 'drop-shadow(0 0 8px rgba(255, 51, 102, 0.95))' } : undefined}
-                    >
-                      {num}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Alternierende Segment-Füllungen (Carbon-Navy vs. Cyan-Glas) */}
-              {DARTBOARD_NUMBERS.map((num, i) => {
-                const startAng = i * 18 - 9;
-                const endAng = i * 18 + 9;
-                const isEven = i % 2 === 0;
-                const singleFill = isEven ? 'rgba(7, 16, 34, 0.92)' : 'rgba(18, 46, 78, 0.42)';
-                const ringFill = isEven ? 'rgba(0, 229, 255, 0.16)' : 'rgba(14, 116, 144, 0.28)';
-
-                return (
-                  <g key={`bg-sec-${num}`}>
-                    <path d={getAnnularSectorPath(cx, cy, rDoubleIn, rDoubleOut, startAng, endAng)} fill={ringFill} />
-                    <path d={getAnnularSectorPath(cx, cy, rTripleOut, rDoubleIn, startAng, endAng)} fill={singleFill} />
-                    <path d={getAnnularSectorPath(cx, cy, rTripleIn, rTripleOut, startAng, endAng)} fill={ringFill} />
-                    <path d={getAnnularSectorPath(cx, cy, rSingleInnerIn, rTripleIn, startAng, endAng)} fill={singleFill} />
-                  </g>
-                );
-              })}
-
-              {/* 20 Radiale Speichenlinien */}
-              {Array.from({ length: 20 }).map((_, i) => {
-                const ang = i * 18 - 9;
-                const rad = (ang * Math.PI) / 180;
-                const x1 = cx + rSingleInnerIn * Math.sin(rad);
-                const y1 = cy - rSingleInnerIn * Math.cos(rad);
-                const x2 = cx + rDoubleOut * Math.sin(rad);
-                const y2 = cy - rDoubleOut * Math.cos(rad);
-                return (
-                  <line
-                    key={i}
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke="#67e8f9"
-                    strokeWidth="1"
-                    strokeOpacity="0.45"
-                  />
-                );
-              })}
-
-              {/* Konzentrische Drähte / Ringe */}
-              <circle cx={cx} cy={cy} r={rDoubleOut} fill="none" stroke="#38bdf8" strokeWidth="1.8" strokeOpacity="0.75" />
-              <circle cx={cx} cy={cy} r={rDoubleIn} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.5" />
-              <circle cx={cx} cy={cy} r={rTripleOut} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.5" />
-              <circle cx={cx} cy={cy} r={rTripleIn} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.5" />
-              <circle cx={cx} cy={cy} r={rSingleInnerIn} fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.4" />
-
-              {/* ============================================================= */}
-              {/* TARGET HIGHLIGHTS: Primäre Zielsegmente (T16 & D8) */}
-              {/* ============================================================= */}
-              {primary.map((t, idx) => {
-                if (t.ring === 'bull') {
-                  return (
-                    <circle
-                      key={`prim-bull-${idx}`}
-                      cx={cx}
-                      cy={cy}
-                      r="20"
-                      fill="#ff3366"
-                      stroke="#ff3366"
-                      strokeWidth="3"
-                      filter="url(#coralNeonGlow)"
-                    />
-                  );
-                }
-                const numIdx = DARTBOARD_NUMBERS.indexOf(t.number);
-                if (numIdx === -1) return null;
-                const centerAng = numIdx * 18;
-                const startAng = centerAng - 9;
-                const endAng = centerAng + 9;
-                const { rIn, rOut } = getRadiiForTarget(t.ring);
-                const pathD = getAnnularSectorPath(cx, cy, rIn, rOut, startAng, endAng);
-                const corners = getSectorCorners(cx, cy, rIn, rOut, startAng, endAng);
-
-                return (
-                  <g key={`prim-${t.ring}-${t.number}-${idx}`}>
-                    {/* Leuchtende Füllung & Kontur */}
-                    <path
-                      d={pathD}
-                      fill="rgba(255, 51, 85, 0.45)"
-                      stroke="#ff3366"
-                      strokeWidth="3"
-                      filter="url(#coralNeonGlow)"
-                    />
-                    {/* HUD Gold Corner Brackets ⌜ ⌝ ⌞ ⌟ */}
-                    <circle cx={corners.c1Out.x} cy={corners.c1Out.y} r="2.5" fill="#ffd700" />
-                    <circle cx={corners.c2Out.x} cy={corners.c2Out.y} r="2.5" fill="#ffd700" />
-                    <circle cx={corners.c1In.x} cy={corners.c1In.y} r="2.5" fill="#ffd700" />
-                    <circle cx={corners.c2In.x} cy={corners.c2In.y} r="2.5" fill="#ffd700" />
-                  </g>
-                );
-              })}
-
-              {/* Sekundäre Zielsegmente (falls vorhanden) */}
-              {secondary.map((t, idx) => {
-                const numIdx = DARTBOARD_NUMBERS.indexOf(t.number);
-                if (numIdx === -1) return null;
-                const centerAng = numIdx * 18;
-                const startAng = centerAng - 9;
-                const endAng = centerAng + 9;
-                const { rIn, rOut } = getRadiiForTarget(t.ring);
-                const pathD = getAnnularSectorPath(cx, cy, rIn, rOut, startAng, endAng);
-
-                return (
-                  <path
-                    key={`sec-${t.ring}-${t.number}-${idx}`}
-                    d={pathD}
-                    fill="rgba(255, 170, 0, 0.25)"
-                    stroke="#ffaa00"
-                    strokeWidth="2"
-                    strokeDasharray="4 2"
-                  />
-                );
-              })}
-
-              {/* ============================================================= */}
-              {/* ZENTRALER KERN: RESTPUNKTE (64) IN GIGANTISCHEM CYAN-GLOW */}
-              {/* ============================================================= */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r="78"
-                fill="rgba(4, 7, 17, 0.92)"
-                stroke="#00e5ff"
-                strokeWidth="4"
-                filter="url(#cyanNeonGlow)"
-              />
-              <circle
-                cx={cx}
-                cy={cy}
-                r="70"
-                fill="none"
-                stroke="#ff3366"
-                strokeWidth="2"
-                strokeOpacity="0.75"
-              />
-
-              {/* Gigantische Rest-Zahl (64) */}
-              <text
-                x={cx}
-                y={cy + 4}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="#00f0ff"
-                fontSize="68"
-                fontFamily="monospace"
-                fontWeight="900"
-                filter="url(#cyanNeonGlow)"
-              >
-                {currentNumber}
-              </text>
-            </svg>
-
-            {/* ============================================================= */}
-            {/* GEDOCKTER ROUTEN-POD (T16 ➔ D8) AM UNTEREN RAND DES RADARS */}
-            {/* ============================================================= */}
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-8 py-2.5 rounded-full bg-slate-950/95 border-2 border-cyan-400/90 shadow-[0_0_30px_rgba(6,182,212,0.7)] flex items-center gap-3 z-30 pointer-events-auto">
-              {primaryTokens.map((tok, i) => {
-                const isFinish = tok.toUpperCase().startsWith('D') || tok.toUpperCase().includes('BULL');
-                return (
-                  <React.Fragment key={i}>
-                    {i > 0 && <span className="text-white font-bold text-sm">➔</span>}
-                    <span
-                      className={`font-black font-mono tracking-wider ${
-                        isFinish
-                          ? 'text-[#ffd700] text-base sm:text-lg drop-shadow-[0_0_12px_rgba(255,215,0,0.8)]'
-                          : 'text-[#00f0ff] text-base sm:text-lg drop-shadow-[0_0_12px_rgba(0,240,255,0.8)]'
-                      }`}
-                    >
-                      {tok}
-                    </span>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* --------------------------------------------------------------- */}
-          {/* RECHTER FLÜGEL: CHECKS & QUOTE (PERFEKT ZENTRIERT & HARMONISCH) */}
-          {/* --------------------------------------------------------------- */}
-          <div
-            className="relative z-10 w-[320px] sm:w-[380px] lg:w-[420px] h-[240px] sm:h-[270px] lg:h-[290px] rounded-[2.5rem] bg-slate-900/65 backdrop-blur-3xl border-2 border-cyan-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.3),0_0_35px_rgba(6,182,212,0.25)] p-6 sm:p-8 flex flex-col items-center justify-between text-center -ml-8 overflow-hidden"
-          >
-            {/* Oberer Lichtglanz */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
-
-            {/* Zentraler Score-Bereich: Komplett zentriert & perfekt ausbalanciert */}
-            <div className="flex flex-col items-center justify-center my-auto space-y-1 w-full">
-              {/* Große Zahl: 0 / 15 */}
-              <div className="flex items-baseline justify-center gap-2.5">
-                <span className="text-5xl sm:text-6xl lg:text-7xl font-black font-mono text-[#00ff88] leading-none drop-shadow-[0_0_35px_rgba(0,255,136,0.8)]">
-                  {checksCount}
-                </span>
-                <span className="text-2xl sm:text-3xl lg:text-4xl font-bold font-mono text-slate-400 leading-none">
-                  / {totalVisits}
-                </span>
-              </div>
-
-              {/* Dezentes, edles Label */}
-              <span className="text-[11px] sm:text-xs font-black font-mono uppercase tracking-widest text-emerald-400/90 block pt-1">
-                CHECKS VERWANDELT
-              </span>
-
-              {/* Quote */}
-              <span className="text-2xl sm:text-3xl font-black font-mono text-amber-300 tracking-wider drop-shadow-[0_0_20px_rgba(251,191,36,0.7)] pt-1 block">
-                {checkPct}%
-              </span>
-            </div>
-
-            {/* 15 gleichmäßige Kapseln zentriert am Boden */}
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2 w-full pt-2">
-              {Array.from({ length: totalVisits }).map((_, i) => {
-                const isChecked = i < checksCount;
-                return (
-                  <div
-                    key={i}
-                    className={`h-3 sm:h-3.5 flex-1 max-w-[20px] rounded-full transition-all duration-500 ${
-                      isChecked
-                        ? 'bg-[#00ff88] shadow-[0_0_15px_#00ff88,0_0_5px_#ffffff] border border-[#00ff88]'
-                        : 'bg-slate-800/80 border border-white/10'
-                    }`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Unten: Absolut sauber ohne störende Ecken-Texte (wie im Soll-Bild 2) */}
-      <div className="relative z-20 h-4" />
-    </div>
+    <TrainingMonitorShell
+      boardId={boardId}
+      boardLabel={boardLabel}
+      gameName="STELLEN & CHECKEN"
+      headerTitle="STELLEN & CHECKEN"
+      counter={`AUFNAHME ${safeVisit}/${safeTotal}`}
+      kind="board"
+      playerName={activeName}
+      playerTop={is1vs1 ? `SPIELER ${activePlayer} · AM OCHE` : undefined}
+      centerLabel="ZIELZAHL"
+      centerValue={String(currentNumber)}
+      highlightNumber={extractTargetNumber(recommendedRoute)}
+      route={formattedRoute}
+      statsTitle="CHECKS"
+      statsValue={String(checksCount)}
+      statsSuffix={`/ ${safeTotal}`}
+      statsDetail="CHECKS VERWANDELT"
+      secondary={`${quote.toFixed(1)}%`}
+      progressDots={progressDots}
+      currentTime={currentTime}
+      isFullscreen={isFullscreen}
+      onToggleFullscreen={onToggleFullscreen}
+    />
   );
 }

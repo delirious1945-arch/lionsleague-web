@@ -261,6 +261,7 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
       ballPossession={ballPossession as 1 | 2}
       fussballStats={liveState.fussballStats}
       activeTarget={liveState.activeTarget}
+      gameMode={liveState.gameMode}
       isFullscreen={isFullscreen}
       onToggleFullscreen={toggleFullscreen}
     />

@@ -1,0 +1,377 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@600;700;800&display=swap');
+
+/* Gescoptes TV-Monitor-Design für Fußball Darts (keine globalen body/button-Regeln) */
+.fb-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100vh;
+  min-height: 540px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #01050b;
+  color: #f5fbff;
+  font-family: Inter, sans-serif;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.fb-screen *,
+.fb-screen *::before,
+.fb-screen *::after {
+  box-sizing: border-box;
+}
+
+.fb-screen .fb-arena-background {
+  position: absolute;
+  z-index: -4;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.01);
+  animation: fb-arena-breathe 12s ease-in-out infinite alternate;
+}
+
+.fb-screen .fb-cinematic-grade {
+  position: absolute;
+  z-index: -3;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(1, 5, 12, 0.02) 0%, transparent 38%, rgba(0, 3, 9, 0.18) 66%, rgba(0, 2, 7, 0.62) 100%),
+    radial-gradient(ellipse at center, transparent 22%, rgba(0, 4, 12, 0.13) 62%, rgba(0, 2, 8, 0.48) 100%);
+}
+
+.fb-screen .fb-cinematic-grade::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.14'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+.fb-screen .fb-light-sweep {
+  position: absolute;
+  z-index: -2;
+  top: -20%;
+  width: 18%;
+  height: 120%;
+  opacity: 0.2;
+  filter: blur(22px);
+  background: linear-gradient(90deg, transparent, rgba(146, 228, 255, 0.26), transparent);
+  pointer-events: none;
+}
+
+.fb-screen .fb-light-sweep.left {
+  left: 10%;
+  transform: rotate(-15deg);
+}
+
+.fb-screen .fb-light-sweep.right {
+  right: 10%;
+  transform: rotate(15deg);
+}
+
+.fb-screen .fb-match-header {
+  position: absolute;
+  top: clamp(24px, 4.8vh, 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  height: clamp(42px, 5.5vh, 56px);
+  min-width: min(680px, 70vw);
+  padding: 0 34px;
+  border: 1px solid rgba(158, 198, 221, 0.36);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(16, 29, 47, 0.91), rgba(8, 18, 33, 0.89));
+  box-shadow:
+    inset 0 0 0 1px rgba(220, 245, 255, 0.09),
+    0 12px 35px rgba(0, 0, 0, 0.45),
+    0 0 30px rgba(31, 173, 218, 0.08);
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  color: #dbe7ef;
+  font-size: clamp(10px, 0.9vw, 13px);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.fb-screen .fb-match-header strong {
+  color: #37dcfa;
+  font-weight: 800;
+}
+
+.fb-screen .fb-match-header i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #657d95;
+  display: inline-block;
+}
+
+.fb-screen .fb-fullscreen-button {
+  position: absolute;
+  top: clamp(26px, 4.8vh, 52px);
+  right: clamp(24px, 2.8vw, 48px);
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(149, 181, 202, 0.22);
+  border-radius: 14px;
+  color: #aab9c7;
+  background: rgba(11, 20, 37, 0.75);
+  backdrop-filter: blur(12px);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font: inherit;
+  z-index: 4;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.fb-screen .fb-fullscreen-button:hover {
+  color: #ffffff;
+  border-color: rgba(55, 220, 250, 0.55);
+}
+
+.fb-screen .fb-fullscreen-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fb-screen .fb-player-panel {
+  position: absolute;
+  top: 33%;
+  width: 27%;
+  font-family: "Barlow Condensed", sans-serif;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.72);
+  z-index: 3;
+}
+
+.fb-screen .fb-player-one {
+  left: 6.2%;
+}
+
+.fb-screen .fb-player-two {
+  right: 6.2%;
+  text-align: right;
+}
+
+.fb-screen .fb-player-kicker {
+  display: block;
+  margin-bottom: 9px;
+  color: #80a3b7;
+  font-size: clamp(9px, 0.75vw, 12px);
+  font-weight: 800;
+  letter-spacing: 0.23em;
+}
+
+.fb-screen .fb-player-panel h1,
+.fb-screen .fb-player-panel h2 {
+  margin: 0;
+  font-size: clamp(42px, 4vw, 67px);
+  font-weight: 900;
+  line-height: 0.82;
+  letter-spacing: -0.015em;
+  color: #f5fbff;
+}
+
+.fb-screen .fb-player-panel h1 span,
+.fb-screen .fb-player-panel h2 span {
+  display: block;
+}
+
+.fb-screen .fb-player-two h2 {
+  font-size: clamp(34px, 3.1vw, 54px);
+}
+
+.fb-screen .fb-player-two p {
+  margin: 7px 0 18px;
+  font-size: clamp(20px, 2vw, 34px);
+  font-weight: 800;
+  line-height: 1;
+  color: #dbe7ef;
+}
+
+.fb-screen .fb-possession-badge {
+  height: 43px;
+  margin-top: 23px;
+  padding: 0 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-size: clamp(10px, 0.95vw, 14px);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-shadow: none;
+  backdrop-filter: blur(12px);
+  color: #09efa0;
+  border: 2px solid #09efa0;
+  background: rgba(0, 30, 28, 0.69);
+  box-shadow:
+    0 0 25px rgba(9, 239, 160, 0.28),
+    inset 0 0 18px rgba(9, 239, 160, 0.05);
+  text-transform: uppercase;
+}
+
+.fb-screen .fb-possession-badge svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.fb-screen .fb-player-two .fb-possession-badge {
+  margin-left: auto;
+}
+
+.fb-screen .fb-scoreboard {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(30px, 5.2vh, 62px);
+  transform: translateX(-50%);
+  width: clamp(300px, 23vw, 380px);
+  height: clamp(140px, 18.5vh, 178px);
+  border: 2px solid #08daf8;
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(4, 26, 35, 0.94), rgba(5, 13, 26, 0.96));
+  box-shadow:
+    0 0 32px rgba(8, 218, 248, 0.16),
+    inset 0 0 24px rgba(16, 160, 188, 0.08),
+    0 20px 45px rgba(0, 0, 0, 0.47);
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.fb-screen .fb-scoreline {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(66px, 5.8vw, 94px);
+  font-weight: 800;
+  line-height: 0.72;
+  color: #f5fbff;
+}
+
+.fb-screen .fb-scoreline strong {
+  font-weight: 800;
+}
+
+.fb-screen .fb-scoreline .fb-score-home {
+  color: #08efa0;
+  text-shadow: 0 0 22px rgba(8, 239, 160, 0.22);
+}
+
+.fb-screen .fb-scoreline > span {
+  color: #8aa5b6;
+  font-size: 0.66em;
+}
+
+.fb-screen .fb-score-divider {
+  width: 74%;
+  height: 1px;
+  margin-top: 17px;
+  background: linear-gradient(90deg, transparent, rgba(132, 178, 197, 0.3), transparent);
+}
+
+.fb-screen .fb-scoreboard p {
+  margin: 11px 0 0;
+  color: #a3b4c0;
+  font-size: clamp(9px, 0.75vw, 13px);
+  font-weight: 800;
+  letter-spacing: 0.17em;
+}
+
+.fb-screen .fb-live-indicator {
+  position: absolute;
+  left: 26px;
+  bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(176, 203, 218, 0.55);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+  z-index: 3;
+}
+
+.fb-screen .fb-live-indicator i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #09efa0;
+  box-shadow: 0 0 9px #09efa0;
+  animation: fb-live-pulse 1.8s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes fb-live-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes fb-arena-breathe {
+  from {
+    transform: scale(1.01);
+  }
+  to {
+    transform: scale(1.035);
+  }
+}
+
+@media (max-width: 800px) {
+  .fb-screen .fb-match-header {
+    min-width: 76vw;
+    padding: 0 20px;
+    gap: 10px;
+  }
+  .fb-screen .fb-match-header span:nth-of-type(2),
+  .fb-screen .fb-match-header i:nth-of-type(2) {
+    display: none;
+  }
+  .fb-screen .fb-player-panel {
+    top: 31%;
+  }
+  .fb-screen .fb-player-one {
+    left: 4%;
+  }
+  .fb-screen .fb-player-two {
+    right: 4%;
+  }
+  .fb-screen .fb-possession-badge {
+    padding: 0 13px;
+    height: 37px;
+  }
+}
+
+@media (max-aspect-ratio: 4 / 3) {
+  .fb-screen .fb-arena-background {
+    width: 140%;
+    left: -20%;
+    max-width: none;
+  }
+  .fb-screen .fb-player-panel {
+    width: 32%;
+  }
+  .fb-screen .fb-player-one {
+    left: 3%;
+  }
+  .fb-screen .fb-player-two {
+    right: 3%;
+  }
+}
