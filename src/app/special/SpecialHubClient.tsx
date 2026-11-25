@@ -68,7 +68,8 @@ export default function SpecialHubClient({
         localStorage.getItem('lions_active_board_adventskalender') ||
         localStorage.getItem('lions_active_board_rudolph') ||
         localStorage.getItem('lions_active_board_bingo') ||
-        localStorage.getItem('lions_active_board_dartsgolf')
+        localStorage.getItem('lions_active_board_dartsgolf') ||
+        localStorage.getItem('lions_active_board_dartsrally')
       )?.trim().toLowerCase();
       if (saved && (['1', '2', '3', '4', '5'].includes(saved) || isPlayerSlug(saved))) {
         return saved;
@@ -94,6 +95,7 @@ export default function SpecialHubClient({
         localStorage.setItem('lions_active_board_rudolph', b);
         localStorage.setItem('lions_active_board_bingo', b);
         localStorage.setItem('lions_active_board_dartsgolf', b);
+        localStorage.setItem('lions_active_board_dartsrally', b);
         window.history.replaceState(null, '', `/special?board=${b}`);
       } catch {}
     }
@@ -456,7 +458,7 @@ export default function SpecialHubClient({
 
           <div
             data-ui-id="SPECIAL.GAME_DARTSGOLF.CARD"
-            className="group relative overflow-hidden rounded-3xl border border-emerald-500/35 bg-gradient-to-br from-slate-900/95 via-emerald-950/30 to-slate-900/95 p-6 sm:p-7 flex flex-col justify-between gap-6 shadow-2xl shadow-emerald-950/30 hover:border-emerald-400/55 transition-all lg:col-span-2"
+            className="group relative overflow-hidden rounded-3xl border border-emerald-500/35 bg-gradient-to-br from-slate-900/95 via-emerald-950/30 to-slate-900/95 p-6 sm:p-7 flex flex-col justify-between gap-6 shadow-2xl shadow-emerald-950/30 hover:border-emerald-400/55 transition-all"
           >
             <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
             <div className="relative z-10 space-y-4">
@@ -507,6 +509,63 @@ export default function SpecialHubClient({
                 className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
               >
                 <span>Golfrunde starten</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+
+          <div
+            data-ui-id="SPECIAL.GAME_DARTSRALLY.CARD"
+            className="group relative overflow-hidden rounded-3xl border border-rose-500/35 bg-gradient-to-br from-slate-900/95 via-rose-950/30 to-slate-900/95 p-6 sm:p-7 flex flex-col justify-between gap-6 shadow-2xl shadow-rose-950/30 hover:border-rose-400/55 transition-all"
+          >
+            <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-400/35 flex items-center justify-center text-3xl shadow-inner shrink-0">
+                    🏎️
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        1000-Punkte-Staffel
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-800/80 text-slate-300 border border-slate-700">
+                        Team vs. Team &amp; Live Sync
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                      Darts Rally
+                    </h3>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Highspeed-Team-Eilrennen über 750, 1.000 oder 1.500 Punkte mit Bananen, Frost-Blitz,
+                Schneesturm-Nebel und Lenkraketen in Echtzeit! Wurf abdrücken, nächsten Läufer abklatschen.
+              </p>
+
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  🏁 1000 Pkt Staffel
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  ⚡ 6 Echtzeit-Items
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+                  📡 Board vs. Board Sync
+                </span>
+              </div>
+            </div>
+
+            <div className="relative z-10">
+              <Link
+                href={`/special/dartsrally?board=${activeBoard}`}
+                data-ui-id="SPECIAL.GAME_DARTSRALLY.START_BTN"
+                className="w-full min-h-[56px] py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-500 via-amber-500 to-red-600 hover:from-rose-400 hover:to-amber-400 text-white font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-rose-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <span>Rallye starten</span>
                 <ArrowRight className="w-5 h-5" />
               </Link>
             </div>

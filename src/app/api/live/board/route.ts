@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 const BOARD_UI_VERSION =
   process.env.VERCEL_GIT_COMMIT_SHA || '2026-11-25-adventskalender-24-v1';
 
-export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'tannenbaum' | 'adventskalender' | 'rudolph' | 'bingo' | 'dartsgolf';
+export type GameType = 'idle' | 'doppelquote' | 'pdc_challenge' | 'fussball' | 'stellen_checken' | 'scoring_leiter' | 'darts_99' | 'tannenbaum' | 'adventskalender' | 'rudolph' | 'bingo' | 'dartsgolf' | 'dartsrally';
 
 export interface UnifiedLiveState {
   boardId: string;
@@ -30,6 +30,7 @@ export interface UnifiedLiveState {
   rudolphData?: any;
   bingoData?: any;
   dartsgolfData?: any;
+  dartsrallyData?: any;
   // Direct access fields for UI components
   currentTarget?: string;
   currentTargetIndex?: number;
