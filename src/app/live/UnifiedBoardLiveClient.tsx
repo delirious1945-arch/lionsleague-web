@@ -29,6 +29,8 @@ import {
   createInitialGolfPlayerState,
   generateGolfCourse,
 } from '@/app/special/dartsgolf/types';
+import HolographicDartsRallyCockpit from '@/components/HolographicDartsRallyCockpit';
+import { createInitialRallyState } from '@/app/special/dartsrally/types';
 import { getPlayerBySlug, isPlayerSlug } from '@/lib/playerSlugs';
 
 interface UnifiedBoardLiveProps {
@@ -747,6 +749,53 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         lastAction={dg.lastAction ?? null}
         winnerPlayer={dg.winnerPlayer ?? null}
         winnerName={dg.winnerName ?? null}
+        currentTime={currentTime}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
+
+  // =========================================================================
+  // 13. SPIEL: DARTS RALLY
+  // =========================================================================
+  if (liveState.gameType === 'dartsrally') {
+    const dr = liveState.dartsrallyData || {};
+    const fallbackRally = createInitialRallyState({
+      boardId,
+      targetDistance:
+        dr.targetDistance === 750 || dr.targetDistance === 1500
+          ? dr.targetDistance
+          : 1000,
+      gameMode:
+        dr.gameMode === 'board_vs_board' ? 'board_vs_board' : 'single_board',
+    });
+
+    const rallyState =
+      dr && dr.team1 && dr.team2
+        ? dr
+        : {
+            ...fallbackRally,
+            team1: {
+              ...fallbackRally.team1,
+              score: Number(dr.teamRedScore ?? liveState.scoreP1 ?? 0),
+            },
+            team2: {
+              ...fallbackRally.team2,
+              score: Number(dr.teamGoldScore ?? liveState.scoreP2 ?? 0),
+            },
+            winnerTeam:
+              dr.winnerTeam === 1 || dr.winnerTeam === 'red'
+                ? 1
+                : dr.winnerTeam === 2 || dr.winnerTeam === 'gold'
+                ? 2
+                : null,
+          };
+
+    return (
+      <HolographicDartsRallyCockpit
+        boardId={boardId}
+        rally={rallyState}
         currentTime={currentTime}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
