@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Minimize2 } from 'lucide-react';
+import { Image as SceneIcon, Minimize2 } from 'lucide-react';
 import {
   TANNENBAUM_BALL_NUMBERS,
   TannenbaumBallNumber,
@@ -15,6 +15,14 @@ import {
   getRequiredLitToWin,
 } from '@/app/special/tannenbaum/types';
 import './HolographicTannenbaumCockpit.css';
+
+export type TannenbaumSceneId = 'lodge' | 'landscape';
+
+const SCENE_STORAGE_KEY = 'lions_tannenbaum_scene_v1';
+const SCENE_BACKGROUNDS: Record<TannenbaumSceneId, string> = {
+  lodge: '/images/tannenbaum-winter-lodge.png',
+  landscape: '/images/tannenbaum-winter-landscape.png',
+};
 
 export interface HolographicTannenbaumProps {
   boardId: string;
@@ -35,18 +43,19 @@ export interface HolographicTannenbaumProps {
   currentTime?: string;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  initialScene?: TannenbaumSceneId;
 }
 
 const BALL_TARGETS: { num: TannenbaumBallNumber; x: number; y: number }[] = [
-  { num: 20, x: 35, y: 20 },
-  { num: 19, x: 65, y: 20 },
-  { num: 18, x: 22, y: 43 },
+  { num: 20, x: 37, y: 20 },
+  { num: 19, x: 63, y: 20 },
+  { num: 18, x: 27, y: 43 },
   { num: 17, x: 50, y: 43 },
-  { num: 16, x: 78, y: 43 },
-  { num: 15, x: 15, y: 68 },
-  { num: 14, x: 38, y: 68 },
-  { num: 13, x: 62, y: 68 },
-  { num: 12, x: 85, y: 68 },
+  { num: 16, x: 73, y: 43 },
+  { num: 15, x: 17, y: 68 },
+  { num: 14, x: 39, y: 68 },
+  { num: 13, x: 61, y: 68 },
+  { num: 12, x: 83, y: 68 },
 ];
 
 function ExpandIcon() {
@@ -145,8 +154,29 @@ export default function HolographicTannenbaumCockpit({
   currentTime,
   isFullscreen = false,
   onToggleFullscreen,
+  initialScene = 'lodge',
 }: HolographicTannenbaumProps) {
   const [fallbackTime, setFallbackTime] = useState<string>('');
+  const [scene, setScene] = useState<TannenbaumSceneId>(initialScene);
+  const [isScenePickerOpen, setIsScenePickerOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(SCENE_STORAGE_KEY);
+      if (stored === 'lodge' || stored === 'landscape') {
+        setScene(stored);
+      }
+    } catch {}
+  }, []);
+
+  const handleSelectScene = (nextScene: TannenbaumSceneId) => {
+    setScene(nextScene);
+    try {
+      localStorage.setItem(SCENE_STORAGE_KEY, nextScene);
+    } catch {}
+  };
+
+  const backgroundImage = SCENE_BACKGROUNDS[scene];
 
   useEffect(() => {
     if (currentTime) return;
@@ -389,12 +419,89 @@ export default function HolographicTannenbaumCockpit({
 
   return (
     <main
-      className="tb-lodge-root forced-dark"
-      style={
-        { '--lodge': "url('/images/tannenbaum-winter-lodge.png')" } as React.CSSProperties
-      }
+      className={`tb-lodge-root forced-dark game--${scene} ${
+        isScenePickerOpen ? 'is-setup' : 'is-started'
+      }`}
+      style={{ '--lodge': `url('${backgroundImage}')` } as React.CSSProperties}
     >
       <div className="atmosphere" />
+
+      {isScenePickerOpen && (
+        <section className="scene-setup" aria-labelledby="scene-title">
+          <div className="setup-heading">
+            <span>Board {String(boardId).padStart(2, '0')} · Kulissen-Auswahl</span>
+            <h1 id="scene-title">Wähle deine Winterkulisse</h1>
+            <p>Die Auswahl verändert nur die Atmosphäre. Spielregeln und Board bleiben identisch.</p>
+          </div>
+
+          <div className="scene-options" role="radiogroup" aria-label="Winterkulisse">
+            <button
+              type="button"
+              className={`scene-option ${scene === 'lodge' ? 'is-selected' : ''}`}
+              onClick={() => handleSelectScene('lodge')}
+              role="radio"
+              aria-checked={scene === 'lodge'}
+            >
+              <img
+                src={SCENE_BACKGROUNDS.lodge}
+                alt="Dunkle Winternacht mit verschneitem Tannenbaum"
+              />
+              <span className="scene-option__shade" />
+              <span className="scene-option__check" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="m6 12.5 4 4L18.5 8" />
+                </svg>
+              </span>
+              <span className="scene-option__copy">
+                <small>Atmosphäre 01</small>
+                <strong>Winternacht</strong>
+                <em>Dramatisch · Tief · Exklusiv</em>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`scene-option ${scene === 'landscape' ? 'is-selected' : ''}`}
+              onClick={() => handleSelectScene('landscape')}
+              role="radio"
+              aria-checked={scene === 'landscape'}
+            >
+              <img
+                src={SCENE_BACKGROUNDS.landscape}
+                alt="Helle verschneite Berglandschaft mit Tannenbaum"
+              />
+              <span className="scene-option__shade" />
+              <span className="scene-option__check" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="m6 12.5 4 4L18.5 8" />
+                </svg>
+              </span>
+              <span className="scene-option__copy">
+                <small>Atmosphäre 02</small>
+                <strong>Winterlandschaft</strong>
+                <em>Klar · Hell · Weit</em>
+              </span>
+            </button>
+          </div>
+
+          <div className="setup-footer">
+            <div>
+              <span>Ausgewählt</span>
+              <strong>{scene === 'lodge' ? 'Winternacht' : 'Winterlandschaft'}</strong>
+            </div>
+            <button
+              type="button"
+              className="start-button"
+              onClick={() => setIsScenePickerOpen(false)}
+            >
+              <span>Kulisse übernehmen</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h13M14 7l5 5-5 5" />
+              </svg>
+            </button>
+          </div>
+        </section>
+      )}
 
       <header className="topbar">
         <div className="brand">
@@ -416,6 +523,14 @@ export default function HolographicTannenbaumCockpit({
 
         <div className="session">
           <span>{displayTime}</span>
+          <button
+            type="button"
+            onClick={() => setIsScenePickerOpen(true)}
+            aria-label="Winterkulisse wählen"
+            title="Winterkulisse wechseln"
+          >
+            <SceneIcon />
+          </button>
           {onToggleFullscreen && (
             <button
               type="button"
@@ -484,6 +599,7 @@ export default function HolographicTannenbaumCockpit({
                   style={{ left: `${x}%`, top: `${y}%` }}
                   aria-label={`Kugel ${num}`}
                 >
+                  <i className="ornament-hook" aria-hidden="true" />
                   <span>{num}</span>
                 </div>
               );
