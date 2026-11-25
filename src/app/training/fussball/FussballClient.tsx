@@ -12,6 +12,8 @@ import {
   HelpCircle, Sparkles, RefreshCw, CheckCircle2, Bot, User, Users, Flame, Tv
 } from 'lucide-react';
 import { generateSessionId } from '@/lib/liveSession';
+import { isPlayerSlug } from '@/lib/playerSlugs';
+import BoardSelectionPicker from '@/components/BoardSelectionPicker';
 
 interface FussballClientProps {
   players: Player[];
@@ -213,8 +215,8 @@ export default function FussballClient({ players, initialHistory, currentUser }:
   const [activeBoard, setActiveBoard] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlBoard = urlParams.get('board');
-      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+      const urlBoard = urlParams.get('board')?.trim().toLowerCase();
+      if (urlBoard && (['1', '2', '3', '4', '5'].includes(urlBoard) || isPlayerSlug(urlBoard))) {
         return urlBoard;
       }
       return (
@@ -222,7 +224,7 @@ export default function FussballClient({ players, initialHistory, currentUser }:
         localStorage.getItem('lions_active_board_fussball') ||
         localStorage.getItem('lions_active_board') ||
         '1'
-      );
+      ).trim().toLowerCase();
     }
     return '1';
   });
@@ -1370,40 +1372,11 @@ export default function FussballClient({ players, initialHistory, currentUser }:
           </div>
 
           {/* Oche / Board-Auswahl für Mehrscheiben-Betrieb */}
-          <div className="space-y-2 pt-2 border-t border-white/10">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <span>📺 Oche / TV-Monitor zuweisen:</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono">
-                  Board {activeBoard}
-                </span>
-              </label>
-              <Link
-                href={`/board/${activeBoard}`}
-                target="_blank"
-                className="text-xs text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 underline underline-offset-2"
-              >
-                <span>Monitor öffnen</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              {['1', '2', '3', '4', '5'].map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => handleSelectBoard(b)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-mono font-black transition-all cursor-pointer ${
-                    activeBoard === b
-                      ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/30 scale-[1.02]'
-                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-white/10'
-                  }`}
-                >
-                  Board {b}
-                </button>
-              ))}
-            </div>
-          </div>
+          <BoardSelectionPicker
+            activeBoard={activeBoard}
+            onSelectBoard={handleSelectBoard}
+            currentUserName={p1Name}
+          />
 
           {/* Start Button */}
           <button

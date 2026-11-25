@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { loginAction, firstLoginPasswordChangeAction } from '@/app/actions';
+import { getPlayerSlug } from '@/lib/playerSlugs';
 import CookieConsent from './CookieConsent';
 
 export default function LandingPage() {
@@ -34,6 +35,16 @@ export default function LandingPage() {
         setPendingPlayerId(res.playerId);
         setPendingPlayerName(res.name || username);
       } else if (res.success) {
+        try {
+          const playerName = res.user?.name || username;
+          const slug = getPlayerSlug(playerName);
+          localStorage.setItem('lions_player_slug', slug);
+          localStorage.setItem('lions_player_name', playerName);
+          localStorage.setItem('lions_active_board', slug);
+          localStorage.setItem('lions_active_board_pdc', slug);
+          localStorage.setItem('lions_active_board_fussball', slug);
+          localStorage.setItem('lions_active_board_stellen_checken', slug);
+        } catch (e) {}
         router.refresh();
       } else {
         setErrorMessage(
@@ -57,6 +68,15 @@ export default function LandingPage() {
       );
 
       if (res.success) {
+        try {
+          const slug = getPlayerSlug(pendingPlayerName);
+          localStorage.setItem('lions_player_slug', slug);
+          localStorage.setItem('lions_player_name', pendingPlayerName);
+          localStorage.setItem('lions_active_board', slug);
+          localStorage.setItem('lions_active_board_pdc', slug);
+          localStorage.setItem('lions_active_board_fussball', slug);
+          localStorage.setItem('lions_active_board_stellen_checken', slug);
+        } catch (e) {}
         router.refresh();
       } else {
         setErrorMessage(res.error || 'Fehler beim Speichern des neuen Passworts.');

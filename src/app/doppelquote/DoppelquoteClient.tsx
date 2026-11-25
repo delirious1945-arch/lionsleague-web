@@ -18,6 +18,8 @@ import {
   ArrowLeft, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Target, Play, Settings, Tv, Award, Lock
 } from 'lucide-react';
 import { getPlayerPhotoUrl, getPlayerInitials } from '@/lib/avatar';
+import { isPlayerSlug } from '@/lib/playerSlugs';
+import BoardSelectionPicker from '@/components/BoardSelectionPicker';
 
 interface DoppelquoteClientProps {
   players: Player[];
@@ -253,15 +255,18 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
   useEffect(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlBoard = urlParams.get('board');
-      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+      const urlBoard = urlParams.get('board')?.trim().toLowerCase();
+      if (urlBoard && (['1', '2', '3', '4', '5'].includes(urlBoard) || isPlayerSlug(urlBoard))) {
         setActiveBoard(urlBoard);
         localStorage.setItem('lions_tablet_board', urlBoard);
         localStorage.setItem('lions_active_board', urlBoard);
         return;
       }
-      const savedBoard = localStorage.getItem('lions_tablet_board') || localStorage.getItem('lions_active_board');
-      if (savedBoard && ['1', '2', '3', '4', '5'].includes(savedBoard)) {
+      const savedBoard = (
+        localStorage.getItem('lions_tablet_board') ||
+        localStorage.getItem('lions_active_board')
+      )?.trim().toLowerCase();
+      if (savedBoard && (['1', '2', '3', '4', '5'].includes(savedBoard) || isPlayerSlug(savedBoard))) {
         setActiveBoard(savedBoard);
       }
     } catch (e) {}
@@ -1519,44 +1524,11 @@ export default function DoppelquoteClient({ players, initialHistory, user }: Dop
             </div>
 
             {/* TV-Monitor / Oche Board Zuweisung (Multi-Screen) */}
-            <div className="space-y-2 p-3.5 sm:p-4 rounded-2xl bg-zinc-950/80 border border-cyan-500/30 shadow-[inset_0_1px_0_0_rgba(6,182,212,0.2)]">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <label className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-                  <span>📺</span>
-                  <span>Externer TV-Monitor / Oche-Scheibe:</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-zinc-400">
-                    Dieses Tablet steuert <strong className="text-cyan-300 font-bold">TV-Board {activeBoard}</strong>
-                  </span>
-                  <a
-                    href={`/board/${activeBoard}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[11px] font-mono font-bold text-cyan-400 hover:text-cyan-300 underline"
-                  >
-                    Monitor öffnen ↗
-                  </a>
-                </div>
-              </div>
-              <div className="grid grid-cols-5 gap-2 pt-1">
-                {['1', '2', '3', '4', '5'].map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => handleSelectBoard(b)}
-                    className={`py-2 px-2 rounded-xl font-mono text-xs font-black transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
-                      activeBoard === b
-                        ? 'bg-cyan-500/25 text-cyan-300 border-2 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)] scale-[1.02]'
-                        : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800 hover:text-white'
-                    }`}
-                  >
-                    <span>Board {b}</span>
-                    <span className="text-[10px] opacity-75 font-normal">Scheibe {b}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <BoardSelectionPicker
+              activeBoard={activeBoard}
+              onSelectBoard={handleSelectBoard}
+              currentUserName={p1Name}
+            />
 
             {/* Modus Auswahl */}
             <div className="space-y-2" data-ui-id="CHECKOUT.SETUP.MODE_TOGGLE">

@@ -12,6 +12,12 @@ import {
   Tv,
 } from 'lucide-react';
 import { PlayerMonthProgress, LotteryWinner } from '@/lib/trainingLottery';
+import {
+  getPlayerSlug,
+  getPlayerBySlug,
+  isPlayerSlug,
+  getBoardDisplayName,
+} from '@/lib/playerSlugs';
 
 interface TrainingSelectionClientProps {
   user: UserSession;
@@ -25,20 +31,45 @@ export default function TrainingSelectionClient({
   initialBoard,
   monthProgress,
 }: TrainingSelectionClientProps) {
+  const userSlug = user?.name ? getPlayerSlug(user.name) : null;
+  const userPlayer = userSlug ? getPlayerBySlug(userSlug) : null;
+
   const [activeBoard, setActiveBoard] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlBoard = urlParams.get('board');
-      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
+      const urlBoard = urlParams.get('board')?.trim().toLowerCase();
+      if (urlBoard && (['1', '2', '3', '4', '5'].includes(urlBoard) || isPlayerSlug(urlBoard))) {
         return urlBoard;
       }
-      const saved = localStorage.getItem('lions_tablet_board') || localStorage.getItem('lions_active_board');
-      if (saved && ['1', '2', '3', '4', '5'].includes(saved)) {
+      const saved = (
+        localStorage.getItem('lions_tablet_board') ||
+        localStorage.getItem('lions_active_board')
+      )?.trim().toLowerCase();
+      if (saved && (['1', '2', '3', '4', '5'].includes(saved) || isPlayerSlug(saved))) {
         return saved;
       }
+      if (userSlug) {
+        return userSlug;
+      }
     }
-    return initialBoard || '1';
+    return (initialBoard?.trim().toLowerCase()) || userSlug || '1';
   });
+
+  // Automatische Kopplung beim Laden, falls noch kein aktives Board oder altes Board gesetzt ist
+  useEffect(() => {
+    if (userSlug && typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lions_active_board');
+      // Falls noch nichts gespeichert oder bisher nur Standard '1' ohne expliziten URL-Parameter
+      if (!saved || saved === '1') {
+        setActiveBoard(userSlug);
+        localStorage.setItem('lions_active_board', userSlug);
+        localStorage.setItem('lions_player_slug', userSlug);
+        if (user?.name) {
+          localStorage.setItem('lions_player_name', user.name);
+        }
+      }
+    }
+  }, [userSlug, user?.name]);
 
   const handleSelectBoard = (b: string) => {
     setActiveBoard(b);
@@ -155,13 +186,26 @@ export default function TrainingSelectionClient({
                 </span>
               </div>
               <p className="text-sm font-bold text-white">
-                Dieses Tablet steuert: <span className="text-cyan-400 font-mono text-base font-black">BOARD {activeBoard}</span>
+                Dieses Tablet steuert: <span className="text-cyan-400 font-mono text-base font-black">{getBoardDisplayName(activeBoard)}</span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <span className="text-xs font-mono text-slate-400 mr-1 hidden sm:inline">Board wechseln:</span>
+            <span className="text-xs font-mono text-slate-400 mr-1 hidden sm:inline">Monitor wählen:</span>
+            {userPlayer && (
+              <button
+                onClick={() => handleSelectBoard(userPlayer.slug)}
+                className={`px-3 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  activeBoard === userPlayer.slug
+                    ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.6)] scale-105'
+                    : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/30'
+                }`}
+                title={`Mein persönlicher Monitor (${userPlayer.slug.toUpperCase()})`}
+              >
+                👤 Mein Monitor ({userPlayer.slug.toUpperCase()})
+              </button>
+            )}
             {['1', '2', '3', '4', '5'].map((b) => (
               <button
                 key={b}
@@ -179,10 +223,10 @@ export default function TrainingSelectionClient({
               href={`/board/${activeBoard}`}
               target="_blank"
               className="ml-1 sm:ml-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-500/30 text-cyan-300 hover:text-white font-mono text-xs font-bold flex items-center gap-1.5 transition-all"
-              title={`TV-Monitor für Board ${activeBoard} öffnen`}
+              title={`TV-Monitor für ${getBoardDisplayName(activeBoard)} öffnen`}
             >
               <Tv className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Monitor {activeBoard}</span>
+              <span className="hidden md:inline">Monitor {activeBoard.toUpperCase()}</span>
             </Link>
           </div>
         </div>
