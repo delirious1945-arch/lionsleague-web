@@ -542,8 +542,8 @@ export default function SpecialHubClient({
               </div>
 
               <p className="text-sm text-slate-300 leading-relaxed">
-                Highspeed-Team-Eilrennen über 750, 1.000 oder 1.500 Punkte mit Bananen, Frost-Blitz,
-                Schneesturm-Nebel und Lenkraketen in Echtzeit! Wurf abdrücken, nächsten Läufer abklatschen.
+                Highspeed-Team-Eilrennen über 750, 1.000 oder 1.500 Punkte mit Spitzenbruch, Darttausch,
+                Ausgebremst, Reifenplatzer, Turbo und Schild! Wurf abdrücken, nächsten Läufer abklatschen.
               </p>
 
               <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">

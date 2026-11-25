@@ -1,16 +1,16 @@
 // Darts Rally – Datenmodell & Typen
-// Dokumenten-ID: RALLY-TYPES-2026-V1
+// Dokumenten-ID: RALLY-TYPES-2026-V2
 
 export type RallyGameMode = 'board_vs_board' | 'single_board';
 export type RallyTargetDistance = 750 | 1000 | 1500;
 
 export type RallyItemType =
-  | 'banana'    // Schleudertrauma: gegnerischer nächster Werfer nur 2 Darts
-  | 'freeze'    // Frost-Blitz: gegnerisches Tablet friert 10s ein
-  | 'fog'       // Schneesturm-Nebel: gegnerischer Score 20s verdeckt
-  | 'rocket'    // Lenkrakete: -75 beim Gegner, +75 beim eigenen Team
-  | 'turbo'     // Turbo-Booster: 20s doppelte Punkte für eigenes Team
-  | 'shield';   // Eis-Schild: wehrt nächsten Angriff ab
+  | 'spitzenbruch'   // 2 Triples: gegnerischer nächster Werfer nur 2 Darts
+  | 'darttausch'     // Bullseye 50: Jeder Spieler gibt seine Darts an den Hintermann
+  | 'ausgebremst'    // 100+ Pkt: gegnerisches Tablet 20s eingefroren (Timer läuft)
+  | 'reifenplatzer'  // 1 Doppel + 1 Triple: -75 beim Gegner, +75 beim eigenen Team
+  | 'turbo'          // >= 121 Pkt: 20s doppelte Punkte für eigenes Team
+  | 'schild';        // Schnapszahl ab 77: wehrt nächsten feindlichen Angriff ab
 
 export interface RallyTeamMember {
   id: string;
@@ -31,11 +31,10 @@ export interface RallyTeamState {
   activeRunnerIndex: number;
   activeCurses: RallyActiveCurse[];
   hasShield: boolean;
-  isFrozen: boolean;
-  freezeExpiresAt: number | null;
+  isAusgebremst: boolean;
+  ausgebremstExpiresAt: number | null;
   turboExpiresAt: number | null;
-  fogExpiresAt: number | null;
-  bananaActiveForRunner: boolean;
+  spitzenbruchActiveForRunner: boolean;
   totalDartsThrown: number;
   history: {
     runnerName: string;
@@ -67,41 +66,45 @@ export interface RallyThrowVisit {
   triplesCount?: number;
   hasBullseye?: boolean;
   hasDoubleAndTriple?: boolean;
-  isTripleSameNumber?: boolean;
-  hitsOn18?: number;
+}
+
+export function isSchnapszahl(score: number): boolean {
+  if (score < 77) return false;
+  const digits = score.toString().split('');
+  return digits.every((d) => d === digits[0]);
 }
 
 export function detectRallyItems(visit: RallyThrowVisit): RallyItemType[] {
   const items: RallyItemType[] = [];
 
-  // 1. Frost-Blitz (Bullseye 50)
-  if (visit.hasBullseye) {
-    items.push('freeze');
-  }
-
-  // 2. Bananenschale (2 Triples)
+  // 1. Spitzenbruch (2 Triples) -> Gegner nächster Wurf nur 2 Darts
   if (visit.triplesCount && visit.triplesCount >= 2) {
-    items.push('banana');
+    items.push('spitzenbruch');
   }
 
-  // 3. Lenkrakete (1 Doppel + 1 Triple)
-  if (visit.hasDoubleAndTriple) {
-    items.push('rocket');
+  // 2. Darttausch (Bullseye 50) -> Darts an den Hintermann weitergeben
+  if (visit.hasBullseye) {
+    items.push('darttausch');
   }
 
-  // 4. Schneesturm-Nebel (100+ Punkte)
+  // 3. Ausgebremst (100+ Punkte) -> Gegner-Tablet 20s eingefroren
   if (visit.score >= 100) {
-    items.push('fog');
+    items.push('ausgebremst');
   }
 
-  // 5. Turbo-Booster (3x dieselbe Zahl)
-  if (visit.isTripleSameNumber) {
+  // 4. Reifenplatzer (1 Doppel + 1 Triple) -> -75 Gegner / +75 Team
+  if (visit.hasDoubleAndTriple) {
+    items.push('reifenplatzer');
+  }
+
+  // 5. Turbo-Booster (Score >= 121 Punkte) -> 20s doppelte Punkte
+  if (visit.score >= 121) {
     items.push('turbo');
   }
 
-  // 6. Eis-Schild (mind. 2 Treffer in die 18)
-  if (visit.hitsOn18 && visit.hitsOn18 >= 2) {
-    items.push('shield');
+  // 6. Schild (Schnapszahl ab 77 Punkten, z.B. 77, 88, 99, 111) -> Wehrt nächsten Angriff ab
+  if (isSchnapszahl(visit.score)) {
+    items.push('schild');
   }
 
   return items;
