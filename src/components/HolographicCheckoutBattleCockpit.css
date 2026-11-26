@@ -1,0 +1,311 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@600;700;800&display=swap');
+
+/* Gescoptes 16:9 Live-TV-Cockpit für Checkout Battle (Doppelquote) */
+.cb-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100vh;
+  background: #020b14;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  user-select: none;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  color: #d9f5ff;
+  box-sizing: border-box;
+}
+
+.cb-screen *,
+.cb-screen *::before,
+.cb-screen *::after {
+  box-sizing: border-box;
+}
+
+/* Exakter 16:9 Bühnen-Container, damit alle Live-Overlays perfekt auf der Clean-Plate sitzen */
+.cb-screen .cb-canvas {
+  position: relative;
+  width: min(100vw, 177.7778vh);
+  height: min(100vh, 56.25vw);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #020b14;
+  container-type: size;
+}
+
+.cb-screen .cb-stage-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Oben links: Brand */
+.cb-screen .cb-brand {
+  position: absolute;
+  left: 2.1%;
+  top: 2.8%;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7cqw;
+}
+
+.cb-screen .cb-brand-icon {
+  width: 2cqw;
+  height: 2cqw;
+  color: #2ce3ff;
+  filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.75));
+  flex-shrink: 0;
+}
+
+.cb-screen .cb-brand-text {
+  color: #eef9ff;
+  font-size: 1.55cqw;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+/* Oben mittig: Text exakt in der leeren leuchtenden Header-Kapsel */
+.cb-screen .cb-header-pill {
+  position: absolute;
+  left: 50%;
+  top: 2.3%;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 5.2%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.05cqw;
+  color: #e6f7ff;
+  font-size: 1.32cqw;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(0, 217, 255, 0.45);
+}
+
+.cb-screen .cb-header-pill i {
+  width: 0.35cqw;
+  height: 0.35cqw;
+  border-radius: 50%;
+  background: #57e8ff;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Oben rechts: Uhrzeit & Vollbild */
+.cb-screen .cb-top-right {
+  position: absolute;
+  right: 1.4%;
+  top: 2.2%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.9cqw;
+}
+
+.cb-screen .cb-clock {
+  color: rgba(217, 245, 255, 0.7);
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.cb-screen .cb-fullscreen-btn {
+  width: 2.6cqw;
+  height: 2.6cqw;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #e6f7ff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cb-screen .cb-fullscreen-btn:hover {
+  background: rgba(0, 217, 255, 0.16);
+  border-color: rgba(87, 232, 255, 0.5);
+}
+
+.cb-screen .cb-fullscreen-btn svg {
+  width: 68%;
+  height: 68%;
+}
+
+/* Linker Glasflügel: Spieler am Oche */
+.cb-screen .cb-left-wing {
+  position: absolute;
+  left: 7.4%;
+  top: 31%;
+  width: 19.2%;
+  height: 39%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 0.8cqw;
+}
+
+.cb-screen .cb-kicker {
+  color: #c5e3f2;
+  font-size: 1.32cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.cb-screen .cb-divider {
+  width: 100%;
+  height: 1px;
+  margin: 0.55cqw 0 1.25cqw;
+  background: linear-gradient(90deg, rgba(168, 224, 245, 0.48), rgba(168, 224, 245, 0.08));
+}
+
+.cb-screen .cb-player-name {
+  margin: 0 0 1.65cqw;
+  color: #f4fbff;
+  font-size: 4.1cqw;
+  font-weight: 800;
+  line-height: 0.94;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.9);
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.cb-screen .cb-player-name.cb-name-compact {
+  font-size: 3.3cqw;
+}
+
+.cb-screen .cb-player-name span {
+  display: block;
+}
+
+.cb-screen .cb-throw-pill {
+  padding: 0.55cqw 1.75cqw;
+  border: 2px solid #1de4ff;
+  border-radius: 999px;
+  background: rgba(0, 128, 168, 0.22);
+  box-shadow:
+    0 0 18px rgba(0, 217, 255, 0.52),
+    inset 0 0 12px rgba(0, 217, 255, 0.2);
+  color: #7bf2ff;
+  font-size: 1.45cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Rechter Glasflügel: Doppelquote + Gold-Fortschrittsbalken */
+.cb-screen .cb-right-wing {
+  position: absolute;
+  right: 7.4%;
+  top: 31%;
+  width: 19.2%;
+  height: 39%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0 0.8cqw;
+  text-align: center;
+}
+
+.cb-screen .cb-right-wing .cb-kicker {
+  align-self: center;
+  font-size: 1.45cqw;
+  letter-spacing: 0.14em;
+}
+
+.cb-screen .cb-right-wing .cb-divider {
+  margin: 0.55cqw 0 1.05cqw;
+  background: linear-gradient(90deg, transparent, rgba(168, 224, 245, 0.45), transparent);
+}
+
+.cb-screen .cb-quote-value {
+  color: #00ed79;
+  font-size: 6.4cqw;
+  font-weight: 900;
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+  text-shadow:
+    0 0 24px rgba(0, 237, 121, 0.65),
+    0 0 8px rgba(0, 237, 121, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-screen .cb-quote-sub {
+  margin-top: 0.45cqw;
+  color: #9de8c7;
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cb-screen .cb-gold-bar {
+  width: 92%;
+  height: 1.35cqw;
+  min-height: 10px;
+  margin-top: 1.65cqw;
+  padding: 0.18cqw;
+  border: 1.5px solid rgba(255, 189, 61, 0.82);
+  border-radius: 999px;
+  background: rgba(10, 18, 28, 0.72);
+  box-shadow:
+    0 0 14px rgba(255, 189, 61, 0.35),
+    inset 0 2px 5px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.cb-screen .cb-gold-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #d97706, #ffbd3d 50%, #fde68a);
+  box-shadow: 0 0 14px rgba(255, 189, 61, 0.85);
+  transition: width 0.35s ease;
+}
+
+/* Transparentes SVG-Overlay exakt über der fotografierten Dartscheibe */
+.cb-screen .cb-board-overlay {
+  position: absolute;
+  left: 50%;
+  top: 48.05%;
+  height: 80.7%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.cb-screen .cb-board-overlay svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
