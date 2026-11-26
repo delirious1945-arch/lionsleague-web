@@ -263,7 +263,7 @@ export default function LionsDartboardArenaShell({
   bottomPill,
 }: LionsDartboardArenaShellProps) {
   const uid = useId().replace(/:/g, '');
-  const redGlowId = `lda-red-glow-${uid}`;
+  const greenGlowId = `lda-green-glow-${uid}`;
   const goldGlowId = `lda-gold-glow-${uid}`;
   const cyanGlowId = `lda-cyan-glow-${uid}`;
   const wedgeGradId = `lda-wedge-grad-${uid}`;
@@ -387,13 +387,13 @@ export default function LionsDartboardArenaShell({
           <svg viewBox="0 0 600 600">
             <defs>
               <filter
-                id={redGlowId}
+                id={greenGlowId}
                 x="-40%"
                 y="-40%"
                 width="180%"
                 height="180%"
               >
-                <feGaussianBlur stdDeviation="6.5" result="blur" />
+                <feGaussianBlur stdDeviation="5.5" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
                   <feMergeNode in="SourceGraphic" />
@@ -435,16 +435,16 @@ export default function LionsDartboardArenaShell({
               </linearGradient>
             </defs>
 
-            {/* Optionales zweites Ziel (z. B. Finish-Doppel bei Checkrouten) in warmem Gold */}
+            {/* Optionales zweites Ziel (z. B. Finish-Doppel bei Checkrouten) in Smaragdgrün */}
             {secondaryTarget && secondaryTarget.mode === 'bull' && (
               <circle
                 cx={cx}
                 cy={cy}
                 r={rHub + 3}
                 fill="none"
-                stroke="#fbbf24"
+                stroke="#00ed79"
                 strokeWidth="3.5"
-                filter={`url(#${goldGlowId})`}
+                filter={`url(#${greenGlowId})`}
               />
             )}
 
@@ -456,10 +456,10 @@ export default function LionsDartboardArenaShell({
                 <g transform={`rotate(${secondaryAngle} ${cx} ${cy})`}>
                   <path
                     d={describeSectorRing(cx, cy, rDoubleOut, rNumberOuter, -9, 9)}
-                    fill="rgba(245, 158, 11, 0.18)"
-                    stroke="#fbbf24"
-                    strokeWidth="1.6"
-                    filter={`url(#${goldGlowId})`}
+                    fill="rgba(0, 237, 121, 0.16)"
+                    stroke="#00ed79"
+                    strokeWidth="1.8"
+                    filter={`url(#${greenGlowId})`}
                   />
                   <path
                     d={describeSectorRing(
@@ -470,15 +470,15 @@ export default function LionsDartboardArenaShell({
                       -9,
                       9
                     )}
-                    fill={`url(#${wedgeGradId})`}
-                    stroke="#fde047"
+                    fill="rgba(0, 237, 121, 0.34)"
+                    stroke="#00ed79"
                     strokeWidth="2.4"
-                    filter={`url(#${goldGlowId})`}
+                    filter={`url(#${greenGlowId})`}
                   />
                 </g>
               )}
 
-            {/* Primäres Ziel: Bullseye */}
+            {/* Primäres Ziel: Bullseye (Gold + Cyan-Akzent) */}
             {primaryTarget.mode === 'bull' && (
               <g>
                 <circle
@@ -486,17 +486,17 @@ export default function LionsDartboardArenaShell({
                   cy={cy}
                   r={rHub + 2}
                   fill="none"
-                  stroke="#ff4d79"
+                  stroke="#fde047"
                   strokeWidth="4.2"
-                  filter={`url(#${redGlowId})`}
+                  filter={`url(#${goldGlowId})`}
                 />
                 <circle
                   cx={cx}
                   cy={cy}
                   r={rHub - 5}
                   fill="none"
-                  stroke="#ff9eb8"
-                  strokeWidth="1.6"
+                  stroke="#38e8ff"
+                  strokeWidth="1.8"
                   opacity="0.9"
                 />
               </g>
@@ -522,22 +522,22 @@ export default function LionsDartboardArenaShell({
               </g>
             )}
 
-            {/* Primäres Ziel: Sauberes Trefferbereich-Highlight + Fadenkreuz ohne Lichtkegel (Double, Triple, Single) */}
+            {/* Primäres Ziel: Gelb/Goldenes Trefferfeld + leuchtend blauer Zahlenrahmen (Double, Triple, Single) */}
             {(primaryTarget.mode === 'double' ||
               primaryTarget.mode === 'triple' ||
               primaryTarget.mode === 'single') &&
               primaryTarget.number && (
                 <g transform={`rotate(${primaryAngle} ${cx} ${cy})`}>
-                  {/* Zahlenring-Rahmen über der aktiven Zielzahl */}
+                  {/* Blauer/Cyan-Rahmen um die aktive Zielzahl im Zahlenring */}
                   <path
                     d={describeSectorRing(cx, cy, rDoubleOut, rNumberOuter, -9, 9)}
-                    fill="rgba(255, 22, 77, 0.22)"
-                    stroke="#ff5c8a"
-                    strokeWidth="2.2"
-                    filter={`url(#${redGlowId})`}
+                    fill="rgba(37, 99, 235, 0.24)"
+                    stroke="#38e8ff"
+                    strokeWidth="2.5"
+                    filter={`url(#${cyanGlowId})`}
                   />
 
-                  {/* Exakter Trefferbereich Highlight */}
+                  {/* Gelbes Trefferbereich-Highlight exakt auf dem Zielring */}
                   <path
                     d={describeSectorRing(
                       cx,
@@ -547,10 +547,10 @@ export default function LionsDartboardArenaShell({
                       -9,
                       9
                     )}
-                    fill="rgba(255, 22, 77, 0.42)"
-                    stroke="#ff6b94"
+                    fill="rgba(250, 204, 21, 0.42)"
+                    stroke="#fde047"
                     strokeWidth="2.8"
-                    filter={`url(#${redGlowId})`}
+                    filter={`url(#${goldGlowId})`}
                   />
 
                   {/* Fadenkreuz auf dem exakten Zielring */}
@@ -561,7 +561,7 @@ export default function LionsDartboardArenaShell({
                   >
                     <circle
                       r="8.5"
-                      fill="rgba(255, 22, 77, 0.35)"
+                      fill="rgba(250, 204, 21, 0.35)"
                       strokeWidth="1.5"
                     />
                     <line x1="-12" y1="0" x2="12" y2="0" strokeWidth="1.1" />
