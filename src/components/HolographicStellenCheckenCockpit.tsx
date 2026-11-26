@@ -1,10 +1,9 @@
 'use client';
 
 import React from 'react';
-import TrainingMonitorShell, {
-  TrainingMonitorDotState,
-  extractTargetNumber,
-} from '@/components/TrainingMonitorShell';
+import LionsDartboardArenaShell, {
+  parseCheckoutRouteTargets,
+} from '@/components/LionsDartboardArenaShell';
 
 export interface HolographicStellenCheckenProps {
   boardId: string;
@@ -37,6 +36,12 @@ export default function HolographicStellenCheckenCockpit({
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicStellenCheckenProps) {
+  // Spielername immer dynamisch aus dem laufenden Spiel (niemals hardcoded!)
+  const cleanName = (activeName || '').trim() || 'Spieler';
+  const nameParts = cleanName.split(/\s+/).filter(Boolean);
+  const longestPartLen = Math.max(...nameParts.map((p) => p.length), 0);
+  const isCompactName = longestPartLen > 12 || nameParts.length > 2;
+
   const safeTotal = Math.max(1, totalVisits);
   const safeVisit = Math.max(1, Math.min(currentVisit, safeTotal));
   const quote =
@@ -44,43 +49,93 @@ export default function HolographicStellenCheckenCockpit({
       ? Math.min(100, (checksCount / safeVisit) * 100)
       : 0;
 
-  const formattedRoute = recommendedRoute
+  const formattedRoute = (recommendedRoute || '-')
     .replace(/➔/g, '→')
-    .replace(/\s+→\s+/g, '  →  ');
+    .replace(/\s+→\s+/g, ' → ');
 
-  const progressDots: TrainingMonitorDotState[] = Array.from(
-    { length: safeTotal },
-    (_, idx) => {
-      if (idx < safeVisit - 1) return 'hit';
-      if (idx === safeVisit - 1) return 'current';
-      return 'pending';
-    }
-  );
+  const parsedRoute = parseCheckoutRouteTargets(recommendedRoute);
+  const primaryTarget =
+    parsedRoute.primary.mode !== 'none'
+      ? parsedRoute.primary
+      : currentNumber >= 1 && currentNumber <= 20
+      ? { mode: 'wedge' as const, number: currentNumber }
+      : { mode: 'none' as const, number: null };
 
   return (
-    <TrainingMonitorShell
-      boardId={boardId}
-      boardLabel={boardLabel}
-      gameName="STELLEN & CHECKEN"
-      headerTitle="STELLEN & CHECKEN"
-      counter={`AUFNAHME ${safeVisit}/${safeTotal}`}
-      kind="board"
-      playerName={activeName}
-      playerTop={is1vs1 ? `SPIELER ${activePlayer} · AM OCHE` : undefined}
-      centerLabel="ZIELZAHL"
-      centerValue={String(currentNumber)}
-      highlightNumber={extractTargetNumber(recommendedRoute)}
-      route={formattedRoute}
-      statsTitle="CHECKS"
-      statsValue={String(checksCount)}
-      statsSuffix={`/ ${safeTotal}`}
-      statsDetail="CHECKS VERWANDELT"
-      secondary={`${quote.toFixed(1)}%`}
-      progressDots={progressDots}
-      progressStyle="circles"
+    <LionsDartboardArenaShell
+      ariaLabel="Stellen & Checken"
+      gameTitle="STELLEN & CHECKEN"
+      headerItems={[
+        boardLabel || `BOARD ${boardId}`,
+        'LIONS WEYHAUSEN',
+        `AUFNAHME ${safeVisit}/${safeTotal}`,
+      ]}
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}
+      centerLabel="REST"
+      centerValue={String(currentNumber)}
+      primaryTarget={primaryTarget}
+      secondaryTarget={parsedRoute.secondary}
+      leftAriaLabel="Aktiver Spieler"
+      leftWingContent={
+        <>
+          <span className="lda-kicker">
+            {is1vs1 ? `SPIELER ${activePlayer} AM OCHE` : 'SPIELER AM OCHE'}
+          </span>
+          <div className="lda-divider" />
+          <h1
+            className={`lda-player-name ${isCompactName ? 'lda-name-compact' : ''}`}
+          >
+            {nameParts.map((part, idx) => (
+              <span key={`${part}-${idx}`}>{part}</span>
+            ))}
+          </h1>
+          <div className="lda-throw-pill">AM WURF</div>
+        </>
+      }
+      rightWingRich
+      rightAriaLabel="Checks und Quote"
+      rightWingContent={
+        <>
+          <div style={{ width: '100%' }}>
+            <span className="lda-kicker">CHECKS</span>
+            <div className="lda-divider" />
+            <div className="lda-main-row">
+              <div className="lda-main-value lda-main-value-md">
+                {checksCount}
+              </div>
+              <span className="lda-main-suffix">/ {safeTotal}</span>
+            </div>
+            <div className="lda-sub-meta">
+              {quote.toFixed(1)}% · VERWANDELT
+            </div>
+          </div>
+
+          <div className="lda-check-grid" aria-label="Rundenverlauf">
+            {Array.from({ length: safeTotal }, (_, idx) => {
+              const stateCls =
+                idx < safeVisit - 1
+                  ? 'lda-ring-hit'
+                  : idx === safeVisit - 1
+                  ? 'lda-ring-current'
+                  : '';
+              return (
+                <div className={`lda-check-ring ${stateCls}`} key={idx}>
+                  {idx + 1}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      }
+      bottomPill={
+        <>
+          <span>CHECKROUTE</span>
+          <i />
+          <em>{formattedRoute}</em>
+        </>
+      }
     />
   );
 }

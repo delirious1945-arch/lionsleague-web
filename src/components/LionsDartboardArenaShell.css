@@ -1,0 +1,725 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@600;700;800&display=swap');
+
+/* Einheitliches 16:9 Live-TV-Cockpit für alle Dartboard-Trainingsspiele */
+.lda-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100vh;
+  background: #020b14;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  user-select: none;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  color: #d9f5ff;
+  box-sizing: border-box;
+}
+
+.lda-screen *,
+.lda-screen *::before,
+.lda-screen *::after {
+  box-sizing: border-box;
+}
+
+/* Exakter 16:9 Bühnen-Container, damit alle Live-Overlays perfekt auf der Clean-Plate sitzen */
+.lda-screen .lda-canvas {
+  position: relative;
+  width: min(100vw, 177.7778vh);
+  height: min(100vh, 56.25vw);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #020b14;
+  container-type: size;
+}
+
+.lda-screen .lda-stage-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Oben links: Brand & Spielname */
+.lda-screen .lda-brand {
+  position: absolute;
+  left: 2.1%;
+  top: 2.8%;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7cqw;
+  max-width: 26%;
+}
+
+.lda-screen .lda-brand-icon {
+  width: 2cqw;
+  height: 2cqw;
+  color: #2ce3ff;
+  filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.75));
+  flex-shrink: 0;
+}
+
+.lda-screen .lda-brand-text {
+  color: #eef9ff;
+  font-size: 1.55cqw;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Oben mittig: Text exakt in der leeren leuchtenden Header-Kapsel */
+.lda-screen .lda-header-pill {
+  position: absolute;
+  left: 50%;
+  top: 2.3%;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 5.2%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.05cqw;
+  color: #e6f7ff;
+  font-size: 1.32cqw;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(0, 217, 255, 0.45);
+}
+
+.lda-screen .lda-header-pill.lda-header-pill-compact {
+  font-size: 1.1cqw;
+  letter-spacing: 0.1em;
+  gap: 0.72cqw;
+}
+
+.lda-screen .lda-header-pill i {
+  width: 0.35cqw;
+  height: 0.35cqw;
+  border-radius: 50%;
+  background: #57e8ff;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Oben rechts: Uhrzeit & Vollbild */
+.lda-screen .lda-top-right {
+  position: absolute;
+  right: 1.4%;
+  top: 2.2%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.9cqw;
+}
+
+.lda-screen .lda-clock {
+  color: rgba(217, 245, 255, 0.72);
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.lda-screen .lda-fullscreen-btn {
+  width: 2.6cqw;
+  height: 2.6cqw;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #e6f7ff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lda-screen .lda-fullscreen-btn:hover {
+  background: rgba(0, 217, 255, 0.16);
+  border-color: rgba(87, 232, 255, 0.5);
+}
+
+.lda-screen .lda-fullscreen-btn svg {
+  width: 68%;
+  height: 68%;
+}
+
+/* Linker Glasflügel exakt auf der Clean-Plate */
+.lda-screen .lda-left-wing {
+  position: absolute;
+  left: 7.4%;
+  top: 31%;
+  width: 19.2%;
+  height: 39%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 0.85cqw;
+  overflow: hidden;
+}
+
+.lda-screen .lda-left-wing.lda-left-wing-rich {
+  justify-content: space-between;
+  padding: 0.55cqw 0.8cqw;
+}
+
+.lda-screen .lda-kicker {
+  color: #c5e3f2;
+  font-size: 1.32cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.lda-screen .lda-divider {
+  width: 100%;
+  height: 1px;
+  margin: 0.5cqw 0 1.15cqw;
+  background: linear-gradient(90deg, rgba(168, 224, 245, 0.48), rgba(168, 224, 245, 0.08));
+}
+
+.lda-screen .lda-player-name {
+  margin: 0 0 1.45cqw;
+  color: #f4fbff;
+  font-size: 4.1cqw;
+  font-weight: 800;
+  line-height: 0.94;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.9);
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.lda-screen .lda-player-name.lda-name-compact {
+  font-size: 3.15cqw;
+}
+
+.lda-screen .lda-player-name span {
+  display: block;
+}
+
+.lda-screen .lda-player-name-sm {
+  margin: 0.35cqw 0 0.1cqw;
+  color: #f4fbff;
+  font-size: 2.25cqw;
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.9);
+  max-width: 100%;
+  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lda-screen .lda-player-name-sm.lda-name-compact {
+  font-size: 1.8cqw;
+}
+
+.lda-screen .lda-round-sub {
+  color: #a9d6ec;
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lda-screen .lda-throw-pill {
+  padding: 0.52cqw 1.65cqw;
+  border: 2px solid #1de4ff;
+  border-radius: 999px;
+  background: rgba(0, 128, 168, 0.22);
+  box-shadow:
+    0 0 18px rgba(0, 217, 255, 0.52),
+    inset 0 0 12px rgba(0, 217, 255, 0.2);
+  color: #7bf2ff;
+  font-size: 1.42cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.lda-screen .lda-throw-pill.lda-throw-pill-sm {
+  padding: 0.32cqw 1.05cqw;
+  border-width: 1.5px;
+  font-size: 0.98cqw;
+}
+
+.lda-screen .lda-sub-pill {
+  margin-top: 0.75cqw;
+  padding: 0.28cqw 0.8cqw;
+  border: 1px solid rgba(123, 242, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(5, 22, 38, 0.65);
+  color: #b7e9fc;
+  font-size: 0.96cqw;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* 3 horizontale Dart-Slot-Zeilen (für 99 Darts im linken Glasflügel) */
+.lda-screen .lda-dart-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.32cqw;
+  margin: 0.35cqw 0;
+}
+
+.lda-screen .lda-dart-slot {
+  width: 100%;
+  height: 1.92cqw;
+  padding: 0 0.72cqw;
+  border: 1px solid rgba(92, 186, 224, 0.38);
+  border-radius: 0.4cqw;
+  background: rgba(4, 18, 34, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45cqw;
+  transition: all 0.2s ease;
+}
+
+.lda-screen .lda-dart-slot.lda-slot-triple {
+  border-color: rgba(255, 198, 56, 0.85);
+  background: rgba(245, 158, 11, 0.18);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.lda-screen .lda-dart-slot.lda-slot-double {
+  border-color: rgba(41, 228, 255, 0.85);
+  background: rgba(6, 182, 212, 0.18);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+}
+
+.lda-screen .lda-dart-slot.lda-slot-single {
+  border-color: rgba(0, 237, 121, 0.82);
+  background: rgba(16, 185, 129, 0.18);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.28);
+}
+
+.lda-screen .lda-dart-slot.lda-slot-miss {
+  border-color: rgba(244, 63, 94, 0.78);
+  background: rgba(225, 29, 72, 0.18);
+}
+
+.lda-screen .lda-dart-svg {
+  width: 55%;
+  height: 0.9cqw;
+  color: rgba(154, 198, 224, 0.62);
+}
+
+.lda-screen .lda-slot-triple .lda-dart-svg {
+  color: #fde047;
+}
+
+.lda-screen .lda-slot-double .lda-dart-svg {
+  color: #57e8ff;
+}
+
+.lda-screen .lda-slot-single .lda-dart-svg {
+  color: #00ed79;
+}
+
+.lda-screen .lda-slot-miss .lda-dart-svg {
+  color: #fb7185;
+}
+
+.lda-screen .lda-dart-badge {
+  font-size: 0.96cqw;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(168, 206, 226, 0.6);
+  white-space: nowrap;
+}
+
+.lda-screen .lda-slot-triple .lda-dart-badge {
+  color: #fde047;
+}
+
+.lda-screen .lda-slot-double .lda-dart-badge {
+  color: #57e8ff;
+}
+
+.lda-screen .lda-slot-single .lda-dart-badge {
+  color: #00ed79;
+}
+
+.lda-screen .lda-slot-miss .lda-dart-badge {
+  color: #fda4af;
+}
+
+.lda-screen .lda-opponent-bar {
+  width: 100%;
+  padding: 0.24cqw 0.55cqw;
+  border-radius: 0.4cqw;
+  border: 1px solid rgba(255, 189, 61, 0.35);
+  background: rgba(255, 189, 61, 0.1);
+  color: #fde68a;
+  font-size: 0.86cqw;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Untere 2-Spalten-KPIs im linken Flügel */
+.lda-screen .lda-left-kpis {
+  width: 100%;
+  padding-top: 0.45cqw;
+  border-top: 1px solid rgba(130, 205, 235, 0.25);
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: center;
+  text-align: center;
+}
+
+.lda-screen .lda-kpi-sep {
+  height: 100%;
+  background: rgba(130, 205, 235, 0.25);
+}
+
+.lda-screen .lda-kpi-item small {
+  display: block;
+  color: #9ecce4;
+  font-size: 0.78cqw;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.lda-screen .lda-kpi-item strong {
+  display: block;
+  margin-top: 0.1cqw;
+  color: #f4fbff;
+  font-size: 1.9cqw;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(0, 217, 255, 0.35);
+}
+
+/* Rechter Glasflügel exakt auf der Clean-Plate */
+.lda-screen .lda-right-wing {
+  position: absolute;
+  right: 7.4%;
+  top: 31%;
+  width: 19.2%;
+  height: 39%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0 0.85cqw;
+  text-align: center;
+  overflow: hidden;
+}
+
+.lda-screen .lda-right-wing.lda-right-wing-rich {
+  justify-content: space-between;
+  padding: 0.55cqw 0.8cqw;
+}
+
+.lda-screen .lda-right-wing .lda-kicker {
+  align-self: center;
+  font-size: 1.42cqw;
+  letter-spacing: 0.14em;
+}
+
+.lda-screen .lda-right-wing .lda-divider {
+  margin: 0.45cqw 0 0.85cqw;
+  background: linear-gradient(90deg, transparent, rgba(168, 224, 245, 0.45), transparent);
+}
+
+.lda-screen .lda-right-wing.lda-right-wing-rich .lda-divider {
+  margin: 0.25cqw 0 0.35cqw;
+}
+
+.lda-screen .lda-main-value {
+  color: #00ed79;
+  font-size: 6.2cqw;
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-shadow:
+    0 0 24px rgba(0, 237, 121, 0.65),
+    0 0 8px rgba(0, 237, 121, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
+.lda-screen .lda-main-value.lda-main-value-md {
+  font-size: 4.7cqw;
+}
+
+.lda-screen .lda-main-value.lda-main-value-sm {
+  font-size: 3.15cqw;
+}
+
+.lda-screen .lda-main-row {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.38cqw;
+}
+
+.lda-screen .lda-main-suffix {
+  color: #9de8c7;
+  font-size: 2.05cqw;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.lda-screen .lda-sub-meta {
+  margin-top: 0.38cqw;
+  color: #9de8c7;
+  font-size: 1.02cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lda-screen .lda-darts-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35cqw;
+  margin-top: 0.25cqw;
+  padding: 0.18cqw 0.85cqw;
+  border: 1px solid rgba(118, 206, 238, 0.45);
+  border-radius: 999px;
+  background: rgba(4, 18, 34, 0.72);
+  color: #dcf5ff;
+  font-size: 0.92cqw;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* Gold-Fortschrittsbalken (wie Checkout Battle & PDC Challenge) */
+.lda-screen .lda-gold-bar {
+  width: 92%;
+  height: 1.35cqw;
+  min-height: 10px;
+  margin-top: 1.5cqw;
+  padding: 0.18cqw;
+  border: 1.5px solid rgba(255, 189, 61, 0.82);
+  border-radius: 999px;
+  background: rgba(10, 18, 28, 0.72);
+  box-shadow:
+    0 0 14px rgba(255, 189, 61, 0.35),
+    inset 0 2px 5px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.lda-screen .lda-gold-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #d97706, #ffbd3d 50%, #fde68a);
+  box-shadow: 0 0 14px rgba(255, 189, 61, 0.85);
+  transition: width 0.35s ease;
+}
+
+/* 5 kompakte Statistik-Balken rechts (99 Darts) */
+.lda-screen .lda-stat-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.34cqw;
+}
+
+.lda-screen .lda-stat-row {
+  width: 100%;
+  text-align: left;
+}
+
+.lda-screen .lda-stat-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4cqw;
+  margin-bottom: 0.14cqw;
+}
+
+.lda-screen .lda-stat-label {
+  color: #cfeafa;
+  font-size: 0.88cqw;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lda-screen .lda-stat-meta {
+  color: #eef9ff;
+  font-size: 0.94cqw;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.lda-screen .lda-stat-track {
+  width: 100%;
+  height: 0.42cqw;
+  min-height: 4px;
+  border: 1px solid rgba(87, 178, 214, 0.35);
+  border-radius: 999px;
+  background: rgba(3, 14, 28, 0.85);
+  overflow: hidden;
+}
+
+.lda-screen .lda-stat-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.lda-screen .lda-fill-gold {
+  background: linear-gradient(90deg, #d97706, #fde047);
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.65);
+}
+
+.lda-screen .lda-fill-cyan {
+  background: linear-gradient(90deg, #0284c7, #38e8ff);
+  box-shadow: 0 0 8px rgba(56, 232, 255, 0.65);
+}
+
+.lda-screen .lda-fill-green {
+  background: linear-gradient(90deg, #059669, #00ed79);
+  box-shadow: 0 0 8px rgba(0, 237, 121, 0.65);
+}
+
+.lda-screen .lda-fill-red {
+  background: linear-gradient(90deg, #be123c, #fb7185);
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.55);
+}
+
+/* 15 nummerierte Check-Ringe für Stellen & Checken (5 Spalten × 3 Reihen) */
+.lda-screen .lda-check-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.42cqw 0.48cqw;
+  margin-top: 0.3cqw;
+}
+
+.lda-screen .lda-check-ring {
+  height: 2.05cqw;
+  border-radius: 999px;
+  border: 1.5px solid rgba(118, 182, 216, 0.28);
+  background: rgba(4, 18, 34, 0.65);
+  color: rgba(180, 218, 240, 0.52);
+  display: grid;
+  place-items: center;
+  font-size: 0.96cqw;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: all 0.2s ease;
+}
+
+.lda-screen .lda-check-ring.lda-ring-hit {
+  border-color: #00ed79;
+  background: rgba(0, 237, 121, 0.22);
+  color: #b7ffda;
+  box-shadow: 0 0 10px rgba(0, 237, 121, 0.4);
+}
+
+.lda-screen .lda-check-ring.lda-ring-current {
+  border-color: #38e8ff;
+  background: rgba(0, 180, 224, 0.28);
+  color: #ffffff;
+  box-shadow:
+    0 0 12px rgba(56, 232, 255, 0.65),
+    inset 0 0 8px rgba(56, 232, 255, 0.25);
+}
+
+.lda-screen .lda-check-ring.lda-ring-miss {
+  border-color: rgba(244, 63, 94, 0.78);
+  background: rgba(225, 29, 72, 0.2);
+  color: #fda4af;
+}
+
+/* Transparentes SVG-Overlay exakt über der Master-Dartscheibe */
+.lda-screen .lda-board-overlay {
+  position: absolute;
+  left: 50%;
+  top: 48.05%;
+  height: 80.7%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.lda-screen .lda-board-overlay svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* Untere optionale Info-Kapsel (Checkroute / Punkte-Legende) */
+.lda-screen .lda-bottom-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 2.3%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85cqw;
+  padding: 0.36cqw 1.75cqw;
+  border-radius: 999px;
+  border: 1.5px solid rgba(44, 227, 255, 0.72);
+  background: linear-gradient(180deg, rgba(5, 22, 38, 0.9), rgba(2, 12, 24, 0.95));
+  box-shadow:
+    0 0 18px rgba(0, 217, 255, 0.35),
+    inset 0 0 12px rgba(0, 217, 255, 0.14);
+  color: #e6f7ff;
+  font-size: 1.18cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 10px rgba(0, 217, 255, 0.45);
+}
+
+.lda-screen .lda-bottom-pill i {
+  width: 0.3cqw;
+  height: 0.3cqw;
+  border-radius: 50%;
+  background: #57e8ff;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.lda-screen .lda-bottom-pill em {
+  font-style: normal;
+  color: #fde047;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+}

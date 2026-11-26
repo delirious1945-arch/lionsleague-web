@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId } from 'react';
+import React from 'react';
 import {
   DartHitValue,
   Darts99LivePlayerStats,
@@ -8,12 +8,7 @@ import {
   TOTAL_DARTS_99,
   TOTAL_ROUNDS_99,
 } from '@/app/training/99-darts/types';
-import './HolographicDarts99Cockpit.css';
-
-// Offizielle Turnier-Reihenfolge im Uhrzeigersinn ab 12 Uhr (0°)
-const DARTBOARD_NUMBERS = [
-  20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5,
-] as const;
+import LionsDartboardArenaShell from '@/components/LionsDartboardArenaShell';
 
 export interface HolographicDarts99Props {
   boardId: string;
@@ -31,50 +26,10 @@ export interface HolographicDarts99Props {
   onToggleFullscreen?: () => void;
 }
 
-function getSegmentAngle(num: number): number {
-  const idx = DARTBOARD_NUMBERS.indexOf(
-    num as (typeof DARTBOARD_NUMBERS)[number]
-  );
-  return idx >= 0 ? idx * 18 : 0;
-}
-
-function describeSectorRing(
-  cx: number,
-  cy: number,
-  innerRadius: number,
-  outerRadius: number,
-  startDeg: number,
-  endDeg: number
-): string {
-  const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
-  const startRad = toRad(startDeg);
-  const endRad = toRad(endDeg);
-
-  const x1Outer = cx + outerRadius * Math.cos(startRad);
-  const y1Outer = cy + outerRadius * Math.sin(startRad);
-  const x2Outer = cx + outerRadius * Math.cos(endRad);
-  const y2Outer = cy + outerRadius * Math.sin(endRad);
-
-  const x1Inner = cx + innerRadius * Math.cos(endRad);
-  const y1Inner = cy + innerRadius * Math.sin(endRad);
-  const x2Inner = cx + innerRadius * Math.cos(startRad);
-  const y2Inner = cy + innerRadius * Math.sin(startRad);
-
-  const largeArc = endDeg - startDeg > 180 ? 1 : 0;
-
-  return [
-    `M ${x1Outer.toFixed(2)} ${y1Outer.toFixed(2)}`,
-    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${x2Outer.toFixed(2)} ${y2Outer.toFixed(2)}`,
-    `L ${x1Inner.toFixed(2)} ${y1Inner.toFixed(2)}`,
-    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x2Inner.toFixed(2)} ${y2Inner.toFixed(2)}`,
-    'Z',
-  ].join(' ');
-}
-
 function DartSilhouetteSvg() {
   return (
     <svg
-      className="d99-dart-svg"
+      className="lda-dart-svg"
       viewBox="0 0 180 20"
       fill="currentColor"
       aria-hidden="true"
@@ -87,40 +42,15 @@ function DartSilhouetteSvg() {
   );
 }
 
-function FullscreenCornerIcon({ isFullscreen }: { isFullscreen?: boolean }) {
-  if (isFullscreen) {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M4 9h5V4m11 5h-5V4M4 15h5v5m11-5h-5v5"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-        />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M9 4H4v5m11-5h5v5M9 20H4v-5m11 5h5v-5"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function getDartSlotMeta(
   val: DartHitValue | undefined,
   idx: number,
   targetNumber: number
 ): { cls: string; badge: string } {
-  if (val === 3) return { cls: 'd99-slot-triple', badge: `T${targetNumber} (+3)` };
-  if (val === 2) return { cls: 'd99-slot-double', badge: `D${targetNumber} (+2)` };
-  if (val === 1) return { cls: 'd99-slot-single', badge: `S${targetNumber} (+1)` };
-  if (val === 0) return { cls: 'd99-slot-miss', badge: 'MISS (0)' };
+  if (val === 3) return { cls: 'lda-slot-triple', badge: `T${targetNumber} (+3)` };
+  if (val === 2) return { cls: 'lda-slot-double', badge: `D${targetNumber} (+2)` };
+  if (val === 1) return { cls: 'lda-slot-single', badge: `S${targetNumber} (+1)` };
+  if (val === 0) return { cls: 'lda-slot-miss', badge: 'MISS (0)' };
   return { cls: '', badge: `DART ${idx + 1}` };
 }
 
@@ -139,11 +69,6 @@ export default function HolographicDarts99Cockpit({
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicDarts99Props) {
-  const uid = useId().replace(/:/g, '');
-  const goldGlowId = `d99-gold-glow-${uid}`;
-  const cyanGlowId = `d99-cyan-glow-${uid}`;
-  const wedgeGradId = `d99-wedge-grad-${uid}`;
-
   // Spielername immer dynamisch aus dem laufenden Spiel (niemals hardcoded!)
   const cleanName = (activeName || '').trim() || 'Spieler';
   const isCompactName = cleanName.length > 15;
@@ -156,7 +81,6 @@ export default function HolographicDarts99Cockpit({
     TOTAL_ROUNDS_99
   );
   const safeTarget = [20, 19, 18].includes(targetNumber) ? targetNumber : 20;
-  const beamAngle = getSegmentAngle(safeTarget);
 
   const otherName = activePlayer === 1 ? p2Name : p1Name;
   const otherStats = activePlayer === 1 ? p2Stats : p1Stats;
@@ -183,87 +107,42 @@ export default function HolographicDarts99Cockpit({
     Math.round((activeStats.dartsThrown / TOTAL_DARTS_99) * 100)
   );
 
-  const handleFullscreen = () => {
-    if (onToggleFullscreen) {
-      onToggleFullscreen();
-      return;
-    }
-    if (typeof document !== 'undefined') {
-      if (document.fullscreenElement) {
-        void document.exitFullscreen();
-      } else {
-        void document.documentElement.requestFullscreen();
-      }
-    }
-  };
-
-  // Geometrie des transparenten SVG-Overlays exakt auf der Clean-Plate-Dartscheibe
-  const cx = 300;
-  const cy = 300;
-  const rHub = 84;
-  const rDoubleOut = 218;
-  const rNumberOuter = 272;
-
   return (
-    <main className="d99-screen" aria-label="99 Darts Challenge">
-      <div className="d99-canvas">
-        {/* Textfreie 1:1 Arena-Clean-Plate */}
-        <img
-          className="d99-stage-img"
-          src="/images/darts99-stage.jpg"
-          alt=""
-        />
-
-        {/* Obere Header-Kapsel */}
-        <header className="d99-header-pill">
-          <span>{boardLabel || `BOARD ${boardId}`}</span>
-          <i />
-          <span>LIONS WEYHAUSEN</span>
-          <i />
-          <span>99 DARTS CHALLENGE</span>
-          <i />
-          <span>ZIEL {safeTarget}</span>
-          <i />
-          <span>
-            AUFNAHME {displayRound}/{TOTAL_ROUNDS_99}
-          </span>
-        </header>
-
-        {/* Oben rechts: Uhrzeit & Vollbild */}
-        <div className="d99-top-right">
-          {currentTime && <span className="d99-clock">{currentTime}</span>}
-          <button
-            type="button"
-            className="d99-fullscreen-btn"
-            onClick={handleFullscreen}
-            aria-label={
-              isFullscreen ? 'Vollbildmodus beenden' : 'Vollbildmodus umschalten'
-            }
-            title={
-              isFullscreen ? 'Vollbildmodus beenden' : 'Vollbildmodus umschalten'
-            }
-          >
-            <FullscreenCornerIcon isFullscreen={isFullscreen} />
-          </button>
-        </div>
-
-        {/* Linker Glasflügel: Aktiver Spieler, Dart-Slots & Quoten */}
-        <section className="d99-left-wing" aria-label="Aktiver Spieler">
+    <LionsDartboardArenaShell
+      ariaLabel="99 Darts Challenge"
+      gameTitle="99 DARTS CHALLENGE"
+      headerItems={[
+        boardLabel || `BOARD ${boardId}`,
+        'LIONS WEYHAUSEN',
+        `ZIEL ${safeTarget}`,
+        `AUFNAHME ${displayRound}/${TOTAL_ROUNDS_99}`,
+      ]}
+      currentTime={currentTime}
+      isFullscreen={isFullscreen}
+      onToggleFullscreen={onToggleFullscreen}
+      centerLabel="ZIELZAHL"
+      centerValue={String(safeTarget)}
+      primaryTarget={{ mode: 'wedge', number: safeTarget }}
+      leftWingRich
+      leftAriaLabel="Aktiver Spieler"
+      leftWingContent={
+        <>
           <div style={{ width: '100%' }}>
-            <span className="d99-throw-pill">
+            <span className="lda-throw-pill lda-throw-pill-sm">
               {is1vs1 ? `SPIELER ${activePlayer} · AM WURF` : 'AM WURF'}
             </span>
             <h1
-              className={`d99-player-name ${isCompactName ? 'd99-name-compact' : ''}`}
+              className={`lda-player-name-sm ${isCompactName ? 'lda-name-compact' : ''}`}
+              title={cleanName}
             >
               {cleanName}
             </h1>
-            <div className="d99-round-sub">
+            <div className="lda-round-sub">
               AUFNAHME {displayRound} / {TOTAL_ROUNDS_99}
             </div>
           </div>
 
-          <div className="d99-dart-list">
+          <div className="lda-dart-list">
             {[0, 1, 2].map((idx) => {
               const meta = getDartSlotMeta(
                 activeStats.currentTurnDarts?.[idx],
@@ -271,135 +150,44 @@ export default function HolographicDarts99Cockpit({
                 safeTarget
               );
               return (
-                <div className={`d99-dart-slot ${meta.cls}`} key={idx}>
+                <div className={`lda-dart-slot ${meta.cls}`} key={idx}>
                   <DartSilhouetteSvg />
-                  <span className="d99-dart-badge">{meta.badge}</span>
+                  <span className="lda-dart-badge">{meta.badge}</span>
                 </div>
               );
             })}
           </div>
 
           {is1vs1 && otherStats && (
-            <div className="d99-opponent-bar">
+            <div className="lda-opponent-bar">
               GEGNER: {otherName} · {otherStats.totalPoints} PKT
             </div>
           )}
 
-          <div className="d99-left-kpis">
-            <div className="d99-kpi-item">
+          <div className="lda-left-kpis">
+            <div className="lda-kpi-item">
               <small>TREFFERQUOTE</small>
               <strong>{activeStats.hitQuote.toFixed(1)}%</strong>
             </div>
-            <div className="d99-kpi-sep" />
-            <div className="d99-kpi-item">
+            <div className="lda-kpi-sep" />
+            <div className="lda-kpi-item">
               <small>PKT / DART</small>
               <strong>{activeStats.pointsPerDart.toFixed(2)}</strong>
             </div>
           </div>
-        </section>
-
-        {/* Transparentes SVG-Overlay exakt über dem Dartboard (Ziel-Highlight + Zentral-Hub) */}
-        <div className="d99-board-overlay" aria-hidden="true">
-          <svg viewBox="0 0 600 600">
-            <defs>
-              <filter
-                id={goldGlowId}
-                x="-35%"
-                y="-35%"
-                width="170%"
-                height="170%"
-              >
-                <feGaussianBlur stdDeviation="5.5" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-
-              <filter
-                id={cyanGlowId}
-                x="-35%"
-                y="-35%"
-                width="170%"
-                height="170%"
-              >
-                <feGaussianBlur stdDeviation="5" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-
-              <linearGradient id={wedgeGradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fde047" stopOpacity="0.45" />
-                <stop offset="55%" stopColor="#f59e0b" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.06" />
-              </linearGradient>
-            </defs>
-
-            {/* Drehbares Ziel-Highlight exakt auf der aktiven Zielzahl (20, 19 oder 18) */}
-            <g transform={`rotate(${beamAngle} ${cx} ${cy})`}>
-              {/* Blau leuchtender Rahmen um die Zielzahl im Zahlenring */}
-              <path
-                d={describeSectorRing(cx, cy, rDoubleOut, rNumberOuter, -9, 9)}
-                fill="rgba(37, 99, 235, 0.24)"
-                stroke="#38e8ff"
-                strokeWidth="2.5"
-                filter={`url(#${cyanGlowId})`}
-              />
-
-              {/* Warm-goldener Glow-Rahmen über das gesamte Ziel-Segment */}
-              <path
-                d={describeSectorRing(cx, cy, rHub, rDoubleOut, -9, 9)}
-                fill={`url(#${wedgeGradId})`}
-                stroke="#fbbf24"
-                strokeWidth="2.6"
-                filter={`url(#${goldGlowId})`}
-              />
-            </g>
-
-            {/* Zentraler Ziel-Hub exakt im leeren Glas-Kreis */}
-            <g>
-              <text
-                x={cx}
-                y={cy - 26}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="#b8ecff"
-                fontSize="17"
-                fontWeight="800"
-                letterSpacing="2.4"
-                fontFamily="Barlow Condensed, sans-serif"
-              >
-                ZIELZAHL
-              </text>
-              <text
-                x={cx}
-                y={cy + 16}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="#ffffff"
-                fontSize="66"
-                fontWeight="900"
-                fontFamily="Barlow Condensed, sans-serif"
-                style={{
-                  filter: 'drop-shadow(0 0 16px rgba(0, 217, 255, 0.6))',
-                }}
-              >
-                {safeTarget}
-              </text>
-            </g>
-          </svg>
-        </div>
-
-        {/* Rechter Glasflügel: Punktestand, Darts-Counter & 5 Live-Balken */}
-        <section className="d99-right-wing" aria-label="Punktestand und Statistik">
-          <div className="d99-score-head">
-            <span className="d99-score-kicker">PUNKTESTAND</span>
-            <div className="d99-score-big">
+        </>
+      }
+      rightWingRich
+      rightAriaLabel="Punktestand und Statistik"
+      rightWingContent={
+        <>
+          <div style={{ width: '100%' }}>
+            <span className="lda-kicker">PUNKTESTAND</span>
+            <div className="lda-divider" />
+            <div className="lda-main-value lda-main-value-sm">
               {activeStats.totalPoints} / {MAX_POINTS_99}
             </div>
-            <div className="d99-darts-pill">
+            <div className="lda-darts-pill">
               <span>🎯</span>
               <span>
                 Darts {activeStats.dartsThrown} / {TOTAL_DARTS_99}
@@ -407,84 +195,84 @@ export default function HolographicDarts99Cockpit({
             </div>
           </div>
 
-          <div className="d99-stat-list">
-            <div className="d99-stat-row">
-              <div className="d99-stat-top">
-                <span className="d99-stat-label">
+          <div className="lda-stat-list">
+            <div className="lda-stat-row">
+              <div className="lda-stat-top">
+                <span className="lda-stat-label">
                   Triple (T{safeTarget}) · {activeStats.triples}×
                 </span>
-                <span className="d99-stat-meta">{triplePct}%</span>
+                <span className="lda-stat-meta">{triplePct}%</span>
               </div>
-              <div className="d99-stat-track">
+              <div className="lda-stat-track">
                 <div
-                  className="d99-stat-fill d99-fill-gold"
+                  className="lda-stat-fill lda-fill-gold"
                   style={{ width: `${triplePct}%` }}
                 />
               </div>
             </div>
 
-            <div className="d99-stat-row">
-              <div className="d99-stat-top">
-                <span className="d99-stat-label">
+            <div className="lda-stat-row">
+              <div className="lda-stat-top">
+                <span className="lda-stat-label">
                   Double (D{safeTarget}) · {activeStats.doubles}×
                 </span>
-                <span className="d99-stat-meta">{doublePct}%</span>
+                <span className="lda-stat-meta">{doublePct}%</span>
               </div>
-              <div className="d99-stat-track">
+              <div className="lda-stat-track">
                 <div
-                  className="d99-stat-fill d99-fill-cyan"
+                  className="lda-stat-fill lda-fill-cyan"
                   style={{ width: `${doublePct}%` }}
                 />
               </div>
             </div>
 
-            <div className="d99-stat-row">
-              <div className="d99-stat-top">
-                <span className="d99-stat-label">
+            <div className="lda-stat-row">
+              <div className="lda-stat-top">
+                <span className="lda-stat-label">
                   Single (S{safeTarget}) · {activeStats.singles}×
                 </span>
-                <span className="d99-stat-meta">{singlePct}%</span>
+                <span className="lda-stat-meta">{singlePct}%</span>
               </div>
-              <div className="d99-stat-track">
+              <div className="lda-stat-track">
                 <div
-                  className="d99-stat-fill d99-fill-green"
+                  className="lda-stat-fill lda-fill-green"
                   style={{ width: `${singlePct}%` }}
                 />
               </div>
             </div>
 
-            <div className="d99-stat-row">
-              <div className="d99-stat-top">
-                <span className="d99-stat-label">
+            <div className="lda-stat-row">
+              <div className="lda-stat-top">
+                <span className="lda-stat-label">
                   Miss (0 Pkt) · {activeStats.misses}×
                 </span>
-                <span className="d99-stat-meta">{missPct}%</span>
+                <span className="lda-stat-meta">{missPct}%</span>
               </div>
-              <div className="d99-stat-track">
+              <div className="lda-stat-track">
                 <div
-                  className="d99-stat-fill d99-fill-red"
+                  className="lda-stat-fill lda-fill-red"
                   style={{ width: `${missPct}%` }}
                 />
               </div>
             </div>
 
-            <div className="d99-stat-row">
-              <div className="d99-stat-top">
-                <span className="d99-stat-label">FORTSCHRITT</span>
-                <span className="d99-stat-meta">{progressPct}%</span>
+            <div className="lda-stat-row">
+              <div className="lda-stat-top">
+                <span className="lda-stat-label">FORTSCHRITT</span>
+                <span className="lda-stat-meta">{progressPct}%</span>
               </div>
-              <div className="d99-stat-track">
+              <div className="lda-stat-track">
                 <div
-                  className="d99-stat-fill d99-fill-cyan"
+                  className="lda-stat-fill lda-fill-cyan"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
             </div>
           </div>
-        </section>
-
-        {/* Untere Legende-Kapsel */}
-        <footer className="d99-bottom-pill">
+        </>
+      }
+      bottomPill={
+        <>
           <span>S{safeTarget}: 1P</span>
           <i />
           <span>D{safeTarget}: 2P</span>
@@ -492,8 +280,8 @@ export default function HolographicDarts99Cockpit({
           <span>T{safeTarget}: 3P</span>
           <i />
           <span>{TOTAL_DARTS_99} DARTS</span>
-        </footer>
-      </div>
-    </main>
+        </>
+      }
+    />
   );
 }

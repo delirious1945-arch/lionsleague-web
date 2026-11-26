@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import TrainingMonitorShell, {
-  extractTargetNumber,
-} from '@/components/TrainingMonitorShell';
+import LionsDartboardArenaShell, {
+  parseDartToken,
+} from '@/components/LionsDartboardArenaShell';
 
 export interface HolographicPdcChallengeProps {
   boardId: string;
@@ -36,31 +36,93 @@ export default function HolographicPdcChallengeCockpit({
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicPdcChallengeProps) {
+  // Spielername immer dynamisch aus dem laufenden Spiel (niemals hardcoded!)
+  const cleanName = (activeName || '').trim() || 'Spieler';
+  const nameParts = cleanName.split(/\s+/).filter(Boolean);
+  const longestPartLen = Math.max(...nameParts.map((p) => p.length), 0);
+  const isCompactName = longestPartLen > 12 || nameParts.length > 2;
+
+  const safeTotal = Math.max(1, totalVisits);
+  const safeVisit = Math.max(1, Math.min(currentVisit, safeTotal));
+  const visitProgressPct = Math.round((safeVisit / safeTotal) * 100);
+  const goldBarWidth = Math.max(14, Math.min(100, visitProgressPct));
+
   const centerLabel =
     currentPart === 2 ? 'DOPPEL' : currentPart === 3 ? 'SHANGHAI' : 'ZIEL';
-  const safeVisit = Math.max(1, Math.min(currentVisit, totalVisits));
-  const visitProgressPct = Math.round((safeVisit / Math.max(1, totalVisits)) * 100);
+  const safeTarget = (currentTarget || '-').trim().toUpperCase();
+  const parsed = parseDartToken(safeTarget);
+
+  const primaryTarget =
+    currentPart === 2 && parsed.mode === 'wedge' && parsed.number
+      ? { mode: 'double' as const, number: parsed.number }
+      : (currentPart === 1 || currentPart === 3) &&
+        parsed.mode !== 'bull' &&
+        parsed.number
+      ? { mode: 'wedge' as const, number: parsed.number }
+      : parsed;
+
+  const partLabel =
+    currentPart === 1
+      ? 'TEIL 1 · SCORING'
+      : currentPart === 2
+      ? 'TEIL 2 · DOPPEL'
+      : currentPart === 3
+      ? 'TEIL 3 · SHANGHAI'
+      : undefined;
 
   return (
-    <TrainingMonitorShell
-      boardId={boardId}
-      boardLabel={boardLabel}
-      gameName={`PDC CHALLENGE${currentPart ? ` · TEIL ${currentPart}` : ''}`}
-      headerTitle=""
-      counter={`AUFNAHME ${safeVisit}/${totalVisits}`}
-      kind="board"
-      playerName={activeName}
-      playerTop={is1vs1 ? `SPIELER ${activePlayer} · AM OCHE` : 'SPIELER AM OCHE'}
-      centerLabel={centerLabel}
-      centerValue={currentTarget}
-      highlightNumber={extractTargetNumber(currentTarget)}
-      statsTitle="PUNKTESTAND"
-      statsValue={String(currentScore)}
-      statsSuffix="/ 100"
-      goldProgressPct={visitProgressPct}
+    <LionsDartboardArenaShell
+      ariaLabel="PDC Challenge"
+      gameTitle={`PDC CHALLENGE${currentPart ? ` · TEIL ${currentPart}` : ''}`}
+      headerItems={[
+        boardLabel || `BOARD ${boardId}`,
+        'LIONS WEYHAUSEN',
+        `AUFNAHME ${safeVisit}/${safeTotal}`,
+      ]}
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}
+      centerLabel={centerLabel}
+      centerValue={safeTarget}
+      primaryTarget={primaryTarget}
+      leftAriaLabel="Aktiver Spieler"
+      leftWingContent={
+        <>
+          <span className="lda-kicker">
+            {is1vs1 ? `SPIELER ${activePlayer} AM OCHE` : 'SPIELER AM OCHE'}
+          </span>
+          <div className="lda-divider" />
+          <h1
+            className={`lda-player-name ${isCompactName ? 'lda-name-compact' : ''}`}
+          >
+            {nameParts.map((part, idx) => (
+              <span key={`${part}-${idx}`}>{part}</span>
+            ))}
+          </h1>
+          <div className="lda-throw-pill">AM WURF</div>
+          {partLabel && <div className="lda-sub-pill">{partLabel}</div>}
+        </>
+      }
+      rightAriaLabel="Punktestand"
+      rightWingContent={
+        <>
+          <span className="lda-kicker">PUNKTESTAND</span>
+          <div className="lda-divider" />
+          <div className="lda-main-row">
+            <div className="lda-main-value">{currentScore}</div>
+            <span className="lda-main-suffix">/ 100</span>
+          </div>
+          <div className="lda-sub-meta">
+            AUFNAHME {safeVisit} VON {safeTotal}
+          </div>
+          <div className="lda-gold-bar">
+            <div
+              className="lda-gold-bar-fill"
+              style={{ width: `${goldBarWidth}%` }}
+            />
+          </div>
+        </>
+      }
     />
   );
 }
