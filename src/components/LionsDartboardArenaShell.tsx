@@ -39,6 +39,7 @@ export interface LionsDartboardArenaShellProps {
   primaryTarget: DartboardTargetSpec;
   secondaryTarget?: DartboardTargetSpec;
   bottomPill?: React.ReactNode;
+  stageImageSrc?: string;
 }
 
 /**
@@ -261,6 +262,7 @@ export default function LionsDartboardArenaShell({
   primaryTarget,
   secondaryTarget,
   bottomPill,
+  stageImageSrc = '/images/checkout-battle-stage.jpg',
 }: LionsDartboardArenaShellProps) {
   const uid = useId().replace(/:/g, '');
   const greenGlowId = `lda-green-glow-${uid}`;
@@ -334,7 +336,7 @@ export default function LionsDartboardArenaShell({
         {/* Einheitliche, textfreie Master-Arena-Clean-Plate */}
         <img
           className="lda-stage-img"
-          src="/images/checkout-battle-stage.jpg"
+          src={stageImageSrc}
           alt=""
         />
 

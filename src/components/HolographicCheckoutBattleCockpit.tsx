@@ -20,6 +20,7 @@ export interface HolographicCheckoutBattleProps {
   currentTime?: string;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  stageImageSrc?: string;
 }
 
 export default function HolographicCheckoutBattleCockpit({
@@ -37,6 +38,7 @@ export default function HolographicCheckoutBattleCockpit({
   currentTime,
   isFullscreen = false,
   onToggleFullscreen,
+  stageImageSrc,
 }: HolographicCheckoutBattleProps) {
   // Spielername immer dynamisch aus dem laufenden Spiel (niemals hardcoded!)
   const cleanName = (activeName || '').trim() || 'Spieler';
@@ -69,6 +71,7 @@ export default function HolographicCheckoutBattleCockpit({
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}
+      stageImageSrc={stageImageSrc}
       centerLabel="DOPPEL"
       centerValue={safeTarget}
       primaryTarget={primaryTarget}

@@ -7,8 +7,35 @@ import HolographicPdcChallengeCockpit from '@/components/HolographicPdcChallenge
 import HolographicStellenCheckenCockpit from '@/components/HolographicStellenCheckenCockpit';
 import { Darts99LivePlayerStats } from '@/app/training/99-darts/types';
 
-type PreviewGame = 'checkout-battle' | 'darts-99' | 'pdc-challenge' | 'stellen-checken';
+type PreviewGame =
+  | 'checkout-battle'
+  | 'darts-99'
+  | 'pdc-challenge'
+  | 'stellen-checken';
 type PreviewScenario = 'standard' | 'duel-long-name' | 'bull-endgame';
+type PreviewStageLogo = 'fire-gold' | 'emerald-gold' | 'original';
+
+const STAGE_OPTIONS: {
+  id: PreviewStageLogo;
+  label: string;
+  src: string;
+}[] = [
+  {
+    id: 'fire-gold',
+    label: '🔥 Logo 1 (Fire-Gold)',
+    src: '/images/arena-stage-fire-gold.jpg',
+  },
+  {
+    id: 'emerald-gold',
+    label: '💚 Logo 2 (Smaragd-Gold)',
+    src: '/images/arena-stage-emerald-gold.jpg',
+  },
+  {
+    id: 'original',
+    label: '🦁 Original (Lions)',
+    src: '/images/checkout-battle-stage.jpg',
+  },
+];
 
 const GAME_OPTIONS: { id: PreviewGame; label: string }[] = [
   { id: 'checkout-battle', label: '1. Checkout Battle' },
@@ -26,7 +53,12 @@ const SCENARIO_OPTIONS: { id: PreviewScenario; label: string }[] = [
 export default function DartboardArenaPreviewClient() {
   const [activeGame, setActiveGame] = useState<PreviewGame>('checkout-battle');
   const [scenario, setScenario] = useState<PreviewScenario>('standard');
+  const [stageLogo, setStageLogo] = useState<PreviewStageLogo>('fire-gold');
   const [toolbarHidden, setToolbarHidden] = useState(false);
+
+  const stageImageSrc =
+    STAGE_OPTIONS.find((opt) => opt.id === stageLogo)?.src ??
+    '/images/arena-stage-fire-gold.jpg';
 
   const playerName =
     scenario === 'duel-long-name'
@@ -106,12 +138,37 @@ export default function DartboardArenaPreviewClient() {
               ? 'BULL'
               : 'D20'
           }
-          currentRound={scenario === 'bull-endgame' ? 10 : scenario === 'duel-long-name' ? 6 : 3}
+          currentRound={
+            scenario === 'bull-endgame'
+              ? 10
+              : scenario === 'duel-long-name'
+              ? 6
+              : 3
+          }
           totalRounds={10}
-          quote={scenario === 'bull-endgame' ? 40.0 : scenario === 'duel-long-name' ? 27.8 : 33.3}
-          hits={scenario === 'bull-endgame' ? 12 : scenario === 'duel-long-name' ? 5 : 3}
-          thrown={scenario === 'bull-endgame' ? 30 : scenario === 'duel-long-name' ? 18 : 9}
+          quote={
+            scenario === 'bull-endgame'
+              ? 40.0
+              : scenario === 'duel-long-name'
+              ? 27.8
+              : 33.3
+          }
+          hits={
+            scenario === 'bull-endgame'
+              ? 12
+              : scenario === 'duel-long-name'
+              ? 5
+              : 3
+          }
+          thrown={
+            scenario === 'bull-endgame'
+              ? 30
+              : scenario === 'duel-long-name'
+              ? 18
+              : 9
+          }
           currentTime="19:42"
+          stageImageSrc={stageImageSrc}
         />
       )}
 
@@ -128,6 +185,7 @@ export default function DartboardArenaPreviewClient() {
           p1Stats={darts99StatsStandard}
           p2Stats={active99Stats}
           currentTime="19:42"
+          stageImageSrc={stageImageSrc}
         />
       )}
 
@@ -153,13 +211,22 @@ export default function DartboardArenaPreviewClient() {
               : '19'
           }
           currentScore={
-            scenario === 'bull-endgame' ? 84 : scenario === 'duel-long-name' ? 52 : 38
+            scenario === 'bull-endgame'
+              ? 84
+              : scenario === 'duel-long-name'
+              ? 52
+              : 38
           }
           currentVisit={
-            scenario === 'bull-endgame' ? 24 : scenario === 'duel-long-name' ? 14 : 7
+            scenario === 'bull-endgame'
+              ? 24
+              : scenario === 'duel-long-name'
+              ? 14
+              : 7
           }
           totalVisits={26}
           currentTime="19:42"
+          stageImageSrc={stageImageSrc}
         />
       )}
 
@@ -171,11 +238,19 @@ export default function DartboardArenaPreviewClient() {
           is1vs1={is1vs1}
           activePlayer={activePlayer}
           currentVisit={
-            scenario === 'bull-endgame' ? 15 : scenario === 'duel-long-name' ? 8 : 4
+            scenario === 'bull-endgame'
+              ? 15
+              : scenario === 'duel-long-name'
+              ? 8
+              : 4
           }
           totalVisits={15}
           currentNumber={
-            scenario === 'bull-endgame' ? 50 : scenario === 'duel-long-name' ? 43 : 64
+            scenario === 'bull-endgame'
+              ? 50
+              : scenario === 'duel-long-name'
+              ? 43
+              : 64
           }
           recommendedRoute={
             scenario === 'bull-endgame'
@@ -185,9 +260,14 @@ export default function DartboardArenaPreviewClient() {
               : 'T16 ➔ D8'
           }
           checksCount={
-            scenario === 'bull-endgame' ? 11 : scenario === 'duel-long-name' ? 5 : 3
+            scenario === 'bull-endgame'
+              ? 11
+              : scenario === 'duel-long-name'
+              ? 5
+              : 3
           }
           currentTime="19:42"
+          stageImageSrc={stageImageSrc}
         />
       )}
 
@@ -227,12 +307,12 @@ export default function DartboardArenaPreviewClient() {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            maxWidth: '96vw',
+            maxWidth: '98vw',
             padding: '8px 12px',
             borderRadius: '14px',
             border: '1px solid rgba(44, 227, 255, 0.55)',
-            background: 'rgba(3, 14, 26, 0.88)',
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.75)',
+            background: 'rgba(3, 14, 26, 0.9)',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.78)',
             backdropFilter: 'blur(10px)',
             fontFamily: 'system-ui, -apple-system, sans-serif',
           }}
@@ -251,6 +331,38 @@ export default function DartboardArenaPreviewClient() {
           >
             LOKALE VORSCHAU · NICHT LIVE
           </span>
+
+          {/* Hintergrund-Logo-Umschalter */}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {STAGE_OPTIONS.map((opt) => {
+              const active = stageLogo === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setStageLogo(opt.id)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '8px',
+                    border: active
+                      ? '1px solid #fbbf24'
+                      : '1px solid rgba(148, 198, 224, 0.28)',
+                    background: active
+                      ? 'rgba(245, 158, 11, 0.28)'
+                      : 'rgba(10, 28, 46, 0.7)',
+                    color: active ? '#fef08a' : '#b8dff2',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <span style={{ color: 'rgba(148,198,224,0.35)' }}>|</span>
 
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {GAME_OPTIONS.map((opt) => {

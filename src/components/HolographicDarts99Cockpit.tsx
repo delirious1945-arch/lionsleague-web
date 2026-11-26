@@ -24,6 +24,7 @@ export interface HolographicDarts99Props {
   currentTime?: string;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  stageImageSrc?: string;
 }
 
 function DartSilhouetteSvg() {
@@ -68,6 +69,7 @@ export default function HolographicDarts99Cockpit({
   currentTime,
   isFullscreen = false,
   onToggleFullscreen,
+  stageImageSrc,
 }: HolographicDarts99Props) {
   // Spielername immer dynamisch aus dem laufenden Spiel (niemals hardcoded!)
   const cleanName = (activeName || '').trim() || 'Spieler';
@@ -120,6 +122,7 @@ export default function HolographicDarts99Cockpit({
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}
+      stageImageSrc={stageImageSrc}
       centerLabel="ZIELZAHL"
       centerValue={String(safeTarget)}
       primaryTarget={{ mode: 'wedge', number: safeTarget }}

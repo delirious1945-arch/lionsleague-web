@@ -19,6 +19,7 @@ export interface HolographicStellenCheckenProps {
   currentTime?: string;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  stageImageSrc?: string;
 }
 
 export default function HolographicStellenCheckenCockpit({
@@ -35,6 +36,7 @@ export default function HolographicStellenCheckenCockpit({
   currentTime,
   isFullscreen = false,
   onToggleFullscreen,
+  stageImageSrc,
 }: HolographicStellenCheckenProps) {
   // Spielername immer dynamisch aus dem laufenden Spiel (niemals hardcoded!)
   const cleanName = (activeName || '').trim() || 'Spieler';
@@ -73,6 +75,7 @@ export default function HolographicStellenCheckenCockpit({
       currentTime={currentTime}
       isFullscreen={isFullscreen}
       onToggleFullscreen={onToggleFullscreen}
+      stageImageSrc={stageImageSrc}
       centerLabel="REST"
       centerValue={String(currentNumber)}
       primaryTarget={primaryTarget}
