@@ -46,7 +46,7 @@
   -webkit-user-drag: none;
 }
 
-/* Oben links: Brand & Spielname */
+/* Oben links: Spielname */
 .lda-screen .lda-brand {
   position: absolute;
   left: 2.1%;
@@ -54,16 +54,7 @@
   z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: 0.7cqw;
   max-width: 26%;
-}
-
-.lda-screen .lda-brand-icon {
-  width: 2cqw;
-  height: 2cqw;
-  color: #2ce3ff;
-  filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.75));
-  flex-shrink: 0;
 }
 
 .lda-screen .lda-brand-text {

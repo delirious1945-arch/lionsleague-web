@@ -170,19 +170,6 @@ function describeSectorRing(
   ].join(' ');
 }
 
-function BrandCrownIcon() {
-  return (
-    <svg
-      className="lda-brand-icon"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path d="M3.5 17.5h17L22 8.5l-5 3.4L12 4.5 7 11.9 2 8.5l1.5 9Zm0 2h17v1.8h-17v-1.8Z" />
-    </svg>
-  );
-}
-
 function FullscreenCornerIcon({ isFullscreen }: { isFullscreen?: boolean }) {
   if (isFullscreen) {
     return (
@@ -262,7 +249,7 @@ export default function LionsDartboardArenaShell({
   primaryTarget,
   secondaryTarget,
   bottomPill,
-  stageImageSrc = '/images/checkout-battle-stage.jpg',
+  stageImageSrc = '/images/arena-stage-emerald-gold.jpg',
 }: LionsDartboardArenaShellProps) {
   const uid = useId().replace(/:/g, '');
   const greenGlowId = `lda-green-glow-${uid}`;
@@ -340,9 +327,8 @@ export default function LionsDartboardArenaShell({
           alt=""
         />
 
-        {/* Oben links: Brand & Spielname */}
+        {/* Oben links: Spielname */}
         <div className="lda-brand">
-          <BrandCrownIcon />
           <span className="lda-brand-text">{gameTitle}</span>
         </div>
 

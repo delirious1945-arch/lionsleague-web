@@ -167,14 +167,6 @@ function describeSectorRing(
   ].join(' ');
 }
 
-function BrandCrestIcon() {
-  return (
-    <svg className="tmc-brand-crest" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M4 17h16l1.5-8.5-4.8 3.2L12 4.5 7.3 11.7 2.5 8.5 4 17Zm0 2.5h16v2H4v-2Z" />
-    </svg>
-  );
-}
-
 interface RealisticArenaDartboardProps {
   centerLabel?: string;
   centerValue?: string;
@@ -654,7 +646,6 @@ export default function TrainingMonitorShell({
       <div className="tmc-arena-vignette" />
 
       <div className="tmc-game-brand">
-        <BrandCrestIcon />
         <span className="tmc-game-name">{gameName}</span>
       </div>
 
