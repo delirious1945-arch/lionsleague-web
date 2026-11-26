@@ -991,16 +991,272 @@
   box-shadow: 0 0 12px rgba(229, 179, 75, .3);
 }
 
-.dr-rally-root .auto-detect-pill {
-  font-size: 11px;
-  color: #fde047;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: rgba(234, 179, 8, 0.15);
-  border: 1px solid rgba(234, 179, 8, 0.35);
-  padding: 2px 8px;
-  border-radius: 9999px;
+/* ==========================================================================
+   NEUE REINE SCORE-TRIGGER CHEAT-SHEET & DYNAMISCHES IMPACT OVERLAY
+   ========================================================================== */
+
+.dr-rally-root .trigger-cheat-sheet {
+  margin: 10px 0 14px 0;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
+
+.dr-rally-root .trigger-cheat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 5px;
+}
+
+.dr-rally-root .trigger-cheat-header span {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #f59e0b;
+}
+
+.dr-rally-root .trigger-cheat-header small {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.dr-rally-root .trigger-cheat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .dr-rally-root .trigger-cheat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dr-rally-root .trigger-pill {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.dr-rally-root .trigger-pill .pill-name {
+  font-size: 11px;
+  font-weight: 800;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dr-rally-root .trigger-pill .pill-target {
+  font-size: 10px;
+  font-family: monospace;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.dr-rally-root .trigger-pill.is-active {
+  transform: scale(1.04);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);
+  border-color: #f59e0b;
+}
+
+.dr-rally-root .trigger-pill.turbo.is-active {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.15));
+  border-color: #f59e0b;
+}
+
+.dr-rally-root .trigger-pill.ausgebremst.is-active {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.15));
+  border-color: #ef4444;
+}
+
+/* ==========================================================================
+   RALLY IMPACT OVERLAY (GEGNER-STRAFEN VS. EIGENE BUFFS)
+   ========================================================================== */
+
+.dr-rally-root .rally-impact-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+  animation: impactFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes impactFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dr-rally-root .impact-card {
+  pointer-events: auto;
+  max-width: 580px;
+  width: 100%;
+  border-radius: 20px;
+  padding: 24px 28px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+  animation: impactPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes impactPop {
+  0% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+
+/* Strafe für das eigene Team (Rote Gefahrenzone) */
+.dr-rally-root .rally-impact-overlay.is-danger-penalty .impact-card {
+  background: linear-gradient(145deg, rgba(30, 8, 8, 0.95), rgba(15, 4, 4, 0.98));
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 45px rgba(239, 68, 68, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Alarm: Gegner hat Buff aktiviert (Gelbe Warnung) */
+.dr-rally-root .rally-impact-overlay.is-warning-alert .impact-card {
+  background: linear-gradient(145deg, rgba(35, 25, 8, 0.95), rgba(18, 12, 4, 0.98));
+  border: 2px solid #f59e0b;
+  box-shadow: 0 0 45px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Eigener Vorteil / Buff (Smaragdgrün & Gold) */
+.dr-rally-root .rally-impact-overlay.is-success-boost .impact-card {
+  background: linear-gradient(145deg, rgba(6, 30, 20, 0.95), rgba(3, 15, 10, 0.98));
+  border: 2px solid #10b981;
+  box-shadow: 0 0 45px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dr-rally-root .impact-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 14px;
+}
+
+.dr-rally-root .impact-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dr-rally-root .team-pill {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dr-rally-root .team-pill.team-1 {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+
+.dr-rally-root .team-pill.team-2 {
+  background: #f59e0b;
+  color: #0f172a;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+.dr-rally-root .score-pill {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.dr-rally-root .impact-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+.dr-rally-root .impact-body {
+  margin-top: 14px;
+}
+
+.dr-rally-root .penalty-box {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.dr-rally-root .penalty-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #f87171;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.dr-rally-root .penalty-desc {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.dr-rally-root .benefit-box {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.dr-rally-root .benefit-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #34d399;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.dr-rally-root .benefit-desc {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.dr-rally-root .neutral-box p {
+  font-size: 14px;
+  color: #cbd5e1;
+  margin: 0;
+}
+
 
 .dr-rally-root .input-grid {
   margin-top: 12px;
@@ -2463,16 +2719,272 @@
   box-shadow: 0 0 12px rgba(229, 179, 75, .3);
 }
 
-.dr-rally-root .auto-detect-pill {
-  font-size: 11px;
-  color: #fde047;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: rgba(234, 179, 8, 0.15);
-  border: 1px solid rgba(234, 179, 8, 0.35);
-  padding: 2px 8px;
-  border-radius: 9999px;
+/* ==========================================================================
+   NEUE REINE SCORE-TRIGGER CHEAT-SHEET & DYNAMISCHES IMPACT OVERLAY
+   ========================================================================== */
+
+.dr-rally-root .trigger-cheat-sheet {
+  margin: 10px 0 14px 0;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
+
+.dr-rally-root .trigger-cheat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 5px;
+}
+
+.dr-rally-root .trigger-cheat-header span {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #f59e0b;
+}
+
+.dr-rally-root .trigger-cheat-header small {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.dr-rally-root .trigger-cheat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .dr-rally-root .trigger-cheat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dr-rally-root .trigger-pill {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.dr-rally-root .trigger-pill .pill-name {
+  font-size: 11px;
+  font-weight: 800;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dr-rally-root .trigger-pill .pill-target {
+  font-size: 10px;
+  font-family: monospace;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.dr-rally-root .trigger-pill.is-active {
+  transform: scale(1.04);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);
+  border-color: #f59e0b;
+}
+
+.dr-rally-root .trigger-pill.turbo.is-active {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.15));
+  border-color: #f59e0b;
+}
+
+.dr-rally-root .trigger-pill.ausgebremst.is-active {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.15));
+  border-color: #ef4444;
+}
+
+/* ==========================================================================
+   RALLY IMPACT OVERLAY (GEGNER-STRAFEN VS. EIGENE BUFFS)
+   ========================================================================== */
+
+.dr-rally-root .rally-impact-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+  animation: impactFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes impactFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dr-rally-root .impact-card {
+  pointer-events: auto;
+  max-width: 580px;
+  width: 100%;
+  border-radius: 20px;
+  padding: 24px 28px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+  animation: impactPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes impactPop {
+  0% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+
+/* Strafe für das eigene Team (Rote Gefahrenzone) */
+.dr-rally-root .rally-impact-overlay.is-danger-penalty .impact-card {
+  background: linear-gradient(145deg, rgba(30, 8, 8, 0.95), rgba(15, 4, 4, 0.98));
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 45px rgba(239, 68, 68, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Alarm: Gegner hat Buff aktiviert (Gelbe Warnung) */
+.dr-rally-root .rally-impact-overlay.is-warning-alert .impact-card {
+  background: linear-gradient(145deg, rgba(35, 25, 8, 0.95), rgba(18, 12, 4, 0.98));
+  border: 2px solid #f59e0b;
+  box-shadow: 0 0 45px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Eigener Vorteil / Buff (Smaragdgrün & Gold) */
+.dr-rally-root .rally-impact-overlay.is-success-boost .impact-card {
+  background: linear-gradient(145deg, rgba(6, 30, 20, 0.95), rgba(3, 15, 10, 0.98));
+  border: 2px solid #10b981;
+  box-shadow: 0 0 45px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dr-rally-root .impact-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 14px;
+}
+
+.dr-rally-root .impact-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dr-rally-root .team-pill {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dr-rally-root .team-pill.team-1 {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+
+.dr-rally-root .team-pill.team-2 {
+  background: #f59e0b;
+  color: #0f172a;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+.dr-rally-root .score-pill {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.dr-rally-root .impact-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+.dr-rally-root .impact-body {
+  margin-top: 14px;
+}
+
+.dr-rally-root .penalty-box {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.dr-rally-root .penalty-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #f87171;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.dr-rally-root .penalty-desc {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.dr-rally-root .benefit-box {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.dr-rally-root .benefit-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #34d399;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.dr-rally-root .benefit-desc {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.dr-rally-root .neutral-box p {
+  font-size: 14px;
+  color: #cbd5e1;
+  margin: 0;
+}
+
 
 .dr-rally-root .input-grid {
     grid-template-columns: 1fr;

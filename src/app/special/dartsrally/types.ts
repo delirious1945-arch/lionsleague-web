@@ -30,8 +30,12 @@ export interface RallyEventBanner {
   id: string;
   itemType: RallyItemType;
   actorTeam: RallyTeamNumber;
+  sourceTeamName?: string;
+  scoreThrown?: number;
   text: string;
   detail: string;
+  opponentPenaltyText?: string;
+  teamBenefitText?: string;
   createdAt: string;
 }
 
@@ -63,15 +67,18 @@ export interface RallyLiveState {
 }
 
 export function isSchnapszahl(score: number): boolean {
-  if (score < 77) return false;
+  if (score < 55) return false;
   const digits = score.toString().split('');
-  return digits.every((d) => d === digits[0]);
+  return digits.length > 1 && digits.every((d) => d === digits[0]);
 }
 
 export function getAutoDetectedItem(score: number): RallyItemType | null {
   if (score >= 121) return 'turbo';
-  if (isSchnapszahl(score)) return 'schild';
   if (score >= 100 && score <= 120) return 'ausgebremst';
+  if (score === 80 || score === 90) return 'reifenplatzer';
+  if (score === 26) return 'spitzenbruch';
+  if (score === 50) return 'darttausch';
+  if (isSchnapszahl(score)) return 'schild';
   return null;
 }
 
@@ -83,49 +90,63 @@ export const RALLY_ITEM_META: Record<
     trigger: string;
     headline: string;
     detail: string;
+    opponentPenalty?: string;
+    teamBenefit?: string;
   }
 > = {
   spitzenbruch: {
     type: 'spitzenbruch',
     label: 'Spitzenbruch',
-    trigger: '2× Triple',
+    trigger: 'Exakt 26 Pkt',
     headline: 'SPITZENBRUCH',
-    detail: 'Der nächste gegnerische Werfer darf nur 2 Darts werfen',
+    detail: 'Frust-26 geworfen! Gegner hat Materialschaden und darf nächste Aufnahme nur 2 Darts werfen',
+    opponentPenalty: 'Materialschaden: Euer nächster Werfer darf NUR 2 DARTS werfen (Slot 3 gesperrt)!',
+    teamBenefit: 'Gegnerischem Werfer wurde Dart-Slot 3 gesperrt!',
   },
   darttausch: {
     type: 'darttausch',
     label: 'Darttausch',
-    trigger: 'Bullseye 50',
+    trigger: 'Exakt 50 Pkt',
     headline: 'DARTTAUSCH',
-    detail: 'Jeder Spieler gibt seine Darts an den Hintermann weiter',
+    detail: 'Bullseye 50 getroffen! Alle Spieler geben sofort ihre Darts an den Hintermann ab',
+    opponentPenalty: 'Materialwechsel: Gebt eure Darts sofort an den Spieler hinter euch weiter!',
+    teamBenefit: 'Materialwechsel: Gebt eure Darts sofort an den Spieler hinter euch weiter!',
   },
   ausgebremst: {
     type: 'ausgebremst',
     label: 'Ausgebremst',
     trigger: '100–120 Pkt',
     headline: 'AUSGEBREMST',
-    detail: 'Gegnerisches Tablet für 20 Sekunden komplett gesperrt',
+    detail: 'Dreistelliger Ton geworfen! Gegnerisches Tablet ist für 20 Sekunden komplett gesperrt',
+    opponentPenalty: 'Boxenstopp-Strafe: Euer Tablet ist für 20 Sekunden komplett eingefroren!',
+    teamBenefit: 'Gegnerisches Tablet für 20 Sekunden blockiert!',
   },
   reifenplatzer: {
     type: 'reifenplatzer',
     label: 'Reifenplatzer',
-    trigger: 'Doppel + Triple',
+    trigger: 'Exakt 80 oder 90 Pkt',
     headline: 'REIFENPLATZER',
-    detail: '75 Punkte erfolgreich übertragen (-75 Gegner, +75 Team)',
+    detail: 'Reifenplatzer beim Gegner! -75 Punkte beim Gegner abgezogen und eigenem Team gutgeschrieben',
+    opponentPenalty: 'Reifenplatzer: Euch werden -75 Punkte abgezogen (+75 für den Gegner)!',
+    teamBenefit: '+75 Punkte vom gegnerischen Team gestohlen!',
   },
   turbo: {
     type: 'turbo',
     label: 'Turbo',
     trigger: 'Score ≥ 121',
     headline: 'TURBO-BOOSTER',
-    detail: 'Doppelte Punkte für 20 Sekunden aktiviert',
+    detail: 'Highscore! Eure geworfenen Punkte zählen für 20 Sekunden DOPPELT (×2)',
+    opponentPenalty: 'Achtung: Gegner hat Turbo aktiviert und punktet 20s lang doppelt!',
+    teamBenefit: 'Turbo aktiv: Alle geworfenen Punkte zählen für 20 Sekunden DOPPELT (×2)!',
   },
   schild: {
     type: 'schild',
     label: 'Schild',
-    trigger: 'Schnapszahl ab 77',
+    trigger: 'Schnapszahl 55, 66, 77, 88, 99',
     headline: 'TITAN-SCHILD',
-    detail: 'Der nächste Angriff wird automatisch geblockt',
+    detail: 'Schnapszahl geworfen! Titan-Schutzschild wehrt den nächsten gegnerischen Angriff ab',
+    opponentPenalty: 'Achtung: Gegner hat einen Schutzschild aktiv! Nächster Angriff verpufft!',
+    teamBenefit: 'Schutzschild aktiv: Wehrt den nächsten gegnerischen Angriff automatisch ab!',
   },
   // Abwärtskompatible Aliase
   banana: {
@@ -388,10 +409,14 @@ export function applyRallyScore(
       id: effectId,
       itemType: blocked ? 'schild' : effectiveItem,
       actorTeam: blocked ? opponent : team,
+      sourceTeamName: actorTeam.teamName,
+      scoreThrown: baseScore,
       text: blocked ? 'ANGRIFF GEBLOCKT' : meta.headline,
       detail: blocked
         ? `${oppTeam.teamName} wehrt den Angriff mit dem Titan-Schild ab!`
-        : meta.detail,
+        : `${actorTeam.teamName} wirft ${baseScore} Pkt: ${meta.detail}`,
+      opponentPenaltyText: meta.opponentPenalty,
+      teamBenefitText: meta.teamBenefit,
       createdAt: new Date(now).toISOString(),
     };
   }

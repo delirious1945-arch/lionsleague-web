@@ -523,10 +523,10 @@ export default function DartsRallyClient({
   const activeRunner = ownTeam.members[ownTeam.activeMemberIndex] || 'Werfer';
   const inputDisabled = Boolean(ausgebremst) || Boolean(rally.winnerTeam);
 
-  // Automatische Score-Erkennung für Turbo (>= 121), Schild (Schnapszahl >= 77) oder Ausgebremst (100-120)
+  // Automatische Score-Erkennung für alle 6 Items (≥121 Turbo, 100-120 Ausgebremst, 80/90 Reifenplatzer, 26 Spitzenbruch, 50 Darttausch, Schnapszahl Schild)
   const currentTypedScore = Number(scoreInput || 0);
   const autoDetectedItem = getAutoDetectedItem(currentTypedScore);
-  const activeEffectiveItem = selectedItem || autoDetectedItem;
+  const activeEffectiveItem = autoDetectedItem;
 
   const submitScore = (explicitValue?: number) => {
     if (inputDisabled) return;
@@ -541,7 +541,7 @@ export default function DartsRallyClient({
       rally,
       effectiveTeam,
       raw,
-      selectedItem || undefined,
+      undefined,
       Date.now()
     );
     const nextControl =
@@ -1091,34 +1091,37 @@ export default function DartsRallyClient({
                 )}
               </div>
 
-              {/* Kompakte Item-Treffermuster-Schnellwahl */}
-              <div className="item-selector is-compact">
-                <div className="item-selector-label">
-                  <small>TREFFERMUSTER</small>
-                  <strong>Spezial-Wurf:</strong>
+              {/* Statische Trigger-Legende (Reine Zahlen-Logik, keine Klick-Buttons) */}
+              <div className="trigger-cheat-sheet" aria-label="Item Trigger Übersicht">
+                <div className="trigger-cheat-header">
+                  <span>⚡ SCORE-TRIGGER (VOLLAUTOMATISCH)</span>
+                  <small>Einfach Score tippen & werten</small>
                 </div>
-                <div className="item-pills-row">
-                  {RALLY_ITEM_OPTIONS.map((item) => {
-                    const isSelected = selectedItem === item.type;
-                    const isAuto = !selectedItem && autoDetectedItem === item.type;
-                    return (
-                      <button
-                        type="button"
-                        key={item.type}
-                        disabled={inputDisabled}
-                        className={`item-pill-btn ${isSelected ? 'is-selected' : ''} ${
-                          isAuto ? 'is-auto' : ''
-                        } ${item.type}`}
-                        onClick={() =>
-                          setSelectedItem((curr) => (curr === item.type ? null : item.type))
-                        }
-                        title={item.trigger}
-                      >
-                        <span className="item-pill-name">{item.label}</span>
-                        <small className="item-pill-desc">{item.trigger}</small>
-                      </button>
-                    );
-                  })}
+                <div className="trigger-cheat-grid">
+                  <div className={`trigger-pill turbo ${autoDetectedItem === 'turbo' ? 'is-active' : ''}`}>
+                    <span className="pill-name">🚀 Turbo (×2)</span>
+                    <strong className="pill-target">≥ 121 Pkt</strong>
+                  </div>
+                  <div className={`trigger-pill ausgebremst ${autoDetectedItem === 'ausgebremst' ? 'is-active' : ''}`}>
+                    <span className="pill-name">🛑 Freeze (20s)</span>
+                    <strong className="pill-target">100–120 Pkt</strong>
+                  </div>
+                  <div className={`trigger-pill reifenplatzer ${autoDetectedItem === 'reifenplatzer' ? 'is-active' : ''}`}>
+                    <span className="pill-name">🚗💥 Platzer (-75)</span>
+                    <strong className="pill-target">80 / 90 Pkt</strong>
+                  </div>
+                  <div className={`trigger-pill schild ${autoDetectedItem === 'schild' ? 'is-active' : ''}`}>
+                    <span className="pill-name">🛡️ Schild</span>
+                    <strong className="pill-target">55, 66, 77, 88, 99</strong>
+                  </div>
+                  <div className={`trigger-pill darttausch ${autoDetectedItem === 'darttausch' ? 'is-active' : ''}`}>
+                    <span className="pill-name">🔄 Tausch</span>
+                    <strong className="pill-target">50 Pkt (Bull)</strong>
+                  </div>
+                  <div className={`trigger-pill spitzenbruch ${autoDetectedItem === 'spitzenbruch' ? 'is-active' : ''}`}>
+                    <span className="pill-name">💥 Bruch (2 Darts)</span>
+                    <strong className="pill-target">26 Pkt (1-20-5)</strong>
+                  </div>
                 </div>
               </div>
 
@@ -1270,7 +1273,7 @@ export default function DartsRallyClient({
                 </div>
               )}
 
-              <RallyItemEffectOverlay event={effectEvent} />
+              <RallyItemEffectOverlay event={effectEvent} viewingTeam={controlTeam} />
             </div>
           </div>
         </section>

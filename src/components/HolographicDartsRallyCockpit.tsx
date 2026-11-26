@@ -7,6 +7,7 @@ import {
   RallyEventBanner,
   RallyItemType,
   RallyLiveState,
+  RallyTeamNumber,
   RallyTeamSnapshot,
 } from '@/app/special/dartsrally/types';
 import './HolographicDartsRallyCockpit.css';
@@ -105,64 +106,87 @@ export function getRallySecondsLeft(
 
 export function RallyItemEffectOverlay({
   event,
+  viewingTeam,
 }: {
   event: RallyEventBanner | null;
+  viewingTeam?: RallyTeamNumber;
 }) {
   if (!event) return null;
 
-  if (event.itemType === 'reifenplatzer' || event.itemType === 'rocket') {
-    return (
-      <div key={event.id} className={`item-fx rocket-fx team-${event.actorTeam}`}>
-        <div className="rocket-projectile">
-          <span />
+  const isActor = viewingTeam !== undefined ? event.actorTeam === viewingTeam : null;
+  const actorName = event.sourceTeamName || (event.actorTeam === 1 ? 'Team Rot' : 'Team Gold');
+
+  // Ist es ein Angriff gegen das betrachtende Team?
+  const isAttackAgainstMe =
+    isActor === false &&
+    (event.itemType === 'ausgebremst' ||
+      event.itemType === 'spitzenbruch' ||
+      event.itemType === 'reifenplatzer' ||
+      event.itemType === 'freeze' ||
+      event.itemType === 'fog' ||
+      event.itemType === 'banana' ||
+      event.itemType === 'rocket');
+
+  // Ist es ein Buff des Gegners?
+  const isEnemyBuff = isActor === false && (event.itemType === 'turbo' || event.itemType === 'schild' || event.itemType === 'shield');
+
+  // Eigener Vorteil / Buff
+  const isOwnBenefit = isActor === true;
+
+  return (
+    <aside
+      key={event.id}
+      className={`rally-impact-overlay ${
+        isAttackAgainstMe
+          ? 'is-danger-penalty'
+          : isEnemyBuff
+          ? 'is-warning-alert'
+          : 'is-success-boost'
+      } team-${event.actorTeam}`}
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className="impact-card">
+        <div className="impact-header">
+          <div className="impact-badge">
+            <span className={`team-pill team-${event.actorTeam}`}>{actorName}</span>
+            {event.scoreThrown !== undefined && (
+              <span className="score-pill">{event.scoreThrown} PKT</span>
+            )}
+          </div>
+          <strong className="impact-title">
+            {isAttackAgainstMe
+              ? `🛑 GEGNER-ANGRIFF: ${event.text}`
+              : isEnemyBuff
+              ? `⚠️ GEGNER-ALARM: ${event.text}`
+              : `🚀 ${event.text}`}
+          </strong>
         </div>
-        <div className="impact-ring" />
+
+        <div className="impact-body">
+          {isAttackAgainstMe ? (
+            <div className="penalty-box">
+              <small className="penalty-label">⚠️ STRAFE FÜR EUER TEAM:</small>
+              <p className="penalty-desc">
+                {event.opponentPenaltyText || event.detail}
+              </p>
+            </div>
+          ) : isOwnBenefit ? (
+            <div className="benefit-box">
+              <small className="benefit-label">✨ VORTEIL FÜR EUER TEAM:</small>
+              <p className="benefit-desc">
+                {event.teamBenefitText || event.detail}
+              </p>
+            </div>
+          ) : (
+            <div className="neutral-box">
+              <p className="neutral-desc">{event.detail}</p>
+            </div>
+          )}
+        </div>
       </div>
-    );
-  }
-  if (event.itemType === 'ausgebremst' || event.itemType === 'freeze' || event.itemType === 'fog') {
-    return (
-      <div key={event.id} className="item-fx freeze-fx">
-        {[0, 1, 2, 3, 4, 5, 6].map((idx) => (
-          <i key={idx} style={{ animationDelay: `${idx * 45}ms` }} />
-        ))}
-        <strong>AUSGEBREMST</strong>
-      </div>
-    );
-  }
-  if (event.itemType === 'darttausch') {
-    return (
-      <div key={event.id} className="item-fx energy-fx turbo-fx">
-        <RallyIcon name="sync" size={48} />
-        <strong>DARTTAUSCH!</strong>
-      </div>
-    );
-  }
-  if (event.itemType === 'turbo') {
-    return (
-      <div key={event.id} className="item-fx energy-fx turbo-fx">
-        <RallyIcon name="bolt" size={48} />
-        <strong>TURBO AKTIV</strong>
-      </div>
-    );
-  }
-  if (event.itemType === 'schild' || event.itemType === 'shield') {
-    return (
-      <div key={event.id} className="item-fx energy-fx shield-fx">
-        <RallyIcon name="shield" size={50} />
-        <strong>{event.text}</strong>
-      </div>
-    );
-  }
-  if (event.itemType === 'spitzenbruch' || event.itemType === 'banana') {
-    return (
-      <div key={event.id} className="item-fx banana-fx">
-        <span>03</span>
-        <strong>NUR 2 DARTS</strong>
-      </div>
-    );
-  }
-  return null;
+    </aside>
+  );
 }
 
 export interface HolographicDartsRallyProps {
@@ -472,7 +496,16 @@ export default function HolographicDartsRallyCockpit({
         )}
       </div>
 
-      <RallyItemEffectOverlay event={effectEvent} />
+      <RallyItemEffectOverlay
+        event={effectEvent}
+        viewingTeam={
+          rally.board1Id && boardId === rally.board1Id
+            ? 1
+            : rally.board2Id && boardId === rally.board2Id
+            ? 2
+            : undefined
+        }
+      />
     </main>
   );
 }
