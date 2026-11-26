@@ -363,7 +363,7 @@ export default function HolographicDartsRallyCockpit({
           <div className="event-id">
             <RallyIcon name="target" size={22} />
             <span>
-              LIONS WEYHAUSEN
+              DARTS FUN ARENA
               <small>DARTS RALLY · BOARD {boardId}</small>
             </span>
           </div>

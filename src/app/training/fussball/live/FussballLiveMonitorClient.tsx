@@ -18,7 +18,7 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
     scoreP1: 0,
     scoreP2: 0,
     targetGoals: 5,
-    ballPossession: 1,
+    ballPossession: null,
     activePlayer: 1,
   });
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -122,8 +122,12 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
   const scoreP1 = liveState.scoreP1 ?? 0;
   const scoreP2 = liveState.scoreP2 ?? 0;
   const targetGoals = liveState.targetGoals ?? 5;
-  const ballPossession = liveState.ballPossession || 1;
-  const activeName = ballPossession === 1 ? rawP1Name : rawP2Name;
+  const ballPossession: 1 | 2 | null =
+    liveState.ballPossession === 1 || liveState.ballPossession === 2
+      ? liveState.ballPossession
+      : null;
+  const currentActivePlayer: 1 | 2 = liveState.activePlayer === 2 ? 2 : 1;
+  const activeName = currentActivePlayer === 1 ? rawP1Name : rawP2Name;
   const is1vs1 = liveState.gameMode === '1vs1' || liveState.gameMode === 'bot' || liveState.gameMode === '1vsComputer' || (liveState.gameMode !== 'solo' && !!liveState.p2Name);
 
   // STANDBY SCREEN
@@ -190,7 +194,7 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
         </div>
 
         <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 font-mono border-t border-white/10 pt-4">
-          <span>LIONS WEYHAUSEN 2.0 · LIVE TELEMETRY</span>
+          <span>LIVE TELEMETRY</span>
           <span>DUELL UM BALLBESITZ & TORE</span>
         </div>
       </div>
@@ -254,11 +258,11 @@ export default function FussballLiveMonitorClient({ initialBoardId = '1' }: Fuss
       p2Name={rawP2Name}
       activeName={activeName}
       is1vs1={is1vs1}
-      activePlayer={ballPossession as 1 | 2}
+      activePlayer={currentActivePlayer}
       scoreP1={scoreP1}
       scoreP2={scoreP2}
       targetGoals={targetGoals}
-      ballPossession={ballPossession as 1 | 2}
+      ballPossession={ballPossession}
       fussballStats={liveState.fussballStats}
       activeTarget={liveState.activeTarget}
       gameMode={liveState.gameMode}

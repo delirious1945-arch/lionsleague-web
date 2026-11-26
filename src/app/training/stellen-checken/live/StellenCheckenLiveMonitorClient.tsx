@@ -196,7 +196,7 @@ export default function StellenCheckenLiveMonitorClient({ initialBoardId = '1' }
         </div>
 
         <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 font-mono border-t border-white/10 pt-4">
-          <span>LIONS WEYHAUSEN 2.0 · LIVE TELEMETRY</span>
+          <span>LIVE TELEMETRY</span>
           <span>15 AUFNAHMEN · 3 BIS 101 PUNKTE</span>
         </div>
       </div>

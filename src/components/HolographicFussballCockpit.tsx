@@ -89,6 +89,12 @@ function PlayerName({ name }: { name: string }) {
   );
 }
 
+function isLongPlayerName(name: string): boolean {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const longestPart = Math.max(...parts.map((p) => p.length), 0);
+  return longestPart > 12 || parts.length > 2;
+}
+
 function parseOpponentName(rawName: string, aiLevel?: string) {
   const trimmed = rawName.trim() || 'Gegner';
   const bracketMatch = trimmed.match(/^(.+?)\s*\(([^)]+)\)$/);
@@ -108,16 +114,18 @@ export default function HolographicFussballCockpit({
   boardLabel,
   p1Name = 'Spieler 1',
   p2Name = 'Gegner',
+  activePlayer = 1,
   scoreP1,
   scoreP2,
   targetGoals = 5,
-  ballPossession = 1,
+  ballPossession = null,
+  fussballStats,
   gameMode,
   aiLevel,
   isFullscreen = false,
   onToggleFullscreen,
 }: HolographicFussballProps) {
-  const cleanP1 = p1Name.trim() || 'Spieler 1';
+  const cleanP1 = (p1Name || '').trim() || 'Spieler 1';
   const opponent = parseOpponentName(p2Name, aiLevel);
 
   const isComputerMatch =
@@ -127,6 +135,21 @@ export default function HolographicFussballCockpit({
     p2Name.toLowerCase().includes('bot');
 
   const modeLabel = isComputerMatch ? '1 VS COMPUTER' : '1 VS 1 DUELL';
+
+  const normalizedPossession: 1 | 2 | null =
+    ballPossession === 1 || ballPossession === 2 ? ballPossession : null;
+  const normalizedActivePlayer: 1 | 2 = activePlayer === 2 ? 2 : 1;
+
+  const p1HasBall = normalizedPossession === 1;
+  const p2HasBall = normalizedPossession === 2;
+  const p1Throws = normalizedActivePlayer === 1;
+  const p2Throws = normalizedActivePlayer === 2;
+
+  const hasP1Stats = (fussballStats?.p1Darts ?? 0) > 0;
+  const bullHits = fussballStats?.p1BullHits ?? 0;
+  const bullAttempts = fussballStats?.p1BullAttempts ?? 0;
+  const doubleHits = fussballStats?.p1DoubleHits ?? 0;
+  const doubleAttempts = fussballStats?.p1DoubleAttempts ?? 0;
 
   const handleFullscreen = () => {
     if (onToggleFullscreen) {
@@ -143,77 +166,135 @@ export default function HolographicFussballCockpit({
   };
 
   return (
-    <main className="fb-screen">
-      <img
-        className="fb-arena-background"
-        src="/images/soccer-darts-arena.png"
-        alt=""
-      />
-      <div className="fb-cinematic-grade" />
-      <div className="fb-light-sweep left" />
-      <div className="fb-light-sweep right" />
+    <main className="fb-screen" aria-label="Fußball Darts">
+      <div className="fb-canvas">
+        <img
+          className="fb-arena-background"
+          src="/images/soccer-darts-arena.png"
+          alt=""
+        />
+        <div className="fb-cinematic-grade" />
+        <div className="fb-light-sweep left" />
+        <div className="fb-light-sweep right" />
 
-      <header className="fb-match-header" aria-label="Spieldetails">
-        <strong>{boardLabel || `BOARD ${boardId}`}</strong>
-        <i />
-        <span>LIONS WEYHAUSEN</span>
-        <i />
-        <span>FUSSBALL DARTS</span>
-        <i />
-        <strong>{modeLabel}</strong>
-      </header>
+        <header className="fb-match-header" aria-label="Spieldetails">
+          <strong>{boardLabel || `BOARD ${boardId}`}</strong>
+          <i />
+          <span>FUSSBALL DARTS</span>
+          <i />
+          <strong>{modeLabel}</strong>
+        </header>
 
-      <button
-        type="button"
-        className="fb-fullscreen-button"
-        aria-label={isFullscreen ? 'Vollbild schließen' : 'Vollbild öffnen'}
-        onClick={handleFullscreen}
-      >
-        <ExpandIcon isFullscreen={isFullscreen} />
-      </button>
+        <button
+          type="button"
+          className="fb-fullscreen-button"
+          aria-label={isFullscreen ? 'Vollbild schließen' : 'Vollbild öffnen'}
+          onClick={handleFullscreen}
+        >
+          <ExpandIcon isFullscreen={isFullscreen} />
+        </button>
 
-      <section className="fb-player-panel fb-player-one" aria-label="Spieler eins">
-        <span className="fb-player-kicker">SPIELER 1</span>
-        <h1>
-          <PlayerName name={cleanP1} />
-        </h1>
-        {ballPossession === 1 && (
-          <div className="fb-possession-badge">
-            <FootballIcon />
-            <span>{cleanP1.toUpperCase()} HAT BALLBESITZ</span>
+        {/* Linker Glasflügel: Spieler 1 (mittig zentriert) */}
+        <section className="fb-player-panel fb-player-one" aria-label="Spieler eins">
+          <span className="fb-player-kicker">SPIELER 1</span>
+          <div className="fb-wing-divider" />
+          <h1
+            className={`fb-player-name ${isLongPlayerName(cleanP1) ? 'fb-name-compact' : ''}`}
+          >
+            <PlayerName name={cleanP1} />
+          </h1>
+
+          {p1HasBall ? (
+            <>
+              <div className="fb-possession-badge">
+                <FootballIcon />
+                <span>BALLBESITZ</span>
+              </div>
+              <div className="fb-target-hint">ZIEL: DOPPEL FÜR TOR</div>
+            </>
+          ) : p1Throws ? (
+            <>
+              <div className="fb-turn-badge">AM WURF</div>
+              <div className="fb-target-hint fb-target-hint-neutral">
+                {normalizedPossession === null
+                  ? 'ZIEL: BULL FÜR BALLBESITZ'
+                  : 'ZIEL: BULL FÜR BALLGEWINN'}
+              </div>
+            </>
+          ) : null}
+
+          {hasP1Stats && (
+            <div className="fb-wing-stats">
+              <div className="fb-wing-stat-item">
+                <small>BULL</small>
+                <strong>
+                  {bullHits}/{bullAttempts}
+                </strong>
+              </div>
+              <div className="fb-wing-stat-sep" />
+              <div className="fb-wing-stat-item">
+                <small>DOPPEL</small>
+                <strong>
+                  {doubleHits}/{doubleAttempts}
+                </strong>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Rechter Glasflügel: Gegner / Computer (mittig zentriert) */}
+        <section className="fb-player-panel fb-player-two" aria-label="Spieler zwei">
+          <span className="fb-player-kicker">GEGNER</span>
+          <div className="fb-wing-divider" />
+          <h2
+            className={`fb-player-name ${isLongPlayerName(opponent.baseName) ? 'fb-name-compact' : ''}`}
+          >
+            <PlayerName name={opponent.baseName} />
+          </h2>
+          {opponent.detail && (
+            <div className="fb-opponent-league">{opponent.detail}</div>
+          )}
+
+          {p2HasBall ? (
+            <>
+              <div className="fb-possession-badge">
+                <FootballIcon />
+                <span>BALLBESITZ</span>
+              </div>
+              <div className="fb-target-hint">ZIEL: DOPPEL FÜR TOR</div>
+            </>
+          ) : p2Throws ? (
+            <>
+              <div className="fb-turn-badge">AM WURF</div>
+              <div className="fb-target-hint fb-target-hint-neutral">
+                {normalizedPossession === null
+                  ? 'ZIEL: BULL FÜR BALLBESITZ'
+                  : 'ZIEL: BULL FÜR BALLGEWINN'}
+              </div>
+            </>
+          ) : null}
+        </section>
+
+        {/* Zentrales Scoreboard unten mittig */}
+        <section
+          className="fb-scoreboard"
+          aria-label={`Spielstand ${scoreP1} zu ${scoreP2}`}
+        >
+          <div className="fb-scoreline">
+            <strong className="fb-score-home">{scoreP1}</strong>
+            <span>:</span>
+            <strong>{scoreP2}</strong>
           </div>
-        )}
-      </section>
+          <div className="fb-score-divider" />
+          <p>ZIEL: {targetGoals} TORE</p>
+          {normalizedPossession === null && (
+            <div className="fb-kickoff-hint">ANSTOSS · KEIN BALLBESITZ</div>
+          )}
+        </section>
 
-      <section className="fb-player-panel fb-player-two" aria-label="Spieler zwei">
-        <span className="fb-player-kicker">GEGNER</span>
-        <h2>
-          <PlayerName name={opponent.baseName} />
-        </h2>
-        {opponent.detail && <p>({opponent.detail})</p>}
-        {ballPossession === 2 && (
-          <div className="fb-possession-badge">
-            <FootballIcon />
-            <span>{opponent.baseName.toUpperCase()} HAT BALLBESITZ</span>
-          </div>
-        )}
-      </section>
-
-      <section
-        className="fb-scoreboard"
-        aria-label={`Spielstand ${scoreP1} zu ${scoreP2}`}
-      >
-        <div className="fb-scoreline">
-          <strong className="fb-score-home">{scoreP1}</strong>
-          <span>:</span>
-          <strong>{scoreP2}</strong>
+        <div className="fb-live-indicator">
+          <i /> LIVE
         </div>
-        <div className="fb-score-divider" />
-        <p>ZIEL: {targetGoals} TORE</p>
-      </section>
-
-      <div className="fb-live-indicator">
-        <i /> LIVE
       </div>
     </main>
   );

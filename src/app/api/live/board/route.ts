@@ -43,7 +43,7 @@ export interface UnifiedLiveState {
   scoreP1?: number;
   scoreP2?: number;
   targetGoals?: number;
-  ballPossession?: 1 | 2;
+  ballPossession?: 1 | 2 | null;
   currentAction?: string;
   p1Stats?: any;
   p2Stats?: any;

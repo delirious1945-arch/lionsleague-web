@@ -11,7 +11,7 @@ export interface FussballLiveState {
   p1Name?: string;
   p2Name?: string;
   activePlayer?: 1 | 2;
-  ballPossession?: 1 | 2;
+  ballPossession?: 1 | 2 | null;
   scoreP1?: number;
   scoreP2?: number;
   targetGoals?: number;
@@ -31,7 +31,7 @@ const defaultState = (boardId: string, sessionId?: string): FussballLiveState =>
   scoreP1: 0,
   scoreP2: 0,
   targetGoals: 5,
-  ballPossession: 1,
+  ballPossession: null,
   activePlayer: 1,
   currentAction: 'Anstoß',
   activeTarget: 'D20',

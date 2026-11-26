@@ -301,8 +301,8 @@ export default function HolographicAdventskalenderCockpit({
     >
       <header className="app-header">
         <div className="event-brand">
-          <span>LW</span>
-          <b>Lions Weyhausen</b>
+          <span>DFA</span>
+          <b>Darts Fun Arena</b>
         </div>
 
         <div className="game-title">

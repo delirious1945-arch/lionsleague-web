@@ -483,7 +483,7 @@ export default function DoppelquoteLiveMonitorClient({ initialBoardId = '1' }: D
         </main>
 
         <footer className="flex items-center justify-between text-xs text-slate-500 border-t border-white/[0.08] pt-3 relative z-20 font-mono">
-          <span>Lions Weyhausen · Leistungsdiagnostik</span>
+          <span>Leistungsdiagnostik</span>
           <span className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
             <span>Bereit für nächste Session</span>

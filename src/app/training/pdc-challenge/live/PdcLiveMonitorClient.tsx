@@ -206,7 +206,7 @@ export default function PdcLiveMonitorClient({ initialBoardId = '1' }: PdcLiveMo
         </div>
 
         <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 font-mono border-t border-white/10 pt-4">
-          <span>LIONS WEYHAUSEN 2.0 · LIVE TELEMETRY</span>
+          <span>LIVE TELEMETRY</span>
           <span>57 DARTS · 3 PHASEN · MAX 100 PKT</span>
         </div>
       </div>

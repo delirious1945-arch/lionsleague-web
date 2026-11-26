@@ -416,8 +416,12 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
     const scoreP1 = liveState.scoreP1 ?? 0;
     const scoreP2 = liveState.scoreP2 ?? 0;
     const targetGoals = liveState.targetGoals ?? 5;
-    const ballPossession = liveState.ballPossession || 1;
-    const activeFootballName = ballPossession === 1 ? p1Name : p2Name;
+    const ballPossession: 1 | 2 | null =
+      liveState.ballPossession === 1 || liveState.ballPossession === 2
+        ? liveState.ballPossession
+        : null;
+    const activeFootballName =
+      ballPossession === 1 ? p1Name : ballPossession === 2 ? p2Name : activeName;
     const isFussball1vs1 = liveState.gameMode === '1vs1' || liveState.gameMode === '1vsComputer' || liveState.gameMode === 'bot' || (liveState.gameMode !== 'solo' && !!liveState.p2Name);
 
     return (
@@ -432,7 +436,7 @@ export default function UnifiedBoardLiveClient({ initialBoardId = '1' }: Unified
         scoreP1={scoreP1}
         scoreP2={scoreP2}
         targetGoals={targetGoals}
-        ballPossession={ballPossession as 1 | 2}
+        ballPossession={ballPossession}
         fussballStats={liveState.fussballStats || liveState.fussballData?.stats}
         activeTarget={liveState.currentTarget}
         gameMode={liveState.gameMode}

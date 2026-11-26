@@ -65,7 +65,6 @@ export default function HolographicCheckoutBattleCockpit({
       gameTitle="CHECKOUT BATTLE"
       headerItems={[
         boardLabel || `BOARD ${boardId}`,
-        'LIONS WEYHAUSEN',
         `AUFNAHME ${safeRound}/${safeTotal}`,
       ]}
       currentTime={currentTime}

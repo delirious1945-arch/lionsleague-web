@@ -78,7 +78,6 @@ export default function HolographicPdcChallengeCockpit({
       gameTitle={`PDC CHALLENGE${currentPart ? ` · TEIL ${currentPart}` : ''}`}
       headerItems={[
         boardLabel || `BOARD ${boardId}`,
-        'LIONS WEYHAUSEN',
         `AUFNAHME ${safeVisit}/${safeTotal}`,
       ]}
       currentTime={currentTime}

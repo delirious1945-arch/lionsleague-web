@@ -115,7 +115,6 @@ export default function HolographicDarts99Cockpit({
       gameTitle="99 DARTS CHALLENGE"
       headerItems={[
         boardLabel || `BOARD ${boardId}`,
-        'LIONS WEYHAUSEN',
         `ZIEL ${safeTarget}`,
         `AUFNAHME ${displayRound}/${TOTAL_ROUNDS_99}`,
       ]}

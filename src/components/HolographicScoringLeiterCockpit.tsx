@@ -184,8 +184,6 @@ export default function HolographicScoringLeiterCockpit({
         <header className="sl-header-pill">
           <span>{boardLabel || `BOARD ${boardId}`}</span>
           <i />
-          <span>LIONS WEYHAUSEN</span>
-          <i />
           <span>SCORING-LEITER</span>
           <i />
           <span>

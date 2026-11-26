@@ -69,7 +69,6 @@ export default function HolographicStellenCheckenCockpit({
       gameTitle="STELLEN & CHECKEN"
       headerItems={[
         boardLabel || `BOARD ${boardId}`,
-        'LIONS WEYHAUSEN',
         `AUFNAHME ${safeVisit}/${safeTotal}`,
       ]}
       currentTime={currentTime}

@@ -1,18 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@600;700;800&display=swap');
 
-/* Gescoptes TV-Monitor-Design für Fußball Darts (keine globalen body/button-Regeln) */
+/* Gescoptes 16:9 TV-Monitor-Design für Fußball Darts (pixelgenau in beiden Arena-Flügeln) */
 .fb-screen {
   position: fixed;
   inset: 0;
   z-index: 50;
   width: 100vw;
   height: 100vh;
-  min-height: 540px;
+  display: grid;
+  place-items: center;
   overflow: hidden;
-  isolation: isolate;
   background: #01050b;
   color: #f5fbff;
-  font-family: Inter, sans-serif;
+  font-family: "Barlow Condensed", Inter, sans-serif;
   user-select: none;
   box-sizing: border-box;
 }
@@ -23,6 +23,18 @@
   box-sizing: border-box;
 }
 
+/* Exakter 16:9 Bühnen-Container passend zu /images/soccer-darts-arena.png */
+.fb-screen .fb-canvas {
+  position: relative;
+  width: min(100vw, 177.7778vh);
+  height: min(100vh, 56.25vw);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  isolation: isolate;
+  background: #01050b;
+  container-type: size;
+}
+
 .fb-screen .fb-arena-background {
   position: absolute;
   z-index: -4;
@@ -31,8 +43,9 @@
   height: 100%;
   object-fit: cover;
   object-position: center;
-  transform: scale(1.01);
-  animation: fb-arena-breathe 12s ease-in-out infinite alternate;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
 }
 
 .fb-screen .fb-cinematic-grade {
@@ -41,17 +54,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(to bottom, rgba(1, 5, 12, 0.02) 0%, transparent 38%, rgba(0, 3, 9, 0.18) 66%, rgba(0, 2, 7, 0.62) 100%),
-    radial-gradient(ellipse at center, transparent 22%, rgba(0, 4, 12, 0.13) 62%, rgba(0, 2, 8, 0.48) 100%);
-}
-
-.fb-screen .fb-cinematic-grade::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.2;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.14'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
+    linear-gradient(to bottom, rgba(1, 5, 12, 0.04) 0%, transparent 38%, rgba(0, 3, 9, 0.18) 66%, rgba(0, 2, 7, 0.58) 100%),
+    radial-gradient(ellipse at center, transparent 24%, rgba(0, 4, 12, 0.14) 64%, rgba(0, 2, 8, 0.44) 100%);
 }
 
 .fb-screen .fb-light-sweep {
@@ -60,9 +64,9 @@
   top: -20%;
   width: 18%;
   height: 120%;
-  opacity: 0.2;
+  opacity: 0.18;
   filter: blur(22px);
-  background: linear-gradient(90deg, transparent, rgba(146, 228, 255, 0.26), transparent);
+  background: linear-gradient(90deg, transparent, rgba(146, 228, 255, 0.24), transparent);
   pointer-events: none;
 }
 
@@ -76,30 +80,33 @@
   transform: rotate(15deg);
 }
 
+/* Obere Header-Kapsel ohne Vereinszusatz */
 .fb-screen .fb-match-header {
   position: absolute;
-  top: clamp(24px, 4.8vh, 52px);
+  top: 3.4%;
   left: 50%;
   transform: translateX(-50%);
-  height: clamp(42px, 5.5vh, 56px);
-  min-width: min(680px, 70vw);
-  padding: 0 34px;
+  height: 5.2%;
+  min-width: 34cqw;
+  padding: 0 2.4cqw;
   border: 1px solid rgba(158, 198, 221, 0.36);
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(16, 29, 47, 0.91), rgba(8, 18, 33, 0.89));
   box-shadow:
     inset 0 0 0 1px rgba(220, 245, 255, 0.09),
     0 12px 35px rgba(0, 0, 0, 0.45),
-    0 0 30px rgba(31, 173, 218, 0.08);
+    0 0 30px rgba(31, 173, 218, 0.1);
   backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 1.2cqw;
   color: #dbe7ef;
-  font-size: clamp(10px, 0.9vw, 13px);
+  font-family: Inter, sans-serif;
+  font-size: 1.05cqw;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
   white-space: nowrap;
   z-index: 4;
 }
@@ -110,142 +117,236 @@
 }
 
 .fb-screen .fb-match-header i {
-  width: 5px;
-  height: 5px;
+  width: 0.34cqw;
+  height: 0.34cqw;
   border-radius: 50%;
   background: #657d95;
   display: inline-block;
+  flex-shrink: 0;
 }
 
+/* Vollbild-Schalter oben rechts */
 .fb-screen .fb-fullscreen-button {
   position: absolute;
-  top: clamp(26px, 4.8vh, 52px);
-  right: clamp(24px, 2.8vw, 48px);
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgba(149, 181, 202, 0.22);
-  border-radius: 14px;
-  color: #aab9c7;
+  top: 3.2%;
+  right: 2.2%;
+  width: 2.8cqw;
+  height: 2.8cqw;
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid rgba(149, 181, 202, 0.28);
+  border-radius: 0.7cqw;
+  color: #c8d9e8;
   background: rgba(11, 20, 37, 0.75);
   backdrop-filter: blur(12px);
   display: grid;
   place-items: center;
   cursor: pointer;
-  font: inherit;
-  z-index: 4;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+  z-index: 5;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .fb-screen .fb-fullscreen-button:hover {
   color: #ffffff;
-  border-color: rgba(55, 220, 250, 0.55);
+  background: rgba(16, 36, 58, 0.9);
+  border-color: rgba(55, 220, 250, 0.6);
 }
 
 .fb-screen .fb-fullscreen-button svg {
-  width: 18px;
-  height: 18px;
+  width: 56%;
+  height: 56%;
 }
 
+/* Beide Glasflügel exakt mittig in den linken & rechten LED-Flügel-Rahmen */
 .fb-screen .fb-player-panel {
   position: absolute;
-  top: 33%;
-  width: 27%;
-  font-family: "Barlow Condensed", sans-serif;
-  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.72);
+  top: 15.5%;
+  width: 19.6%;
+  height: 46%;
   z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 0.85cqw;
+  padding: 1.1cqw 0.9cqw;
+  font-family: "Barlow Condensed", sans-serif;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.82);
+  overflow: hidden;
 }
 
 .fb-screen .fb-player-one {
-  left: 6.2%;
+  left: 2.7%;
 }
 
 .fb-screen .fb-player-two {
-  right: 6.2%;
-  text-align: right;
+  right: 2.7%;
 }
 
 .fb-screen .fb-player-kicker {
   display: block;
-  margin-bottom: 9px;
-  color: #80a3b7;
-  font-size: clamp(9px, 0.75vw, 12px);
+  color: #9ecce4;
+  font-size: 1.18cqw;
   font-weight: 800;
-  letter-spacing: 0.23em;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  line-height: 1;
 }
 
-.fb-screen .fb-player-panel h1,
-.fb-screen .fb-player-panel h2 {
+.fb-screen .fb-wing-divider {
+  width: 82%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(140, 210, 240, 0.48), transparent);
+  flex-shrink: 0;
+}
+
+.fb-screen .fb-player-name {
   margin: 0;
-  font-size: clamp(42px, 4vw, 67px);
+  width: 100%;
+  font-size: 3.7cqw;
   font-weight: 900;
-  line-height: 0.82;
+  line-height: 0.94;
   letter-spacing: -0.015em;
   color: #f5fbff;
+  text-align: center;
+  overflow-wrap: break-word;
 }
 
-.fb-screen .fb-player-panel h1 span,
-.fb-screen .fb-player-panel h2 span {
+.fb-screen .fb-player-name.fb-name-compact {
+  font-size: 2.85cqw;
+}
+
+.fb-screen .fb-player-name span {
   display: block;
 }
 
-.fb-screen .fb-player-two h2 {
-  font-size: clamp(34px, 3.1vw, 54px);
-}
-
-.fb-screen .fb-player-two p {
-  margin: 7px 0 18px;
-  font-size: clamp(20px, 2vw, 34px);
+.fb-screen .fb-opponent-league {
+  padding: 0.22cqw 0.85cqw;
+  border-radius: 999px;
+  border: 1px solid rgba(158, 206, 232, 0.32);
+  background: rgba(9, 25, 44, 0.72);
+  color: #bde2f5;
+  font-size: 1.02cqw;
   font-weight: 800;
-  line-height: 1;
-  color: #dbe7ef;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.1;
 }
 
+/* Status-Pills in den Flügeln */
 .fb-screen .fb-possession-badge {
-  height: 43px;
-  margin-top: 23px;
-  padding: 0 22px;
+  margin-top: 0.25cqw;
+  padding: 0.48cqw 1.25cqw;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  gap: 11px;
-  font-size: clamp(10px, 0.95vw, 14px);
+  justify-content: center;
+  gap: 0.55cqw;
+  font-size: 1.15cqw;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-shadow: none;
   backdrop-filter: blur(12px);
   color: #09efa0;
   border: 2px solid #09efa0;
-  background: rgba(0, 30, 28, 0.69);
+  background: rgba(0, 32, 28, 0.78);
   box-shadow:
-    0 0 25px rgba(9, 239, 160, 0.28),
-    inset 0 0 18px rgba(9, 239, 160, 0.05);
+    0 0 22px rgba(9, 239, 160, 0.38),
+    inset 0 0 14px rgba(9, 239, 160, 0.1);
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .fb-screen .fb-possession-badge svg {
-  width: 20px;
-  height: 20px;
+  width: 1.25cqw;
+  height: 1.25cqw;
   flex-shrink: 0;
 }
 
-.fb-screen .fb-player-two .fb-possession-badge {
-  margin-left: auto;
+.fb-screen .fb-turn-badge {
+  margin-top: 0.25cqw;
+  padding: 0.44cqw 1.3cqw;
+  border-radius: 999px;
+  border: 2px solid #1de4ff;
+  background: rgba(0, 118, 158, 0.26);
+  box-shadow:
+    0 0 18px rgba(0, 217, 255, 0.45),
+    inset 0 0 12px rgba(0, 217, 255, 0.18);
+  color: #88f3ff;
+  font-size: 1.14cqw;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  line-height: 1;
+  text-shadow: none;
+  white-space: nowrap;
 }
 
+.fb-screen .fb-target-hint {
+  color: #9de8c7;
+  font-size: 0.96cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fb-screen .fb-target-hint.fb-target-hint-neutral {
+  color: #a9d6ec;
+}
+
+/* Kompakte Statistik-Leiste unten im linken Flügel (nur wenn >0 Darts geworfen) */
+.fb-screen .fb-wing-stats {
+  width: 92%;
+  margin-top: 0.35cqw;
+  padding-top: 0.55cqw;
+  border-top: 1px solid rgba(140, 210, 240, 0.26);
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: center;
+  text-align: center;
+}
+
+.fb-screen .fb-wing-stat-sep {
+  height: 100%;
+  background: rgba(140, 210, 240, 0.24);
+}
+
+.fb-screen .fb-wing-stat-item small {
+  display: block;
+  color: #96c5de;
+  font-size: 0.78cqw;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fb-screen .fb-wing-stat-item strong {
+  display: block;
+  margin-top: 0.1cqw;
+  color: #f4fbff;
+  font-size: 1.48cqw;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zentrales Scoreboard unten mittig unter dem LED-Tor */
 .fb-screen .fb-scoreboard {
   position: absolute;
   left: 50%;
-  bottom: clamp(30px, 5.2vh, 62px);
+  bottom: 4%;
   transform: translateX(-50%);
-  width: clamp(300px, 23vw, 380px);
-  height: clamp(140px, 18.5vh, 178px);
+  width: 24.5cqw;
+  padding: 1.05cqw 1.4cqw;
   border: 2px solid #08daf8;
-  border-radius: 24px;
+  border-radius: 1.5cqw;
   background: linear-gradient(145deg, rgba(4, 26, 35, 0.94), rgba(5, 13, 26, 0.96));
   box-shadow:
-    0 0 32px rgba(8, 218, 248, 0.16),
-    inset 0 0 24px rgba(16, 160, 188, 0.08),
-    0 20px 45px rgba(0, 0, 0, 0.47);
+    0 0 32px rgba(8, 218, 248, 0.2),
+    inset 0 0 24px rgba(16, 160, 188, 0.1),
+    0 20px 45px rgba(0, 0, 0, 0.52);
   backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
@@ -257,12 +358,13 @@
 .fb-screen .fb-scoreline {
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 1.75cqw;
   font-family: "Barlow Condensed", sans-serif;
-  font-size: clamp(66px, 5.8vw, 94px);
+  font-size: 5.2cqw;
   font-weight: 800;
-  line-height: 0.72;
+  line-height: 0.82;
   color: #f5fbff;
+  font-variant-numeric: tabular-nums;
 }
 
 .fb-screen .fb-scoreline strong {
@@ -271,7 +373,7 @@
 
 .fb-screen .fb-scoreline .fb-score-home {
   color: #08efa0;
-  text-shadow: 0 0 22px rgba(8, 239, 160, 0.22);
+  text-shadow: 0 0 22px rgba(8, 239, 160, 0.35);
 }
 
 .fb-screen .fb-scoreline > span {
@@ -280,38 +382,54 @@
 }
 
 .fb-screen .fb-score-divider {
-  width: 74%;
+  width: 78%;
   height: 1px;
-  margin-top: 17px;
-  background: linear-gradient(90deg, transparent, rgba(132, 178, 197, 0.3), transparent);
+  margin-top: 0.72cqw;
+  background: linear-gradient(90deg, transparent, rgba(132, 178, 197, 0.34), transparent);
 }
 
 .fb-screen .fb-scoreboard p {
-  margin: 11px 0 0;
-  color: #a3b4c0;
-  font-size: clamp(9px, 0.75vw, 13px);
+  margin: 0.52cqw 0 0;
+  color: #bde0f2;
+  font-family: Inter, sans-serif;
+  font-size: 0.88cqw;
   font-weight: 800;
-  letter-spacing: 0.17em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
+.fb-screen .fb-kickoff-hint {
+  margin-top: 0.42cqw;
+  padding: 0.2cqw 0.8cqw;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 232, 255, 0.45);
+  background: rgba(0, 128, 168, 0.22);
+  color: #7bf2ff;
+  font-size: 0.88cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Dezenter LIVE-Punkt unten links */
 .fb-screen .fb-live-indicator {
   position: absolute;
-  left: 26px;
-  bottom: 22px;
+  left: 2.2%;
+  bottom: 2.6%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: rgba(176, 203, 218, 0.55);
+  gap: 0.45cqw;
+  color: rgba(176, 203, 218, 0.65);
   font-family: "Barlow Condensed", sans-serif;
-  font-size: 9px;
+  font-size: 0.92cqw;
   font-weight: 800;
   letter-spacing: 0.17em;
   z-index: 3;
 }
 
 .fb-screen .fb-live-indicator i {
-  width: 6px;
-  height: 6px;
+  width: 0.45cqw;
+  height: 0.45cqw;
   border-radius: 50%;
   background: #09efa0;
   box-shadow: 0 0 9px #09efa0;
@@ -322,56 +440,5 @@
 @keyframes fb-live-pulse {
   50% {
     opacity: 0.25;
-  }
-}
-
-@keyframes fb-arena-breathe {
-  from {
-    transform: scale(1.01);
-  }
-  to {
-    transform: scale(1.035);
-  }
-}
-
-@media (max-width: 800px) {
-  .fb-screen .fb-match-header {
-    min-width: 76vw;
-    padding: 0 20px;
-    gap: 10px;
-  }
-  .fb-screen .fb-match-header span:nth-of-type(2),
-  .fb-screen .fb-match-header i:nth-of-type(2) {
-    display: none;
-  }
-  .fb-screen .fb-player-panel {
-    top: 31%;
-  }
-  .fb-screen .fb-player-one {
-    left: 4%;
-  }
-  .fb-screen .fb-player-two {
-    right: 4%;
-  }
-  .fb-screen .fb-possession-badge {
-    padding: 0 13px;
-    height: 37px;
-  }
-}
-
-@media (max-aspect-ratio: 4 / 3) {
-  .fb-screen .fb-arena-background {
-    width: 140%;
-    left: -20%;
-    max-width: none;
-  }
-  .fb-screen .fb-player-panel {
-    width: 32%;
-  }
-  .fb-screen .fb-player-one {
-    left: 3%;
-  }
-  .fb-screen .fb-player-two {
-    right: 3%;
   }
 }

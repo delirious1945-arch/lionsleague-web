@@ -651,8 +651,6 @@ export default function TrainingMonitorShell({
 
       <header className="tmc-header">
         <strong>{boardLabel || `BOARD ${boardId}`}</strong>
-        <i />
-        <span>LIONS WEYHAUSEN</span>
         {headerTitle && (
           <>
             <i />
