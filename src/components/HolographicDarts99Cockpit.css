@@ -1,0 +1,499 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@600;700;800&display=swap');
+
+/* Gescoptes 16:9 Live-TV-Cockpit für 99 Darts Challenge */
+.d99-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100vh;
+  background: #020b14;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  user-select: none;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  color: #e6f7ff;
+  box-sizing: border-box;
+}
+
+.d99-screen *,
+.d99-screen *::before,
+.d99-screen *::after {
+  box-sizing: border-box;
+}
+
+/* Exakter 16:9 Bühnen-Container für pixelgenaue Ausrichtung auf der Clean-Plate */
+.d99-screen .d99-canvas {
+  position: relative;
+  width: min(100vw, 177.7778vh);
+  height: min(100vh, 56.25vw);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #020b14;
+  container-type: size;
+}
+
+.d99-screen .d99-stage-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Obere Header-Kapsel */
+.d99-screen .d99-header-pill {
+  position: absolute;
+  left: 50%;
+  top: 2.0%;
+  transform: translateX(-50%);
+  width: 58.6%;
+  height: 5.2%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.95cqw;
+  color: #e6f7ff;
+  font-size: 1.28cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(0, 217, 255, 0.45);
+}
+
+.d99-screen .d99-header-pill i {
+  width: 0.32cqw;
+  height: 0.32cqw;
+  border-radius: 50%;
+  background: #57e8ff;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Oben rechts: Uhrzeit & Vollbild */
+.d99-screen .d99-top-right {
+  position: absolute;
+  right: 1.35%;
+  top: 2.0%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.85cqw;
+}
+
+.d99-screen .d99-clock {
+  color: rgba(217, 245, 255, 0.72);
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.d99-screen .d99-fullscreen-btn {
+  width: 2.75cqw;
+  height: 2.75cqw;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1.5px solid rgba(87, 232, 255, 0.42);
+  border-radius: 0.55cqw;
+  background: rgba(5, 20, 38, 0.65);
+  color: #e6f7ff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.d99-screen .d99-fullscreen-btn:hover {
+  background: rgba(0, 217, 255, 0.22);
+  border-color: rgba(87, 232, 255, 0.85);
+}
+
+.d99-screen .d99-fullscreen-btn svg {
+  width: 60%;
+  height: 60%;
+}
+
+/* Linker Glasflügel */
+.d99-screen .d99-left-wing {
+  position: absolute;
+  left: 6.4%;
+  top: 23.2%;
+  width: 21.4%;
+  height: 54.5%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.6cqw 0.7cqw;
+}
+
+.d99-screen .d99-throw-pill {
+  padding: 0.42cqw 1.35cqw;
+  border: 1.5px solid #29e4ff;
+  border-radius: 999px;
+  background: rgba(0, 148, 192, 0.28);
+  box-shadow:
+    0 0 16px rgba(0, 217, 255, 0.48),
+    inset 0 0 10px rgba(0, 217, 255, 0.22);
+  color: #aef4ff;
+  font-size: 1.15cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.d99-screen .d99-player-name {
+  margin: 0.65cqw 0 0.2cqw;
+  color: #f4fbff;
+  font-size: 3.1cqw;
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.9);
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.d99-screen .d99-player-name.d99-name-compact {
+  font-size: 2.45cqw;
+}
+
+.d99-screen .d99-round-sub {
+  color: #a9d6ec;
+  font-size: 1.25cqw;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* 3 horizontale Dart-Slot-Zeilen (wie im Vorlagenbild) */
+.d99-screen .d99-dart-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55cqw;
+  margin: 0.85cqw 0;
+}
+
+.d99-screen .d99-dart-slot {
+  width: 100%;
+  height: 2.35cqw;
+  padding: 0 1.0cqw;
+  border: 1px solid rgba(92, 186, 224, 0.38);
+  border-radius: 0.45cqw;
+  background: rgba(4, 18, 34, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6cqw;
+  transition: all 0.25s ease;
+}
+
+.d99-screen .d99-dart-slot.d99-slot-triple {
+  border-color: rgba(255, 198, 56, 0.85);
+  background: rgba(245, 158, 11, 0.18);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.32);
+}
+
+.d99-screen .d99-dart-slot.d99-slot-double {
+  border-color: rgba(41, 228, 255, 0.85);
+  background: rgba(6, 182, 212, 0.18);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.32);
+}
+
+.d99-screen .d99-dart-slot.d99-slot-single {
+  border-color: rgba(0, 237, 121, 0.82);
+  background: rgba(16, 185, 129, 0.18);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+}
+
+.d99-screen .d99-dart-slot.d99-slot-miss {
+  border-color: rgba(244, 63, 94, 0.78);
+  background: rgba(225, 29, 72, 0.18);
+}
+
+.d99-screen .d99-dart-svg {
+  width: 58%;
+  height: 1.05cqw;
+  color: rgba(154, 198, 224, 0.62);
+}
+
+.d99-screen .d99-slot-triple .d99-dart-svg {
+  color: #fde047;
+}
+
+.d99-screen .d99-slot-double .d99-dart-svg {
+  color: #57e8ff;
+}
+
+.d99-screen .d99-slot-single .d99-dart-svg {
+  color: #00ed79;
+}
+
+.d99-screen .d99-slot-miss .d99-dart-svg {
+  color: #fb7185;
+}
+
+.d99-screen .d99-dart-badge {
+  font-size: 1.1cqw;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(168, 206, 226, 0.55);
+  white-space: nowrap;
+}
+
+.d99-screen .d99-slot-triple .d99-dart-badge {
+  color: #fde047;
+}
+
+.d99-screen .d99-slot-double .d99-dart-badge {
+  color: #57e8ff;
+}
+
+.d99-screen .d99-slot-single .d99-dart-badge {
+  color: #00ed79;
+}
+
+.d99-screen .d99-slot-miss .d99-dart-badge {
+  color: #fda4af;
+}
+
+.d99-screen .d99-opponent-bar {
+  width: 100%;
+  padding: 0.3cqw 0.7cqw;
+  border-radius: 0.45cqw;
+  border: 1px solid rgba(255, 189, 61, 0.35);
+  background: rgba(255, 189, 61, 0.1);
+  color: #fde68a;
+  font-size: 0.95cqw;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Untere 2-Spalten-KPIs links */
+.d99-screen .d99-left-kpis {
+  width: 100%;
+  padding-top: 0.75cqw;
+  border-top: 1px solid rgba(130, 205, 235, 0.25);
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: center;
+  text-align: center;
+}
+
+.d99-screen .d99-kpi-sep {
+  height: 100%;
+  background: rgba(130, 205, 235, 0.25);
+}
+
+.d99-screen .d99-kpi-item small {
+  display: block;
+  color: #9ecce4;
+  font-size: 0.92cqw;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.d99-screen .d99-kpi-item strong {
+  display: block;
+  margin-top: 0.15cqw;
+  color: #f4fbff;
+  font-size: 2.45cqw;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(0, 217, 255, 0.35);
+}
+
+/* Rechter Glasflügel */
+.d99-screen .d99-right-wing {
+  position: absolute;
+  right: 6.4%;
+  top: 23.2%;
+  width: 21.4%;
+  height: 54.5%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.5cqw 0.75cqw;
+}
+
+.d99-screen .d99-score-head {
+  text-align: center;
+}
+
+.d99-screen .d99-score-kicker {
+  display: block;
+  text-align: left;
+  color: #d6effc;
+  font-size: 1.28cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.d99-screen .d99-score-big {
+  margin-top: 0.15cqw;
+  color: #00ed79;
+  font-size: 4.55cqw;
+  font-weight: 900;
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 22px rgba(0, 237, 121, 0.58),
+    0 0 8px rgba(0, 237, 121, 0.35);
+}
+
+.d99-screen .d99-darts-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45cqw;
+  margin-top: 0.45cqw;
+  padding: 0.28cqw 1.05cqw;
+  border: 1px solid rgba(118, 206, 238, 0.45);
+  border-radius: 999px;
+  background: rgba(4, 18, 34, 0.72);
+  color: #dcf5ff;
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* 5 Statistik-Balken rechts */
+.d99-screen .d99-stat-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.62cqw;
+  margin-top: 0.6cqw;
+}
+
+.d99-screen .d99-stat-row {
+  width: 100%;
+}
+
+.d99-screen .d99-stat-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5cqw;
+  margin-bottom: 0.22cqw;
+}
+
+.d99-screen .d99-stat-label {
+  color: #cfeafa;
+  font-size: 0.98cqw;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.d99-screen .d99-stat-meta {
+  color: #eef9ff;
+  font-size: 1.08cqw;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.d99-screen .d99-stat-track {
+  width: 100%;
+  height: 0.55cqw;
+  min-height: 5px;
+  border: 1px solid rgba(87, 178, 214, 0.35);
+  border-radius: 999px;
+  background: rgba(3, 14, 28, 0.85);
+  overflow: hidden;
+}
+
+.d99-screen .d99-stat-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.d99-screen .d99-fill-gold {
+  background: linear-gradient(90deg, #d97706, #fde047);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.65);
+}
+
+.d99-screen .d99-fill-cyan {
+  background: linear-gradient(90deg, #0284c7, #38e8ff);
+  box-shadow: 0 0 10px rgba(56, 232, 255, 0.65);
+}
+
+.d99-screen .d99-fill-green {
+  background: linear-gradient(90deg, #059669, #00ed79);
+  box-shadow: 0 0 10px rgba(0, 237, 121, 0.65);
+}
+
+.d99-screen .d99-fill-red {
+  background: linear-gradient(90deg, #be123c, #fb7185);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.55);
+}
+
+/* Transparentes SVG-Overlay exakt über der fotografierten Dartscheibe */
+.d99-screen .d99-board-overlay {
+  position: absolute;
+  left: 50%;
+  top: 46.2%;
+  height: 73.5%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.d99-screen .d99-board-overlay svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* Untere Legende-Kapsel */
+.d99-screen .d99-bottom-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 4.5%;
+  transform: translateX(-50%);
+  width: 33%;
+  height: 5.2%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75cqw;
+  color: #e6f7ff;
+  font-size: 1.12cqw;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 10px rgba(0, 217, 255, 0.45);
+}
+
+.d99-screen .d99-bottom-pill i {
+  width: 0.28cqw;
+  height: 0.28cqw;
+  border-radius: 50%;
+  background: #57e8ff;
+  display: inline-block;
+  flex-shrink: 0;
+}
