@@ -266,8 +266,6 @@ export default function LionsDartboardArenaShell({
   const redGlowId = `lda-red-glow-${uid}`;
   const goldGlowId = `lda-gold-glow-${uid}`;
   const cyanGlowId = `lda-cyan-glow-${uid}`;
-  const laserGradId = `lda-laser-grad-${uid}`;
-  const numGlowGradId = `lda-num-glow-${uid}`;
   const wedgeGradId = `lda-wedge-grad-${uid}`;
 
   const handleFullscreen = () => {
@@ -430,17 +428,6 @@ export default function LionsDartboardArenaShell({
                 </feMerge>
               </filter>
 
-              <linearGradient id={laserGradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ff225c" stopOpacity="0.95" />
-                <stop offset="55%" stopColor="#ff164d" stopOpacity="0.52" />
-                <stop offset="100%" stopColor="#ff164d" stopOpacity="0.02" />
-              </linearGradient>
-
-              <radialGradient id={numGlowGradId} cx="50%" cy="35%" r="70%">
-                <stop offset="0%" stopColor="#ff336b" stopOpacity="0.68" />
-                <stop offset="100%" stopColor="#c40d3a" stopOpacity="0.18" />
-              </radialGradient>
-
               <linearGradient id={wedgeGradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#fde047" stopOpacity="0.46" />
                 <stop offset="55%" stopColor="#f59e0b" stopOpacity="0.22" />
@@ -535,38 +522,22 @@ export default function LionsDartboardArenaShell({
               </g>
             )}
 
-            {/* Primäres Ziel: Roter Laser + Ring-Highlight + Fadenkreuz (Double, Triple, Single) */}
+            {/* Primäres Ziel: Sauberes Trefferbereich-Highlight + Fadenkreuz ohne Lichtkegel (Double, Triple, Single) */}
             {(primaryTarget.mode === 'double' ||
               primaryTarget.mode === 'triple' ||
               primaryTarget.mode === 'single') &&
               primaryTarget.number && (
                 <g transform={`rotate(${primaryAngle} ${cx} ${cy})`}>
-                  {/* Roter Glow-Kegel über der aktiven Zahl */}
+                  {/* Zahlenring-Rahmen über der aktiven Zielzahl */}
                   <path
                     d={describeSectorRing(cx, cy, rDoubleOut, rNumberOuter, -9, 9)}
-                    fill={`url(#${numGlowGradId})`}
-                    stroke="#ff4b7d"
-                    strokeWidth="1.4"
+                    fill="rgba(255, 22, 77, 0.22)"
+                    stroke="#ff5c8a"
+                    strokeWidth="2.2"
                     filter={`url(#${redGlowId})`}
                   />
 
-                  {/* Laser-Strahl vom oberen Rand bis zum Ziel-Ring */}
-                  <polygon
-                    points={`${cx - 16},-22 ${cx + 16},-22 ${cx + 24},${cy - primaryBounds.rIn + 8} ${cx - 24},${cy - primaryBounds.rIn + 8}`}
-                    fill={`url(#${laserGradId})`}
-                    filter={`url(#${redGlowId})`}
-                  />
-                  <line
-                    x1={cx}
-                    y1="-24"
-                    x2={cx}
-                    y2={cy - primaryBounds.rCenter}
-                    stroke="#ff9eb8"
-                    strokeWidth="2.8"
-                    opacity="0.95"
-                  />
-
-                  {/* Aktives Ziel-Segment Highlight */}
+                  {/* Exakter Trefferbereich Highlight */}
                   <path
                     d={describeSectorRing(
                       cx,
@@ -576,9 +547,9 @@ export default function LionsDartboardArenaShell({
                       -9,
                       9
                     )}
-                    fill="rgba(255, 22, 77, 0.36)"
-                    stroke="#ff5c8a"
-                    strokeWidth="2.4"
+                    fill="rgba(255, 22, 77, 0.42)"
+                    stroke="#ff6b94"
+                    strokeWidth="2.8"
                     filter={`url(#${redGlowId})`}
                   />
 
