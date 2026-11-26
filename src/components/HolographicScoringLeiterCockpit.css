@@ -1,0 +1,403 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@600;700;800&display=swap');
+
+/* Gescoptes 16:9 Live-TV-Cockpit für Scoring-Leiter (41–140) */
+.sl-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100vh;
+  background: #020912;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  user-select: none;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  color: #e6f7ff;
+  box-sizing: border-box;
+}
+
+.sl-screen *,
+.sl-screen *::before,
+.sl-screen *::after {
+  box-sizing: border-box;
+}
+
+/* Exakter 16:9 Bühnen-Container für pixelgenaue Ausrichtung auf der Clean-Plate */
+.sl-screen .sl-canvas {
+  position: relative;
+  width: min(100vw, 177.7778vh);
+  height: min(100vh, 56.25vw);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #020912;
+  container-type: size;
+}
+
+.sl-screen .sl-stage-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Obere Header-Kapsel */
+.sl-screen .sl-header-pill {
+  position: absolute;
+  left: 50%;
+  top: 2.0%;
+  transform: translateX(-50%);
+  width: 50%;
+  height: 5.2%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.95cqw;
+  color: #e8f7ff;
+  font-size: 1.32cqw;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(0, 217, 255, 0.45);
+}
+
+.sl-screen .sl-header-pill i {
+  width: 0.32cqw;
+  height: 0.32cqw;
+  border-radius: 50%;
+  background: #57e8ff;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Oben rechts: Uhrzeit & Vollbild */
+.sl-screen .sl-top-right {
+  position: absolute;
+  right: 1.4%;
+  top: 2.0%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.85cqw;
+}
+
+.sl-screen .sl-clock {
+  color: rgba(217, 245, 255, 0.72);
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.sl-screen .sl-fullscreen-btn {
+  width: 2.6cqw;
+  height: 2.6cqw;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #e6f7ff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sl-screen .sl-fullscreen-btn:hover {
+  background: rgba(0, 217, 255, 0.18);
+  border-color: rgba(87, 232, 255, 0.55);
+}
+
+.sl-screen .sl-fullscreen-btn svg {
+  width: 68%;
+  height: 68%;
+}
+
+/* Linker 3D-Glasflügel: Aktiver Spieler */
+.sl-screen .sl-left-wing {
+  position: absolute;
+  left: 9.8%;
+  top: 25.5%;
+  width: 20.6%;
+  height: 41.5%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 0.8cqw;
+}
+
+.sl-screen .sl-player-name {
+  margin: 0 0 1.45cqw;
+  color: #f4fbff;
+  font-size: 4.2cqw;
+  font-weight: 800;
+  line-height: 0.94;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.92);
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.sl-screen .sl-player-name.sl-name-compact {
+  font-size: 3.3cqw;
+}
+
+.sl-screen .sl-player-name span {
+  display: block;
+}
+
+.sl-screen .sl-throw-pill {
+  padding: 0.55cqw 1.85cqw;
+  border: 2px solid #22e3ff;
+  border-radius: 999px;
+  background: rgba(0, 128, 168, 0.24);
+  box-shadow:
+    0 0 18px rgba(0, 217, 255, 0.52),
+    inset 0 0 12px rgba(0, 217, 255, 0.2);
+  color: #7bf2ff;
+  font-size: 1.5cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.sl-screen .sl-opponent-pill {
+  margin-top: 1.15cqw;
+  padding: 0.35cqw 0.85cqw;
+  border-radius: 0.45cqw;
+  border: 1px solid rgba(255, 189, 61, 0.38);
+  background: rgba(255, 189, 61, 0.12);
+  color: #fde68a;
+  font-size: 1.0cqw;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Perspektivische 8 Stufen zwischen den leuchtenden Cyan-Holmen */
+.sl-screen .sl-rung {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  border-radius: 0.55cqw;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 1.25cqw;
+  transition: all 0.3s ease;
+}
+
+.sl-screen .sl-rung-left {
+  text-align: left;
+  font-size: 0.95cqw;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: rgba(168, 214, 236, 0.65);
+  text-transform: uppercase;
+}
+
+.sl-screen .sl-rung-center {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 0.92;
+}
+
+.sl-screen .sl-rung-stage-label {
+  font-size: 0.92cqw;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #b8f2ff;
+  text-transform: uppercase;
+  margin-bottom: 0.15cqw;
+}
+
+.sl-screen .sl-rung-value {
+  font-weight: 800;
+  color: #cfe4f2;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+.sl-screen .sl-rung-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: rgba(178, 214, 235, 0.75);
+}
+
+.sl-screen .sl-rung-right svg {
+  width: 1.15cqw;
+  height: 1.15cqw;
+}
+
+/* Abgeschlossene Stufe (Smaragdgrün) */
+.sl-screen .sl-rung.sl-rung-cleared {
+  background: linear-gradient(90deg, rgba(4, 38, 30, 0.72), rgba(6, 62, 46, 0.78), rgba(4, 38, 30, 0.72));
+  border: 1.5px solid rgba(0, 237, 121, 0.65);
+  box-shadow: 0 0 16px rgba(0, 237, 121, 0.28);
+}
+
+.sl-screen .sl-rung.sl-rung-cleared .sl-rung-value,
+.sl-screen .sl-rung.sl-rung-cleared .sl-rung-right {
+  color: #00ed79;
+}
+
+.sl-screen .sl-cleared-check {
+  font-size: 1.25cqw;
+  font-weight: 900;
+}
+
+/* Aktive Zielstufe (Leuchtend Cyan + goldenes ZIEL-Badge wie in der Vorlage) */
+.sl-screen .sl-rung.sl-rung-active {
+  background: linear-gradient(90deg, rgba(6, 55, 82, 0.88), rgba(14, 126, 168, 0.9), rgba(6, 55, 82, 0.88));
+  border: 2px solid #75f4ff;
+  box-shadow:
+    0 0 28px rgba(12, 221, 250, 0.72),
+    inset 0 0 18px rgba(120, 245, 255, 0.35);
+  z-index: 6;
+}
+
+.sl-screen .sl-rung.sl-rung-active .sl-rung-value {
+  color: #ffffff;
+  font-weight: 900;
+  text-shadow: 0 0 18px rgba(120, 245, 255, 0.8);
+}
+
+.sl-screen .sl-target-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35cqw;
+  padding: 0.32cqw 0.75cqw;
+  border-radius: 0.45cqw;
+  background: linear-gradient(180deg, #fde047, #d97706);
+  color: #161104;
+  font-size: 1.05cqw;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.75);
+  white-space: nowrap;
+}
+
+/* K.o.-Stufe (Rot) */
+.sl-screen .sl-rung.sl-rung-eliminated {
+  background: linear-gradient(90deg, rgba(58, 10, 26, 0.92), rgba(110, 18, 46, 0.94), rgba(58, 10, 26, 0.92));
+  border: 2px solid #fb7185;
+  box-shadow: 0 0 24px rgba(244, 63, 94, 0.65);
+  z-index: 6;
+}
+
+.sl-screen .sl-rung.sl-rung-eliminated .sl-target-badge {
+  background: #e11d48;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.75);
+}
+
+/* Rechter 3D-Glasflügel: Aufstieg-Counter & 10 vertikale Kapseln */
+.sl-screen .sl-right-wing {
+  position: absolute;
+  right: 9.8%;
+  top: 25.5%;
+  width: 20.6%;
+  height: 41.5%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 0 0.75cqw;
+}
+
+.sl-screen .sl-hits-big {
+  color: #00ed79;
+  font-size: 5.8cqw;
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 24px rgba(0, 237, 121, 0.62),
+    0 0 8px rgba(0, 237, 121, 0.4);
+}
+
+.sl-screen .sl-hits-label {
+  margin-top: 0.45cqw;
+  color: #eef9ff;
+  font-size: 1.38cqw;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sl-screen .sl-divider {
+  width: 86%;
+  height: 1px;
+  margin: 0.9cqw 0 0.85cqw;
+  background: linear-gradient(90deg, transparent, rgba(168, 224, 245, 0.45), transparent);
+}
+
+.sl-screen .sl-visit-label {
+  color: #fde047;
+  font-size: 1.45cqw;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(250, 204, 21, 0.45);
+}
+
+.sl-screen .sl-capsules {
+  width: 94%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35cqw;
+  margin-top: 0.95cqw;
+}
+
+.sl-screen .sl-capsule {
+  flex: 1;
+  height: 2.35cqw;
+  border-radius: 999px;
+  border: 1.5px solid rgba(132, 174, 204, 0.48);
+  background: rgba(6, 18, 34, 0.65);
+  display: block;
+  transition: all 0.25s ease;
+}
+
+.sl-screen .sl-capsule.sl-cap-current {
+  border-color: #fef08a;
+  background: linear-gradient(180deg, #fde047, #d97706);
+  box-shadow: 0 0 16px rgba(250, 204, 21, 0.82);
+}
+
+.sl-screen .sl-capsule.sl-cap-hit {
+  border-color: #6ee7b7;
+  background: linear-gradient(180deg, #00ed79, #059669);
+  box-shadow: 0 0 14px rgba(0, 237, 121, 0.65);
+}
+
+.sl-screen .sl-capsule.sl-cap-miss {
+  border-color: #fda4af;
+  background: linear-gradient(180deg, #f43f5e, #881337);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.55);
+}
