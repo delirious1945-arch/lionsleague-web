@@ -2,7 +2,6 @@
 
 import React from 'react';
 import {
-  DartHitValue,
   Darts99LivePlayerStats,
   MAX_POINTS_99,
   TOTAL_DARTS_99,
@@ -27,34 +26,6 @@ export interface HolographicDarts99Props {
   stageImageSrc?: string;
 }
 
-function DartSilhouetteSvg() {
-  return (
-    <svg
-      className="lda-dart-svg"
-      viewBox="0 0 180 20"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <polygon points="4,10 26,3 34,8 34,12 26,17" opacity="0.85" />
-      <rect x="34" y="8.5" width="44" height="3" rx="1.5" opacity="0.7" />
-      <rect x="78" y="7" width="54" height="6" rx="3" />
-      <polygon points="132,8.5 174,10 132,11.5" opacity="0.9" />
-    </svg>
-  );
-}
-
-function getDartSlotMeta(
-  val: DartHitValue | undefined,
-  idx: number,
-  targetNumber: number
-): { cls: string; badge: string } {
-  if (val === 3) return { cls: 'lda-slot-triple', badge: `T${targetNumber} (+3)` };
-  if (val === 2) return { cls: 'lda-slot-double', badge: `D${targetNumber} (+2)` };
-  if (val === 1) return { cls: 'lda-slot-single', badge: `S${targetNumber} (+1)` };
-  if (val === 0) return { cls: 'lda-slot-miss', badge: 'MISS (0)' };
-  return { cls: '', badge: `DART ${idx + 1}` };
-}
-
 export default function HolographicDarts99Cockpit({
   boardId,
   boardLabel,
@@ -73,7 +44,9 @@ export default function HolographicDarts99Cockpit({
 }: HolographicDarts99Props) {
   // Spielername immer dynamisch aus dem laufenden Spiel (niemals hardcoded!)
   const cleanName = (activeName || '').trim() || 'Spieler';
-  const isCompactName = cleanName.length > 15;
+  const nameParts = cleanName.split(/\s+/).filter(Boolean);
+  const longestPartLen = Math.max(...nameParts.map((p) => p.length), 0);
+  const isCompactName = longestPartLen > 12 || nameParts.length > 2;
 
   const activeStats =
     is1vs1 && activePlayer === 2 && p2Stats ? p2Stats : p1Stats;
@@ -130,34 +103,28 @@ export default function HolographicDarts99Cockpit({
       leftWingContent={
         <>
           <div style={{ width: '100%' }}>
-            <span className="lda-throw-pill lda-throw-pill-sm">
-              {is1vs1 ? `SPIELER ${activePlayer} · AM WURF` : 'AM WURF'}
+            <span className="lda-kicker">
+              {is1vs1 ? `SPIELER ${activePlayer} AM OCHE` : 'SPIELER AM OCHE'}
             </span>
+            <div className="lda-divider" style={{ margin: '0.4cqw 0 0.7cqw' }} />
             <h1
-              className={`lda-player-name-sm ${isCompactName ? 'lda-name-compact' : ''}`}
+              className={`lda-player-name ${isCompactName ? 'lda-name-compact' : ''}`}
+              style={{
+                marginBottom: '0.75cqw',
+                fontSize: isCompactName ? '2.55cqw' : '3.3cqw',
+              }}
               title={cleanName}
             >
-              {cleanName}
+              {nameParts.map((part, idx) => (
+                <span key={`${part}-${idx}`}>{part}</span>
+              ))}
             </h1>
-            <div className="lda-round-sub">
-              AUFNAHME {displayRound} / {TOTAL_ROUNDS_99}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45cqw' }}>
+              <span className="lda-throw-pill lda-throw-pill-sm">AM WURF</span>
+              <div className="lda-round-sub">
+                AUFNAHME {displayRound} / {TOTAL_ROUNDS_99}
+              </div>
             </div>
-          </div>
-
-          <div className="lda-dart-list">
-            {[0, 1, 2].map((idx) => {
-              const meta = getDartSlotMeta(
-                activeStats.currentTurnDarts?.[idx],
-                idx,
-                safeTarget
-              );
-              return (
-                <div className={`lda-dart-slot ${meta.cls}`} key={idx}>
-                  <DartSilhouetteSvg />
-                  <span className="lda-dart-badge">{meta.badge}</span>
-                </div>
-              );
-            })}
           </div>
 
           {is1vs1 && otherStats && (

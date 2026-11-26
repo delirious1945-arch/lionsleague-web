@@ -122,28 +122,31 @@
   height: 68%;
 }
 
-/* Linker 3D-Glasflügel: Aktiver Spieler */
+/* Linker 3D-Glasflügel: Aktiver Spieler (zentriert) */
 .sl-screen .sl-left-wing {
   position: absolute;
-  left: 9.8%;
-  top: 25.5%;
+  left: 10.1%;
+  top: 24.5%;
   width: 20.6%;
-  height: 41.5%;
+  height: 43%;
   z-index: 5;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: flex-start;
-  padding: 0 0.8cqw;
+  align-items: center;
+  text-align: center;
+  padding: 0 0.85cqw;
 }
 
 .sl-screen .sl-player-name {
   margin: 0 0 1.45cqw;
+  width: 100%;
   color: #f4fbff;
   font-size: 4.2cqw;
   font-weight: 800;
   line-height: 0.94;
   letter-spacing: -0.01em;
+  text-align: center;
   text-shadow: 0 4px 18px rgba(0, 0, 0, 0.92);
   max-width: 100%;
   overflow-wrap: break-word;
@@ -184,6 +187,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-align: center;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
@@ -312,20 +316,20 @@
   box-shadow: 0 0 14px rgba(244, 63, 94, 0.75);
 }
 
-/* Rechter 3D-Glasflügel: Aufstieg-Counter & 10 vertikale Kapseln */
+/* Rechter 3D-Glasflügel: Aufstieg-Counter & 10 vertikale Kapseln (zentriert) */
 .sl-screen .sl-right-wing {
   position: absolute;
-  right: 9.8%;
-  top: 25.5%;
+  right: 10.1%;
+  top: 24.5%;
   width: 20.6%;
-  height: 41.5%;
+  height: 43%;
   z-index: 5;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 0 0.75cqw;
+  padding: 0 0.85cqw;
 }
 
 .sl-screen .sl-hits-big {
