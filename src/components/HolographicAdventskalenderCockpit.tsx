@@ -238,10 +238,17 @@ export default function HolographicAdventskalenderCockpit({
               <b>🛡 {shields}</b>
               Schilde
             </span>
-            <span>
-              <b>{state.dartsThrown}</b>
-              Darts
-            </span>
+            {state.multiplier && state.multiplier > 1 ? (
+              <span className="multiplier">
+                <b>×2</b>
+                bereit
+              </span>
+            ) : (
+              <span>
+                <b>{state.dartsThrown}</b>
+                Darts
+              </span>
+            )}
           </div>
 
           {(shields > 0 || activeCurses.length > 0 || pendingCurses.length > 0) && (
@@ -307,7 +314,7 @@ export default function HolographicAdventskalenderCockpit({
 
         <div className="game-title">
           <small>Board {boardId}</small>
-          <strong>Der verhexte Adventskalender</strong>
+          <strong>Der verflixte Adventskalender</strong>
         </div>
 
         <div className="header-actions">
@@ -350,7 +357,7 @@ export default function HolographicAdventskalenderCockpit({
                 : `Runde ${roundNumber}`}
             </small>
             <h1>
-              Der verhexte
+              Der verflixte
               <br />
               <em>Adventskalender</em>
             </h1>
@@ -410,6 +417,16 @@ export default function HolographicAdventskalenderCockpit({
                       <b>{door.number}</b>
                       <small>{target.isSpecial ? target.label : target.subLabel}</small>
                       <i />
+                      {Array.isArray(door.partialHits) && door.partialHits.length > 0 && (
+                        <span className="combo-dots">
+                          {(door.number === 6 ? ['6', 'BULL'] : ['20', '4', 'BULL']).map((key) => (
+                            <em
+                              key={key}
+                              className={door.partialHits?.includes(key) ? 'done' : ''}
+                            />
+                          ))}
+                        </span>
+                      )}
                     </span>
                   </div>
                 );
@@ -442,7 +459,7 @@ export default function HolographicAdventskalenderCockpit({
       {winnerPlayer && (
         <div className="winner-banner">
           <div className="winner-card">
-            <small>Der verhexte Adventskalender</small>
+            <small>Der verflixte Adventskalender</small>
             <strong className="winner-name">
               {winnerPlayer === 'draw'
                 ? '🤝 Unentschieden!'
@@ -451,7 +468,7 @@ export default function HolographicAdventskalenderCockpit({
             <p className="winner-sub">
               {winnerPlayer === 'draw'
                 ? 'Gleichstand nach allen gespielten Runden'
-                : 'gewinnt den verwunschenen Adventskalender'}
+                : 'gewinnt den verflixten Adventskalender'}
             </p>
 
             {is1vs1 ? (

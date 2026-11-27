@@ -696,6 +696,36 @@
   background: radial-gradient(circle, #d09b18, #6e4507 60%, #281604);
 }
 
+.ak-hall-root .game-door.opened.tone-social .door-content {
+  background: radial-gradient(circle, #b45309, #6b2f06 60%, #241003);
+}
+
+.ak-hall-root .combo-dots {
+  position: absolute;
+  right: 7px;
+  bottom: 6px;
+  left: 7px;
+  display: flex;
+  gap: 3px;
+}
+
+.ak-hall-root .combo-dots em {
+  height: 3px;
+  flex: 1;
+  background: rgba(255, 255, 255, .16);
+}
+
+.ak-hall-root .combo-dots em.done {
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+}
+
+.ak-hall-root .player-stats .multiplier {
+  border-color: #facc15;
+  color: #fef08a;
+  box-shadow: inset 0 0 14px rgba(250, 204, 21, .1);
+}
+
 .ak-hall-root .game-door.opened.tone-curse .door-content {
   background: radial-gradient(circle, #9d2626, #521010 60%, #210707);
 }
@@ -741,6 +771,11 @@
 .ak-hall-root .tv-throws.tone-win {
   border-color: rgba(251, 191, 36, .55);
   background: rgba(54, 34, 6, .88);
+}
+
+.ak-hall-root .tv-throws.tone-social {
+  border-color: rgba(217, 119, 6, .55);
+  background: rgba(68, 32, 6, .88);
 }
 
 .ak-hall-root .tv-throws.tone-curse {

@@ -53,7 +53,7 @@ export interface AdventsDoorReward {
   icon: string;
   title: string;
   shortBadge: string;
-  tone: 'good' | 'jackpot' | 'grinch' | 'curse' | 'niete';
+  tone: 'good' | 'jackpot' | 'social' | 'grinch' | 'curse' | 'niete';
 }
 
 export interface AdventsDoorState {
@@ -62,6 +62,7 @@ export interface AdventsDoorState {
   openedBy: 1 | 2 | null;
   openedInRound: number | null;
   reward: AdventsDoorReward;
+  partialHits?: string[]; // Für Kombi-Türen: z.B. ['6'] oder ['20', '4']
 }
 
 export interface AdventsDartEvent {
@@ -69,7 +70,7 @@ export interface AdventsDartEvent {
   doorNumber?: AdventsDoorNumber;
   label: string;
   subLabel: string;
-  tone: 'good' | 'jackpot' | 'grinch' | 'curse' | 'niete' | 'miss';
+  tone: 'good' | 'jackpot' | 'social' | 'grinch' | 'curse' | 'niete' | 'miss';
 }
 
 export interface AdventsPlayerState {
@@ -79,6 +80,7 @@ export interface AdventsPlayerState {
   roundsPlayed: number;
   grinchHits: number;
   shieldsCount?: number;
+  multiplier?: number;
   activeCurses: AdventsCurseType[];
   pendingCurses: AdventsCurseType[];
   currentTurnDarts: AdventsDartEvent[];
@@ -87,7 +89,7 @@ export interface AdventsPlayerState {
 export interface AdventsLastActionBanner {
   id: number;
   doorNumber?: AdventsDoorNumber | null;
-  tone: 'good' | 'jackpot' | 'grinch' | 'curse' | 'niete' | 'miss' | 'win' | 'info';
+  tone: 'good' | 'jackpot' | 'social' | 'grinch' | 'curse' | 'niete' | 'miss' | 'win' | 'info';
   icon: string;
   headline: string;
   subline: string;
@@ -119,11 +121,11 @@ const DUEL_REWARD_POOL: AdventsDoorReward[] = [
   { kind: 'bell_bless_45', icon: '🔔', title: 'Glöckchen-Segen II', shortBadge: '+45 · HEILT', tone: 'good' },
   { kind: 'double_star', icon: '🌟', title: 'Weihnachtsstern', shortBadge: '×2 PUNKTE', tone: 'jackpot' },
   // 5x Steal, Tausch & Schutz
-  { kind: 'steal_25', icon: '🎅', title: 'Wichtel-Dieb', shortBadge: 'KLAUT 25', tone: 'good' },
-  { kind: 'steal_50', icon: '🧳', title: 'Geschenke-Räuber', shortBadge: 'KLAUT 50', tone: 'good' },
-  { kind: 'grinch_swap', icon: '👹', title: 'DER GRINCH!', shortBadge: '⇄ TAUSCH!', tone: 'grinch' },
-  { kind: 'roulette_duel', icon: '🎲', title: 'Wichtel-Roulette', shortBadge: '+60 / -30', tone: 'grinch' },
-  { kind: 'shield_angel', icon: '🛡️', title: 'Schutz-Engel', shortBadge: '2× SCHILD', tone: 'good' },
+  { kind: 'steal_25', icon: '🥷', title: 'Wichtel-Dieb', shortBadge: '−25', tone: 'social' },
+  { kind: 'steal_50', icon: '🏴‍☠️', title: 'Großer Geschenke-Räuber', shortBadge: '−50', tone: 'social' },
+  { kind: 'grinch_swap', icon: '👹', title: 'Der Grinch!', shortBadge: '⇄', tone: 'grinch' },
+  { kind: 'roulette_duel', icon: '🎰', title: 'Wichtel-Roulette', shortBadge: '50/50', tone: 'social' },
+  { kind: 'shield_angel', icon: '🛡️', title: 'Schutz-Engel', shortBadge: '×2', tone: 'good' },
   // 6x Flüche & Bestrafungen
   { kind: 'curse_wrong_hand', icon: '🧦', title: 'Knecht Ruprecht', shortBadge: 'FALSCHE HAND', tone: 'curse' },
   { kind: 'curse_two_darts', icon: '❄️', title: 'Schneesturm', shortBadge: 'NUR 2 DARTS', tone: 'curse' },
@@ -170,12 +172,32 @@ const SOLO_REWARD_POOL: AdventsDoorReward[] = [
 
 /**
  * Gibt das Dart-Ziel für das jeweilige Türchen 1..24 zurück.
+ * Tür 6 und Tür 24 sind spezielle Kombi-/Doppeltüren nach BBDV-/Lions-Standard:
+ * - Tür 6 (Nikolaus): Benötigt 6 UND Single Bull oder Bullseye (25/50).
+ * - Tür 24 (Heiligabend): Benötigt 20, 4 UND Single Bull oder Bullseye (25/50).
  */
 export function getDoorTargetLabel(doorNum: AdventsDoorNumber): {
   label: string;
   subLabel: string;
   isSpecial: boolean;
+  requiredTargets?: string[];
 } {
+  if (doorNum === 6) {
+    return {
+      label: '6 + BULL',
+      subLabel: '6 & Bull 25/50',
+      isSpecial: true,
+      requiredTargets: ['6', 'bull'],
+    };
+  }
+  if (doorNum === 24) {
+    return {
+      label: '20 + 4 + BULL',
+      subLabel: '20, 4 & Bull 25/50',
+      isSpecial: true,
+      requiredTargets: ['20', '4', 'bull'],
+    };
+  }
   if (doorNum <= 20) {
     return {
       label: String(doorNum),
@@ -197,16 +219,9 @@ export function getDoorTargetLabel(doorNum: AdventsDoorNumber): {
       isSpecial: true,
     };
   }
-  if (doorNum === 23) {
-    return {
-      label: 'BULL 25',
-      subLabel: 'Single Bull',
-      isSpecial: true,
-    };
-  }
   return {
-    label: 'BULL 50',
-    subLabel: 'Bullseye / D20',
+    label: 'BULL 25',
+    subLabel: 'Single Bull',
     isSpecial: true,
   };
 }
@@ -240,6 +255,7 @@ export function createInitialAdventsPlayerState(): AdventsPlayerState {
     roundsPlayed: 0,
     grinchHits: 0,
     shieldsCount: 0,
+    multiplier: 1,
     activeCurses: [],
     pendingCurses: [],
     currentTurnDarts: [],
@@ -254,6 +270,7 @@ export function cloneAdventsPlayerState(s: AdventsPlayerState): AdventsPlayerSta
     roundsPlayed: s.roundsPlayed,
     grinchHits: s.grinchHits,
     shieldsCount: s.shieldsCount ?? 0,
+    multiplier: s.multiplier ?? 1,
     activeCurses: [...s.activeCurses],
     pendingCurses: [...s.pendingCurses],
     currentTurnDarts: s.currentTurnDarts.map((ev) => ({ ...ev })),
@@ -267,6 +284,7 @@ export function cloneDoors(doors: AdventsDoorState[]): AdventsDoorState[] {
     openedBy: d.openedBy,
     openedInRound: d.openedInRound,
     reward: { ...d.reward },
+    partialHits: d.partialHits ? [...d.partialHits] : undefined,
   }));
 }
 

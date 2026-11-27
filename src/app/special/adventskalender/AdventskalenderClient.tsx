@@ -1,146 +1,235 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { Player } from '@/lib/data';
 import { generateSessionId } from '@/lib/liveSession';
 import {
   AdventsCurseType,
-  AdventsDartEvent,
   AdventsDoorNumber,
   AdventsDoorState,
   AdventsLastActionBanner,
   AdventsPlayerState,
   AdventsRewardKind,
-  cloneAdventsPlayerState,
-  cloneDoors,
-  countOpenDoors,
-  createInitialAdventsPlayerState,
-  createShuffledDoors,
-  getDoorTargetLabel,
 } from './types';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Clock,
-  HelpCircle,
-  RotateCcw,
-  Sparkles,
-  Tv,
-  User,
-  Users,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import './AdventskalenderV3.css';
 
-const CACHE_KEY = 'lions_active_adventskalender_session_v1';
+const CACHE_KEY = 'lions_active_adventskalender_session_v3';
 
 interface AdventskalenderClientProps {
   players: Player[];
   currentUser?: { name?: string; role?: string; id?: number } | null;
 }
 
-interface TurnSnapshot {
-  activePlayer: 1 | 2;
-  roundNumber: number;
-  isSuddenDeath: boolean;
-  doors: AdventsDoorState[];
-  p1State: AdventsPlayerState;
-  p2State: AdventsPlayerState;
-  lastAction: AdventsLastActionBanner | null;
-  winnerPlayer: 1 | 2 | 'draw' | null;
-  isGameFinished: boolean;
+type Tone = 'good' | 'jackpot' | 'social' | 'curse' | 'grinch' | 'niete';
+type Curse = AdventsCurseType;
+type Mode = 'duel' | 'solo';
+type Status = 'playing' | 'shootout' | 'finished';
+type SoundKind = 'good' | 'jackpot' | 'social' | 'grinch' | 'curse' | 'niete' | 'miss' | 'win';
+
+interface V3Player {
+  name: string;
+  score: number;
+  opened: number;
+  shields: number;
+  multiplier: number;
+  grinchHits: number;
+  actionsCount: number;
+  curseQueue: Curse[];
+  activeCurse?: Curse;
 }
 
-type SoundKind = 'good' | 'jackpot' | 'grinch' | 'curse' | 'niete' | 'miss' | 'win';
+interface V3Reward {
+  kind: AdventsRewardKind;
+  icon: string;
+  name: string;
+  short: string;
+  description: string;
+  tone: Tone;
+  points?: number;
+  action?: 'heal' | 'double' | 'steal25' | 'steal50' | 'swap' | 'roulette' | 'shield';
+  curse?: Curse;
+}
 
-const CURSE_UI_META: Record<
-  AdventsCurseType,
-  {
-    icon: string;
-    badge: string;
-    short: string;
-    warning: string;
-    chipCls: string;
+interface V3Door {
+  number: AdventsDoorNumber;
+  target: string;
+  reward: V3Reward;
+  openedBy?: 0 | 1;
+  openedInRound?: number;
+}
+
+interface V3Reveal {
+  door: AdventsDoorNumber;
+  reward: V3Reward;
+  player: 0 | 1;
+  resolvedText: string;
+}
+
+interface V3Session {
+  version: 3;
+  mode: Mode;
+  doors: V3Door[];
+  players: [V3Player, V3Player];
+  activePlayer: 0 | 1;
+  starter: 0 | 1;
+  round: number;
+  comboProgress: Record<number, string[]>;
+  status: Status;
+  winner?: 0 | 1;
+  lastReveal?: V3Reveal;
+  lastBanner?: AdventsLastActionBanner | null;
+  message?: string;
+  sessionId?: string;
+}
+
+const curseLabels: Record<Curse, { icon: string; title: string; instruction: string }> = {
+  wrong_hand: { icon: '🧙', title: 'Knecht Ruprecht', instruction: 'Mit der falschen Hand werfen!' },
+  two_darts: { icon: '❄️', title: 'Schneesturm', instruction: 'Nur 2 Darts für diesen Versuch!' },
+  one_dart: { icon: '🎰', title: 'Einarmiger Bandit', instruction: 'Nur 1 Dart für diesen Versuch!' },
+  sitting: { icon: '🪑', title: 'Opa Hoppenstedt', instruction: 'Im Sitzen werfen!' },
+  skip_round: { icon: '⛄', title: 'In der Schneewehe', instruction: 'Diese Aufnahme komplett aussetzen!' },
+  spin_360: { icon: '🌀', title: 'Glühwein-Drehwurm', instruction: 'Vor jedem Dart einmal um 360° drehen!' },
+};
+
+const rewards: V3Reward[] = [
+  { kind: 'points_25', icon: '🍫', name: 'Schoko-Nikolaus', short: '+25', description: '+25 Punkte', tone: 'good', points: 25 },
+  { kind: 'points_35', icon: '⭐', name: 'Zimtstern-Teller', short: '+35', description: '+35 Punkte', tone: 'good', points: 35 },
+  { kind: 'points_40', icon: '🥐', name: 'Vanillekipferl', short: '+40', description: '+40 Punkte', tone: 'good', points: 40 },
+  { kind: 'points_50', icon: '🎁', name: 'Weihnachtspaket', short: '+50', description: '+50 Punkte', tone: 'good', points: 50 },
+  { kind: 'points_55', icon: '🧝', name: 'Wichtel-Überraschung', short: '+55', description: '+55 Punkte', tone: 'good', points: 55 },
+  { kind: 'points_65', icon: '🍷', name: 'Heißer Glühwein', short: '+65', description: '+65 Punkte', tone: 'jackpot', points: 65 },
+  { kind: 'points_75', icon: '🦌', name: 'Rentier-Schlitten', short: '+75', description: '+75 Punkte', tone: 'jackpot', points: 75 },
+  { kind: 'bell_bless_30', icon: '🔔', name: 'Glöckchen-Segen I', short: '+30', description: '+30 Punkte und alle Flüche geheilt', tone: 'good', points: 30, action: 'heal' },
+  { kind: 'bell_bless_45', icon: '🔔', name: 'Glöckchen-Segen II', short: '+45', description: '+45 Punkte und alle Flüche geheilt', tone: 'good', points: 45, action: 'heal' },
+  { kind: 'double_star', icon: '🌟', name: 'Weihnachtsstern', short: '×2', description: 'Die nächste erfolgreiche Punkte-Tür zählt doppelt', tone: 'jackpot', action: 'double' },
+  { kind: 'steal_25', icon: '🥷', name: 'Wichtel-Dieb', short: '−25', description: '25 Punkte vom Gegner gestohlen', tone: 'social', action: 'steal25' },
+  { kind: 'steal_50', icon: '🏴‍☠️', name: 'Großer Geschenke-Räuber', short: '−50', description: '50 Punkte vom Gegner gestohlen', tone: 'social', action: 'steal50' },
+  { kind: 'grinch_swap', icon: '👹', name: 'Der Grinch!', short: '⇄', description: 'Die Punktestände werden bei Rückstand getauscht', tone: 'grinch', action: 'swap' },
+  { kind: 'roulette_duel', icon: '🎰', name: 'Wichtel-Roulette', short: '50/50', description: 'Zufällig +60 oder −30 Punkte', tone: 'social', action: 'roulette' },
+  { kind: 'shield_angel', icon: '🛡️', name: 'Schutz-Engel', short: '×2', description: 'Zwei Schutzschilde erhalten', tone: 'good', action: 'shield' },
+  { kind: 'curse_wrong_hand', icon: '🧙', name: 'Knecht Ruprecht', short: 'Fluch', description: 'Der Gegner wirft seine nächste Aufnahme mit der falschen Hand', tone: 'curse', curse: 'wrong_hand' },
+  { kind: 'curse_two_darts', icon: '❄️', name: 'Schneesturm', short: '2 Darts', description: 'Der Gegner hat in seiner nächsten Aufnahme nur zwei Darts', tone: 'curse', curse: 'two_darts' },
+  { kind: 'curse_one_dart', icon: '🎰', name: 'Einarmiger Bandit', short: '1 Dart', description: 'Der Gegner hat in seiner nächsten Aufnahme nur einen Dart', tone: 'curse', curse: 'one_dart' },
+  { kind: 'curse_sitting', icon: '🪑', name: 'Opa Hoppenstedt', short: 'Sitzen', description: 'Der Gegner muss seine nächste Aufnahme im Sitzen werfen', tone: 'curse', curse: 'sitting' },
+  { kind: 'curse_skip_round', icon: '⛄', name: 'In der Schneewehe', short: 'Pause', description: 'Der Gegner muss seine nächste Aufnahme aussetzen', tone: 'curse', curse: 'skip_round' },
+  { kind: 'curse_spin_360', icon: '🌀', name: 'Glühwein-Drehwurm', short: '360°', description: 'Der Gegner muss sich vor jedem Dart einmal drehen', tone: 'curse', curse: 'spin_360' },
+  { kind: 'grinch_trap_30', icon: '🪤', name: 'Kleine Grinch-Falle', short: '−30', description: '30 Punkte Sofortabzug', tone: 'grinch', points: -30 },
+  { kind: 'grinch_trap_50', icon: '🧊', name: 'Eiszapfen-Schock', short: '−50', description: '50 Punkte Sofortabzug', tone: 'grinch', points: -50 },
+  { kind: 'niete_0', icon: '🍪', name: 'Verbrannte Plätzchen', short: 'Niete', description: 'Keine Punkte – trockene Niete', tone: 'niete' },
+];
+
+const targets: string[] = Array.from({ length: 24 }, (_, index) => {
+  const number = index + 1;
+  if (number === 6) return '6 + Bull';
+  if (number <= 20) return `${number}`;
+  if (number === 21) return 'Doppel';
+  if (number === 22) return 'Triple';
+  if (number === 23) return 'Bull 25';
+  return '20 + 4 + Bull';
+});
+
+const comboParts: Record<number, { key: string; label: string }[]> = {
+  6: [
+    { key: '6', label: 'Feld 6' },
+    { key: 'BULL', label: 'Bull 25 / 50' },
+  ],
+  24: [
+    { key: '20', label: 'Feld 20' },
+    { key: '4', label: 'Feld 4' },
+    { key: 'BULL', label: 'Bull 25 / 50' },
+  ],
+};
+
+function normalizeName(name: string): string {
+  return name.normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function shuffled<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-> = {
-  wrong_hand: {
-    icon: '🧦',
-    badge: 'FALSCHE HAND!',
-    short: 'Falsche Hand',
-    warning: 'wirft diese Aufnahme mit der FALSCHEN HAND!',
-    chipCls: 'bg-red-600/35 border-red-400 text-red-100',
-  },
-  two_darts: {
-    icon: '❄️',
-    badge: 'NUR 2 DARTS!',
-    short: 'Nur 2 Darts',
-    warning: 'hat diese Aufnahme NUR 2 DARTS!',
-    chipCls: 'bg-sky-600/35 border-sky-400 text-sky-100',
-  },
-  one_dart: {
-    icon: '🎯',
-    badge: 'NUR 1 DART!',
-    short: 'Nur 1 Dart',
-    warning: 'hat diese Aufnahme NUR 1 DART!',
-    chipCls: 'bg-rose-600/35 border-rose-400 text-rose-100',
-  },
-  sitting: {
-    icon: '🪑',
-    badge: 'IM SITZEN!',
-    short: 'Im Sitzen',
-    warning: 'muss diese Aufnahme IM SITZEN werfen!',
-    chipCls: 'bg-amber-600/35 border-amber-400 text-amber-100',
-  },
-  skip_round: {
-    icon: '⛄',
-    badge: 'AUSSETZEN!',
-    short: 'Runde aussetzen',
-    warning: 'ist EINGESCHNEIT und setzt diese Runde aus (0 Darts)!',
-    chipCls: 'bg-cyan-600/35 border-cyan-300 text-cyan-50',
-  },
-  spin_360: {
-    icon: '🌪️',
-    badge: '360° DREHWURM!',
-    short: '360° Drehung',
-    warning: 'muss sich vor dem Wurf 360° DREHEN (Drehwurm)!',
-    chipCls: 'bg-purple-600/35 border-purple-400 text-purple-100',
-  },
-};
+  return copy;
+}
 
-const CURSE_REWARD_MAP: Partial<Record<AdventsRewardKind, AdventsCurseType>> = {
-  curse_wrong_hand: 'wrong_hand',
-  curse_two_darts: 'two_darts',
-  curse_one_dart: 'one_dart',
-  curse_sitting: 'sitting',
-  curse_skip_round: 'skip_round',
-  curse_spin_360: 'spin_360',
-};
+function makePlayer(name: string): V3Player {
+  return {
+    name,
+    score: 0,
+    opened: 0,
+    shields: 0,
+    multiplier: 1,
+    grinchHits: 0,
+    actionsCount: 0,
+    curseQueue: [],
+  };
+}
 
-const POINTS_REWARD_MAP: Partial<Record<AdventsRewardKind, { points: number; isJackpot: boolean; label: string }>> = {
-  points_25: { points: 25, isJackpot: false, label: 'Schoko-Nikolaus-Punkte' },
-  points_30: { points: 30, isJackpot: false, label: 'Schoko-Punkte' },
-  points_35: { points: 35, isJackpot: false, label: 'Zimtstern-Punkte' },
-  points_40: { points: 40, isJackpot: false, label: 'Vanillekipferl-Punkte' },
-  solo_bonus_45: { points: 45, isJackpot: false, label: 'Nikolaus-Stiefel-Punkte' },
-  points_50: { points: 50, isJackpot: false, label: 'Geschenk-Punkte' },
-  points_55: { points: 55, isJackpot: false, label: 'Wichtel-Punkte' },
-  points_60: { points: 60, isJackpot: true, label: 'Glühwein-Jackpot-Punkte' },
-  points_65: { points: 65, isJackpot: true, label: 'Glühwein-Jackpot-Punkte' },
-  points_75: { points: 75, isJackpot: true, label: 'Rentier-Schlitten-Jackpot' },
-};
+function cloneSession(state: V3Session): V3Session {
+  return JSON.parse(JSON.stringify(state)) as V3Session;
+}
 
-function getMaxDartsForCurses(curses: AdventsCurseType[]): number {
-  if (curses.includes('skip_round')) return 0;
-  if (curses.includes('one_dart')) return 1;
-  if (curses.includes('two_darts')) return 2;
-  return 3;
+function createV3Session(
+  mode: Mode = 'duel',
+  starter: 0 | 1 = 0,
+  names: [string, string] = ['Spieler 1', 'Spieler 2'],
+  sessionId?: string
+): V3Session {
+  const deck = shuffled(rewards);
+  return {
+    version: 3,
+    mode,
+    doors: targets.map((target, index) => ({
+      number: (index + 1) as AdventsDoorNumber,
+      target,
+      reward: { ...deck[index] },
+    })),
+    players: [
+      makePlayer(names[0].trim() || 'Spieler 1'),
+      makePlayer(mode === 'solo' ? 'Solo-Training' : names[1].trim() || 'Spieler 2'),
+    ],
+    activePlayer: mode === 'solo' ? 0 : starter,
+    starter: mode === 'solo' ? 0 : starter,
+    round: 1,
+    comboProgress: { 6: [], 24: [] },
+    status: 'playing',
+    lastBanner: null,
+    sessionId,
+  };
+}
+
+function readSavedV3(): V3Session | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as V3Session;
+    if (
+      parsed &&
+      parsed.version === 3 &&
+      Array.isArray(parsed.doors) &&
+      parsed.doors.length === 24 &&
+      Array.isArray(parsed.players) &&
+      parsed.players.length === 2 &&
+      parsed.status !== 'finished'
+    ) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function createAdventsSound(kind: SoundKind) {
   if (typeof window === 'undefined') return;
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
     const now = ctx.currentTime;
@@ -150,7 +239,7 @@ function createAdventsSound(kind: SoundKind) {
       startOffset: number,
       duration: number,
       type: OscillatorType = 'sine',
-      gainLevel = 0.12
+      gainLevel = 0.11
     ) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -164,7 +253,7 @@ function createAdventsSound(kind: SoundKind) {
       osc.stop(now + startOffset + duration);
     };
 
-    if (kind === 'good') {
+    if (kind === 'good' || kind === 'social') {
       playTone(587.33, 0, 0.14, 'triangle', 0.12);
       playTone(880, 0.09, 0.22, 'sine', 0.13);
     } else if (kind === 'jackpot') {
@@ -173,9 +262,9 @@ function createAdventsSound(kind: SoundKind) {
       playTone(783.99, 0.16, 0.14, 'triangle', 0.14);
       playTone(1046.5, 0.26, 0.34, 'sine', 0.15);
     } else if (kind === 'grinch') {
-      playTone(392, 0, 0.15, 'sawtooth', 0.1);
-      playTone(277.18, 0.12, 0.18, 'sawtooth', 0.1);
-      playTone(185, 0.26, 0.32, 'sawtooth', 0.11);
+      playTone(392, 0, 0.15, 'sawtooth', 0.09);
+      playTone(277.18, 0.12, 0.18, 'sawtooth', 0.09);
+      playTone(185, 0.26, 0.3, 'sawtooth', 0.1);
     } else if (kind === 'curse') {
       playTone(620, 0, 0.12, 'sine', 0.1);
       playTone(466.16, 0.1, 0.14, 'triangle', 0.1);
@@ -187,7 +276,7 @@ function createAdventsSound(kind: SoundKind) {
       playTone(1046.5, 0.35, 0.42, 'sine', 0.16);
       playTone(1318.51, 0.5, 0.52, 'sine', 0.14);
     } else {
-      playTone(175, 0, 0.15, 'sine', 0.08);
+      playTone(180, 0, 0.15, 'sine', 0.08);
     }
 
     setTimeout(() => {
@@ -196,79 +285,215 @@ function createAdventsSound(kind: SoundKind) {
   } catch {}
 }
 
+function toLivePlayerState(player: V3Player, round: number): AdventsPlayerState {
+  return {
+    score: player.score,
+    doorsOpened: player.opened,
+    dartsThrown: player.actionsCount,
+    roundsPlayed: Math.max(0, round - 1),
+    grinchHits: player.grinchHits,
+    shieldsCount: player.shields,
+    multiplier: player.multiplier,
+    activeCurses: player.activeCurse ? [player.activeCurse] : [],
+    pendingCurses: [...player.curseQueue],
+    currentTurnDarts: [],
+  };
+}
+
+function toLiveDoors(session: V3Session): AdventsDoorState[] {
+  return session.doors.map((door) => ({
+    number: door.number,
+    isOpen: door.openedBy !== undefined,
+    openedBy: door.openedBy === undefined ? null : ((door.openedBy + 1) as 1 | 2),
+    openedInRound: door.openedInRound ?? null,
+    reward: {
+      kind: door.reward.kind,
+      icon: door.reward.icon,
+      title: door.reward.name,
+      shortBadge: door.reward.short,
+      tone: door.reward.tone,
+    },
+    partialHits:
+      session.comboProgress[door.number]?.length
+        ? [...session.comboProgress[door.number]]
+        : undefined,
+  }));
+}
+
+function PlayerScore({
+  player: item,
+  index,
+  active,
+  compact = false,
+}: {
+  player: V3Player;
+  index: 0 | 1;
+  active: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <article className={`score-card p${index + 1} ${active ? 'active' : ''} ${compact ? 'compact' : ''}`}>
+      <div className="score-card-top">
+        <span>Spieler {index + 1}</span>
+        <b>{active ? 'Am Wurf' : 'Wartet'}</b>
+      </div>
+      <h2>{item.name}</h2>
+      <strong className="big-score">{item.score}</strong>
+      <div className="player-stats">
+        <span>
+          <b>{item.opened}</b> Türchen
+        </span>
+        <span>
+          <b>🛡 {item.shields}</b> Schutz
+        </span>
+        {item.multiplier > 1 && (
+          <span className="multiplier">
+            <b>×2</b> bereit
+          </span>
+        )}
+      </div>
+      {(item.activeCurse || item.curseQueue.length > 0) && (
+        <div className="mini-curse">
+          {item.activeCurse ? curseLabels[item.activeCurse].icon : '⏳'}{' '}
+          {item.activeCurse
+            ? `${curseLabels[item.activeCurse].title} aktiv`
+            : `${item.curseQueue.length} Fluch${item.curseQueue.length > 1 ? 'e' : ''} in Warteschlange`}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function DoorButton({
+  door,
+  progress,
+  inspect,
+  onOpen,
+  disabled,
+  tv = false,
+}: {
+  door: V3Door;
+  progress: string[];
+  inspect: boolean;
+  onOpen: () => void;
+  disabled: boolean;
+  tv?: boolean;
+}) {
+  const opened = door.openedBy !== undefined;
+  const isCombo = Boolean(comboParts[door.number]);
+  return (
+    <button
+      type="button"
+      className={`game-door ${opened ? `opened p${door.openedBy! + 1} tone-${door.reward.tone}` : ''} ${
+        inspect && !opened ? 'inspected' : ''
+      } ${isCombo ? 'combo-door' : ''} ${tv ? 'tv-door' : ''}`}
+      onClick={onOpen}
+      disabled={disabled || opened}
+      aria-label={
+        opened ? `Tür ${door.number}: ${door.reward.name}` : `Tür ${door.number}, Ziel ${door.target}`
+      }
+    >
+      <span className="door-content">
+        <i>{door.reward.icon}</i>
+        <b>{door.reward.short}</b>
+        <small>{opened ? `P${door.openedBy! + 1}` : inspect ? door.reward.name : ''}</small>
+      </span>
+      <span className="wood-door">
+        <b>{door.number}</b>
+        <small>{door.target}</small>
+        <i />
+        {isCombo && progress.length > 0 && (
+          <span className="combo-dots">
+            {comboParts[door.number].map((part) => (
+              <em className={progress.includes(part.key) ? 'done' : ''} key={part.key} />
+            ))}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
 export default function AdventskalenderClient({
   players,
   currentUser,
 }: AdventskalenderClientProps) {
-  const validPlayers = players.filter((p) => !p.name.startsWith('Board '));
+  const validPlayers = useMemo(
+    () => players.filter((p) => !p.name.startsWith('Board ')),
+    [players]
+  );
+
   const isBoardUser = Boolean(
-    currentUser?.name && currentUser.name.trim().toLowerCase().startsWith('board')
+    currentUser?.name && normalizeName(currentUser.name).startsWith('board')
   );
-  const userPlayerMatch = validPlayers.find(
-    (p) => p.name.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
-  );
-  const defaultP1 =
-    !isBoardUser && userPlayerMatch
-      ? userPlayerMatch.name
-      : validPlayers[0]?.name || 'Sebastian Kirste';
 
-  // Setup-Konfiguration
-  const [isGameStarted, setIsGameStarted] = useState<boolean>(false);
-  const [isGameFinished, setIsGameFinished] = useState<boolean>(false);
-  const [gameMode, setGameMode] = useState<'1vs1' | 'solo'>('1vs1');
-  const [maxRounds, setMaxRounds] = useState<number | null>(4);
-  const [p1Name, setP1Name] = useState<string>(defaultP1);
-  const [p2Name, setP2Name] = useState<string>(validPlayers[1]?.name || 'Gastspieler');
-  const [isGuestP1, setIsGuestP1] = useState<boolean>(false);
-  const [isGuestP2, setIsGuestP2] = useState<boolean>(false);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [showHelp, setShowHelp] = useState<boolean>(false);
+  const userPlayerMatch = useMemo(() => {
+    if (!currentUser?.name) return undefined;
+    const normalizedCurrent = normalizeName(currentUser.name);
+    return validPlayers.find((p) => normalizeName(p.name) === normalizedCurrent);
+  }, [currentUser?.name, validPlayers]);
 
-  // User-Arretierung im Solo-Modus (AGENTS.md §12.5)
-  useEffect(() => {
-    if (gameMode === 'solo' && !isBoardUser && userPlayerMatch) {
-      setIsGuestP1(false);
-      setP1Name(userPlayerMatch.name);
-    }
-  }, [gameMode, isBoardUser, userPlayerMatch]);
+  const lockedSoloName =
+    !isBoardUser && currentUser?.name
+      ? userPlayerMatch?.name || currentUser.name.trim()
+      : null;
 
-  // Spiel-Zustand
-  const [activePlayer, setActivePlayer] = useState<1 | 2>(1);
-  const [roundNumber, setRoundNumber] = useState<number>(1);
-  const [isSuddenDeath, setIsSuddenDeath] = useState<boolean>(false);
-  const [doors, setDoors] = useState<AdventsDoorState[]>(() => createShuffledDoors('1vs1'));
-  const [p1State, setP1State] = useState<AdventsPlayerState>(createInitialAdventsPlayerState);
-  const [p2State, setP2State] = useState<AdventsPlayerState>(createInitialAdventsPlayerState);
-  const [lastAction, setLastAction] = useState<AdventsLastActionBanner | null>(null);
-  const [winnerPlayer, setWinnerPlayer] = useState<1 | 2 | 'draw' | null>(null);
-  const [undoStack, setUndoStack] = useState<TurnSnapshot[]>([]);
+  const defaultP1 = lockedSoloName || validPlayers[0]?.name || 'Spieler 1';
+  const defaultP2 =
+    validPlayers.find((p) => normalizeName(p.name) !== normalizeName(defaultP1))?.name ||
+    'Spieler 2';
 
-  // Crash- & Wisch-Schutz
-  const [cachedSessionToResume, setCachedSessionToResume] = useState<any | null>(null);
-  const [restoredFromCache, setRestoredFromCache] = useState<boolean>(false);
-
-  // Board-Zuweisung
   const [activeBoard, setActiveBoard] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlBoard = urlParams.get('board');
-      if (urlBoard && ['1', '2', '3', '4', '5'].includes(urlBoard)) {
-        return urlBoard;
-      }
-      return (
-        localStorage.getItem('lions_tablet_board') ||
-        localStorage.getItem('lions_active_board_adventskalender') ||
-        localStorage.getItem('lions_active_board') ||
-        '1'
-      );
+    if (typeof window === 'undefined') return '1';
+    const urlBoard = new URLSearchParams(window.location.search).get('board');
+    if (urlBoard && ['1', '2', '3', '4', '5', 'personal'].includes(urlBoard)) {
+      return urlBoard;
     }
-    return '1';
+    return (
+      localStorage.getItem('lions_tablet_board') ||
+      localStorage.getItem('lions_active_board_adventskalender') ||
+      localStorage.getItem('lions_active_board') ||
+      '1'
+    );
   });
 
-  const [gameSessionId, setGameSessionId] = useState<string>(() =>
-    generateSessionId('adventskalender', activeBoard)
+  const [view, setView] = useState<'tablet' | 'tv'>('tablet');
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [savedGame, setSavedGame] = useState<V3Session | null>(null);
+  const [setupOpen, setSetupOpen] = useState<boolean>(true);
+  const [inspect, setInspect] = useState<boolean>(false);
+  const [comboDoor, setComboDoor] = useState<number | null>(null);
+  const [history, setHistory] = useState<V3Session[]>([]);
+
+  const [setupMode, setSetupMode] = useState<Mode>('duel');
+  const [setupStarter, setSetupStarter] = useState<'random' | 'p1' | 'p2'>('random');
+  const [setupP1, setSetupP1] = useState<string>(defaultP1);
+  const [setupP2, setSetupP2] = useState<string>(defaultP2);
+  const [isGuestP1, setIsGuestP1] = useState<boolean>(validPlayers.length === 0 && !lockedSoloName);
+  const [isGuestP2, setIsGuestP2] = useState<boolean>(validPlayers.length < 2);
+
+  const [session, setSession] = useState<V3Session>(() =>
+    createV3Session('duel', 0, [defaultP1, defaultP2], generateSessionId('adventskalender', '1'))
   );
+
   const liveBroadcastRef = useRef<BroadcastChannel | null>(null);
+
+  // Cache-Prüfung nach dem Mounten (Hydration-sicher)
+  useEffect(() => {
+    const found = readSavedV3();
+    if (found) {
+      setSavedGame(found);
+      setSetupOpen(false);
+    }
+  }, []);
+
+  // Strikte User-Arretierung im Solo-Modus (AGENTS.md §12.5)
+  useEffect(() => {
+    if (setupMode === 'solo' && lockedSoloName) {
+      setIsGuestP1(false);
+      setSetupP1(lockedSoloName);
+    }
+  }, [setupMode, lockedSoloName]);
 
   const playSound = useCallback(
     (kind: SoundKind) => {
@@ -279,54 +504,141 @@ export default function AdventskalenderClient({
     [soundEnabled]
   );
 
-  const handleSelectBoard = (b: string) => {
-    setActiveBoard(b);
+  const handleSelectBoard = (boardValue: string) => {
+    setActiveBoard(boardValue);
     try {
-      localStorage.setItem('lions_tablet_board', b);
-      localStorage.setItem('lions_active_board', b);
-      localStorage.setItem('lions_active_board_adventskalender', b);
-      window.history.replaceState(null, '', `/special/adventskalender?board=${b}`);
+      localStorage.setItem('lions_tablet_board', boardValue);
+      localStorage.setItem('lions_active_board', boardValue);
+      localStorage.setItem('lions_active_board_adventskalender', boardValue);
+      window.history.replaceState(null, '', `/special/adventskalender?board=${boardValue}`);
     } catch {}
   };
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
     try {
-      liveBroadcastRef.current = new BroadcastChannel(`lions_adventskalender_live_sync_${activeBoard}`);
+      liveBroadcastRef.current = new BroadcastChannel(
+        `lions_adventskalender_live_sync_${activeBoard}`
+      );
     } catch {}
     return () => {
       liveBroadcastRef.current?.close();
     };
   }, [activeBoard]);
 
-  // 1. Lokalen Cache beim Start prüfen
+  // Atomare Sicherung im localStorage nach jeder Änderung während des aktiven Spiels
   useEffect(() => {
+    if (setupOpen || savedGame) return;
     try {
-      const cachedStr = localStorage.getItem(CACHE_KEY);
-      if (cachedStr) {
-        const cached = JSON.parse(cachedStr);
-        if (
-          cached &&
-          cached.isGameStarted &&
-          !cached.isGameFinished &&
-          Array.isArray(cached.doors) &&
-          cached.doors.length === 24 &&
-          (cached.p1State?.dartsThrown > 0 ||
-            cached.p2State?.dartsThrown > 0 ||
-            cached.p1State?.roundsPlayed > 0 ||
-            cached.p2State?.roundsPlayed > 0)
-        ) {
-          setCachedSessionToResume(cached);
-        }
+      if (session.status === 'finished') {
+        localStorage.removeItem(CACHE_KEY);
+      } else {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(session));
       }
-    } catch (e) {
-      console.error('Fehler beim Laden des Adventskalender-Caches:', e);
-    }
-  }, []);
+    } catch {}
+  }, [session, setupOpen, savedGame]);
 
-  // Standby-Reset Helfer
+  const buildLivePayload = useCallback(
+    (state: V3Session) => {
+      const is1vs1 = state.mode === 'duel';
+      const p1Name = state.players[0].name;
+      const p2Name = state.players[1].name;
+      const winnerPlayer: 1 | 2 | null =
+        state.status === 'finished' && state.winner !== undefined
+          ? ((state.winner + 1) as 1 | 2)
+          : null;
+      const winnerDisplayName =
+        winnerPlayer === 1 ? p1Name : winnerPlayer === 2 ? p2Name : null;
+
+      let banner: AdventsLastActionBanner | null = state.lastBanner ?? null;
+      if (state.lastReveal) {
+        banner = {
+          id: Date.now(),
+          doorNumber: state.lastReveal.door,
+          tone: state.lastReveal.reward.tone,
+          icon: state.lastReveal.reward.icon,
+          headline: `Tür ${state.lastReveal.door}: ${state.lastReveal.reward.name}`,
+          subline: state.lastReveal.resolvedText,
+          actorPlayer: (state.lastReveal.player + 1) as 1 | 2,
+        };
+      }
+
+      return {
+        boardId: activeBoard,
+        sessionId: state.sessionId || generateSessionId('adventskalender', activeBoard),
+        status: state.status === 'finished' ? ('completed' as const) : ('playing' as const),
+        gameType: 'adventskalender' as const,
+        gameTitle: 'Der verflixte Adventskalender',
+        gameMode: is1vs1 ? ('1vs1' as const) : ('solo' as const),
+        p1Name,
+        p2Name,
+        activePlayer: (state.activePlayer + 1) as 1 | 2,
+        currentRound: state.round,
+        scoreP1: state.players[0].score,
+        scoreP2: state.players[1].score,
+        winner: winnerDisplayName || undefined,
+        adventskalenderData: {
+          maxRounds: null,
+          roundNumber: state.round,
+          isSuddenDeath: state.status === 'shootout',
+          doors: toLiveDoors(state),
+          p1: toLivePlayerState(state.players[0], state.round),
+          p2: toLivePlayerState(state.players[1], state.round),
+          lastAction: banner,
+          winnerPlayer,
+          winnerName: winnerDisplayName,
+        },
+        updatedAt: Date.now(),
+      };
+    },
+    [activeBoard]
+  );
+
+  const broadcastLiveState = useCallback(
+    (state: V3Session) => {
+      if (setupOpen || savedGame) return;
+      const payload = buildLivePayload(state);
+      try {
+        liveBroadcastRef.current?.postMessage(payload);
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
+          masterBc.postMessage(payload);
+          masterBc.close();
+        }
+        localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(payload));
+        if (activeBoard !== 'personal') {
+          fetch('/api/live/board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }).catch(() => {});
+        }
+      } catch {}
+    },
+    [activeBoard, buildLivePayload, savedGame, setupOpen]
+  );
+
+  useEffect(() => {
+    if (!setupOpen && !savedGame) {
+      broadcastLiveState(session);
+    }
+  }, [session, setupOpen, savedGame, broadcastLiveState]);
+
+  useEffect(() => {
+    if (setupOpen || savedGame || activeBoard === 'personal') return;
+    const interval = setInterval(() => {
+      const payload = buildLivePayload(session);
+      fetch('/api/live/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activeBoard, buildLivePayload, savedGame, session, setupOpen]);
+
   const sendStandbySignal = useCallback(
-    (bId = activeBoard, sId = gameSessionId) => {
+    (bId = activeBoard, sId = session.sessionId) => {
       try {
         const idlePayload = {
           boardId: bId,
@@ -343,23 +655,27 @@ export default function AdventskalenderClient({
         }
         localStorage.setItem(`lions_board_live_sync_${bId}`, JSON.stringify(idlePayload));
 
-        const payloadStr = JSON.stringify(idlePayload);
-        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-          navigator.sendBeacon('/api/live/board', new Blob([payloadStr], { type: 'application/json' }));
-        } else {
-          fetch('/api/live/board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payloadStr,
-            keepalive: true,
-          }).catch(() => {});
+        if (bId !== 'personal') {
+          const payloadStr = JSON.stringify(idlePayload);
+          if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+            navigator.sendBeacon(
+              '/api/live/board',
+              new Blob([payloadStr], { type: 'application/json' })
+            );
+          } else {
+            fetch('/api/live/board', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payloadStr,
+              keepalive: true,
+            }).catch(() => {});
+          }
         }
       } catch {}
     },
-    [activeBoard, gameSessionId]
+    [activeBoard, session.sessionId]
   );
 
-  // Standby beim Verlassen / Unmount
   useEffect(() => {
     const handleUnload = () => sendStandbySignal();
     window.addEventListener('beforeunload', handleUnload);
@@ -371,1580 +687,835 @@ export default function AdventskalenderClient({
     };
   }, [sendStandbySignal]);
 
-  const buildLivePayload = useCallback(
-    (
-      finished: boolean,
-      dList: AdventsDoorState[],
-      p1S: AdventsPlayerState,
-      p2S: AdventsPlayerState,
-      actPlayer: 1 | 2,
-      rNum: number,
-      sudden: boolean,
-      banner: AdventsLastActionBanner | null,
-      winPlayer: 1 | 2 | 'draw' | null,
-      overrideSessionId?: string
-    ) => {
-      const winnerDisplayName =
-        winPlayer === 1 ? p1Name : winPlayer === 2 ? p2Name : winPlayer === 'draw' ? 'Unentschieden' : null;
+  const active = session.players[session.activePlayer];
+  const openedCount = session.doors.filter((door) => door.openedBy !== undefined).length;
+  const boardLabel = activeBoard === 'personal' ? 'Persönlicher TV' : `Board ${activeBoard}`;
 
-      return {
-        boardId: activeBoard,
-        sessionId: overrideSessionId || gameSessionId,
-        status: finished ? ('completed' as const) : ('playing' as const),
-        gameType: 'adventskalender' as const,
-        gameTitle: 'Der verhexte Adventskalender',
-        gameMode,
-        p1Name: p1Name.trim() || 'Spieler 1',
-        p2Name: p2Name.trim() || 'Spieler 2',
-        activePlayer: actPlayer,
-        currentRound: rNum,
-        scoreP1: p1S.score,
-        scoreP2: p2S.score,
-        winner: winnerDisplayName || undefined,
-        adventskalenderData: {
-          maxRounds,
-          roundNumber: rNum,
-          isSuddenDeath: sudden,
-          doors: dList,
-          p1: p1S,
-          p2: p2S,
-          lastAction: banner,
-          winnerPlayer: winPlayer,
-          winnerName: winnerDisplayName,
-        },
-        updatedAt: Date.now(),
-      };
-    },
-    [activeBoard, gameSessionId, gameMode, maxRounds, p1Name, p2Name]
-  );
+  const pushHistory = () => {
+    setHistory((items) => [...items.slice(-19), cloneSession(session)]);
+  };
 
-  // 4s Heartbeat solange aktiv oder im Sieger-Screen
-  useEffect(() => {
-    if (!isGameStarted && !isGameFinished) return;
-    const interval = setInterval(() => {
-      const payload = buildLivePayload(
-        isGameFinished,
-        doors,
-        p1State,
-        p2State,
-        activePlayer,
-        roundNumber,
-        isSuddenDeath,
-        lastAction,
-        winnerPlayer
-      );
-      fetch('/api/live/board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }).catch(() => {});
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [
-    isGameStarted,
-    isGameFinished,
-    buildLivePayload,
-    doors,
-    p1State,
-    p2State,
-    activePlayer,
-    roundNumber,
-    isSuddenDeath,
-    lastAction,
-    winnerPlayer,
-  ]);
-
-  const broadcastLiveState = useCallback(
-    (
-      started: boolean,
-      finished: boolean,
-      dList: AdventsDoorState[],
-      p1S: AdventsPlayerState,
-      p2S: AdventsPlayerState,
-      actPlayer: 1 | 2,
-      rNum: number,
-      sudden: boolean,
-      banner: AdventsLastActionBanner | null,
-      winPlayer: 1 | 2 | 'draw' | null,
-      overrideSessionId?: string
-    ) => {
-      if (!started && !finished) return;
-      const payload = buildLivePayload(
-        finished,
-        dList,
-        p1S,
-        p2S,
-        actPlayer,
-        rNum,
-        sudden,
-        banner,
-        winPlayer,
-        overrideSessionId
-      );
-
-      try {
-        liveBroadcastRef.current?.postMessage(payload);
-        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-          const masterBc = new BroadcastChannel(`lions_board_live_sync_${activeBoard}`);
-          masterBc.postMessage(payload);
-          masterBc.close();
-        }
-        localStorage.setItem(`lions_board_live_sync_${activeBoard}`, JSON.stringify(payload));
-        fetch('/api/live/board', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }).catch(() => {});
-      } catch {}
-    },
-    [activeBoard, buildLivePayload]
-  );
-
-  useEffect(() => {
-    if (isGameStarted || isGameFinished) {
-      broadcastLiveState(
-        isGameStarted,
-        isGameFinished,
-        doors,
-        p1State,
-        p2State,
-        activePlayer,
-        roundNumber,
-        isSuddenDeath,
-        lastAction,
-        winnerPlayer
-      );
+  const activateNextCurse = (playerList: [V3Player, V3Player], next: 0 | 1) => {
+    if (!playerList[next].activeCurse && playerList[next].curseQueue.length > 0) {
+      playerList[next].activeCurse = playerList[next].curseQueue.shift();
     }
-  }, [
-    isGameStarted,
-    isGameFinished,
-    doors,
-    p1State,
-    p2State,
-    activePlayer,
-    roundNumber,
-    isSuddenDeath,
-    lastAction,
-    winnerPlayer,
-    broadcastLiveState,
-  ]);
+  };
 
-  // Atomarer Cache nach jedem Wurf
-  useEffect(() => {
-    if (
-      isGameStarted &&
-      !isGameFinished &&
-      (p1State.dartsThrown > 0 ||
-        p2State.dartsThrown > 0 ||
-        p1State.roundsPlayed > 0 ||
-        p2State.roundsPlayed > 0)
-    ) {
-      try {
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({
-            isGameStarted,
-            isGameFinished,
-            gameMode,
-            maxRounds,
-            p1Name,
-            p2Name,
-            isGuestP1,
-            isGuestP2,
-            activePlayer,
-            roundNumber,
-            isSuddenDeath,
-            doors,
-            p1State,
-            p2State,
-            lastAction,
-            winnerPlayer,
-            undoStack,
-            gameSessionId,
-            activeBoard,
-            updatedAt: Date.now(),
-          })
-        );
-      } catch {}
+  const advanceTurn = (state: V3Session): V3Session => {
+    const nextPlayers = cloneSession(state).players;
+    nextPlayers[state.activePlayer].activeCurse = undefined;
+    if (state.mode === 'solo') {
+      activateNextCurse(nextPlayers, 0);
+      return { ...state, players: nextPlayers, activePlayer: 0, round: state.round + 1 };
     }
-  }, [
-    isGameStarted,
-    isGameFinished,
-    gameMode,
-    maxRounds,
-    p1Name,
-    p2Name,
-    isGuestP1,
-    isGuestP2,
-    activePlayer,
-    roundNumber,
-    isSuddenDeath,
-    doors,
-    p1State,
-    p2State,
-    lastAction,
-    winnerPlayer,
-    undoStack,
-    gameSessionId,
-    activeBoard,
-  ]);
-
-  // Spiel starten
-  const handleStartGame = () => {
-    const cleanP1 = p1Name.trim() || 'Spieler 1';
-    const cleanP2 = p2Name.trim() || 'Gastspieler';
-    setP1Name(cleanP1);
-    setP2Name(cleanP2);
-
-    const freshId = generateSessionId('adventskalender', activeBoard);
-    const freshDoors = createShuffledDoors(gameMode);
-    const initP1 = createInitialAdventsPlayerState();
-    const initP2 = createInitialAdventsPlayerState();
-    const startBanner: AdventsLastActionBanner = {
-      id: Date.now(),
-      tone: 'info',
-      icon: '🚪',
-      headline: 'KALENDER GEMISCHT!',
-      subline:
-        gameMode === '1vs1'
-          ? `${cleanP1} eröffnet gegen ${cleanP2} – wirf 1–20, Doppel (21), Triple (22) & Bull (23/24)!`
-          : `${cleanP1} startet die 24-Türchen-Jagd auf 1–20, Doppel, Triple & Bull!`,
-      actorPlayer: 1,
+    const next = (state.activePlayer === 0 ? 1 : 0) as 0 | 1;
+    activateNextCurse(nextPlayers, next);
+    return {
+      ...state,
+      players: nextPlayers,
+      activePlayer: next,
+      round: next === state.starter ? state.round + 1 : state.round,
     };
-
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch {}
-    setCachedSessionToResume(null);
-    setRestoredFromCache(false);
-    setGameSessionId(freshId);
-    setDoors(freshDoors);
-    setP1State(initP1);
-    setP2State(initP2);
-    setActivePlayer(1);
-    setRoundNumber(1);
-    setIsSuddenDeath(false);
-    setWinnerPlayer(null);
-    setUndoStack([]);
-    setLastAction(startBanner);
-    setIsGameFinished(false);
-    setIsGameStarted(true);
-
-    broadcastLiveState(
-      true,
-      false,
-      freshDoors,
-      initP1,
-      initP2,
-      1,
-      1,
-      false,
-      startBanner,
-      null,
-      freshId
-    );
   };
 
-  // Wiederherstellung aus Cache
-  const handleResumeCachedGame = () => {
-    if (!cachedSessionToResume) return;
-    const c = cachedSessionToResume;
-    if (c.activeBoard && ['1', '2', '3', '4', '5'].includes(c.activeBoard)) {
-      setActiveBoard(c.activeBoard);
-    }
-    setGameMode(c.gameMode === 'solo' ? 'solo' : '1vs1');
-    setMaxRounds(typeof c.maxRounds === 'number' && c.maxRounds > 0 ? c.maxRounds : null);
-    setP1Name(c.p1Name || defaultP1);
-    setP2Name(c.p2Name || 'Gastspieler');
-    setIsGuestP1(Boolean(c.isGuestP1));
-    setIsGuestP2(Boolean(c.isGuestP2));
-    setActivePlayer(c.activePlayer === 2 ? 2 : 1);
-    setRoundNumber(Number(c.roundNumber || 1));
-    setIsSuddenDeath(Boolean(c.isSuddenDeath));
-    setDoors(
-      Array.isArray(c.doors) && c.doors.length === 24
-        ? c.doors
-        : createShuffledDoors(c.gameMode === 'solo' ? 'solo' : '1vs1')
-    );
-    setP1State(c.p1State || createInitialAdventsPlayerState());
-    setP2State(c.p2State || createInitialAdventsPlayerState());
-    setLastAction(c.lastAction ?? null);
-    setWinnerPlayer(c.winnerPlayer ?? null);
-    setUndoStack(Array.isArray(c.undoStack) ? c.undoStack : []);
-    setGameSessionId(c.gameSessionId || generateSessionId('adventskalender', activeBoard));
-    setIsGameFinished(false);
-    setIsGameStarted(true);
-    setRestoredFromCache(true);
-    setCachedSessionToResume(null);
+  const blockHostile = (target: V3Player): boolean => {
+    if (target.shields <= 0) return false;
+    target.shields -= 1;
+    return true;
   };
 
-  const handleDiscardCachedGame = () => {
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch {}
-    setCachedSessionToResume(null);
-    setRestoredFromCache(false);
-  };
+  const applyReward = (state: V3Session, reward: V3Reward): { state: V3Session; text: string } => {
+    const cloned = cloneSession(state);
+    const nextPlayers = cloned.players;
+    const current = nextPlayers[state.activePlayer];
+    const opponentIndex = (state.activePlayer === 0 ? 1 : 0) as 0 | 1;
+    const opponent = nextPlayers[opponentIndex];
+    let text = reward.description;
 
-  // Zurück zum Setup
-  const handleAbortToSetup = () => {
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch {}
-    setIsGameStarted(false);
-    setIsGameFinished(false);
-    setWinnerPlayer(null);
-    setUndoStack([]);
-    sendStandbySignal();
-  };
-
-  // Undo (Korrektur)
-  const handleUndo = () => {
-    if (undoStack.length === 0) return;
-    const prev = undoStack[undoStack.length - 1];
-    setUndoStack((s) => s.slice(0, -1));
-    setActivePlayer(prev.activePlayer);
-    setRoundNumber(prev.roundNumber);
-    setIsSuddenDeath(prev.isSuddenDeath);
-    setDoors(cloneDoors(prev.doors));
-    setP1State(cloneAdventsPlayerState(prev.p1State));
-    setP2State(cloneAdventsPlayerState(prev.p2State));
-    setLastAction(prev.lastAction);
-    setWinnerPlayer(prev.winnerPlayer);
-    setIsGameFinished(prev.isGameFinished);
-    setIsGameStarted(true);
-  };
-
-  const pushSnapshot = () => {
-    const snap: TurnSnapshot = {
-      activePlayer,
-      roundNumber,
-      isSuddenDeath,
-      doors: cloneDoors(doors),
-      p1State: cloneAdventsPlayerState(p1State),
-      p2State: cloneAdventsPlayerState(p2State),
-      lastAction,
-      winnerPlayer,
-      isGameFinished,
-    };
-    setUndoStack((prev) => [...prev.slice(-49), snap]);
-  };
-
-  // Zugabschluss & Spielende prüfen
-  const commitTurnStep = (
-    nextDoors: AdventsDoorState[],
-    nextP1: AdventsPlayerState,
-    nextP2: AdventsPlayerState,
-    banner: AdventsLastActionBanner
-  ) => {
-    const ownAfter = activePlayer === 1 ? nextP1 : nextP2;
-    let nextActive: 1 | 2 = activePlayer;
-    let nextRound = roundNumber;
-    let nextSudden = isSuddenDeath;
-    let winPlayer: 1 | 2 | 'draw' | null = null;
-    let finalBanner = banner;
-
-    const allOpened = countOpenDoors(nextDoors) >= 24;
-
-    if (allOpened) {
-      ownAfter.roundsPlayed += 1;
-      ownAfter.activeCurses = [];
-      if (gameMode === 'solo') {
-        winPlayer = 1;
-      } else if (nextP1.score > nextP2.score) {
-        winPlayer = 1;
-      } else if (nextP2.score > nextP1.score) {
-        winPlayer = 2;
-      } else {
-        winPlayer = 'draw';
+    if (reward.points) {
+      const positive = reward.points > 0;
+      const delta = positive ? reward.points * current.multiplier : reward.points;
+      current.score = Math.max(0, current.score + delta);
+      if (reward.tone === 'grinch') {
+        current.grinchHits += 1;
       }
-      playSound('win');
-      try {
-        localStorage.removeItem(CACHE_KEY);
-      } catch {}
-    } else {
-      const maxDartsForOwn = getMaxDartsForCurses(ownAfter.activeCurses);
+      if (positive && current.multiplier > 1) {
+        text = `Weihnachtsstern! ${reward.points} × 2 = +${delta} Punkte`;
+        current.multiplier = 1;
+      }
+    }
 
-      if (ownAfter.currentTurnDarts.length >= maxDartsForOwn) {
-        ownAfter.roundsPlayed += 1;
-        ownAfter.activeCurses = [];
-
-        if (gameMode === '1vs1') {
-          if (activePlayer === 1) {
-            nextActive = 2;
-            nextP2.activeCurses = [...nextP2.pendingCurses];
-            nextP2.pendingCurses = [];
-            nextP2.currentTurnDarts = [];
-          } else {
-            // Spieler 2 hat die Runde abgeschlossen -> Rundenlimit prüfen
-            if (maxRounds !== null && roundNumber >= maxRounds) {
-              if (nextP1.score !== nextP2.score) {
-                winPlayer = nextP1.score > nextP2.score ? 1 : 2;
-                playSound('win');
-                try {
-                  localStorage.removeItem(CACHE_KEY);
-                } catch {}
-              } else {
-                // Gleichstand nach Rundenende -> Sudden Death!
-                nextSudden = true;
-                nextRound = roundNumber + 1;
-                nextActive = 1;
-                nextP1.activeCurses = [...nextP1.pendingCurses];
-                nextP1.pendingCurses = [];
-                nextP1.currentTurnDarts = [];
-                finalBanner = {
-                  ...banner,
-                  subline: `${banner.subline} • 🔥 Gleichstand! Weiter mit Sudden Death!`,
-                };
-              }
-            } else {
-              nextRound = roundNumber + 1;
-              nextActive = 1;
-              nextP1.activeCurses = [...nextP1.pendingCurses];
-              nextP1.pendingCurses = [];
-              nextP1.currentTurnDarts = [];
-            }
-          }
+    if (reward.action === 'heal') {
+      current.curseQueue = [];
+      current.activeCurse = undefined;
+    }
+    if (reward.action === 'double') {
+      current.multiplier = 2;
+    }
+    if (reward.action === 'shield') {
+      current.shields += 2;
+    }
+    if (reward.action === 'roulette') {
+      const delta = Math.random() < 0.5 ? 60 : -30;
+      current.score = Math.max(0, current.score + delta);
+      if (delta < 0) current.grinchHits += 1;
+      text =
+        delta > 0
+          ? 'Das Roulette schenkt dir +60 Punkte!'
+          : 'Das Roulette nimmt dir 30 Punkte!';
+    }
+    if (reward.action === 'steal25' || reward.action === 'steal50') {
+      const amount = reward.action === 'steal25' ? 25 : 50;
+      if (state.mode === 'solo') {
+        const delta = amount * current.multiplier;
+        current.score += delta;
+        if (current.multiplier > 1) {
+          text = `Solo-Bonus mit Weihnachtsstern! +${delta} Punkte`;
+          current.multiplier = 1;
         } else {
-          // Solo-Modus
-          if (maxRounds !== null && roundNumber >= maxRounds) {
-            winPlayer = 1;
-            playSound('win');
-            try {
-              localStorage.removeItem(CACHE_KEY);
-            } catch {}
-          } else {
-            nextRound = roundNumber + 1;
-            nextP1.activeCurses = [...nextP1.pendingCurses];
-            nextP1.pendingCurses = [];
-            nextP1.currentTurnDarts = [];
-          }
+          text = `Solo-Bonus: ${amount} zusätzliche Punkte gesichert!`;
         }
+      } else if (blockHostile(opponent)) {
+        text = 'Schutzschild! Der Diebstahl wurde abgewehrt.';
+      } else {
+        const stolen = Math.min(amount, opponent.score);
+        opponent.score -= stolen;
+        current.score += stolen;
+        text = `${stolen} Punkte von ${opponent.name} gestohlen`;
+      }
+    }
+    if (reward.action === 'swap') {
+      if (state.mode === 'solo') {
+        text = 'Im Solo-Modus gibt es keinen Gegner zum Tauschen – Glück gehabt!';
+      } else if (current.score >= opponent.score) {
+        text = 'Du führst bereits – der Grinch hat keine Auswirkung.';
+      } else if (blockHostile(opponent)) {
+        text = 'Schutzschild! Der Punktetausch wurde abgewehrt.';
+      } else {
+        [current.score, opponent.score] = [opponent.score, current.score];
+        current.grinchHits += 1;
+        text = 'Der Grinch tauscht beide Punktestände!';
+      }
+    }
+    if (reward.curse) {
+      const target = state.mode === 'solo' ? current : opponent;
+      if (blockHostile(target)) {
+        text = `Schutzschild! ${curseLabels[reward.curse].title} wurde abgewehrt.`;
+      } else {
+        target.curseQueue.push(reward.curse);
+        text =
+          state.mode === 'solo'
+            ? `${curseLabels[reward.curse].title} wartet in deiner Fluch-Warteschlange.`
+            : `${curseLabels[reward.curse].title} trifft ${opponent.name} in einer der nächsten Aufnahmen.`;
       }
     }
 
-    setDoors(nextDoors);
-    setP1State(nextP1);
-    setP2State(nextP2);
-    setActivePlayer(nextActive);
-    setRoundNumber(nextRound);
-    setIsSuddenDeath(nextSudden);
-    setLastAction(finalBanner);
-    setWinnerPlayer(winPlayer);
-    setIsGameFinished(winPlayer !== null);
+    return { state: { ...cloned, players: nextPlayers }, text };
   };
 
-  // A) Tipp auf Kalendertürchen 1..24
-  const handleDoorHit = (doorNum: AdventsDoorNumber) => {
-    if (isGameFinished) return;
-    const currentOwn = activePlayer === 1 ? p1State : p2State;
-    if (currentOwn.activeCurses.includes('skip_round')) return;
-    pushSnapshot();
-
-    const nextDoors = cloneDoors(doors);
-    const nextP1 = cloneAdventsPlayerState(p1State);
-    const nextP2 = cloneAdventsPlayerState(p2State);
-    const own = activePlayer === 1 ? nextP1 : nextP2;
-    const opp = activePlayer === 1 ? nextP2 : nextP1;
-    const activeName = activePlayer === 1 ? p1Name : p2Name;
-    const oppName = activePlayer === 1 ? p2Name : p1Name;
-
-    const curMaxDarts = getMaxDartsForCurses(own.activeCurses);
-    if (own.currentTurnDarts.length >= curMaxDarts) own.currentTurnDarts = [];
-
-    const door = nextDoors.find((d) => d.number === doorNum);
-    if (!door) return;
-
-    const targetMeta = getDoorTargetLabel(doorNum);
-    const doorTitleLabel = targetMeta.isSpecial
-      ? `TÜRCHEN ${doorNum} (${targetMeta.label})`
-      : `TÜRCHEN ${doorNum}`;
-
-    if (door.isOpen) {
-      own.dartsThrown += 1;
-      own.currentTurnDarts.push({
-        kind: 'door_empty',
-        doorNumber: doorNum,
-        label: `🚪 ${doorNum}`,
-        subLabel: 'Leer',
-        tone: 'niete',
-      });
-      playSound('niete');
-      const banner: AdventsLastActionBanner = {
-        id: Date.now(),
-        doorNumber: doorNum,
-        tone: 'niete',
-        icon: '🕯️',
-        headline: `${doorTitleLabel} SCHON LEER`,
-        subline: `${activeName} trifft das bereits geöffnete Türchen ${doorNum} – keine Punkte.`,
-        actorPlayer: activePlayer,
+  const finalizeIfComplete = (state: V3Session): V3Session => {
+    if (state.doors.some((door) => door.openedBy === undefined)) return state;
+    if (state.mode === 'duel' && state.players[0].score === state.players[1].score) {
+      return {
+        ...state,
+        status: 'shootout',
+        message: 'Goldener Nikolaus-Shootout',
+        lastBanner: {
+          id: Date.now(),
+          tone: 'win',
+          icon: '🎅',
+          headline: 'Gleichstand nach 24 Türchen!',
+          subline: 'Goldener Nikolaus-Shootout auf Bullseye',
+          actorPlayer: (state.activePlayer + 1) as 1 | 2,
+        },
       };
-      commitTurnStep(nextDoors, nextP1, nextP2, banner);
+    }
+    const winner =
+      state.mode === 'solo' || state.players[0].score > state.players[1].score ? 0 : 1;
+    playSound('win');
+    return { ...state, status: 'finished', winner };
+  };
+
+  const completeDoor = (number: AdventsDoorNumber, base: V3Session) => {
+    const selected = base.doors[number - 1];
+    if (!selected || selected.openedBy !== undefined) return;
+    pushHistory();
+    let next = cloneSession(base);
+    next.message = undefined;
+    next.doors[number - 1].openedBy = next.activePlayer;
+    next.doors[number - 1].openedInRound = next.round;
+    next.players[next.activePlayer].opened += 1;
+    next.players[next.activePlayer].actionsCount += 1;
+
+    const applied = applyReward(next, selected.reward);
+    next = applied.state;
+    next.lastReveal = {
+      door: number,
+      reward: selected.reward,
+      player: next.activePlayer,
+      resolvedText: applied.text,
+    };
+    next.lastBanner = {
+      id: Date.now(),
+      doorNumber: number,
+      tone: selected.reward.tone,
+      icon: selected.reward.icon,
+      headline: `Tür ${number}: ${selected.reward.name}`,
+      subline: applied.text,
+      actorPlayer: (next.activePlayer + 1) as 1 | 2,
+    };
+
+    playSound(selected.reward.tone);
+    setSession(finalizeIfComplete(next));
+  };
+
+  const openDoor = (number: AdventsDoorNumber) => {
+    if (session.status !== 'playing' || session.lastReveal) return;
+    if (comboParts[number]) {
+      setComboDoor(number);
       return;
     }
+    completeDoor(number, session);
+  };
 
-    // Türchen war geschlossen -> Öffnen!
-    door.isOpen = true;
-    door.openedBy = activePlayer;
-    door.openedInRound = roundNumber;
-    own.doorsOpened += 1;
-    own.dartsThrown += 1;
-
-    const rw = door.reward;
-    let ev: AdventsDartEvent = {
-      kind: 'door_opened',
-      doorNumber: doorNum,
-      label: `${rw.icon} #${doorNum}`,
-      subLabel: rw.shortBadge,
-      tone: rw.tone,
-    };
-
-    const banner: AdventsLastActionBanner = {
-      id: Date.now(),
-      doorNumber: doorNum,
-      tone: rw.tone,
-      icon: rw.icon,
-      headline: `${doorTitleLabel}: ${rw.title.toUpperCase()}!`,
-      subline: '',
-      actorPlayer: activePlayer,
-    };
-
-    const pointsMeta = POINTS_REWARD_MAP[rw.kind];
-    const curseType = CURSE_REWARD_MAP[rw.kind];
-
-    if (pointsMeta) {
-      own.score += pointsMeta.points;
-      playSound(pointsMeta.isJackpot ? 'jackpot' : 'good');
-      banner.subline = `${activeName} ${pointsMeta.isJackpot ? 'räumt' : 'schnappt sich'} +${pointsMeta.points} ${pointsMeta.label} ab (Stand: ${own.score})!`;
-    } else if (curseType) {
-      const meta = CURSE_UI_META[curseType];
-      const targetPlayer = gameMode === '1vs1' ? opp : own;
-      const targetName = gameMode === '1vs1' ? oppName : activeName;
-      if ((targetPlayer.shieldsCount ?? 0) > 0) {
-        targetPlayer.shieldsCount = (targetPlayer.shieldsCount ?? 1) - 1;
-        ev = { ...ev, subLabel: '🛡️ GEBLOCKT', tone: 'good' };
-        playSound('good');
-        banner.tone = 'good';
-        banner.icon = '🛡️';
-        banner.headline = '🛡️ FLUCH ABGEWEHRT!';
-        banner.subline = `${targetName} wehrt ${rw.title} (${meta.badge}) mit 1 Schutzschild ab (noch ${targetPlayer.shieldsCount})!`;
-      } else {
-        if (!targetPlayer.pendingCurses.includes(curseType)) {
-          targetPlayer.pendingCurses.push(curseType);
-        }
-        playSound('curse');
-        banner.headline = `${meta.icon} ${rw.title.toUpperCase()}: ${meta.badge}`;
-        banner.subline = `${targetName} ${meta.warning}`;
-      }
+  const registerComboHit = (part: string) => {
+    if (!comboDoor) return;
+    const doorNum = comboDoor as AdventsDoorNumber;
+    const existing = session.comboProgress[doorNum] || [];
+    if (existing.includes(part)) return;
+    const next = cloneSession(session);
+    next.comboProgress[doorNum] = [...existing, part];
+    setComboDoor(null);
+    if (next.comboProgress[doorNum].length === comboParts[doorNum].length) {
+      completeDoor(doorNum, next);
     } else {
-      switch (rw.kind) {
-        case 'bell_bless_30':
-        case 'bell_bless_35':
-        case 'bell_bless_45': {
-          const pts = rw.kind === 'bell_bless_45' ? 45 : rw.kind === 'bell_bless_35' ? 35 : 30;
-          const hadCurses = own.activeCurses.length + own.pendingCurses.length > 0;
-          own.score += pts;
-          own.activeCurses = [];
-          own.pendingCurses = [];
-          playSound('good');
-          banner.subline = hadCurses
-            ? `${activeName} erhält +${pts} Pkt UND wird von allen Flüchen geheilt!`
-            : `${activeName} erhält +${pts} Glöckchen-Punkte (von allen Flüchen befreit)!`;
-          break;
-        }
-
-        case 'shield_angel': {
-          own.shieldsCount = (own.shieldsCount ?? 0) + 2;
-          playSound('good');
-          banner.headline = '🛡️ SCHUTZ-ENGEL: +2 SCHILDE!';
-          banner.subline = `${activeName} erhält 2 Schutzschilde (gesamt: ${own.shieldsCount}) gegen Flüche & Diebstahl!`;
-          break;
-        }
-
-        case 'steal_25':
-        case 'steal_50': {
-          const isSteal50 = rw.kind === 'steal_50';
-          if (gameMode === '1vs1' && (opp.shieldsCount ?? 0) > 0) {
-            opp.shieldsCount = (opp.shieldsCount ?? 1) - 1;
-            ev = { ...ev, subLabel: '🛡️ GEBLOCKT', tone: 'niete' };
-            playSound('curse');
-            banner.tone = 'good';
-            banner.icon = '🛡️';
-            banner.headline = '🛡️ DIEBSTAHL ABGEWEHRT!';
-            banner.subline = `${oppName} blockt den ${rw.title} mit 1 Schutzschild ab (noch ${opp.shieldsCount})!`;
-          } else if (isSteal50) {
-            const stolen = Math.min(50, opp.score);
-            opp.score -= stolen;
-            own.score += stolen;
-            playSound(stolen > 0 ? 'jackpot' : 'good');
-            banner.subline =
-              stolen > 0
-                ? `${activeName} raubt ${oppName} ganze ${stolen} Punkte (Stand: ${own.score})!`
-                : `${activeName} will 50 Pkt klauen, aber ${oppName} hat 0 Punkte!`;
-          } else {
-            const stolen = Math.min(25, opp.score);
-            opp.score -= stolen;
-            own.score += 25;
-            playSound('good');
-            banner.subline =
-              stolen > 0
-                ? `${activeName} bekommt +25 Pkt und stiehlt ${oppName} ${stolen} Pkt!`
-                : `${activeName} ergattert +25 Wichtel-Punkte!`;
-          }
-          break;
-        }
-
-        case 'double_star': {
-          if (own.score > 0) {
-            own.score *= 2;
-            banner.subline = `${activeName} VERDOPPELT auf sensationelle ${own.score} Punkte!`;
-          } else {
-            own.score += 40;
-            banner.subline = `${activeName} startet mit +40 Weihnachtsstern-Punkten!`;
-          }
-          playSound('jackpot');
-          break;
-        }
-
-        case 'grinch_swap': {
-          const tmp = own.score;
-          own.score = opp.score;
-          opp.score = tmp;
-          own.grinchHits += 1;
-          playSound('grinch');
-          banner.headline = '👹 DER GRINCH TAUSCHT DIE PUNKTE!';
-          banner.subline = `${activeName} & ${oppName} tauschen eiskalt die Punktestände (${opp.score} ⇄ ${own.score})!`;
-          break;
-        }
-
-        case 'roulette_duel': {
-          const lucky = Math.random() >= 0.5;
-          if (lucky) {
-            own.score += 60;
-            playSound('jackpot');
-            ev = { ...ev, subLabel: '+60 GLÜCK!', tone: 'jackpot' };
-            banner.tone = 'jackpot';
-            banner.headline = '🎲 WICHTEL-ROULETTE: +60 PKT!';
-            banner.subline = `${activeName} gewinnt beim Wichtel-Roulette +60 Pkt (Stand: ${own.score})!`;
-          } else {
-            own.score = Math.max(0, own.score - 30);
-            own.grinchHits += 1;
-            playSound('grinch');
-            ev = { ...ev, subLabel: '-30 PECH!', tone: 'grinch' };
-            banner.tone = 'grinch';
-            banner.headline = '🎲 WICHTEL-ROULETTE: -30 PKT!';
-            banner.subline = `Pech beim Wichtel-Roulette! ${activeName} verliert 30 Pkt (Stand: ${own.score})!`;
-          }
-          break;
-        }
-
-        case 'grinch_trap_30':
-        case 'grinch_trap_50': {
-          const penalty = rw.kind === 'grinch_trap_50' ? 50 : 30;
-          own.score = Math.max(0, own.score - penalty);
-          own.grinchHits += 1;
-          playSound('grinch');
-          banner.headline =
-            rw.kind === 'grinch_trap_50'
-              ? '🥶 EISZAPFEN-SCHOCK! -50 PKT'
-              : '😈 GRINCH-FALLE! -30 PKT';
-          banner.subline = `${activeName} verliert sofort ${penalty} Punkte – neuer Stand: ${own.score} Pkt!`;
-          break;
-        }
-
-        case 'solo_gamble': {
-          const lucky = Math.random() >= 0.5;
-          if (lucky) {
-            own.score += 80;
-            playSound('jackpot');
-            ev = { ...ev, subLabel: '+80 LUCKY!', tone: 'jackpot' };
-            banner.tone = 'jackpot';
-            banner.headline = '🎲 GRINCH-ROULETTE: JACKPOT +80!';
-            banner.subline = `${activeName} gewinnt beim Roulette +80 Pkt (Stand: ${own.score})!`;
-          } else {
-            own.score = Math.floor(own.score / 2);
-            own.grinchHits += 1;
-            playSound('grinch');
-            ev = { ...ev, subLabel: '½ HALBIERT', tone: 'grinch' };
-            banner.headline = '👹 GRINCH-ROULETTE: HALBIERT!';
-            banner.subline = `Der Grinch halbiert ${activeName}s Konto auf ${own.score} Pkt!`;
-          }
-          break;
-        }
-
-        case 'niete_0':
-        default:
-          playSound('niete');
-          banner.subline = `${activeName} öffnet nur verbrannte Plätzchen (0 Punkte).`;
-          break;
-      }
+      pushHistory();
+      playSound('good');
+      const label = comboParts[doorNum].find((item) => item.key === part)?.label || part;
+      next.players[next.activePlayer].actionsCount += 1;
+      const msg = `${label} für Tür ${doorNum} gesichert.`;
+      setSession(
+        advanceTurn({
+          ...next,
+          message: msg,
+          lastBanner: {
+            id: Date.now(),
+            doorNumber: doorNum,
+            tone: 'good',
+            icon: '🧩',
+            headline: `Tür ${doorNum} · Teil-Treffer`,
+            subline: msg,
+            actorPlayer: (next.activePlayer + 1) as 1 | 2,
+          },
+        })
+      );
     }
-
-    own.currentTurnDarts.push(ev);
-    commitTurnStep(nextDoors, nextP1, nextP2, banner);
   };
 
-  // B) Fehlwurf (Daneben)
-  const handleMiss = () => {
-    if (isGameFinished) return;
-    const currentOwn = activePlayer === 1 ? p1State : p2State;
-    if (currentOwn.activeCurses.includes('skip_round')) return;
-    pushSnapshot();
-
-    const nextDoors = cloneDoors(doors);
-    const nextP1 = cloneAdventsPlayerState(p1State);
-    const nextP2 = cloneAdventsPlayerState(p2State);
-    const own = activePlayer === 1 ? nextP1 : nextP2;
-    const activeName = activePlayer === 1 ? p1Name : p2Name;
-
-    const maxDarts = getMaxDartsForCurses(own.activeCurses);
-    if (own.currentTurnDarts.length >= maxDarts) own.currentTurnDarts = [];
-
-    own.dartsThrown += 1;
-    own.currentTurnDarts.push({
-      kind: 'miss',
-      label: 'MISS',
-      subLabel: 'Daneben',
-      tone: 'miss',
-    });
-
+  const registerMiss = () => {
+    if (session.status !== 'playing' || active.activeCurse === 'skip_round') return;
+    pushHistory();
     playSound('miss');
-    const banner: AdventsLastActionBanner = {
-      id: Date.now(),
-      doorNumber: null,
-      tone: 'miss',
-      icon: '✕',
-      headline: 'DANEBEN',
-      subline: `${activeName} trifft kein Kalendertürchen (1–24).`,
-      actorPlayer: activePlayer,
-    };
-
-    commitTurnStep(nextDoors, nextP1, nextP2, banner);
+    const next = cloneSession(session);
+    next.players[next.activePlayer].actionsCount += 1;
+    setSession(
+      advanceTurn({
+        ...next,
+        message: 'Keine Tür getroffen.',
+        lastBanner: {
+          id: Date.now(),
+          tone: 'miss',
+          icon: '❄️',
+          headline: `${active.name}: Keine Tür getroffen`,
+          subline: 'Aufnahme ohne Türchen beendet',
+          actorPlayer: (next.activePlayer + 1) as 1 | 2,
+        },
+      })
+    );
   };
 
-  // C) Restliche Darts dieser Aufnahme als Miss buchen
-  const handleRestMiss = () => {
-    if (isGameFinished) return;
-    const currentOwn = activePlayer === 1 ? p1State : p2State;
-    if (currentOwn.activeCurses.includes('skip_round')) return;
-    pushSnapshot();
-
-    const nextDoors = cloneDoors(doors);
-    const nextP1 = cloneAdventsPlayerState(p1State);
-    const nextP2 = cloneAdventsPlayerState(p2State);
-    const own = activePlayer === 1 ? nextP1 : nextP2;
-    const activeName = activePlayer === 1 ? p1Name : p2Name;
-
-    const maxDarts = getMaxDartsForCurses(own.activeCurses);
-    const existing = own.currentTurnDarts.length >= maxDarts ? 0 : own.currentTurnDarts.length;
-    if (existing === 0) own.currentTurnDarts = [];
-    const remaining = Math.max(1, maxDarts - existing);
-
-    own.dartsThrown += remaining;
-    for (let i = 0; i < remaining; i += 1) {
-      own.currentTurnDarts.push({
-        kind: 'miss',
-        label: 'MISS',
-        subLabel: 'Daneben',
-        tone: 'miss',
-      });
-    }
-
-    playSound('miss');
-    const banner: AdventsLastActionBanner = {
-      id: Date.now(),
-      doorNumber: null,
-      tone: 'miss',
-      icon: '✕',
-      headline: 'AUFNAHME DANEBEN',
-      subline: `${activeName} beendet die Aufnahme ohne weiteres Türchen.`,
-      actorPlayer: activePlayer,
-    };
-
-    commitTurnStep(nextDoors, nextP1, nextP2, banner);
-  };
-
-  // D) Runde wegen Schneewehen-Fluch (skip_round) mit 0 Darts aussetzen
-  const handleSkipRound = () => {
-    if (isGameFinished) return;
-    const currentOwn = activePlayer === 1 ? p1State : p2State;
-    if (!currentOwn.activeCurses.includes('skip_round')) return;
-    pushSnapshot();
-
-    const nextDoors = cloneDoors(doors);
-    const nextP1 = cloneAdventsPlayerState(p1State);
-    const nextP2 = cloneAdventsPlayerState(p2State);
-    const own = activePlayer === 1 ? nextP1 : nextP2;
-    const activeName = activePlayer === 1 ? p1Name : p2Name;
-
-    own.currentTurnDarts = [];
+  const skipTurn = () => {
+    if (session.status !== 'playing') return;
+    pushHistory();
     playSound('curse');
-
-    const banner: AdventsLastActionBanner = {
-      id: Date.now(),
-      doorNumber: null,
-      tone: 'curse',
-      icon: '⛄',
-      headline: 'EINGESCHNEIT! RUNDE AUSGESETZT',
-      subline: `${activeName} steckt in der Schneewehe und wird mit 0 Darts weitergeschaltet.`,
-      actorPlayer: activePlayer,
-    };
-
-    commitTurnStep(nextDoors, nextP1, nextP2, banner);
+    const next = cloneSession(session);
+    next.players[next.activePlayer].actionsCount += 1;
+    setSession(
+      advanceTurn({
+        ...next,
+        message: `${active.name} hat ausgesetzt (Schneewehe).`,
+        lastBanner: {
+          id: Date.now(),
+          tone: 'curse',
+          icon: '⛄',
+          headline: `${active.name}: Eingeschneit`,
+          subline: 'Aufnahme komplett ausgesetzt',
+          actorPlayer: (next.activePlayer + 1) as 1 | 2,
+        },
+      })
+    );
   };
 
-  // =========================================================================
-  // ANSICHT 1: SETUP-BILDSCHIRM
-  // =========================================================================
-  if (!isGameStarted) {
-    const soloLocked = gameMode === 'solo' && !isBoardUser && Boolean(userPlayerMatch);
+  const closeReveal = () => {
+    setSession((current) =>
+      current.status === 'playing'
+        ? advanceTurn({ ...current, lastReveal: undefined })
+        : { ...current, lastReveal: undefined }
+    );
+  };
 
-    return (
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 space-y-5 animate-fadeIn">
-        {/* Top Navigation */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10">
-          <Link
-            href={`/special?board=${activeBoard}`}
-            data-ui-id="ADVENT.SETUP.BACK_BTN"
-            className="flex items-center gap-2 px-3.5 py-2 min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition-all"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Zurück zur Event-Arena</span>
-          </Link>
+  const undo = () => {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setSession(previous);
+    setHistory((items) => items.slice(0, -1));
+  };
 
-          <Link
-            href={`/board/${activeBoard}`}
-            target="_blank"
-            className="flex items-center gap-2 px-3.5 py-2 min-h-[44px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-400/40 text-xs font-bold transition-all"
-          >
-            <Tv className="w-4 h-4 text-cyan-400" />
-            <span>TV-Monitor Board {activeBoard}</span>
+  const startGame = () => {
+    const resolvedP1 =
+      setupMode === 'solo' && lockedSoloName ? lockedSoloName : setupP1.trim() || 'Spieler 1';
+    const resolvedP2 = setupP2.trim() || 'Spieler 2';
+    const starter: 0 | 1 =
+      setupMode === 'solo'
+        ? 0
+        : setupStarter === 'random'
+        ? Math.random() < 0.5
+          ? 0
+          : 1
+        : setupStarter === 'p1'
+        ? 0
+        : 1;
+    const newSessionId = generateSessionId('adventskalender', activeBoard);
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch {}
+    setSession(createV3Session(setupMode, starter, [resolvedP1, resolvedP2], newSessionId));
+    setHistory([]);
+    setInspect(false);
+    setComboDoor(null);
+    setSetupOpen(false);
+    setSavedGame(null);
+  };
+
+  const resumeSavedGame = () => {
+    if (!savedGame) return;
+    setSession({
+      ...savedGame,
+      sessionId: savedGame.sessionId || generateSessionId('adventskalender', activeBoard),
+    });
+    setSavedGame(null);
+    setSetupOpen(false);
+  };
+
+  const discardSavedGame = () => {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch {}
+    setSavedGame(null);
+    setSetupOpen(true);
+  };
+
+  const shootoutWinner = (winner: 0 | 1) => {
+    pushHistory();
+    playSound('win');
+    setSession({
+      ...session,
+      winner,
+      status: 'finished',
+      lastBanner: {
+        id: Date.now(),
+        tone: 'win',
+        icon: '♛',
+        headline: `${session.players[winner].name} gewinnt den Shootout!`,
+        subline: 'Goldener Nikolaus-Shootout entschieden',
+        actorPlayer: (winner + 1) as 1 | 2,
+      },
+    });
+  };
+
+  return (
+    <main
+      className={`ak-v3-shell view-${view}`}
+      style={{ '--hall-image': "url('/images/adventskalender-hall.png')" } as React.CSSProperties}
+    >
+      <header className="app-header">
+        <div className="event-brand">
+          <Link href="/special" className="ak-back-link">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Zurück
           </Link>
+          <span>DFA</span>
+          <b>Darts Fun Arena</b>
         </div>
 
-        {/* Crash- & Wisch-Schutz */}
-        {cachedSessionToResume && (
-          <div
-            data-ui-id="ADVENT.RESUME.DIALOG"
-            className="rounded-3xl p-5 sm:p-6 bg-amber-950/60 border-2 border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.3)] space-y-4"
+        <div className="game-title">
+          <small>{boardLabel}</small>
+          <strong>Der verflixte Adventskalender</strong>
+        </div>
+
+        <div className="header-actions">
+          <label className="monitor-select">
+            Monitor
+            <select
+              value={activeBoard}
+              onChange={(event) => handleSelectBoard(event.target.value)}
+            >
+              {[1, 2, 3, 4, 5].map((num) => (
+                <option key={num} value={String(num)}>
+                  Board {num}
+                </option>
+              ))}
+              <option value="personal">Persönlicher TV</option>
+            </select>
+          </label>
+
+          <div className="view-switch">
+            <button
+              type="button"
+              className={view === 'tablet' ? 'selected' : ''}
+              onClick={() => setView('tablet')}
+            >
+              Tablet
+            </button>
+            <button
+              type="button"
+              className={view === 'tv' ? 'selected' : ''}
+              onClick={() => setView('tv')}
+            >
+              TV
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className={`ak-sound-btn ${soundEnabled ? '' : 'muted'}`}
+            onClick={() => setSoundEnabled((v) => !v)}
+            aria-label={soundEnabled ? 'Ton ausschalten' : 'Ton einschalten'}
+            title={soundEnabled ? 'Ton an' : 'Ton aus'}
           >
-            <div className="flex items-start gap-3">
-              <span className="text-3xl">⚠️</span>
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          <span>{openedCount} / 24 offen</span>
+        </div>
+      </header>
+
+      {view === 'tablet' ? (
+        <div className="tablet-cockpit">
+          <section className={`tablet-scoreboard ${session.mode === 'solo' ? 'solo' : ''}`}>
+            <PlayerScore
+              player={session.players[0]}
+              index={0}
+              active={session.activePlayer === 0}
+              compact
+            />
+            <div className="round-medallion">
+              <small>{session.mode === 'solo' ? 'Versuch' : 'Runde'}</small>
+              <b>{session.round}</b>
+            </div>
+            {session.mode === 'duel' && (
+              <PlayerScore
+                player={session.players[1]}
+                index={1}
+                active={session.activePlayer === 1}
+                compact
+              />
+            )}
+          </section>
+
+          {active.activeCurse && (
+            <section className={`penalty-takeover curse-${active.activeCurse}`}>
+              <span>{curseLabels[active.activeCurse].icon}</span>
               <div>
-                <h2 className="text-lg sm:text-xl font-black text-amber-200">
-                  Unterbrochenes Spiel gefunden!
-                </h2>
-                <p className="text-xs sm:text-sm text-amber-100/90 mt-1">
-                  <strong>{cachedSessionToResume.p1Name}</strong>
-                  {cachedSessionToResume.gameMode === '1vs1' ? (
-                    <>
-                      {' '}vs. <strong>{cachedSessionToResume.p2Name}</strong> (
-                      {cachedSessionToResume.p1State?.score ?? 0} : {cachedSessionToResume.p2State?.score ?? 0} Pkt)
-                    </>
-                  ) : (
-                    <> ({cachedSessionToResume.p1State?.score ?? 0} Pkt)</>
-                  )}{' '}
-                  • {countOpenDoors(cachedSessionToResume.doors || [])}/24 Türchen offen • Runde{' '}
-                  {cachedSessionToResume.roundNumber || 1}
-                </p>
+                <small>Aktive Strafe für {active.name}</small>
+                <strong>{curseLabels[active.activeCurse].title}</strong>
+                <p>{curseLabels[active.activeCurse].instruction}</p>
+              </div>
+              <b>!</b>
+            </section>
+          )}
+
+          <section className="turn-objective">
+            <div>
+              <small>Aktiver Werfer</small>
+              <strong>{active.name}</strong>
+            </div>
+            <div>
+              <small>Aufgabe</small>
+              <strong>
+                {active.activeCurse === 'one_dart'
+                  ? '1 Dart'
+                  : active.activeCurse === 'two_darts'
+                  ? '2 Darts'
+                  : active.activeCurse === 'skip_round'
+                  ? '0 Darts'
+                  : 'Bis zu 3 Darts'}
+              </strong>
+            </div>
+            <div>
+              <small>Ziel</small>
+              <strong>Eine geschlossene Tür treffen</strong>
+            </div>
+            <button
+              type="button"
+              className={inspect ? 'active' : ''}
+              onClick={() => setInspect((value) => !value)}
+            >
+              👁 {inspect ? 'Inhalte verbergen' : 'Alle Inhalte aufdecken'}
+            </button>
+          </section>
+
+          {active.activeCurse === 'skip_round' ? (
+            <button type="button" className="skip-button" onClick={skipTurn}>
+              <span>⛄</span>
+              <strong>Eingeschneit! Aufnahme aussetzen</strong>
+              <small>Ohne Wurf an den nächsten Spieler übergeben</small>
+            </button>
+          ) : (
+            <section className="tablet-calendar">
+              <div className="section-heading">
+                <div>
+                  <small>Treffer erfassen</small>
+                  <h1>Welches Tür-Ziel wurde getroffen?</h1>
+                </div>
+                <p>Pro Aufnahme kann maximal eine Tür geöffnet werden.</p>
+              </div>
+              <div className="door-grid tablet-grid">
+                {session.doors.map((door) => (
+                  <DoorButton
+                    key={door.number}
+                    door={door}
+                    progress={session.comboProgress[door.number] || []}
+                    inspect={inspect}
+                    onOpen={() => openDoor(door.number)}
+                    disabled={session.status !== 'playing'}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <nav className="action-bar">
+            <button type="button" className="abort" onClick={() => setSetupOpen(true)}>
+              Neues Spiel
+            </button>
+            <button type="button" className="undo" onClick={undo} disabled={!history.length}>
+              ↩ Letztes Türchen schließen
+            </button>
+            <button
+              type="button"
+              className="miss"
+              onClick={registerMiss}
+              disabled={session.status !== 'playing' || active.activeCurse === 'skip_round'}
+            >
+              ⏭ Keine Tür getroffen · Miss
+            </button>
+          </nav>
+        </div>
+      ) : (
+        <div className={`tv-stage ${session.mode === 'solo' ? 'solo' : ''}`}>
+          <PlayerScore
+            player={session.players[0]}
+            index={0}
+            active={session.activePlayer === 0}
+          />
+          <section className="tv-calendar">
+            <div className="tv-title">
+              <small>
+                Runde {session.round} · {openedCount} von 24 geöffnet
+              </small>
+              <h1>
+                Der verflixte
+                <br />
+                <em>Adventskalender</em>
+              </h1>
+            </div>
+            {active.activeCurse && (
+              <div className="tv-curse">
+                <span>{curseLabels[active.activeCurse].icon}</span>
+                <b>
+                  {active.name}: {curseLabels[active.activeCurse].instruction}
+                </b>
+              </div>
+            )}
+            <div className="tv-cabinet">
+              <div className="door-grid">
+                {session.doors.map((door) => (
+                  <DoorButton
+                    key={door.number}
+                    door={door}
+                    progress={session.comboProgress[door.number] || []}
+                    inspect={false}
+                    onOpen={() => {}}
+                    disabled
+                    tv
+                  />
+                ))}
               </div>
             </div>
+            <div className="tv-throws">
+              <span>{active.name} ist am Wurf</span>
+              <span>{session.message || 'Bis zu 3 Darts auf ein geschlossenes Ziel'}</span>
+            </div>
+          </section>
+          {session.mode === 'duel' && (
+            <PlayerScore
+              player={session.players[1]}
+              index={1}
+              active={session.activePlayer === 1}
+            />
+          )}
+        </div>
+      )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={handleResumeCachedGame}
-                className="min-h-[56px] px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm sm:text-base transition-all cursor-pointer shadow-lg"
-              >
+      {session.lastReveal && (
+        <div className={`reveal-overlay tone-${session.lastReveal.reward.tone}`} role="dialog" aria-modal="true">
+          <div className="reveal-card">
+            <span className="reveal-kicker">
+              Türchen {session.lastReveal.door} · {session.players[session.lastReveal.player].name}
+            </span>
+            <div className="reward-icon">{session.lastReveal.reward.icon}</div>
+            <h2>{session.lastReveal.reward.name}</h2>
+            <p>{session.lastReveal.resolvedText}</p>
+            <button type="button" onClick={closeReveal}>
+              {session.status === 'playing' ? 'An nächsten Spieler übergeben' : 'Ergebnis ansehen'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {comboDoor && (
+        <div className="combo-overlay" role="dialog" aria-modal="true">
+          <div>
+            <span className="reveal-kicker">Kombi-Tür {comboDoor}</span>
+            <h2>{comboDoor === 6 ? 'Nikolaus-Doppeltür' : 'Heiligabend-Kombination'}</h2>
+            <p>Welcher Teil der Kombination wurde getroffen?</p>
+            <div className="combo-options">
+              {comboParts[comboDoor].map((part) => {
+                const done = session.comboProgress[comboDoor]?.includes(part.key);
+                return (
+                  <button
+                    type="button"
+                    key={part.key}
+                    disabled={done}
+                    onClick={() => registerComboHit(part.key)}
+                  >
+                    <span>{done ? '✓' : '○'}</span>
+                    <b>{part.label}</b>
+                    <small>{done ? 'Bereits geschafft' : 'Treffer eintragen'}</small>
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" className="cancel-combo" onClick={() => setComboDoor(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {session.status === 'shootout' && !session.lastReveal && (
+        <div className="shootout-overlay" role="dialog" aria-modal="true">
+          <div>
+            <span>🎅</span>
+            <small>Gleichstand nach 24 Türchen</small>
+            <h2>Goldener Nikolaus-Shootout</h2>
+            <p>Je ein Dart auf Bullseye. Wer näher am Zentrum liegt, gewinnt.</p>
+            <div>
+              <button type="button" onClick={() => shootoutWinner(0)}>
+                {session.players[0].name} war näher
+              </button>
+              <button type="button" onClick={() => shootoutWinner(1)}>
+                {session.players[1].name} war näher
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {session.status === 'finished' && session.winner !== undefined && !session.lastReveal && (
+        <div className="winner-banner">
+          <small>
+            {session.mode === 'solo' ? 'Alle 24 Türchen geöffnet' : 'Der Kalender ist entschieden'}
+          </small>
+          <strong>♛ {session.players[session.winner].name}</strong>
+          <span>
+            {session.players[session.winner].score} Punkte · gewinnt den verflixten Adventskalender
+          </span>
+          <button type="button" onClick={() => setSetupOpen(true)}>
+            Neues Spiel
+          </button>
+        </div>
+      )}
+
+      {savedGame && (
+        <div className="resume-overlay" role="dialog" aria-modal="true">
+          <div>
+            <span>⚠</span>
+            <small>Unterbrochenes Spiel gefunden</small>
+            <h2>Letztes Duell fortsetzen?</h2>
+            <p>
+              {savedGame.players[0].name} ({savedGame.players[0].score} Pkt)
+              {savedGame.mode === 'duel'
+                ? ` vs. ${savedGame.players[1].name} (${savedGame.players[1].score} Pkt)`
+                : ' (Solo)'}{' '}
+              · Runde {savedGame.round} ·{' '}
+              {savedGame.doors.filter((door) => door.openedBy !== undefined).length} von 24 Türchen
+              geöffnet
+            </p>
+            <nav>
+              <button type="button" onClick={resumeSavedGame}>
                 ▶ Spiel jetzt fortsetzen
               </button>
+              <button type="button" onClick={discardSavedGame}>
+                ✕ Spiel verwerfen & Neu beginnen
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {setupOpen && !savedGame && (
+        <div className="setup-overlay" role="dialog" aria-modal="true">
+          <div className="setup-card">
+            <span className="reveal-kicker">Neues Spiel</span>
+            <h2>Der verflixte Adventskalender</h2>
+            <p>24 Türen. Ein Gewinner. Unendlich viel Schadenfreude.</p>
+
+            <div className="setup-modes">
               <button
                 type="button"
-                onClick={handleDiscardCachedGame}
-                className="min-h-[56px] px-5 py-3 rounded-2xl bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-500/50 font-black text-sm sm:text-base transition-all cursor-pointer"
+                className={setupMode === 'duel' ? 'active' : ''}
+                onClick={() => setSetupMode('duel')}
               >
-                ✕ Spiel verwerfen &amp; Neu beginnen
+                <b>1 vs. 1 Duell</b>
+                <small>Flüche, Diebstähle und Sabotage</small>
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* Haupt-Setup Karte */}
-        <div className="rounded-3xl p-5 sm:p-8 bg-gradient-to-br from-[#230910]/90 via-slate-900/95 to-[#161006]/90 border-2 border-amber-500/40 shadow-2xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-5">
-            <div className="flex items-center gap-3.5">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-3xl">
-                🚪
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  Der verhexte Adventskalender
-                </h1>
-                <p className="text-xs sm:text-sm text-amber-300 font-semibold">
-                  24 Mystery-Türchen (1–20, Doppel, Triple, Bull) · Schilde, Steal, Grinch &amp; Flüche!
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              {['1', '2', '3', '4', '5'].map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => handleSelectBoard(b)}
-                  className={`min-w-[44px] min-h-[44px] rounded-xl font-mono text-xs font-black transition-all cursor-pointer ${
-                    activeBoard === b
-                      ? 'bg-amber-400 text-slate-950 shadow-lg'
-                      : 'bg-slate-950/70 hover:bg-slate-800 text-slate-300 border border-white/10'
-                  }`}
-                >
-                  B{b}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Spielmodus */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-black uppercase tracking-wider text-slate-300 block">
-              Spielmodus
-            </label>
-            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setGameMode('1vs1')}
-                className={`min-h-[56px] px-4 py-3 rounded-2xl border-2 font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  gameMode === '1vs1'
-                    ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(251,191,36,0.25)]'
-                    : 'bg-slate-950/60 border-white/10 text-slate-400 hover:text-white'
-                }`}
+                className={setupMode === 'solo' ? 'active' : ''}
+                onClick={() => setSetupMode('solo')}
               >
-                <Users className="w-5 h-5" />
-                <span>1 vs. 1 Duell (Party-Standard)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setGameMode('solo')}
-                className={`min-h-[56px] px-4 py-3 rounded-2xl border-2 font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  gameMode === 'solo'
-                    ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(251,191,36,0.25)]'
-                    : 'bg-slate-950/60 border-white/10 text-slate-400 hover:text-white'
-                }`}
-              >
-                <User className="w-5 h-5" />
-                <span>Solo-Challenge</span>
+                <b>Solo-Training</b>
+                <small>Allein auf maximalen Highscore</small>
               </button>
             </div>
-          </div>
 
-          {/* Spielerauswahl */}
-          <div className={`grid gap-4 ${gameMode === '1vs1' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-950/60 border border-white/10">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-mono font-black uppercase tracking-wider text-red-300">
-                  {gameMode === '1vs1' ? 'Spieler 1 · Rot' : 'Spieler 1'}
-                </label>
-                {!soloLocked && (
-                  <button
-                    type="button"
-                    onClick={() => setIsGuestP1((v) => !v)}
-                    className="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline cursor-pointer"
-                  >
-                    {isGuestP1 ? 'Aus Vereinsliste wählen' : 'Gastname eingeben'}
-                  </button>
-                )}
-              </div>
-
-              {soloLocked ? (
-                <div className="min-h-[52px] px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-400/50 flex items-center justify-between gap-2">
-                  <span className="font-black text-white text-sm sm:text-base">{p1Name}</span>
-                  <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950">
-                    ✓ Angemeldet · Fest fixiert
-                  </span>
-                </div>
-              ) : isGuestP1 ? (
-                <input
-                  type="text"
-                  value={p1Name}
-                  onChange={(e) => setP1Name(e.target.value)}
-                  placeholder="Gastname eingeben..."
-                  className="w-full min-h-[52px] px-4 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-sm focus:outline-none focus:border-red-400"
-                />
-              ) : (
-                <select
-                  value={p1Name}
-                  onChange={(e) => setP1Name(e.target.value)}
-                  className="w-full min-h-[52px] px-4 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-sm focus:outline-none focus:border-red-400 cursor-pointer"
-                >
-                  {validPlayers.map((p) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name} ({p.team})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {gameMode === '1vs1' && (
-              <div className="space-y-2 p-4 rounded-2xl bg-slate-950/60 border border-white/10">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-mono font-black uppercase tracking-wider text-amber-300">
-                    Spieler 2 · Gold
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsGuestP2((v) => !v)}
-                    className="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline cursor-pointer"
-                  >
-                    {isGuestP2 ? 'Aus Vereinsliste wählen' : 'Gastname eingeben'}
-                  </button>
+            <div className="setup-fields">
+              <div className="setup-field-group">
+                <div className="setup-field-header">
+                  <label htmlFor="ak-p1-input">Spieler 1</label>
+                  {!(setupMode === 'solo' && lockedSoloName) && validPlayers.length > 0 && (
+                    <button
+                      type="button"
+                      className={`ak-guest-toggle ${isGuestP1 ? 'active' : ''}`}
+                      onClick={() => setIsGuestP1((v) => !v)}
+                    >
+                      {isGuestP1 ? 'Aus Liste' : 'Gast'}
+                    </button>
+                  )}
                 </div>
 
-                {isGuestP2 ? (
+                {setupMode === 'solo' && lockedSoloName ? (
+                  <div className="ak-locked-badge">
+                    <span>{lockedSoloName}</span>
+                    <small>✓ Angemeldet · Fest fixiert</small>
+                  </div>
+                ) : isGuestP1 || validPlayers.length === 0 ? (
                   <input
-                    type="text"
-                    value={p2Name}
-                    onChange={(e) => setP2Name(e.target.value)}
-                    placeholder="Gastname eingeben..."
-                    className="w-full min-h-[52px] px-4 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-sm focus:outline-none focus:border-amber-400"
+                    id="ak-p1-input"
+                    value={setupP1}
+                    placeholder="Name Spieler 1"
+                    onChange={(event) => setSetupP1(event.target.value)}
                   />
                 ) : (
                   <select
-                    value={p2Name}
-                    onChange={(e) => setP2Name(e.target.value)}
-                    className="w-full min-h-[52px] px-4 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-sm focus:outline-none focus:border-amber-400 cursor-pointer"
+                    id="ak-p1-input"
+                    value={setupP1}
+                    onChange={(event) => setSetupP1(event.target.value)}
                   >
                     {validPlayers.map((p) => (
                       <option key={p.id} value={p.name}>
-                        {p.name} ({p.team})
+                        {p.name}
                       </option>
                     ))}
                   </select>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Spiellänge */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Spiellänge (Endet automatisch, wenn alle 24 Türchen offen sind)</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { val: 4, label: '4 Runden (8 Türen)', sub: 'Schnell · Party-Duell' },
-                { val: 6, label: '6 Runden (12 Türen)', sub: 'Mittel · Taktik & Chaos' },
-                { val: 8, label: '8 Runden (16 Türen)', sub: 'Lang · Große Punktejagd' },
-                { val: null, label: 'Alle 24 Türchen', sub: 'Voller Kalender bis Tür 24' },
-              ].map((opt) => (
-                <button
-                  key={String(opt.val)}
-                  type="button"
-                  onClick={() => setMaxRounds(opt.val)}
-                  className={`min-h-[58px] px-4 py-2.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                    maxRounds === opt.val
-                      ? 'bg-amber-500/20 border-amber-400 text-amber-100 shadow-lg'
-                      : 'bg-slate-950/60 border-white/10 text-slate-300 hover:border-white/25'
-                  }`}
-                >
-                  <div className="text-sm font-black">{opt.label}</div>
-                  <div className="text-[11px] text-slate-400">{opt.sub}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Start Button */}
-          <button
-            type="button"
-            onClick={handleStartGame}
-            data-ui-id="ADVENT.SETUP.START_BTN"
-            className="w-full min-h-[60px] py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-lg flex items-center justify-center gap-3 shadow-xl shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-          >
-            <Sparkles className="w-5 h-5" />
-            <span>🚪 Türchen mischen &amp; Spiel starten</span>
-            <ArrowRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // =========================================================================
-  // ANSICHT 2: AKTIVES SPIEL (TABLET-OBERFLÄCHE)
-  // =========================================================================
-  const ownState = activePlayer === 1 ? p1State : p2State;
-  const ownName = activePlayer === 1 ? p1Name : p2Name;
-  const openCount = countOpenDoors(doors);
-  const totalDoors = doors.length || 24;
-  const hasSkipRoundCurse = ownState.activeCurses.includes('skip_round');
-  const hasOneDartCurse = ownState.activeCurses.includes('one_dart');
-  const hasTwoDartsCurse = ownState.activeCurses.includes('two_darts');
-  const activeHeaderCurses = ownState.activeCurses;
-
-  return (
-    <div className="max-w-5xl mx-auto px-2.5 sm:px-5 space-y-3.5 animate-fadeIn">
-      {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-slate-900/80 border border-white/10">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleAbortToSetup}
-            className="min-h-[44px] px-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-white/10"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Event-Arena / Abbruch</span>
-          </button>
-
-          <span className="px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-400/35 text-cyan-300 font-mono text-xs font-black">
-            BOARD {activeBoard}
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/35 text-amber-200 font-mono text-xs font-black">
-            {isSuddenDeath
-              ? '🔥 SUDDEN DEATH'
-              : maxRounds
-              ? `RUNDE ${roundNumber}/${maxRounds}`
-              : `RUNDE ${roundNumber}`}
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/35 text-emerald-200 font-mono text-xs font-black">
-            {openCount}/{totalDoors} OFFEN
-          </span>
-          {!isGameFinished &&
-            activeHeaderCurses.map((c) => {
-              const meta = CURSE_UI_META[c];
-              return (
-                <span
-                  key={`hdr-${c}`}
-                  className={`px-2.5 py-1 rounded-lg border font-mono text-xs font-black animate-pulse ${meta.chipCls}`}
-                >
-                  {meta.icon} {meta.badge}
-                </span>
-              );
-            })}
-          {restoredFromCache && (
-            <span className="hidden sm:inline px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 text-[10px] font-bold">
-              ✓ Wiederhergestellt
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSoundEnabled((v) => !v)}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 cursor-pointer"
-            title={soundEnabled ? 'Ton ausschalten' : 'Ton einschalten'}
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowHelp((v) => !v)}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-200 cursor-pointer"
-            title="Regeln anzeigen"
-          >
-            <HelpCircle className="w-4 h-4 text-amber-300" />
-          </button>
-        </div>
-      </div>
-
-      {/* Regel-Hilfe Box */}
-      {showHelp && (
-        <div className="rounded-2xl p-4 bg-slate-900/95 border border-amber-400/40 text-xs sm:text-sm text-slate-200 space-y-1.5">
-          <div className="font-black text-amber-300">🚪 Spielregeln: Der verhexte Adventskalender (24 Türchen)</div>
-          <p>
-            1. Wirf am Dartboard die Zahlen <strong>1 bis 20</strong> (Single, Double oder Triple egal) sowie{' '}
-            <strong>Doppel (Tür 21)</strong>, <strong>Triple (Tür 22)</strong>, <strong>Single Bull 25 (Tür 23)</strong>{' '}
-            und <strong>Bullseye 50 / D20 (Tür 24)</strong>!
-          </p>
-          <p>
-            2. Hinter den 24 Türchen warten <strong>Punkte (+25 bis +75)</strong>, der{' '}
-            <strong>Schutz-Engel (2× Schild gegen Flüche &amp; Diebstahl)</strong>, der{' '}
-            <strong>Weihnachtsstern (×2)</strong>, der <strong>Geschenke-Räuber (klaut bis zu 50 Pkt)</strong>,{' '}
-            <strong>Wichtel-Roulette (+60 / -30)</strong>, der <strong>Grinch (Punkte-Tausch!)</strong> sowie 6 fiese
-            Flüche (<strong>Falsche Hand</strong>, <strong>Nur 2 Darts</strong>, <strong>Nur 1 Dart</strong>,{' '}
-            <strong>Im Sitzen</strong>, <strong>Runde aussetzen</strong> &amp; <strong>360°-Drehwurm</strong>).
-          </p>
-          <p>3. Bereits geöffnete Türchen bleiben leer. Wer am Ende die meisten Punkte hat, gewinnt!</p>
-        </div>
-      )}
-
-      {/* Spieler Status Karten */}
-      <div className={`grid gap-3 ${gameMode === '1vs1' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        {[1, ...(gameMode === '1vs1' ? [2] : [])].map((pNum) => {
-          const isP1 = pNum === 1;
-          const st = isP1 ? p1State : p2State;
-          const name = isP1 ? p1Name : p2Name;
-          const isAct = !isGameFinished && activePlayer === pNum;
-          const isWin = winnerPlayer === pNum;
-          const shields = st.shieldsCount ?? 0;
-
-          return (
-            <div
-              key={pNum}
-              className={`rounded-2xl p-3.5 sm:p-4 border-2 transition-all ${
-                isWin
-                  ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.35)]'
-                  : isAct
-                  ? isP1
-                    ? 'bg-red-950/45 border-red-400 shadow-[0_0_25px_rgba(239,68,68,0.28)]'
-                    : 'bg-amber-950/45 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
-                  : 'bg-slate-900/60 border-white/10 opacity-80'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm sm:text-lg font-black text-white truncate">{name}</div>
-                  <div className="text-[11px] font-mono text-slate-300 flex items-center gap-2 mt-0.5 flex-wrap">
-                    {isWin ? (
-                      <span className="text-amber-300 font-black">🏆 SIEGER!</span>
-                    ) : isAct ? (
-                      <span className={`${isP1 ? 'text-red-300' : 'text-amber-300'} font-black`}>
-                        🎯 AM WURF
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">Wartet</span>
+              {setupMode === 'duel' && (
+                <div className="setup-field-group">
+                  <div className="setup-field-header">
+                    <label htmlFor="ak-p2-input">Spieler 2</label>
+                    {validPlayers.length > 0 && (
+                      <button
+                        type="button"
+                        className={`ak-guest-toggle ${isGuestP2 ? 'active' : ''}`}
+                        onClick={() => setIsGuestP2((v) => !v)}
+                      >
+                        {isGuestP2 ? 'Aus Liste' : 'Gast'}
+                      </button>
                     )}
-                    <span className="text-slate-400">· {st.doorsOpened} Türchen</span>
                   </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <span
-                    className={`text-2xl sm:text-4xl font-black font-mono ${
-                      isP1 ? 'text-red-300' : 'text-amber-300'
-                    }`}
-                  >
-                    {st.score}
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400 block">PUNKTE</span>
-                </div>
-              </div>
-
-              {(shields > 0 || st.activeCurses.length > 0 || st.pendingCurses.length > 0) && (
-                <div className="flex flex-wrap gap-1.5 mt-2 font-mono text-[10px] font-black">
-                  {shields > 0 && (
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/25 border border-emerald-300 text-emerald-100">
-                      🛡️ SCHUTZSCHILD ×{shields}
-                    </span>
+                  {isGuestP2 || validPlayers.length === 0 ? (
+                    <input
+                      id="ak-p2-input"
+                      value={setupP2}
+                      placeholder="Name Spieler 2"
+                      onChange={(event) => setSetupP2(event.target.value)}
+                    />
+                  ) : (
+                    <select
+                      id="ak-p2-input"
+                      value={setupP2}
+                      onChange={(event) => setSetupP2(event.target.value)}
+                    >
+                      {validPlayers.map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
                   )}
-                  {st.activeCurses.map((c) => {
-                    const meta = CURSE_UI_META[c];
-                    return (
-                      <span
-                        key={`act-${c}`}
-                        className={`px-2 py-0.5 rounded-md border ${meta.chipCls}`}
-                      >
-                        {meta.icon} {meta.badge}
-                      </span>
-                    );
-                  })}
-                  {st.pendingCurses.map((c) => {
-                    const meta = CURSE_UI_META[c];
-                    return (
-                      <span
-                        key={`pend-${c}`}
-                        className="px-2 py-0.5 rounded-md bg-sky-950/80 border border-sky-400/50 text-sky-200"
-                      >
-                        ⏳ Nächste: {meta.icon} {meta.short}
-                      </span>
-                    );
-                  })}
+                </div>
+              )}
+
+              {setupMode === 'duel' && (
+                <div className="setup-field-group">
+                  <label htmlFor="ak-starter-select">Wer beginnt?</label>
+                  <select
+                    id="ak-starter-select"
+                    value={setupStarter}
+                    onChange={(event) =>
+                      setSetupStarter(event.target.value as 'random' | 'p1' | 'p2')
+                    }
+                  >
+                    <option value="random">🎲 Zufall (50/50)</option>
+                    <option value="p1">Spieler 1 ({setupP1 || 'Spieler 1'})</option>
+                    <option value="p2">Spieler 2 ({setupP2 || 'Spieler 2'})</option>
+                  </select>
                 </div>
               )}
             </div>
-          );
-        })}
-      </div>
 
-      {/* Prominenter Fluch-Hinweisbalken für den aktiven Werfer */}
-      {!isGameFinished && ownState.activeCurses.length > 0 && (
-        <div className="rounded-2xl px-4 py-3 bg-gradient-to-r from-sky-950/90 via-red-950/85 to-purple-950/90 border-2 border-sky-400 text-center space-y-2 animate-pulse shadow-[0_0_25px_rgba(56,189,248,0.35)]">
-          {ownState.activeCurses.map((c) => {
-            const meta = CURSE_UI_META[c];
-            return (
-              <div
-                key={`warn-${c}`}
-                className="text-xs sm:text-sm font-black text-white uppercase tracking-wide"
-              >
-                {meta.icon} ACHTUNG: {ownName} {meta.warning}
-              </div>
-            );
-          })}
-
-          {hasSkipRoundCurse && (
-            <button
-              type="button"
-              onClick={handleSkipRound}
-              data-ui-id="ADVENT.PLAY.SKIP_ROUND_BTN"
-              className="w-full min-h-[56px] px-5 py-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.99]"
-            >
-              <span>⛄ Eingeschneit! Runde aussetzen (0 Darts weiter)</span>
+            <button type="button" className="start-game" onClick={startGame}>
+              Kalender mischen &amp; Spiel starten
             </button>
-          )}
-        </div>
-      )}
 
-      {/* Live Event Banner */}
-      {lastAction && (
-        <div
-          className={`rounded-2xl px-4 py-2.5 border text-center transition-all ${
-            lastAction.tone === 'grinch'
-              ? 'bg-purple-950/80 border-purple-400 text-purple-100'
-              : lastAction.tone === 'curse'
-              ? 'bg-sky-950/80 border-sky-400 text-sky-100'
-              : lastAction.tone === 'jackpot' || lastAction.tone === 'win'
-              ? 'bg-amber-950/75 border-amber-400 text-amber-100'
-              : lastAction.tone === 'good'
-              ? 'bg-emerald-950/75 border-emerald-400 text-emerald-100'
-              : lastAction.tone === 'niete' || lastAction.tone === 'miss'
-              ? 'bg-red-950/60 border-red-500/55 text-red-100'
-              : 'bg-slate-900/75 border-white/15 text-slate-200'
-          }`}
-        >
-          <span className="text-xs sm:text-sm font-black uppercase tracking-wider mr-2">
-            {lastAction.icon} {lastAction.headline}
-          </span>
-          <span className="text-xs sm:text-sm opacity-95">{lastAction.subline}</span>
-        </div>
-      )}
-
-      {/* Sieger-Banner am Tablet */}
-      {isGameFinished && winnerPlayer && (
-        <div className="rounded-3xl p-6 bg-gradient-to-br from-amber-950/80 via-slate-900/95 to-red-950/80 border-2 border-amber-400 text-center space-y-4 shadow-2xl">
-          <div className="text-4xl">{winnerPlayer === 'draw' ? '🤝🚪' : '🏆🚪'}</div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white">
-              {winnerPlayer === 'draw'
-                ? 'Unentschieden am Adventskalender!'
-                : `${winnerPlayer === 1 ? p1Name : p2Name} gewinnt mit ${
-                    winnerPlayer === 1 ? p1State.score : p2State.score
-                  } Punkten!`}
-            </h2>
-            <p className="text-xs sm:text-sm text-amber-200 mt-1">
-              {openCount}/{totalDoors} Türchen geöffnet · Runde {roundNumber}
-              {gameMode === '1vs1' ? ` • Endstand ${p1State.score} : ${p2State.score}` : ''}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={undoStack.length === 0}
-              className="min-h-[54px] px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-white/15 font-black text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Letzten Dart korrigieren</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleStartGame}
-              className="min-h-[54px] px-4 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm cursor-pointer"
-            >
-              🔄 Neu mischen &amp; Revanche
-            </button>
-            <button
-              type="button"
-              onClick={handleAbortToSetup}
-              className="min-h-[54px] px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/15 font-black text-sm cursor-pointer"
-            >
-              Zurück zum Setup
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Aktuelle Aufnahme + Korrektur + 24 Türchen Grid */}
-      {!isGameFinished && (
-        <>
-          <div className="grid grid-cols-12 gap-2 items-center">
-            {hasSkipRoundCurse ? (
-              <div className="col-span-8 sm:col-span-9 min-h-[52px] px-3 py-2 rounded-xl border-2 border-cyan-300 bg-gradient-to-r from-sky-950 via-cyan-900/90 to-sky-950 flex items-center justify-center gap-2 font-mono text-xs sm:text-sm font-black text-cyan-100 animate-pulse">
-                <span>⛄</span>
-                <span>EINGESCHNEIT · RUNDE AUSSETZEN (0 DARTS)</span>
-                <span>❄️</span>
-              </div>
-            ) : (
-              <div className="col-span-8 sm:col-span-9 grid grid-cols-3 gap-2">
-                {[0, 1, 2].map((idx) => {
-                  if ((hasOneDartCurse && idx >= 1) || (hasTwoDartsCurse && idx === 2)) {
-                    return (
-                      <div
-                        key={idx}
-                        className="min-h-[52px] px-2 py-1.5 rounded-xl border-2 border-sky-400/70 bg-sky-950/75 flex flex-col items-center justify-center font-mono text-sky-200"
-                      >
-                        <span className="text-[10px] font-black">
-                          {hasOneDartCurse ? '🎯' : '❄️'} Dart {idx + 1}
-                        </span>
-                        <span className="text-[10px] font-black uppercase">
-                          {hasOneDartCurse ? 'GESPERRT' : 'EINGEFROREN'}
-                        </span>
-                      </div>
-                    );
-                  }
-
-                  const ev = ownState.currentTurnDarts[idx];
-                  const isNext = idx === ownState.currentTurnDarts.length;
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`min-h-[52px] px-2 py-1.5 rounded-xl border flex flex-col items-center justify-center font-mono ${
-                        ev
-                          ? ev.tone === 'miss' || ev.tone === 'niete'
-                            ? 'bg-red-950/70 border-red-500/60 text-red-200'
-                            : ev.tone === 'grinch'
-                            ? 'bg-purple-500/25 border-purple-400 text-purple-100'
-                            : ev.tone === 'curse'
-                            ? 'bg-sky-500/25 border-sky-400 text-sky-100'
-                            : ev.tone === 'jackpot'
-                            ? 'bg-amber-500/25 border-amber-400 text-amber-100'
-                            : 'bg-emerald-500/20 border-emerald-400 text-emerald-100'
-                          : isNext
-                          ? 'bg-amber-500/10 border-amber-400 text-amber-300 animate-pulse'
-                          : 'bg-slate-950/60 border-white/10 text-slate-500'
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold opacity-80">
-                        {ev ? ev.label : `Dart ${idx + 1}`}
-                      </span>
-                      <span className="text-[11px] sm:text-xs font-black truncate max-w-full">
-                        {ev ? ev.subLabel : isNext ? 'Bereit' : '•'}
-                      </span>
-                    </div>
-                  );
-                })}
+            {session.players[0].actionsCount > 0 && session.status !== 'finished' && (
+              <div className="setup-back-row">
+                <button
+                  type="button"
+                  className="setup-cancel-btn"
+                  onClick={() => setSetupOpen(false)}
+                >
+                  Zurück zum laufenden Spiel
+                </button>
               </div>
             )}
-
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={undoStack.length === 0}
-              className="col-span-4 sm:col-span-3 min-h-[52px] px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white border border-white/15 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Korrektur</span>
-            </button>
           </div>
-
-          {/* 6x4 / 4x6 Adventskalender Touch-Grid (1 bis 24) */}
-          <div className="rounded-3xl p-3.5 sm:p-5 bg-gradient-to-b from-[#230910]/90 via-slate-950/95 to-slate-950 border-2 border-amber-500/35 space-y-3 shadow-2xl">
-            <div className="text-center text-xs font-mono uppercase tracking-widest text-amber-300 font-bold">
-              🎯 {ownName} wirft ({ownState.score} Pkt) — Tipp getroffenes Türchen (1–24):
-            </div>
-
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 sm:gap-2.5">
-              {doors.map((door) => {
-                const target = getDoorTargetLabel(door.number);
-
-                if (!door.isOpen) {
-                  return (
-                    <button
-                      key={door.number}
-                      type="button"
-                      disabled={hasSkipRoundCurse}
-                      onClick={() => handleDoorHit(door.number)}
-                      data-ui-id={`ADVENT.PLAY.DOOR_${door.number}`}
-                      className={`min-h-[66px] sm:min-h-[76px] rounded-2xl border-2 shadow-lg flex flex-col items-center justify-center p-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-35 disabled:cursor-not-allowed ${
-                        target.isSpecial
-                          ? 'bg-gradient-to-br from-[#231245] via-[#130e2b] to-slate-950 hover:from-[#2f1859] hover:to-slate-900 border-cyan-300/75 hover:border-cyan-200'
-                          : 'bg-gradient-to-br from-[#450e17] via-[#260a12] to-slate-950 hover:from-[#5c1320] hover:to-slate-900 border-amber-400/65 hover:border-amber-300'
-                      }`}
-                    >
-                      {target.isSpecial ? (
-                        <>
-                          <span className="text-[10px] font-mono font-black text-cyan-300 leading-none">
-                            #{door.number}
-                          </span>
-                          <span className="text-xs sm:text-sm font-black font-mono text-white leading-tight mt-0.5">
-                            {target.label}
-                          </span>
-                          <span className="text-[9px] font-mono font-bold text-cyan-200/85 truncate max-w-full">
-                            {target.subLabel}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-xl sm:text-2xl font-black font-mono text-amber-200 leading-none">
-                            {door.number}
-                          </span>
-                          <span className="text-[9px] font-mono font-bold text-amber-400/90 mt-1 truncate max-w-full">
-                            {target.subLabel}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  );
-                }
-
-                const ownerCls =
-                  gameMode === '1vs1' && door.openedBy === 2
-                    ? 'border-amber-400/50 bg-slate-900/75'
-                    : 'border-red-400/50 bg-slate-900/75';
-
-                return (
-                  <button
-                    key={door.number}
-                    type="button"
-                    disabled={hasSkipRoundCurse}
-                    onClick={() => handleDoorHit(door.number)}
-                    data-ui-id={`ADVENT.PLAY.DOOR_${door.number}`}
-                    className={`min-h-[66px] sm:min-h-[76px] rounded-2xl border-2 ${ownerCls} opacity-75 hover:opacity-95 flex flex-col items-center justify-between p-1.5 cursor-pointer active:scale-95 transition-all font-mono disabled:opacity-35 disabled:cursor-not-allowed`}
-                  >
-                    <div className="flex items-center justify-between w-full text-[9px] sm:text-[10px] font-black text-slate-400 gap-0.5">
-                      <span className="truncate">
-                        #{door.number}
-                        {target.isSpecial ? `·${target.label}` : ''}
-                      </span>
-                      {gameMode === '1vs1' && door.openedBy && (
-                        <span
-                          className={
-                            door.openedBy === 1 ? 'text-red-300' : 'text-amber-300'
-                          }
-                        >
-                          P{door.openedBy}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-lg sm:text-xl leading-none">{door.reward.icon}</span>
-                    <span className="text-[9px] sm:text-[10px] font-black text-slate-200 truncate max-w-full">
-                      {door.reward.shortBadge}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Untere Fehlwurf-Leiste */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              disabled={hasSkipRoundCurse}
-              onClick={handleMiss}
-              data-ui-id="ADVENT.PLAY.MISS_BTN"
-              className="min-h-[60px] px-5 py-3 rounded-2xl bg-red-600/85 hover:bg-red-500 text-white border-2 border-red-400 font-black text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98] disabled:opacity-35 disabled:cursor-not-allowed"
-            >
-              <span>✕ DANEBEN (KEIN TREFFER / MISS)</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={hasSkipRoundCurse}
-              onClick={handleRestMiss}
-              data-ui-id="ADVENT.PLAY.REST_MISS_BTN"
-              className="min-h-[60px] px-5 py-3 rounded-2xl bg-rose-950/90 hover:bg-rose-900 text-rose-100 border-2 border-rose-500/70 font-black text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.98] disabled:opacity-35 disabled:cursor-not-allowed"
-            >
-              <span>✕✕✕ Restliche Darts Miss</span>
-            </button>
-          </div>
-        </>
+        </div>
       )}
-    </div>
+    </main>
   );
 }

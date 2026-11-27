@@ -7,8 +7,8 @@ import { getPlayers } from '@/lib/data';
 import AdventskalenderClient from './AdventskalenderClient';
 
 export const metadata: Metadata = {
-  title: 'Der verhexte Adventskalender | Lions Weyhausen',
-  description: 'Event-Dartspiel Der verhexte Adventskalender – 12 Türchen mit Schoko, Grinch & Flüchen',
+  title: 'Der verflixte Adventskalender | Lions Weyhausen',
+  description: 'Event-Dartspiel Der verflixte Adventskalender – 24 Türchen mit Punkten, Schilden, Grinch & Flüchen',
 };
 
 export const dynamic = 'force-dynamic';
@@ -22,8 +22,8 @@ export default async function AdventskalenderPage() {
   const players = await getPlayers();
 
   return (
-    <main className="min-h-screen py-4 sm:py-6 bg-[#050811] text-slate-100">
+    <div className="-mx-2 sm:-mx-6 -my-3 sm:-my-4 min-h-[calc(100vh-64px)] bg-[#080c0a] text-[#f7f0df]">
       <AdventskalenderClient players={players} currentUser={session} />
-    </main>
+    </div>
   );
 }

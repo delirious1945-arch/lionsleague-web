@@ -304,10 +304,10 @@ export default function SpecialHubClient({
                     </div>
                     <div>
                       <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                        Der verhexte Adventskalender
+                        Der verflixte Adventskalender
                       </h3>
                       <span className="text-xs font-semibold text-amber-300">
-                        24 Mystery-Türchen (1–20, Doppel, Triple &amp; Bull)
+                        24 Mystery-Türchen (inkl. Nikolaus 6+Bull &amp; Heiligabend 20+4+Bull)
                       </span>
                     </div>
                   </div>
@@ -319,7 +319,9 @@ export default function SpecialHubClient({
                 <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
                   Öffne mit Treffern auf <strong className="text-amber-300">1 bis 20</strong>,{' '}
                   <strong className="text-cyan-300">Doppel (21)</strong>, <strong className="text-cyan-300">Triple (22)</strong>{' '}
-                  &amp; <strong className="text-cyan-300">Bull (23/24)</strong> alle 24 Türchen! Dahinter warten{' '}
+                  &amp; <strong className="text-cyan-300">Bull (23)</strong> alle 24 Türchen! Inklusive{' '}
+                  <strong className="text-amber-300">Nikolaus (Tür 6: 6 + Bull)</strong> und{' '}
+                  <strong className="text-amber-300">Heiligabend (Tür 24: 20 + 4 + Bull)</strong>. Dahinter warten{' '}
                   <strong className="text-emerald-300">Punkte (+25 bis +75)</strong>,{' '}
                   <strong className="text-emerald-300">Schutz-Engel (2× Schild)</strong> und der{' '}
                   <strong className="text-red-300">Geschenke-Räuber (Steal 50)</strong>.
