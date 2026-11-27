@@ -12,7 +12,6 @@ import {
   GolfPlayerState,
   MAX_STROKES_PER_HOLE,
   createInitialGolfPlayerState,
-  formatToPar,
   generateGolfCourse,
   isValidThreeDartScore,
   simulateGolfBotVisit,
@@ -20,20 +19,21 @@ import {
 import { generateSessionId } from '@/lib/liveSession';
 import './dart-golf-monitor.css';
 
-const CACHE_KEY = 'lions_active_dartsgolf_v3';
+const CACHE_KEY = 'lions_active_dartsgolf_v4';
 
 export interface GolfPlayer {
   id: string;
   playerName: string;
   initials: string;
   isBot: boolean;
-  totalToPar: number;
+  penaltyPoints: number;
   totalStrokes: number;
   currentHole: number;
   currentHoleStrokes: number;
   remainingDistance: number;
   holeFinished: boolean;
   scores: Record<number, number>;
+  holedByHole: Record<number, boolean>;
 }
 
 interface GolfSnapshot {
@@ -45,7 +45,7 @@ interface GolfSnapshot {
 }
 
 interface SavedGolfSession {
-  version: 3;
+  version: 4;
   gameMode: GolfGameMode;
   botDifficulty: GolfBotDifficulty;
   holesCount: GolfHolesCount;
@@ -55,6 +55,11 @@ interface SavedGolfSession {
   players: [GolfPlayer, GolfPlayer];
   activeBoard: string;
   sessionId: string;
+}
+
+function formatPenalty(points: number): string {
+  if (points <= 0) return '0';
+  return `−${points}`;
 }
 
 interface DartGolfArenaContainerProps {
@@ -86,20 +91,21 @@ function createPlayerRecord(
     playerName: name.trim() || (id === 'p1' ? 'Spieler 1' : 'Spieler 2'),
     initials: makeInitials(name),
     isBot,
-    totalToPar: 0,
+    penaltyPoints: 0,
     totalStrokes: 0,
     currentHole: 1,
     currentHoleStrokes: 0,
     remainingDistance: startDistance,
     holeFinished: false,
     scores: {},
+    holedByHole: {},
   };
 }
 
 function clonePlayers(list: [GolfPlayer, GolfPlayer]): [GolfPlayer, GolfPlayer] {
   return [
-    { ...list[0], scores: { ...list[0].scores } },
-    { ...list[1], scores: { ...list[1].scores } },
+    { ...list[0], scores: { ...list[0].scores }, holedByHole: { ...list[0].holedByHole } },
+    { ...list[1], scores: { ...list[1].scores }, holedByHole: { ...list[1].holedByHole } },
   ];
 }
 
@@ -235,7 +241,7 @@ export default function DartGolfArenaContainer({
       const parsed = JSON.parse(raw) as SavedGolfSession;
       if (
         parsed &&
-        parsed.version === 3 &&
+        parsed.version === 4 &&
         Array.isArray(parsed.holes) &&
         parsed.holes.length >= 9 &&
         Array.isArray(parsed.players) &&
@@ -254,7 +260,7 @@ export default function DartGolfArenaContainer({
         localStorage.removeItem(CACHE_KEY);
       } else {
         const payload: SavedGolfSession = {
-          version: 3,
+          version: 4,
           gameMode,
           botDifficulty,
           holesCount,
@@ -300,19 +306,20 @@ export default function DartGolfArenaContainer({
         currentHoleHoledOut: pl.holeFinished && pl.remainingDistance === 0,
         currentHolePickedUp: pl.holeFinished && pl.remainingDistance > 0,
         totalStrokes: pl.totalStrokes,
-        scoreToPar: pl.totalToPar,
-        completedHoles: Object.entries(pl.scores).map(([holeNo, strokes]) => {
+        scoreToPar: -pl.penaltyPoints,
+        completedHoles: Object.entries(pl.scores).map(([holeNo, penalty]) => {
           const def = holes.find((h) => h.holeNumber === Number(holeNo));
           const par = def?.par ?? 4;
+          const holed = Boolean(pl.holedByHole[Number(holeNo)]);
           return {
             holeNumber: Number(holeNo),
             par,
             startDistance: def?.startDistance ?? 150,
-            strokes,
-            toPar: strokes - par,
+            strokes: penalty,
+            toPar: -penalty,
             overshoots: 0,
-            holedOut: true,
-            pickedUp: false,
+            holedOut: holed,
+            pickedUp: !holed,
             shots: [],
           };
         }),
@@ -320,9 +327,9 @@ export default function DartGolfArenaContainer({
     };
 
     const winnerPlayer = isGameFinished
-      ? matchPlayers[0].totalToPar < matchPlayers[1].totalToPar
+      ? matchPlayers[0].penaltyPoints < matchPlayers[1].penaltyPoints
         ? 1
-        : matchPlayers[1].totalToPar < matchPlayers[0].totalToPar
+        : matchPlayers[1].penaltyPoints < matchPlayers[0].penaltyPoints
         ? 2
         : ('draw' as const)
       : null;
@@ -346,8 +353,8 @@ export default function DartGolfArenaContainer({
       p2Name: matchPlayers[1].playerName,
       activePlayer: (activePlayerIndex + 1) as 1 | 2,
       currentRound: currentHoleIndex + 1,
-      scoreP1: matchPlayers[0].totalStrokes,
-      scoreP2: matchPlayers[1].totalStrokes,
+      scoreP1: matchPlayers[0].penaltyPoints,
+      scoreP2: matchPlayers[1].penaltyPoints,
       winner: winnerName,
       dartsgolfData: {
         holesCount: holes.length as GolfHolesCount,
@@ -459,6 +466,8 @@ export default function DartGolfArenaContainer({
 
       const nextList = clonePlayers(matchPlayers);
       const shooter = nextList[activePlayerIndex];
+      const otherIndex: 0 | 1 = activePlayerIndex === 0 ? 1 : 0;
+      const other = nextList[otherIndex];
       const hole = holes[currentHoleIndex];
       const nextStrokes = shooter.currentHoleStrokes + 1;
       const nextDistance = calculateRemainingDistance(shooter.remainingDistance, throwVal);
@@ -474,23 +483,53 @@ export default function DartGolfArenaContainer({
         statusText = `💨 ${shooter.playerName}: Übers Grün! Neuer Rest ${nextDistance} m`;
       }
 
-      if (holedOut || reachedMax) {
-        shooter.holeFinished = true;
-        shooter.scores = { ...shooter.scores, [hole.holeNumber]: nextStrokes };
-        shooter.totalToPar += nextStrokes - hole.par;
-        statusText = holedOut
-          ? `⛳ ${shooter.playerName} locht mit ${nextStrokes} Schlägen ein!`
-          : `🛑 ${shooter.playerName} erreicht Max (${MAX_STROKES_PER_HOLE} Schläge)`;
-      }
+      let holeCompletedNow = false;
+      let nextHoleStarter: 0 | 1 = activePlayerIndex;
 
-      const otherIndex: 0 | 1 = activePlayerIndex === 0 ? 1 : 0;
-      const bothFinished = nextList[0].holeFinished && nextList[1].holeFinished;
+      if (holedOut) {
+        // Sobald ein Spieler einlocht, ist das Loch sofort beendet; Gegner erhält 1 Minuspunkt pro Restmeter
+        const opponentPenalty = other.remainingDistance;
+        shooter.holeFinished = true;
+        shooter.scores = { ...shooter.scores, [hole.holeNumber]: 0 };
+        shooter.holedByHole = { ...shooter.holedByHole, [hole.holeNumber]: true };
+
+        other.holeFinished = true;
+        other.penaltyPoints += opponentPenalty;
+        other.scores = { ...other.scores, [hole.holeNumber]: opponentPenalty };
+        other.holedByHole = { ...other.holedByHole, [hole.holeNumber]: false };
+
+        holeCompletedNow = true;
+        nextHoleStarter = activePlayerIndex;
+        statusText = `⛳ ${shooter.playerName} locht ein! ${other.playerName} erhält ${
+          opponentPenalty > 0
+            ? `−${opponentPenalty} Minuspunkte (${opponentPenalty} m Rest)`
+            : '0 Minuspunkte'
+        }.`;
+      } else if (reachedMax) {
+        shooter.holeFinished = true;
+        if (other.holeFinished) {
+          // Beide haben Max-Schläge erreicht -> beide bekommen Restentfernung als Minuspunkte
+          shooter.penaltyPoints += shooter.remainingDistance;
+          shooter.scores = { ...shooter.scores, [hole.holeNumber]: shooter.remainingDistance };
+          shooter.holedByHole = { ...shooter.holedByHole, [hole.holeNumber]: false };
+
+          other.penaltyPoints += other.remainingDistance;
+          other.scores = { ...other.scores, [hole.holeNumber]: other.remainingDistance };
+          other.holedByHole = { ...other.holedByHole, [hole.holeNumber]: false };
+
+          holeCompletedNow = true;
+          nextHoleStarter = 0;
+          statusText = `🛑 Beide erreichen Max (${MAX_STROKES_PER_HOLE} Schläge) – Restmeter als Minuspunkte gezählt.`;
+        } else {
+          statusText = `🛑 ${shooter.playerName} erreicht Max (${MAX_STROKES_PER_HOLE} Schläge) – ${other.playerName} wirft noch.`;
+        }
+      }
 
       setMatchPlayers(nextList);
       setScore('');
       setMessage(statusText);
 
-      if (bothFinished) {
+      if (holeCompletedNow) {
         holeAdvanceTimerRef.current = setTimeout(() => {
           if (currentHoleIndex + 1 >= holes.length) {
             setIsGameFinished(true);
@@ -499,7 +538,7 @@ export default function DartGolfArenaContainer({
             const nextIdx = currentHoleIndex + 1;
             const nextHoleObj = holes[nextIdx];
             setCurrentHoleIndex(nextIdx);
-            setActivePlayerIndex(0);
+            setActivePlayerIndex(nextHoleStarter);
             setMatchPlayers((prev) => [
               {
                 ...prev[0],
@@ -520,7 +559,7 @@ export default function DartGolfArenaContainer({
               `🚩 Loch ${nextHoleObj.holeNumber} (Par ${nextHoleObj.par} · ${nextHoleObj.startDistance} m)`
             );
           }
-        }, 1200);
+        }, 1400);
       } else if (!nextList[otherIndex].holeFinished) {
         setActivePlayerIndex(otherIndex);
       } else {
@@ -546,6 +585,7 @@ export default function DartGolfArenaContainer({
       isGameFinished ||
       gameMode !== '1vsComputer' ||
       activePlayerIndex !== 1 ||
+      matchPlayers[0].holeFinished ||
       matchPlayers[1].holeFinished
     ) {
       setIsBotThrowing(false);
@@ -676,16 +716,20 @@ export default function DartGolfArenaContainer({
   const visibleHoles = holes.slice(visibleNineStart, visibleNineStart + 9);
   const nineTitle = visibleNineStart === 0 ? 'Front Nine (1–9)' : 'Back Nine (10–18)';
 
-  // Siegerermittlung bei Spielende
+  // Siegerermittlung bei Spielende (wenigste Minuspunkte gewinnen)
   const winnerText = useMemo(() => {
     if (!isGameFinished) return '';
-    if (matchPlayers[0].totalToPar < matchPlayers[1].totalToPar) {
-      return `🏆 ${matchPlayers[0].playerName} gewinnt (${formatToPar(matchPlayers[0].totalToPar)})!`;
+    if (matchPlayers[0].penaltyPoints < matchPlayers[1].penaltyPoints) {
+      return `🏆 ${matchPlayers[0].playerName} gewinnt (${formatPenalty(
+        matchPlayers[0].penaltyPoints
+      )} Minuspunkte)!`;
     }
-    if (matchPlayers[1].totalToPar < matchPlayers[0].totalToPar) {
-      return `🏆 ${matchPlayers[1].playerName} gewinnt (${formatToPar(matchPlayers[1].totalToPar)})!`;
+    if (matchPlayers[1].penaltyPoints < matchPlayers[0].penaltyPoints) {
+      return `🏆 ${matchPlayers[1].playerName} gewinnt (${formatPenalty(
+        matchPlayers[1].penaltyPoints
+      )} Minuspunkte)!`;
     }
-    return `🤝 Unentschieden (${formatToPar(matchPlayers[0].totalToPar)})!`;
+    return `🤝 Unentschieden (${formatPenalty(matchPlayers[0].penaltyPoints)} Minuspunkte)!`;
   }, [isGameFinished, matchPlayers]);
 
   return (
@@ -960,34 +1004,39 @@ export default function DartGolfArenaContainer({
               </div>
             </header>
 
-            <section className="portrait-turn">
-              <div className="turn-label">
-                <span className="turn-pulse" /> JETZT AM ZUG
-              </div>
-              <strong>{activePlayer.playerName.toUpperCase()}</strong>
-              <span className="player-score">GESAMT {formatToPar(activePlayer.totalToPar)}</span>
-            </section>
-
-            {/* Klare 1-vs-1 / Spieler-vs-Bot Restentfernungen auf dem Tablet */}
+            {/* Klare 1-vs-1 / Spieler-vs-Bot Restentfernungen & Zuganzeige direkt in den Kacheln */}
             <section className="tablet-match-distances" aria-label="Aktuelle Entfernungen">
-              {matchPlayers.map((pl, idx) => (
-                <div
-                  key={pl.id}
-                  className={`tablet-player-pill ${
-                    idx === activePlayerIndex ? 'active' : ''
-                  } ${pl.holeFinished ? 'holed' : ''}`}
-                >
-                  <div>
-                    <small>{pl.playerName}</small>
-                    <span>
-                      Schlag {pl.currentHoleStrokes} · Gesamt {formatToPar(pl.totalToPar)}
-                    </span>
+              {matchPlayers.map((pl, idx) => {
+                const isAct = idx === activePlayerIndex && !isGameFinished;
+                return (
+                  <div
+                    key={pl.id}
+                    className={`tablet-player-pill ${isAct ? 'active' : ''} ${
+                      pl.holeFinished && pl.remainingDistance === 0 ? 'holed' : ''
+                    }`}
+                  >
+                    <div>
+                      <div className="tablet-pill-head">
+                        <small>{pl.playerName}</small>
+                        {isAct && (
+                          <span className="tablet-turn-badge">
+                            <i className="turn-pulse" /> AM ZUG
+                          </span>
+                        )}
+                      </div>
+                      <span className="tablet-pill-meta">
+                        Schlag {pl.currentHoleStrokes} · Minuspunkte:{' '}
+                        {formatPenalty(pl.penaltyPoints)}
+                      </span>
+                    </div>
+                    <strong>
+                      {pl.holeFinished && pl.remainingDistance === 0
+                        ? '⛳ Im Loch'
+                        : `${pl.remainingDistance} m`}
+                    </strong>
                   </div>
-                  <strong>
-                    {pl.holeFinished ? '⛳ Im Loch' : `${pl.remainingDistance} m`}
-                  </strong>
-                </div>
-              ))}
+                );
+              })}
             </section>
 
             <section className="distance-summary">
@@ -1124,139 +1173,136 @@ export default function DartGolfArenaContainer({
             </div>
           </header>
 
-          <div className="turn-banner">
-            <span className="turn-pulse" />
-            <div>
-              <p>JETZT AM ZUG</p>
-              <strong>{activePlayer.playerName.toUpperCase()}</strong>
-            </div>
-            <span className="turn-number">0{activePlayerIndex + 1}</span>
-          </div>
-
-          {/* Klares 1-vs-1 Dual-Distanz-HUD über dem Fairway (ohne Überlagerung des Scoreboards) */}
-          <section className="monitor-players-hud" aria-label="Entfernung beider Spieler zum Loch">
-            {matchPlayers.map((pl, idx) => {
-              const progressPct = Math.max(
-                0,
-                Math.min(
-                  100,
-                  Math.round(
-                    ((currentHole.startDistance - pl.remainingDistance) /
-                      Math.max(1, currentHole.startDistance)) *
-                      100
+          {/* Spieler 1 links, Gegner rechts direkt über dem Club Scorecard Board */}
+          <div className="monitor-bottom-dock">
+            <section className="monitor-players-hud" aria-label="Entfernung beider Spieler zum Loch">
+              {matchPlayers.map((pl, idx) => {
+                const progressPct = Math.max(
+                  0,
+                  Math.min(
+                    100,
+                    Math.round(
+                      ((currentHole.startDistance - pl.remainingDistance) /
+                        Math.max(1, currentHole.startDistance)) *
+                        100
+                    )
                   )
-                )
-              );
-              const isAct = idx === activePlayerIndex && !isGameFinished;
+                );
+                const isAct = idx === activePlayerIndex && !isGameFinished;
+                const holedNow = pl.holeFinished && pl.remainingDistance === 0;
 
-              return (
-                <article
-                  key={pl.id}
-                  className={`monitor-player-card ${isAct ? 'active' : ''} ${
-                    pl.holeFinished ? 'holed' : ''
-                  }`}
-                >
-                  <div className="monitor-player-top">
-                    <div className="monitor-player-ident">
+                return (
+                  <article
+                    key={pl.id}
+                    className={`monitor-player-card ${isAct ? 'active' : ''} ${
+                      holedNow ? 'holed' : ''
+                    }`}
+                  >
+                    <div className="monitor-player-top">
+                      <div className="monitor-player-ident">
+                        <b>0{idx + 1}</b>
+                        <strong>{pl.playerName.toUpperCase()}</strong>
+                      </div>
+                      <span className="monitor-player-badge">
+                        {holedNow ? '⛳ EINGELOCHT' : isAct ? 'AM ZUG' : 'WARTET'}
+                      </span>
+                    </div>
+
+                    <div className="monitor-player-distance">
+                      <div className="monitor-player-meters">
+                        <strong>{holedNow ? '0 m' : pl.remainingDistance}</strong>
+                        {!holedNow && <span>METER ZUM LOCH</span>}
+                      </div>
+                      <div className="monitor-player-meta">
+                        <b>MINUSPKT: {formatPenalty(pl.penaltyPoints)}</b>
+                        <span>Schlag {pl.currentHoleStrokes}</span>
+                      </div>
+                    </div>
+
+                    <div className="monitor-progress-track">
+                      <div
+                        className="monitor-progress-fill"
+                        style={{ width: `${holedNow ? 100 : progressPct}%` }}
+                      />
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+
+            {/* Club-Scoreboard unten inklusive REST-Spalte & Minuspunkte */}
+            <section className="scoreboard">
+              <div className="scoreboard-title">
+                <div>
+                  <span>CLUB SCORECARD</span>
+                  <strong>{nineTitle}</strong>
+                </div>
+                <div className="legend">
+                  <i className="birdie" /> EINGELOCHT (0){' '}
+                  <i className="bogey" /> MINUSPUNKTE (−1 PRO METER REST)
+                </div>
+              </div>
+
+              <div className="score-table">
+                <div className="score-row score-row--head">
+                  <span>SPIELER</span>
+                  <span>REST</span>
+                  {visibleHoles.map(({ holeNumber }) => (
+                    <span
+                      className={holeNumber === currentHole.holeNumber ? 'current-hole' : ''}
+                      key={holeNumber}
+                    >
+                      {holeNumber}
+                    </span>
+                  ))}
+                  <span>GES.</span>
+                </div>
+
+                {matchPlayers.map((pl, idx) => (
+                  <div
+                    key={pl.id}
+                    className={`score-row ${
+                      activePlayerIndex === idx && !isGameFinished ? 'score-row--active' : ''
+                    }`}
+                  >
+                    <span>
                       <b>0{idx + 1}</b>
                       <strong>{pl.playerName.toUpperCase()}</strong>
-                    </div>
-                    <span className="monitor-player-badge">
-                      {pl.holeFinished ? '⛳ EINGELOCHT' : isAct ? 'AM ZUG' : 'WARTET'}
+                      <small>
+                        {pl.holeFinished && pl.remainingDistance === 0
+                          ? 'IM LOCH'
+                          : activePlayerIndex === idx
+                          ? 'AM ZUG'
+                          : 'WARTET'}
+                      </small>
+                    </span>
+                    <span className="rest-col">
+                      {pl.holeFinished && pl.remainingDistance === 0
+                        ? '⛳ 0m'
+                        : `${pl.remainingDistance} m`}
+                    </span>
+                    {visibleHoles.map(({ holeNumber }) => {
+                      const val = pl.scores[holeNumber];
+                      const holed = pl.holedByHole?.[holeNumber];
+                      return (
+                        <span
+                          key={holeNumber}
+                          className={
+                            val === undefined ? '' : holed ? 'under' : val > 0 ? 'over' : ''
+                          }
+                        >
+                          {val === undefined ? '•' : holed ? '⛳ 0' : `−${val}`}
+                        </span>
+                      );
+                    })}
+                    <span className={pl.penaltyPoints > 0 ? 'total-penalty' : 'total-under'}>
+                      {formatPenalty(pl.penaltyPoints)}
                     </span>
                   </div>
-
-                  <div className="monitor-player-distance">
-                    <div className="monitor-player-meters">
-                      <strong>
-                        {pl.holeFinished ? '0 m' : pl.remainingDistance}
-                      </strong>
-                      {!pl.holeFinished && <span>METER ZUM LOCH</span>}
-                    </div>
-                    <div className="monitor-player-meta">
-                      <b>GESAMT {formatToPar(pl.totalToPar)}</b>
-                      <span>Schlag {pl.currentHoleStrokes}</span>
-                    </div>
-                  </div>
-
-                  <div className="monitor-progress-track">
-                    <div
-                      className="monitor-progress-fill"
-                      style={{ width: `${pl.holeFinished ? 100 : progressPct}%` }}
-                    />
-                  </div>
-                </article>
-              );
-            })}
-          </section>
-
-          {/* Club-Scoreboard unten inklusive REST-Spalte */}
-          <section className="scoreboard">
-            <div className="scoreboard-title">
-              <div>
-                <span>CLUB SCORECARD</span>
-                <strong>{nineTitle}</strong>
-              </div>
-              <div className="legend">
-                <i className="eagle" /> EAGLE <i className="birdie" /> BIRDIE{' '}
-                <i className="bogey" /> BOGEY
-              </div>
-            </div>
-
-            <div className="score-table">
-              <div className="score-row score-row--head">
-                <span>SPIELER</span>
-                <span>REST</span>
-                {visibleHoles.map(({ holeNumber }) => (
-                  <span
-                    className={holeNumber === currentHole.holeNumber ? 'current-hole' : ''}
-                    key={holeNumber}
-                  >
-                    {holeNumber}
-                  </span>
                 ))}
-                <span>GES.</span>
               </div>
-
-              {matchPlayers.map((pl, idx) => (
-                <div
-                  key={pl.id}
-                  className={`score-row ${
-                    activePlayerIndex === idx && !isGameFinished ? 'score-row--active' : ''
-                  }`}
-                >
-                  <span>
-                    <b>0{idx + 1}</b>
-                    <strong>{pl.playerName.toUpperCase()}</strong>
-                    <small>
-                      {pl.holeFinished
-                        ? 'IM LOCH'
-                        : activePlayerIndex === idx
-                        ? 'AM ZUG'
-                        : 'WARTET'}
-                    </small>
-                  </span>
-                  <span className="rest-col">
-                    {pl.holeFinished ? '⛳ 0m' : `${pl.remainingDistance} m`}
-                  </span>
-                  {visibleHoles.map(({ holeNumber, par }) => {
-                    const val = pl.scores[holeNumber];
-                    return (
-                      <span
-                        key={holeNumber}
-                        className={
-                          val && val < par ? 'under' : val && val > par ? 'over' : ''
-                        }
-                      >
-                        {val ?? '•'}
-                      </span>
-                    );
-                  })}
-                  <span className="total-under">{formatToPar(pl.totalToPar)}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+            </section>
+          </div>
         </main>
       )}
 
@@ -1295,9 +1341,10 @@ export default function DartGolfArenaContainer({
             </span>
             <h2>{winnerText}</h2>
             <p>
-              {matchPlayers[0].playerName}: {matchPlayers[0].totalStrokes} Schläge (
-              {formatToPar(matchPlayers[0].totalToPar)}) · {matchPlayers[1].playerName}:{' '}
-              {matchPlayers[1].totalStrokes} Schläge ({formatToPar(matchPlayers[1].totalToPar)})
+              {matchPlayers[0].playerName}: {formatPenalty(matchPlayers[0].penaltyPoints)}{' '}
+              Minuspunkte ({matchPlayers[0].totalStrokes} Schläge) ·{' '}
+              {matchPlayers[1].playerName}: {formatPenalty(matchPlayers[1].penaltyPoints)}{' '}
+              Minuspunkte ({matchPlayers[1].totalStrokes} Schläge)
             </p>
             <div className="golf-modal-actions">
               <button type="button" className="golf-btn-primary" onClick={returnToSetup}>
