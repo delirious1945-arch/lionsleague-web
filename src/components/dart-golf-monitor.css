@@ -1,0 +1,1302 @@
+/* =========================================================================
+   Darts Golf Monitor & Tablet Cockpit Theme (Darts Fun Arena)
+   Scoped Stylesheet für /special/dartsgolf und TV-Monitor
+   ========================================================================= */
+
+.dart-golf-scope {
+  --golf-font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --golf-font-display: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #f6f5ef;
+  background: #07120e;
+  font-family: var(--golf-font-sans);
+}
+
+.dart-golf-scope button {
+  cursor: pointer;
+}
+
+.dart-golf-scope .view-switcher {
+  position: fixed;
+  z-index: 50;
+  top: 14px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 4px;
+  background: rgba(4, 13, 9, 0.9);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+}
+
+.dart-golf-scope .view-switcher button {
+  border-radius: 999px;
+  padding: 8px 15px;
+  color: #8ea097;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: 0.2s ease;
+  background: transparent;
+  border: none;
+}
+
+.dart-golf-scope .view-switcher button.active {
+  background: #f2f0e8;
+  color: #10251a;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
+.dart-golf-scope .view-switcher button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* =========================================================================
+   SETUP & LOBBY SHELL
+   ========================================================================= */
+.dart-golf-scope .setup-shell {
+  min-height: 100vh;
+  padding: 78px 16px 36px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(40, 110, 68, 0.28), transparent 48%),
+    #07120e;
+}
+
+.dart-golf-scope .setup-card {
+  width: min(100%, 720px);
+  border: 1px solid rgba(229, 196, 105, 0.28);
+  border-radius: 26px;
+  padding: 26px;
+  background: linear-gradient(155deg, rgba(16, 34, 25, 0.96), rgba(9, 20, 15, 0.98));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
+}
+
+.dart-golf-scope .setup-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dart-golf-scope .setup-intro {
+  margin: 16px 0 18px;
+}
+
+.dart-golf-scope .setup-intro h1 {
+  margin: 0;
+  color: #fff6d6;
+  font-size: clamp(22px, 3.2vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.dart-golf-scope .setup-intro p {
+  margin: 4px 0 0;
+  color: #9cb0a5;
+  font-size: 13px;
+}
+
+.dart-golf-scope .setup-section-label {
+  display: block;
+  margin: 18px 0 8px;
+  color: #c5ab5e;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dart-golf-scope .mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dart-golf-scope .mode-btn {
+  min-height: 74px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(10, 23, 17, 0.85);
+  color: #a9bbb1;
+  text-align: left;
+  transition: 0.15s ease;
+}
+
+.dart-golf-scope .mode-btn strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  color: #f4f1e7;
+}
+
+.dart-golf-scope .mode-btn span {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8ea097;
+}
+
+.dart-golf-scope .mode-btn.active {
+  border-color: #e5c469;
+  background: rgba(229, 196, 105, 0.13);
+  box-shadow: inset 0 0 0 1px rgba(229, 196, 105, 0.35);
+}
+
+.dart-golf-scope .mode-btn.active strong {
+  color: #ffe9a3;
+}
+
+.dart-golf-scope .bot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.dart-golf-scope .bot-btn {
+  min-height: 62px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(10, 23, 17, 0.78);
+  color: #d6e2db;
+  text-align: left;
+  transition: 0.15s ease;
+}
+
+.dart-golf-scope .bot-btn-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dart-golf-scope .bot-btn strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .bot-btn em {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 800;
+  color: #e5c469;
+}
+
+.dart-golf-scope .bot-btn small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #8ea097;
+  line-height: 1.3;
+}
+
+.dart-golf-scope .bot-btn.active {
+  border-color: #34d399;
+  background: rgba(16, 185, 129, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.35);
+}
+
+.dart-golf-scope .holes-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dart-golf-scope .holes-btn {
+  min-height: 54px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(10, 23, 17, 0.8);
+  color: #a9bbb1;
+  font-size: 13px;
+  font-weight: 800;
+  transition: 0.15s ease;
+}
+
+.dart-golf-scope .holes-btn.active {
+  border-color: #e5c469;
+  color: #172218;
+  background: #e5c469;
+}
+
+.dart-golf-scope .setup-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dart-golf-scope .setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dart-golf-scope .setup-field-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dart-golf-scope .setup-field label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9cb0a5;
+}
+
+.dart-golf-scope .guest-toggle-btn {
+  padding: 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #cfdcd5;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.dart-golf-scope .guest-toggle-btn.active {
+  border-color: #e5c469;
+  background: #e5c469;
+  color: #172218;
+}
+
+.dart-golf-scope .setup-field input,
+.dart-golf-scope .setup-field select {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: #08130d;
+  color: #f6f5ef;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dart-golf-scope .locked-player-badge {
+  min-height: 52px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.65);
+  border-radius: 14px;
+  background: rgba(6, 78, 59, 0.35);
+  color: #ecfdf5;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .locked-player-badge small {
+  color: #6ee7b7;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dart-golf-scope .setup-board-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.dart-golf-scope .board-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.dart-golf-scope .board-pill {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: #091710;
+  color: #9cb0a5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .board-pill.active {
+  border-color: #e5c469;
+  background: #e5c469;
+  color: #172218;
+}
+
+.dart-golf-scope .start-match-btn {
+  width: 100%;
+  min-height: 60px;
+  margin-top: 22px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #052e16;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 14px 36px rgba(16, 185, 129, 0.28);
+  transition: 0.15s ease;
+}
+
+.dart-golf-scope .start-match-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+/* Crash-Resume & Winner Overlay */
+.dart-golf-scope .golf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  padding: 20px;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 10, 7, 0.85);
+  backdrop-filter: blur(12px);
+}
+
+.dart-golf-scope .golf-modal {
+  width: min(520px, 100%);
+  border: 1px solid rgba(229, 196, 105, 0.45);
+  border-radius: 24px;
+  padding: 28px;
+  text-align: center;
+  background: linear-gradient(155deg, #12281d, #09140f);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65);
+}
+
+.dart-golf-scope .golf-modal h2 {
+  margin: 8px 0 6px;
+  color: #fff6d6;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .golf-modal p {
+  margin: 0 0 20px;
+  color: #a9bbb1;
+  font-size: 13px;
+}
+
+.dart-golf-scope .golf-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dart-golf-scope .golf-modal-actions button {
+  min-height: 54px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.dart-golf-scope .golf-btn-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #34d399 !important;
+  color: #052e16;
+}
+
+.dart-golf-scope .golf-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e4ede8;
+}
+
+/* =========================================================================
+   TABLET SHELL
+   ========================================================================= */
+.dart-golf-scope .tablet-shell {
+  min-height: 100vh;
+  padding: 72px 16px 28px;
+  background: radial-gradient(circle at 50% 0%, rgba(40, 91, 58, 0.22), transparent 40%), #0a1711;
+}
+
+.dart-golf-scope .portrait-tablet {
+  width: min(100%, 640px);
+  min-height: calc(100vh - 100px);
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  padding: 24px;
+  background: #0f1f17;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+}
+
+.dart-golf-scope .portrait-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dart-golf-scope .portrait-turn {
+  position: relative;
+  display: grid;
+  margin: 14px 0 12px;
+  border: 1px solid rgba(229, 196, 105, 0.6);
+  border-radius: 16px;
+  padding: 15px 18px;
+  color: #172218;
+  background: #e7c967;
+  box-shadow: 0 10px 30px rgba(231, 201, 103, 0.25);
+}
+
+.dart-golf-scope .turn-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+}
+
+.dart-golf-scope .portrait-turn strong {
+  margin-top: 4px;
+  font-size: 23px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.dart-golf-scope .player-score {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.78;
+}
+
+/* Tablet 1vs1 / Player vs Bot Distanz-Vergleich */
+.dart-golf-scope .tablet-match-distances {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dart-golf-scope .tablet-player-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: #0a1610;
+}
+
+.dart-golf-scope .tablet-player-pill.active {
+  border-color: rgba(231, 201, 103, 0.7);
+  background: rgba(231, 201, 103, 0.1);
+}
+
+.dart-golf-scope .tablet-player-pill.holed {
+  border-color: rgba(52, 211, 153, 0.65);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.dart-golf-scope .tablet-player-pill small {
+  display: block;
+  color: #8ea097;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dart-golf-scope .tablet-player-pill span {
+  display: block;
+  color: #71847a;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.dart-golf-scope .tablet-player-pill strong {
+  color: #f6f5ef;
+  font-size: 20px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.dart-golf-scope .tablet-player-pill.holed strong {
+  color: #6ee7b7;
+  font-size: 13px;
+}
+
+.dart-golf-scope .distance-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: #09160f;
+}
+
+.dart-golf-scope .distance-summary > div {
+  display: grid;
+  place-content: center;
+  min-height: 98px;
+  padding: 12px;
+  text-align: center;
+}
+
+.dart-golf-scope .distance-summary > div + div {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dart-golf-scope .distance-summary span {
+  color: #708279;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+.dart-golf-scope .hole-compact b,
+.dart-golf-scope .stroke-compact b {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .remaining-compact strong {
+  margin-top: 2px;
+  font-size: 46px;
+  line-height: 1;
+  font-weight: 800;
+  color: #f4f1e7;
+}
+
+.dart-golf-scope .remaining-compact small {
+  margin-left: 4px;
+  color: #d8bb62;
+  font-size: 16px;
+}
+
+.dart-golf-scope .portrait-input {
+  margin-top: 14px;
+}
+
+.dart-golf-scope .score-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 70px;
+  padding: 0 16px 0 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: #091710;
+  transition: 0.2s ease;
+}
+
+.dart-golf-scope .score-display--valid {
+  border-color: rgba(227, 195, 105, 0.6);
+  box-shadow: inset 0 0 30px rgba(227, 195, 105, 0.08);
+}
+
+.dart-golf-scope .score-display > div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.dart-golf-scope .score-display small {
+  color: #778981;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.dart-golf-scope .score-display span {
+  font-size: 36px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .score-display button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #97a69e;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.dart-golf-scope .score-display button:disabled {
+  opacity: 0.3;
+}
+
+.dart-golf-scope .input-helper {
+  min-height: 28px;
+  padding-top: 6px;
+  color: #8ea097;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Größere Lücke zwischen Schnellauswahl und Ziffernblock */
+.dart-golf-scope .key-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin-top: 4px;
+}
+
+.dart-golf-scope .key-group {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 8px;
+}
+
+.dart-golf-scope .key-group--numpad {
+  padding-left: 4px;
+}
+
+.dart-golf-scope .key-group-head--quick {
+  display: flex;
+  align-items: flex-end;
+  min-height: 46px;
+}
+
+.dart-golf-scope .key-group-head--numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  align-items: end;
+  min-height: 46px;
+}
+
+.dart-golf-scope .key-group-head--numpad .key-label {
+  grid-column: 1 / span 2;
+  padding-bottom: 4px;
+}
+
+.dart-golf-scope .key-label {
+  color: #708279;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+.dart-golf-scope .numpad-back-top {
+  grid-column: 3;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: #d6e2db;
+  background: #17261e;
+  font-size: 16px;
+  font-weight: 800;
+  transition: 0.15s ease;
+}
+
+.dart-golf-scope .numpad-back-top:hover:not(:disabled) {
+  border-color: #d8bd6a;
+  background: #23382d;
+}
+
+.dart-golf-scope .numpad-back-top:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.dart-golf-scope .quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.dart-golf-scope .quick-grid button,
+.dart-golf-scope .numpad button {
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #f0eee7;
+  background: #26362e;
+  font-size: 17px;
+  font-weight: 700;
+  transition: 0.15s ease;
+}
+
+.dart-golf-scope .quick-grid button:hover:not(:disabled),
+.dart-golf-scope .numpad button:hover:not(:disabled) {
+  border-color: #d8bd6a;
+  background: #30483a;
+}
+
+.dart-golf-scope .numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.dart-golf-scope .numpad .numpad-zero {
+  grid-column: 1 / span 2;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .numpad .numpad-confirm {
+  grid-column: 3;
+  display: grid;
+  place-items: center;
+  border-color: #34d399;
+  color: #052e16;
+  background: linear-gradient(135deg, #10b981, #059669);
+  font-size: 24px;
+  font-weight: 900;
+  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.25);
+}
+
+.dart-golf-scope .numpad .numpad-confirm:hover:not(:disabled) {
+  border-color: #6ee7b7;
+  background: linear-gradient(135deg, #34d399, #10b981);
+}
+
+.dart-golf-scope .numpad .numpad-confirm:disabled {
+  opacity: 0.3;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.dart-golf-scope .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dart-golf-scope .brand-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(229, 196, 105, 0.45);
+  border-radius: 50%;
+  color: #e5c469;
+  background: rgba(229, 196, 105, 0.1);
+}
+
+.dart-golf-scope .brand div {
+  display: grid;
+}
+
+.dart-golf-scope .brand strong {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.dart-golf-scope .brand span {
+  margin-top: 4px;
+  color: #74877c;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.dart-golf-scope .connection,
+.dart-golf-scope .live-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #799185;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+
+.dart-golf-scope .connection span,
+.dart-golf-scope .live-badge span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6ed98d;
+  box-shadow: 0 0 0 4px rgba(110, 217, 141, 0.15);
+}
+
+/* =========================================================================
+   MONITOR SHELL (16:9 TV LIVE ARENA)
+   ========================================================================= */
+.dart-golf-scope .monitor-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #0a1711;
+}
+
+.dart-golf-scope .monitor-course {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.95);
+}
+
+.dart-golf-scope .monitor-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(3, 12, 7, 0.72) 0%,
+    rgba(3, 12, 7, 0.16) 28%,
+    rgba(3, 12, 7, 0.24) 56%,
+    rgba(3, 12, 7, 0.92) 82%
+  );
+}
+
+.dart-golf-scope .monitor-header {
+  position: relative;
+  z-index: 4;
+  height: 82px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0 38px;
+  background: rgba(5, 17, 11, 0.68);
+  backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dart-golf-scope .monitor-hole {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.dart-golf-scope .monitor-hole span {
+  margin-left: 10px;
+  color: #c5ab5e;
+  font-size: 11px;
+}
+
+.dart-golf-scope .turn-banner {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  max-width: 640px;
+  margin: 14px auto 0;
+  border: 1px solid rgba(230, 196, 102, 0.5);
+  border-radius: 14px;
+  padding: 9px 18px;
+  color: #142016;
+  background: linear-gradient(90deg, #f3d77f, #ddba5d);
+  box-shadow: 0 10px 35px rgba(187, 147, 47, 0.22);
+}
+
+.dart-golf-scope .turn-banner div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.dart-golf-scope .turn-banner p {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.dart-golf-scope .turn-banner strong {
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.dart-golf-scope .turn-number {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 800;
+  opacity: 0.45;
+}
+
+.dart-golf-scope .turn-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #173d26;
+  box-shadow: 0 0 0 5px rgba(23, 61, 38, 0.14);
+  animation: golfPulse 1.6s ease-out infinite;
+}
+
+/* Klare 1-vs-1 Restentfernung HUD auf dem Monitor (keine Überlagerung mit Scoreboard) */
+.dart-golf-scope .monitor-players-hud {
+  position: relative;
+  z-index: 4;
+  width: min(920px, calc(100% - 60px));
+  margin: 16px auto 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.dart-golf-scope .monitor-player-card {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  padding: 14px 18px;
+  background: rgba(6, 20, 13, 0.82);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  transition: 0.2s ease;
+}
+
+.dart-golf-scope .monitor-player-card.active {
+  border-color: #e5c469;
+  background: rgba(11, 30, 20, 0.9);
+  box-shadow: 0 0 0 1px rgba(229, 196, 105, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
+}
+
+.dart-golf-scope .monitor-player-card.holed {
+  border-color: #34d399;
+}
+
+.dart-golf-scope .monitor-player-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dart-golf-scope .monitor-player-ident {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dart-golf-scope .monitor-player-ident b {
+  color: #8ea097;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .monitor-player-ident strong {
+  color: #f6f5ef;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.dart-golf-scope .monitor-player-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.08);
+  color: #9cb0a5;
+}
+
+.dart-golf-scope .monitor-player-card.active .monitor-player-badge {
+  background: #e5c469;
+  color: #172218;
+}
+
+.dart-golf-scope .monitor-player-card.holed .monitor-player-badge {
+  background: #10b981;
+  color: #052e16;
+}
+
+.dart-golf-scope .monitor-player-distance {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 12px;
+}
+
+.dart-golf-scope .monitor-player-meters {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.dart-golf-scope .monitor-player-meters strong {
+  font-size: clamp(36px, 4.2vw, 52px);
+  line-height: 0.95;
+  font-weight: 900;
+  color: #fff6d6;
+}
+
+.dart-golf-scope .monitor-player-meters span {
+  color: #e5c469;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.dart-golf-scope .monitor-player-card.holed .monitor-player-meters strong {
+  color: #6ee7b7;
+  font-size: 24px;
+}
+
+.dart-golf-scope .monitor-player-meta {
+  text-align: right;
+  font-size: 11px;
+  color: #9cb0a5;
+  font-weight: 700;
+}
+
+.dart-golf-scope .monitor-player-meta b {
+  display: block;
+  color: #7fe09b;
+  font-size: 13px;
+}
+
+.dart-golf-scope .monitor-progress-track {
+  position: relative;
+  height: 7px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.dart-golf-scope .monitor-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #34d399, #e5c469);
+  transition: width 0.45s ease;
+}
+
+.dart-golf-scope .scoreboard {
+  position: absolute;
+  z-index: 5;
+  right: 30px;
+  bottom: 22px;
+  left: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 14px 20px 18px;
+  background: rgba(7, 23, 15, 0.92);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(18px);
+}
+
+.dart-golf-scope .scoreboard-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.dart-golf-scope .scoreboard-title > div:first-child {
+  display: grid;
+}
+
+.dart-golf-scope .scoreboard-title span {
+  color: #c2a95e;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.dart-golf-scope .scoreboard-title strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8ea097;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.dart-golf-scope .legend i {
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.dart-golf-scope .legend .eagle {
+  background: #e0c369;
+}
+.dart-golf-scope .legend .birdie {
+  background: #4ca96b;
+}
+.dart-golf-scope .legend .bogey {
+  background: #c9774a;
+}
+
+.dart-golf-scope .score-table {
+  display: grid;
+  gap: 5px;
+}
+
+/* Inkl. Spalte REST (aktuelle Entfernung zum Loch) pro Spieler */
+.dart-golf-scope .score-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 2.2fr) minmax(66px, 0.85fr) repeat(9, minmax(30px, 1fr)) minmax(48px, 0.8fr);
+  gap: 4px;
+}
+
+.dart-golf-scope .score-row > span {
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dart-golf-scope .score-row > span:first-child {
+  grid-template-columns: 24px 1fr auto;
+  place-items: center start;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.dart-golf-scope .score-row > span:first-child b {
+  color: #71847a;
+  font-size: 8px;
+}
+
+.dart-golf-scope .score-row > span:first-child strong {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.dart-golf-scope .score-row > span:first-child small {
+  color: #7d8f85;
+  font-size: 7px;
+  letter-spacing: 0.12em;
+}
+
+.dart-golf-scope .score-row .rest-col {
+  color: #e5c469;
+  background: rgba(229, 196, 105, 0.09);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.dart-golf-scope .score-row--head > span {
+  min-height: 24px;
+  color: #71847a;
+  background: transparent !important;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.dart-golf-scope .score-row--active > span:first-child {
+  border-left: 3px solid #e1c265;
+  background: rgba(225, 194, 101, 0.12);
+}
+
+.dart-golf-scope .score-row--active > span:first-child small {
+  color: #e1c265;
+}
+
+.dart-golf-scope .score-row .current-hole {
+  color: #18231a;
+  background: #e1c265;
+}
+
+.dart-golf-scope .score-row .under {
+  color: white;
+  background: #2d7848;
+}
+
+.dart-golf-scope .score-row .over {
+  color: white;
+  background: #9c5637;
+}
+
+.dart-golf-scope .score-row .total-under {
+  color: #7fe09b;
+  font-size: 17px;
+}
+
+@keyframes golfPulse {
+  70% {
+    box-shadow: 0 0 0 9px rgba(23, 61, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(23, 61, 38, 0);
+  }
+}
+
+@media (max-width: 800px) {
+  .dart-golf-scope .tablet-shell {
+    padding: 72px 12px 20px;
+  }
+  .dart-golf-scope .monitor-header {
+    padding: 0 16px;
+  }
+  .dart-golf-scope .monitor-hole {
+    display: none;
+  }
+  .dart-golf-scope .monitor-players-hud {
+    width: calc(100% - 20px);
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .dart-golf-scope .scoreboard {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    overflow-x: auto;
+  }
+  .dart-golf-scope .score-row {
+    grid-template-columns: minmax(130px, 2fr) minmax(54px, 0.7fr) repeat(9, minmax(26px, 1fr)) 42px;
+  }
+  .dart-golf-scope .score-row > span:first-child small {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .dart-golf-scope .setup-players,
+  .dart-golf-scope .mode-grid,
+  .dart-golf-scope .bot-grid,
+  .dart-golf-scope .tablet-match-distances {
+    grid-template-columns: 1fr;
+  }
+  .dart-golf-scope .key-layout {
+    gap: 18px;
+  }
+  .dart-golf-scope .portrait-tablet {
+    padding: 16px;
+  }
+}

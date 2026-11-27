@@ -5,6 +5,7 @@ import { getSessionAction } from '@/app/actions';
 import { canAccessSpecialArena } from '@/lib/session';
 import { getPlayers } from '@/lib/data';
 import DartsGolfClient from './DartsGolfClient';
+import DartGolfArenaContainer from '@/components/DartGolfArenaContainer';
 
 export const metadata: Metadata = {
   title: 'Lions Darts-Golf (18 Holes) | Lions Weyhausen',
@@ -23,8 +24,8 @@ export default async function SpecialDartsGolfPage() {
   const players = await getPlayers();
 
   return (
-    <main className="min-h-screen py-4 sm:py-6 bg-[#050811] text-slate-100">
-      <DartsGolfClient players={players} currentUser={session} />
+    <main className="min-h-screen bg-[#07120e] text-slate-100">
+      <DartGolfArenaContainer players={players} currentUser={session} />
     </main>
   );
 }
