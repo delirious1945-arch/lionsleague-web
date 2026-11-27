@@ -88,6 +88,7 @@ function splitPlayerName(name: string) {
 function getSlotToneClass(ev: AdventsDartEvent): string {
   if (ev.tone === 'jackpot') return 'tone-jackpot';
   if (ev.tone === 'good') return 'tone-good';
+  if (ev.tone === 'social') return 'tone-social';
   if (ev.tone === 'curse') return 'tone-curse';
   if (ev.tone === 'grinch') return 'tone-grinch';
   if (ev.tone === 'niete') return 'tone-niete';
@@ -194,6 +195,9 @@ export default function HolographicAdventskalenderCockpit({
   const safeP2 = p2 || p1;
   const openCount = countOpenDoors(doors);
   const totalDoors = doors.length || 24;
+  const missing24 = [4, 6, 20].filter(
+    (n) => !doors.find((d) => d.number === n)?.isOpen
+  );
 
   const activeState = is1vs1 && activePlayer === 2 ? safeP2 : p1;
   const activePlayerCurses = !winnerPlayer ? activeState.activeCurses || [] : [];
@@ -376,6 +380,8 @@ export default function HolographicAdventskalenderCockpit({
               {doors.map((door) => {
                 const target = getDoorTargetLabel(door.number);
                 const isHighlighted = lastAction?.doorNumber === door.number;
+                const isLockedDoor =
+                  door.number === 24 && !door.isOpen && missing24.length > 0;
                 const ownerClass =
                   door.isOpen && is1vs1 && door.openedBy
                     ? `p${door.openedBy}`
@@ -389,11 +395,13 @@ export default function HolographicAdventskalenderCockpit({
                     className={`game-door tv-door ${
                       door.isOpen ? `opened tone-${door.reward.tone} ${ownerClass}` : ''
                     } ${target.isSpecial ? 'is-special' : ''} ${
-                      isHighlighted ? 'is-highlighted' : ''
-                    }`}
+                      isLockedDoor ? 'locked-door' : ''
+                    } ${isHighlighted ? 'is-highlighted' : ''}`}
                     aria-label={
                       door.isOpen
                         ? `Tür ${door.number}: ${door.reward.title}`
+                        : isLockedDoor
+                        ? `Tür ${door.number} gesperrt bis Tür ${missing24.join(', ')} offen`
                         : `Tür ${door.number}, Ziel ${target.label}`
                     }
                   >
@@ -417,15 +425,22 @@ export default function HolographicAdventskalenderCockpit({
                       <b>{door.number}</b>
                       <small>{target.isSpecial ? target.label : target.subLabel}</small>
                       <i />
-                      {Array.isArray(door.partialHits) && door.partialHits.length > 0 && (
-                        <span className="combo-dots">
-                          {(door.number === 6 ? ['6', 'BULL'] : ['20', '4', 'BULL']).map((key) => (
-                            <em
-                              key={key}
-                              className={door.partialHits?.includes(key) ? 'done' : ''}
-                            />
-                          ))}
-                        </span>
+                      {isLockedDoor ? (
+                        <span className="lock-pill">🔒 Erst {missing24.join('·')}</span>
+                      ) : (
+                        Array.isArray(door.partialHits) &&
+                        door.partialHits.length > 0 && (
+                          <span className="combo-dots">
+                            {(door.number === 6 ? ['6', 'BULL'] : ['20', '4', 'BULL']).map(
+                              (key) => (
+                                <em
+                                  key={key}
+                                  className={door.partialHits?.includes(key) ? 'done' : ''}
+                                />
+                              )
+                            )}
+                          </span>
+                        )
                       )}
                     </span>
                   </div>

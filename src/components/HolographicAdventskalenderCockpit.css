@@ -426,6 +426,19 @@
   background: rgba(6, 78, 59, .38);
 }
 
+.ak-hall-root .dart-slot.filled.tone-social {
+  border-color: #f59e0b;
+  background: rgba(120, 53, 15, .36);
+}
+
+.ak-hall-root .dart-slot.filled.tone-social b {
+  color: #fef3c7;
+}
+
+.ak-hall-root .dart-slot.filled.tone-social small {
+  color: #fde68a;
+}
+
 .ak-hall-root .dart-slot.filled.tone-good b,
 .ak-hall-root .dart-slot.filled.tone-jackpot b {
   color: #d1fae5;
@@ -724,6 +737,41 @@
   border-color: #facc15;
   color: #fef08a;
   box-shadow: inset 0 0 14px rgba(250, 204, 21, .1);
+}
+
+.ak-hall-root .game-door.locked-door {
+  border-color: rgba(148, 163, 184, .32);
+  opacity: .78;
+}
+
+.ak-hall-root .game-door.locked-door .wood-door {
+  background: linear-gradient(145deg, #27221d, #14110f 65%, #0c0a09);
+  color: #9b8f7a;
+  filter: saturate(.45);
+}
+
+.ak-hall-root .game-door.locked-door .wood-door i {
+  background: #64748b;
+  box-shadow: none;
+}
+
+.ak-hall-root .lock-pill {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  right: 5px;
+  padding: 2px 4px;
+  background: rgba(15, 23, 42, .82);
+  border: 1px solid rgba(215, 170, 90, .35);
+  color: #e2bd76;
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ak-hall-root .game-door.opened.tone-curse .door-content {

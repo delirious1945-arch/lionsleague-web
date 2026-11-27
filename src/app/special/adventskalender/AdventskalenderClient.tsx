@@ -7,6 +7,7 @@ import { Player } from '@/lib/data';
 import { generateSessionId } from '@/lib/liveSession';
 import {
   AdventsCurseType,
+  AdventsDartEvent,
   AdventsDoorNumber,
   AdventsDoorState,
   AdventsLastActionBanner,
@@ -75,6 +76,7 @@ interface V3Session {
   activePlayer: 0 | 1;
   starter: 0 | 1;
   round: number;
+  turnDarts: AdventsDartEvent[];
   comboProgress: Record<number, string[]>;
   status: Status;
   winner?: 0 | 1;
@@ -82,6 +84,29 @@ interface V3Session {
   lastBanner?: AdventsLastActionBanner | null;
   message?: string;
   sessionId?: string;
+}
+
+const DOOR_24_PREREQS: AdventsDoorNumber[] = [4, 6, 20];
+
+const HIGH_IMPACT_KINDS: AdventsRewardKind[] = [
+  'points_75',
+  'points_65',
+  'double_star',
+  'shield_angel',
+  'steal_50',
+  'grinch_swap',
+  'grinch_trap_50',
+  'curse_skip_round',
+  'curse_one_dart',
+  'curse_wrong_hand',
+  'curse_spin_360',
+];
+
+function getMaxDartsForCurse(curse?: Curse): number {
+  if (curse === 'skip_round') return 0;
+  if (curse === 'one_dart') return 1;
+  if (curse === 'two_darts') return 2;
+  return 3;
 }
 
 const curseLabels: Record<Curse, { icon: string; title: string; instruction: string }> = {
@@ -178,15 +203,32 @@ function createV3Session(
   names: [string, string] = ['Spieler 1', 'Spieler 2'],
   sessionId?: string
 ): V3Session {
-  const deck = shuffled(rewards);
+  // Tür 6 (Nikolaus) und Tür 24 (Heiligabend) erhalten garantiert starke Boni oder Bestrafungsitems
+  const highPool = shuffled(rewards.filter((r) => HIGH_IMPACT_KINDS.includes(r.kind)));
+  const normalPool = rewards.filter((r) => !HIGH_IMPACT_KINDS.includes(r.kind));
+  const rewardForDoor6 = highPool[0];
+  const rewardForDoor24 = highPool[1];
+  const remainingDeck = shuffled([...highPool.slice(2), ...normalPool]);
+
+  let deckCursor = 0;
+  const doors: V3Door[] = targets.map((target, index) => {
+    const number = (index + 1) as AdventsDoorNumber;
+    let reward: V3Reward;
+    if (number === 6) {
+      reward = { ...rewardForDoor6 };
+    } else if (number === 24) {
+      reward = { ...rewardForDoor24 };
+    } else {
+      reward = { ...remainingDeck[deckCursor] };
+      deckCursor += 1;
+    }
+    return { number, target, reward };
+  });
+
   return {
     version: 3,
     mode,
-    doors: targets.map((target, index) => ({
-      number: (index + 1) as AdventsDoorNumber,
-      target,
-      reward: { ...deck[index] },
-    })),
+    doors,
     players: [
       makePlayer(names[0].trim() || 'Spieler 1'),
       makePlayer(mode === 'solo' ? 'Solo-Training' : names[1].trim() || 'Spieler 2'),
@@ -194,6 +236,7 @@ function createV3Session(
     activePlayer: mode === 'solo' ? 0 : starter,
     starter: mode === 'solo' ? 0 : starter,
     round: 1,
+    turnDarts: [],
     comboProgress: { 6: [], 24: [] },
     status: 'playing',
     lastBanner: null,
@@ -216,7 +259,10 @@ function readSavedV3(): V3Session | null {
       parsed.players.length === 2 &&
       parsed.status !== 'finished'
     ) {
-      return parsed;
+      return {
+        ...parsed,
+        turnDarts: Array.isArray(parsed.turnDarts) ? parsed.turnDarts : [],
+      };
     }
     return null;
   } catch {
@@ -285,7 +331,12 @@ function createAdventsSound(kind: SoundKind) {
   } catch {}
 }
 
-function toLivePlayerState(player: V3Player, round: number): AdventsPlayerState {
+function toLivePlayerState(
+  player: V3Player,
+  round: number,
+  isActive: boolean,
+  turnDarts: AdventsDartEvent[]
+): AdventsPlayerState {
   return {
     score: player.score,
     doorsOpened: player.opened,
@@ -296,7 +347,7 @@ function toLivePlayerState(player: V3Player, round: number): AdventsPlayerState 
     multiplier: player.multiplier,
     activeCurses: player.activeCurse ? [player.activeCurse] : [],
     pendingCurses: [...player.curseQueue],
-    currentTurnDarts: [],
+    currentTurnDarts: isActive ? turnDarts.map((ev) => ({ ...ev })) : [],
   };
 }
 
@@ -371,6 +422,7 @@ function DoorButton({
   onOpen,
   disabled,
   tv = false,
+  lockLabel,
 }: {
   door: V3Door;
   progress: string[];
@@ -378,19 +430,25 @@ function DoorButton({
   onOpen: () => void;
   disabled: boolean;
   tv?: boolean;
+  lockLabel?: string;
 }) {
   const opened = door.openedBy !== undefined;
+  const isLocked = Boolean(lockLabel) && !opened;
   const isCombo = Boolean(comboParts[door.number]);
   return (
     <button
       type="button"
       className={`game-door ${opened ? `opened p${door.openedBy! + 1} tone-${door.reward.tone}` : ''} ${
-        inspect && !opened ? 'inspected' : ''
-      } ${isCombo ? 'combo-door' : ''} ${tv ? 'tv-door' : ''}`}
+        inspect && !opened && !isLocked ? 'inspected' : ''
+      } ${isCombo ? 'combo-door' : ''} ${isLocked ? 'locked-door' : ''} ${tv ? 'tv-door' : ''}`}
       onClick={onOpen}
-      disabled={disabled || opened}
+      disabled={disabled || opened || isLocked}
       aria-label={
-        opened ? `Tür ${door.number}: ${door.reward.name}` : `Tür ${door.number}, Ziel ${door.target}`
+        opened
+          ? `Tür ${door.number}: ${door.reward.name}`
+          : isLocked
+          ? `Tür ${door.number} gesperrt: ${lockLabel}`
+          : `Tür ${door.number}, Ziel ${door.target}`
       }
     >
       <span className="door-content">
@@ -402,12 +460,17 @@ function DoorButton({
         <b>{door.number}</b>
         <small>{door.target}</small>
         <i />
-        {isCombo && progress.length > 0 && (
-          <span className="combo-dots">
-            {comboParts[door.number].map((part) => (
-              <em className={progress.includes(part.key) ? 'done' : ''} key={part.key} />
-            ))}
-          </span>
+        {isLocked ? (
+          <span className="lock-pill">🔒 {lockLabel}</span>
+        ) : (
+          isCombo &&
+          progress.length > 0 && (
+            <span className="combo-dots">
+              {comboParts[door.number].map((part) => (
+                <em className={progress.includes(part.key) ? 'done' : ''} key={part.key} />
+              ))}
+            </span>
+          )
         )}
       </span>
     </button>
@@ -582,8 +645,8 @@ export default function AdventskalenderClient({
           roundNumber: state.round,
           isSuddenDeath: state.status === 'shootout',
           doors: toLiveDoors(state),
-          p1: toLivePlayerState(state.players[0], state.round),
-          p2: toLivePlayerState(state.players[1], state.round),
+          p1: toLivePlayerState(state.players[0], state.round, state.activePlayer === 0, state.turnDarts),
+          p2: toLivePlayerState(state.players[1], state.round, state.activePlayer === 1, state.turnDarts),
           lastAction: banner,
           winnerPlayer,
           winnerName: winnerDisplayName,
@@ -688,6 +751,15 @@ export default function AdventskalenderClient({
   }, [sendStandbySignal]);
 
   const active = session.players[session.activePlayer];
+  const activeMaxDarts = getMaxDartsForCurse(active.activeCurse);
+  const remainingDarts = Math.max(0, activeMaxDarts - session.turnDarts.length);
+  const missingDoor24Prereqs = DOOR_24_PREREQS.filter(
+    (num) => session.doors[num - 1]?.openedBy === undefined
+  );
+  const isDoor24Locked = missingDoor24Prereqs.length > 0;
+  const door24LockLabel = isDoor24Locked
+    ? `Erst ${missingDoor24Prereqs.join(' · ')}`
+    : undefined;
   const openedCount = session.doors.filter((door) => door.openedBy !== undefined).length;
   const boardLabel = activeBoard === 'personal' ? 'Persönlicher TV' : `Board ${activeBoard}`;
 
@@ -706,7 +778,13 @@ export default function AdventskalenderClient({
     nextPlayers[state.activePlayer].activeCurse = undefined;
     if (state.mode === 'solo') {
       activateNextCurse(nextPlayers, 0);
-      return { ...state, players: nextPlayers, activePlayer: 0, round: state.round + 1 };
+      return {
+        ...state,
+        players: nextPlayers,
+        activePlayer: 0,
+        round: state.round + 1,
+        turnDarts: [],
+      };
     }
     const next = (state.activePlayer === 0 ? 1 : 0) as 0 | 1;
     activateNextCurse(nextPlayers, next);
@@ -715,6 +793,7 @@ export default function AdventskalenderClient({
       players: nextPlayers,
       activePlayer: next,
       round: next === state.starter ? state.round + 1 : state.round,
+      turnDarts: [],
     };
   };
 
@@ -849,6 +928,16 @@ export default function AdventskalenderClient({
 
     const applied = applyReward(next, selected.reward);
     next = applied.state;
+    next.turnDarts = [
+      ...next.turnDarts,
+      {
+        kind: 'door_opened',
+        doorNumber: number,
+        label: `Tür #${number}`,
+        subLabel: selected.reward.short,
+        tone: selected.reward.tone,
+      },
+    ];
     next.lastReveal = {
       door: number,
       reward: selected.reward,
@@ -870,7 +959,8 @@ export default function AdventskalenderClient({
   };
 
   const openDoor = (number: AdventsDoorNumber) => {
-    if (session.status !== 'playing' || session.lastReveal) return;
+    if (session.status !== 'playing' || session.lastReveal || remainingDarts <= 0) return;
+    if (number === 24 && isDoor24Locked) return;
     if (comboParts[number]) {
       setComboDoor(number);
       return;
@@ -879,7 +969,7 @@ export default function AdventskalenderClient({
   };
 
   const registerComboHit = (part: string) => {
-    if (!comboDoor) return;
+    if (!comboDoor || remainingDarts <= 0) return;
     const doorNum = comboDoor as AdventsDoorNumber;
     const existing = session.comboProgress[doorNum] || [];
     if (existing.includes(part)) return;
@@ -893,42 +983,88 @@ export default function AdventskalenderClient({
       playSound('good');
       const label = comboParts[doorNum].find((item) => item.key === part)?.label || part;
       next.players[next.activePlayer].actionsCount += 1;
+      next.turnDarts = [
+        ...next.turnDarts,
+        {
+          kind: 'door_opened',
+          doorNumber: doorNum,
+          label: `Tür #${doorNum}`,
+          subLabel: `${label} ✓`,
+          tone: 'good',
+        },
+      ];
+      const maxDarts = getMaxDartsForCurse(next.players[next.activePlayer].activeCurse);
       const msg = `${label} für Tür ${doorNum} gesichert.`;
-      setSession(
-        advanceTurn({
-          ...next,
-          message: msg,
-          lastBanner: {
-            id: Date.now(),
-            doorNumber: doorNum,
-            tone: 'good',
-            icon: '🧩',
-            headline: `Tür ${doorNum} · Teil-Treffer`,
-            subline: msg,
-            actorPlayer: (next.activePlayer + 1) as 1 | 2,
-          },
-        })
-      );
+      const withBanner: V3Session = {
+        ...next,
+        message: msg,
+        lastBanner: {
+          id: Date.now(),
+          doorNumber: doorNum,
+          tone: 'good',
+          icon: '🧩',
+          headline: `Tür ${doorNum} · Teil-Treffer`,
+          subline: msg,
+          actorPlayer: (next.activePlayer + 1) as 1 | 2,
+        },
+      };
+      setSession(next.turnDarts.length >= maxDarts ? advanceTurn(withBanner) : withBanner);
     }
   };
 
   const registerMiss = () => {
-    if (session.status !== 'playing' || active.activeCurse === 'skip_round') return;
+    if (
+      session.status !== 'playing' ||
+      active.activeCurse === 'skip_round' ||
+      remainingDarts <= 0
+    ) {
+      return;
+    }
     pushHistory();
     playSound('miss');
     const next = cloneSession(session);
     next.players[next.activePlayer].actionsCount += 1;
+    next.turnDarts = [
+      ...next.turnDarts,
+      {
+        kind: 'miss',
+        label: 'Miss',
+        subLabel: 'Kein Treffer',
+        tone: 'miss',
+      },
+    ];
+    const maxDarts = getMaxDartsForCurse(next.players[next.activePlayer].activeCurse);
+    const dartNo = next.turnDarts.length;
+    const withBanner: V3Session = {
+      ...next,
+      message: `${active.name}: Dart ${dartNo} verfehlt.`,
+      lastBanner: {
+        id: Date.now(),
+        tone: 'miss',
+        icon: '❄️',
+        headline: `${active.name}: Dart ${dartNo} · Miss`,
+        subline:
+          dartNo >= maxDarts ? 'Aufnahme beendet' : `Noch ${maxDarts - dartNo} Dart(s) übrig`,
+        actorPlayer: (next.activePlayer + 1) as 1 | 2,
+      },
+    };
+    setSession(dartNo >= maxDarts ? advanceTurn(withBanner) : withBanner);
+  };
+
+  const finishTurnEarly = () => {
+    if (session.status !== 'playing') return;
+    pushHistory();
     setSession(
       advanceTurn({
-        ...next,
-        message: 'Keine Tür getroffen.',
+        ...session,
+        message: `${active.name} beendet die Aufnahme.`,
         lastBanner: {
           id: Date.now(),
-          tone: 'miss',
-          icon: '❄️',
-          headline: `${active.name}: Keine Tür getroffen`,
-          subline: 'Aufnahme ohne Türchen beendet',
-          actorPlayer: (next.activePlayer + 1) as 1 | 2,
+          tone: 'info',
+          icon: '⏭️',
+          headline: `${active.name}: Aufnahme beendet`,
+          subline: 'Wechsel zum nächsten Werfer',
+          actorPlayer: (session.activePlayer + 1) as 1 | 2,
         },
       })
     );
@@ -957,11 +1093,16 @@ export default function AdventskalenderClient({
   };
 
   const closeReveal = () => {
-    setSession((current) =>
-      current.status === 'playing'
-        ? advanceTurn({ ...current, lastReveal: undefined })
-        : { ...current, lastReveal: undefined }
-    );
+    setSession((current) => {
+      if (current.status !== 'playing') {
+        return { ...current, lastReveal: undefined };
+      }
+      const maxDarts = getMaxDartsForCurse(current.players[current.activePlayer].activeCurse);
+      if (current.turnDarts.length >= maxDarts) {
+        return advanceTurn({ ...current, lastReveal: undefined });
+      }
+      return { ...current, lastReveal: undefined };
+    });
   };
 
   const undo = () => {
@@ -1143,18 +1284,14 @@ export default function AdventskalenderClient({
             <div>
               <small>Aufgabe</small>
               <strong>
-                {active.activeCurse === 'one_dart'
-                  ? '1 Dart'
-                  : active.activeCurse === 'two_darts'
-                  ? '2 Darts'
-                  : active.activeCurse === 'skip_round'
-                  ? '0 Darts'
-                  : 'Bis zu 3 Darts'}
+                {active.activeCurse === 'skip_round'
+                  ? '0 Darts · Aussetzen'
+                  : `Dart ${Math.min(session.turnDarts.length + 1, activeMaxDarts)} von ${activeMaxDarts}`}
               </strong>
             </div>
             <div>
               <small>Ziel</small>
-              <strong>Eine geschlossene Tür treffen</strong>
+              <strong>Bis zu {activeMaxDarts} Türen treffen</strong>
             </div>
             <button
               type="button"
@@ -1164,6 +1301,53 @@ export default function AdventskalenderClient({
               👁 {inspect ? 'Inhalte verbergen' : 'Alle Inhalte aufdecken'}
             </button>
           </section>
+
+          {active.activeCurse !== 'skip_round' && (
+            <section className="turn-tracker" aria-label="Aktuelle 3-Dart-Aufnahme">
+              <div className="turn-heading">
+                <div>
+                  <small>Aktuelle Aufnahme</small>
+                  <strong>
+                    {remainingDarts > 0
+                      ? `Noch ${remainingDarts} ${remainingDarts === 1 ? 'Dart' : 'Darts'} für ${active.name}`
+                      : `Alle ${activeMaxDarts} Darts geworfen`}
+                  </strong>
+                </div>
+                <span>Bis zu {activeMaxDarts} Türchen in dieser Aufnahme</span>
+              </div>
+              <div className="dart-slots">
+                {[0, 1, 2].map((idx) => {
+                  if (idx >= activeMaxDarts) {
+                    return (
+                      <div key={idx} className="dart-slot locked">
+                        <span>Dart {idx + 1}</span>
+                        <b>{active.activeCurse === 'one_dart' ? '🎰 Gesperrt' : '❄️ Gefroren'}</b>
+                        <small>Fluch aktiv</small>
+                      </div>
+                    );
+                  }
+                  const ev = session.turnDarts[idx];
+                  if (ev) {
+                    return (
+                      <div key={idx} className={`dart-slot filled tone-${ev.tone}`}>
+                        <span>Dart {idx + 1}</span>
+                        <b>{ev.label}</b>
+                        <small>{ev.subLabel}</small>
+                      </div>
+                    );
+                  }
+                  const isCurrent = idx === session.turnDarts.length;
+                  return (
+                    <div key={idx} className={`dart-slot ${isCurrent ? 'current' : ''}`}>
+                      <span>Dart {idx + 1}</span>
+                      <b>{isCurrent ? 'Bereit' : '—'}</b>
+                      <small>{isCurrent ? 'Nächster Wurf' : 'Wartet'}</small>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {active.activeCurse === 'skip_round' ? (
             <button type="button" className="skip-button" onClick={skipTurn}>
@@ -1175,10 +1359,12 @@ export default function AdventskalenderClient({
             <section className="tablet-calendar">
               <div className="section-heading">
                 <div>
-                  <small>Treffer erfassen</small>
+                  <small>Dart {Math.min(session.turnDarts.length + 1, activeMaxDarts)} erfassen</small>
                   <h1>Welches Tür-Ziel wurde getroffen?</h1>
                 </div>
-                <p>Pro Aufnahme kann maximal eine Tür geöffnet werden.</p>
+                <p>
+                  Pro Aufnahme 3 Darts (bis zu 3 Türen). Tür 24 öffnet sich erst nach Tür 4, 6 &amp; 20.
+                </p>
               </div>
               <div className="door-grid tablet-grid">
                 {session.doors.map((door) => (
@@ -1188,7 +1374,8 @@ export default function AdventskalenderClient({
                     progress={session.comboProgress[door.number] || []}
                     inspect={inspect}
                     onOpen={() => openDoor(door.number)}
-                    disabled={session.status !== 'playing'}
+                    disabled={session.status !== 'playing' || remainingDarts <= 0}
+                    lockLabel={door.number === 24 ? door24LockLabel : undefined}
                   />
                 ))}
               </div>
@@ -1200,15 +1387,27 @@ export default function AdventskalenderClient({
               Neues Spiel
             </button>
             <button type="button" className="undo" onClick={undo} disabled={!history.length}>
-              ↩ Letztes Türchen schließen
+              ↩ Letzter Dart zurück
             </button>
             <button
               type="button"
               className="miss"
               onClick={registerMiss}
+              disabled={
+                session.status !== 'playing' ||
+                active.activeCurse === 'skip_round' ||
+                remainingDarts <= 0
+              }
+            >
+              ✕ Dart {Math.min(session.turnDarts.length + 1, Math.max(1, activeMaxDarts))}: Miss
+            </button>
+            <button
+              type="button"
+              className="next"
+              onClick={finishTurnEarly}
               disabled={session.status !== 'playing' || active.activeCurse === 'skip_round'}
             >
-              ⏭ Keine Tür getroffen · Miss
+              ⏭ Aufnahme beenden
             </button>
           </nav>
         </div>
@@ -1249,13 +1448,27 @@ export default function AdventskalenderClient({
                     onOpen={() => {}}
                     disabled
                     tv
+                    lockLabel={door.number === 24 ? door24LockLabel : undefined}
                   />
                 ))}
               </div>
             </div>
             <div className="tv-throws">
               <span>{active.name} ist am Wurf</span>
-              <span>{session.message || 'Bis zu 3 Darts auf ein geschlossenes Ziel'}</span>
+              {session.turnDarts.length > 0 ? (
+                <span>
+                  Aufnahme:{' '}
+                  {session.turnDarts
+                    .map((d, i) => `D${i + 1}: ${d.label}`)
+                    .join(' · ')}
+                  {remainingDarts > 0 ? ` · Noch ${remainingDarts} Dart(s)` : ''}
+                </span>
+              ) : (
+                <span>
+                  {session.message ||
+                    `Bis zu ${activeMaxDarts} Darts (bis zu ${activeMaxDarts} Türen)`}
+                </span>
+              )}
             </div>
           </section>
           {session.mode === 'duel' && (
@@ -1278,7 +1491,11 @@ export default function AdventskalenderClient({
             <h2>{session.lastReveal.reward.name}</h2>
             <p>{session.lastReveal.resolvedText}</p>
             <button type="button" onClick={closeReveal}>
-              {session.status === 'playing' ? 'An nächsten Spieler übergeben' : 'Ergebnis ansehen'}
+              {session.status !== 'playing'
+                ? 'Ergebnis ansehen'
+                : remainingDarts > 0
+                ? `Weiter · Noch ${remainingDarts} ${remainingDarts === 1 ? 'Dart' : 'Darts'}`
+                : 'An nächsten Spieler übergeben'}
             </button>
           </div>
         </div>
