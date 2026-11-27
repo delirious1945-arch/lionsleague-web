@@ -410,6 +410,13 @@ export default function DartGolfArenaContainer({
 
   const currentHole = holes[currentHoleIndex] || holes[0];
   const activePlayer = matchPlayers[activePlayerIndex];
+  const otherPlayerOfActive = matchPlayers[activePlayerIndex === 0 ? 1 : 0];
+  const isEqualizingTurn =
+    isGameStarted &&
+    !isGameFinished &&
+    !activePlayer.holeFinished &&
+    otherPlayerOfActive.holeFinished &&
+    otherPlayerOfActive.remainingDistance === 0;
 
   const scoreNumber = Number(score);
   const isValid =
@@ -417,9 +424,15 @@ export default function DartGolfArenaContainer({
 
   const helper = useMemo(() => {
     if (isBotThrowing) {
-      return `🤖 ${activePlayer.playerName} zielt auf die Fahne (${activePlayer.remainingDistance} m)...`;
+      return isEqualizingTurn
+        ? `🤖 ${activePlayer.playerName} zieht nach (${activePlayer.remainingDistance} m Rest)...`
+        : `🤖 ${activePlayer.playerName} zielt auf die Fahne (${activePlayer.remainingDistance} m)...`;
     }
-    if (score === '') return 'Wurfwert zwischen 0 und 180 eingeben';
+    if (score === '') {
+      return isEqualizingTurn
+        ? '⚡ Letzter Schlag zum Nachziehen! Gleiche Schlagzahl wie dein Gegner.'
+        : 'Wurfwert zwischen 0 und 180 eingeben';
+    }
     if (!isValidThreeDartScore(scoreNumber)) {
       return `⚠️ ${scoreNumber} ist kein möglicher 3-Dart-Score`;
     }
@@ -431,6 +444,7 @@ export default function DartGolfArenaContainer({
     return `Danach noch ${next} Meter bis zum Loch`;
   }, [
     isBotThrowing,
+    isEqualizingTurn,
     activePlayer.playerName,
     activePlayer.remainingDistance,
     score,
@@ -485,30 +499,53 @@ export default function DartGolfArenaContainer({
 
       let holeCompletedNow = false;
       let nextHoleStarter: 0 | 1 = activePlayerIndex;
+      const otherAlreadyHoled = other.holeFinished && other.remainingDistance === 0;
 
-      if (holedOut) {
-        // Sobald ein Spieler einlocht, ist das Loch sofort beendet; Gegner erhält 1 Minuspunkt pro Restmeter
-        const opponentPenalty = other.remainingDistance;
+      if (otherAlreadyHoled) {
+        // Fall A: Nachzieh-Schlag auf dieselbe Schlagzahl bzw. Dartanzahl
+        shooter.holeFinished = true;
+        if (holedOut) {
+          shooter.scores = { ...shooter.scores, [hole.holeNumber]: 0 };
+          shooter.holedByHole = { ...shooter.holedByHole, [hole.holeNumber]: true };
+          statusText = `🤝 Ausgeglichen! Auch ${shooter.playerName} locht im ${nextStrokes}. Schlag ein – 0 Minuspunkte für beide!`;
+        } else {
+          shooter.penaltyPoints += nextDistance;
+          shooter.scores = { ...shooter.scores, [hole.holeNumber]: nextDistance };
+          shooter.holedByHole = { ...shooter.holedByHole, [hole.holeNumber]: false };
+          statusText = `⛳ Loch entschieden! ${shooter.playerName} bleibt bei ${nextDistance} m Rest → −${nextDistance} Minuspunkte.`;
+        }
+        holeCompletedNow = true;
+        nextHoleStarter = otherIndex;
+      } else if (holedOut) {
+        // Fall B: Erster Spieler locht an diesem Loch ein -> prüfen, ob Gegner weniger Schläge hat
         shooter.holeFinished = true;
         shooter.scores = { ...shooter.scores, [hole.holeNumber]: 0 };
         shooter.holedByHole = { ...shooter.holedByHole, [hole.holeNumber]: true };
 
-        other.holeFinished = true;
-        other.penaltyPoints += opponentPenalty;
-        other.scores = { ...other.scores, [hole.holeNumber]: opponentPenalty };
-        other.holedByHole = { ...other.holedByHole, [hole.holeNumber]: false };
+        if (other.currentHoleStrokes < nextStrokes) {
+          // Gegner hat weniger Schläge/Darts -> darf noch genau 1× nachziehen
+          holeCompletedNow = false;
+          statusText = `⛳ ${shooter.playerName} locht im ${nextStrokes}. Schlag ein! ${other.playerName} darf noch 1× nachziehen (${other.remainingDistance} m Rest).`;
+        } else {
+          // Gleiche Schlagzahl bereits erreicht -> Loch sofort beendet
+          const opponentPenalty = other.remainingDistance;
+          other.holeFinished = true;
+          other.penaltyPoints += opponentPenalty;
+          other.scores = { ...other.scores, [hole.holeNumber]: opponentPenalty };
+          other.holedByHole = { ...other.holedByHole, [hole.holeNumber]: false };
 
-        holeCompletedNow = true;
-        nextHoleStarter = activePlayerIndex;
-        statusText = `⛳ ${shooter.playerName} locht ein! ${other.playerName} erhält ${
-          opponentPenalty > 0
-            ? `−${opponentPenalty} Minuspunkte (${opponentPenalty} m Rest)`
-            : '0 Minuspunkte'
-        }.`;
+          holeCompletedNow = true;
+          nextHoleStarter = activePlayerIndex;
+          statusText = `⛳ ${shooter.playerName} locht im ${nextStrokes}. Schlag ein! ${other.playerName} erhält ${
+            opponentPenalty > 0
+              ? `−${opponentPenalty} Minuspunkte (${opponentPenalty} m Rest)`
+              : '0 Minuspunkte'
+          }.`;
+        }
       } else if (reachedMax) {
+        // Fall C: Maximalzahl an Schlägen ohne Einlochen erreicht
         shooter.holeFinished = true;
         if (other.holeFinished) {
-          // Beide haben Max-Schläge erreicht -> beide bekommen Restentfernung als Minuspunkte
           shooter.penaltyPoints += shooter.remainingDistance;
           shooter.scores = { ...shooter.scores, [hole.holeNumber]: shooter.remainingDistance };
           shooter.holedByHole = { ...shooter.holedByHole, [hole.holeNumber]: false };
@@ -578,14 +615,13 @@ export default function DartGolfArenaContainer({
     ]
   );
 
-  // Automatischer Computer-Zug im 1vsComputer-Modus
+  // Automatischer Computer-Zug im 1vsComputer-Modus (inkl. Nachzieh-Schlag, solange Bot noch offen ist)
   useEffect(() => {
     if (
       !isGameStarted ||
       isGameFinished ||
       gameMode !== '1vsComputer' ||
       activePlayerIndex !== 1 ||
-      matchPlayers[0].holeFinished ||
       matchPlayers[1].holeFinished
     ) {
       setIsBotThrowing(false);
@@ -1020,7 +1056,8 @@ export default function DartGolfArenaContainer({
                         <small>{pl.playerName}</small>
                         {isAct && (
                           <span className="tablet-turn-badge">
-                            <i className="turn-pulse" /> AM ZUG
+                            <i className="turn-pulse" />{' '}
+                            {isEqualizingTurn ? '⚡ NACHZIEHEN' : 'AM ZUG'}
                           </span>
                         )}
                       </div>
@@ -1204,7 +1241,13 @@ export default function DartGolfArenaContainer({
                         <strong>{pl.playerName.toUpperCase()}</strong>
                       </div>
                       <span className="monitor-player-badge">
-                        {holedNow ? '⛳ EINGELOCHT' : isAct ? 'AM ZUG' : 'WARTET'}
+                        {holedNow
+                          ? '⛳ EINGELOCHT'
+                          : isAct
+                          ? isEqualizingTurn
+                            ? '⚡ NACHZIEHEN'
+                            : 'AM ZUG'
+                          : 'WARTET'}
                       </span>
                     </div>
 
@@ -1271,8 +1314,10 @@ export default function DartGolfArenaContainer({
                       <small>
                         {pl.holeFinished && pl.remainingDistance === 0
                           ? 'IM LOCH'
-                          : activePlayerIndex === idx
-                          ? 'AM ZUG'
+                          : activePlayerIndex === idx && !isGameFinished
+                          ? isEqualizingTurn
+                            ? 'NACHZIEHEN'
+                            : 'AM ZUG'
                           : 'WARTET'}
                       </small>
                     </span>
